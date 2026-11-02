@@ -1,5 +1,7 @@
 # Openmi: Comprehensive Architectural, UI/UX, and Technical Audit
 
+> **Superseded.** This document describes an earlier product shape (blue light theme, per-message Dew pricing, an 8-step agent) that the `test` branch no longer implements. The current, verified audit is [OPENMI_ARCHITECTURE_AUDIT.md](OPENMI_ARCHITECTURE_AUDIT.md). Kept for history only.
+
 *Document generated from exhaustive repository analysis. This document details the complete application architecture, visual design, functionality, and codebase structure.*
 
 ## Table of Contents
