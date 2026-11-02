@@ -124,7 +124,7 @@ export function Workspace(props: WorkspaceProps) {
     .filter((entry) => entry.type === "blob")
     .map((entry) => entry.path);
   const segments = dir.split("/").filter((segment) => segment.length > 0);
-  const pickerHref = chatId ? `/chat?chat=${chatId}` : "/chat";
+  const pickerHref = chatId ? `/chat?chat=${chatId}&view=repos` : "/chat";
   const externalUrl = file
     ? `https://github.com/${repo.fullName}/blob/${sha}/${file.path}${line ? `#L${line}` : ""}`
     : null;

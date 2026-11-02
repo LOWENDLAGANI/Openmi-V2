@@ -16,3 +16,13 @@ export type Chat = {
   updated_at: string;
   deleted_at: string | null;
 };
+
+export type Message = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  model: string | null;
+  seq: number;
+  usage_tokens: number | null;
+  created_at: string;
+};

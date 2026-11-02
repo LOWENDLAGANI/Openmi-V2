@@ -45,9 +45,13 @@ const SHIM = `
   $$;
 
   grant usage on schema public to anon, authenticated;
+  grant usage on schema auth to anon, authenticated;
   grant usage, select on all sequences in schema public to anon, authenticated;
   alter default privileges in schema public grant all on tables to anon, authenticated;
   grant execute on all functions in schema public to anon, authenticated;
+  -- Supabase grants these on its own auth schema. A policy expression resolves
+  -- auth.uid() either way; a function body that calls it does not.
+  grant execute on function auth.uid() to anon, authenticated;
 `;
 
 let db: PGlite;
@@ -195,4 +199,33 @@ test("a GitHub connection is invisible to another account", async () => {
     "select login, token_sealed from public.github_connections"
   );
   expect(other.rows).toEqual([]);
+});
+
+test("append_message assigns a per-chat sequence and refuses another account", async () => {
+  await actAs("authenticated", USER_A);
+  const created = await db.query(
+    "insert into public.chats (owner, title) values ($1, $2) returning id",
+    [USER_A, "New chat"]
+  );
+  const chatId = (created.rows[0] as { id: string }).id;
+
+  const first = await db.query(
+    "select * from public.append_message($1, 'user', $2)",
+    [chatId, "Where is the router?"]
+  );
+  const second = await db.query(
+    "select * from public.append_message($1, 'assistant', $2)",
+    [chatId, "app/page.tsx:1"]
+  );
+
+  expect(Number((first.rows[0] as { seq: number }).seq)).toBe(1);
+  expect(Number((second.rows[0] as { seq: number }).seq)).toBe(2);
+
+  const titled = await db.query("select title from public.chats where id = $1", [chatId]);
+  expect((titled.rows[0] as { title: string }).title).toBe("Where is the router?");
+
+  await actAs("authenticated", USER_B);
+  await expect(
+    db.query("select * from public.append_message($1, 'user', $2)", [chatId, "hijack"])
+  ).rejects.toThrow();
 });

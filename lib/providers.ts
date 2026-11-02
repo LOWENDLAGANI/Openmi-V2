@@ -1,0 +1,177 @@
+import "server-only";
+
+import type { ModelId } from "@/lib/models";
+
+/**
+ * The vendor layer. Server only.
+ *
+ * Everything here — endpoints, model ids, key names — stays on the server. The
+ * browser asks for a capability id ("auto", "code", "flash") and never learns
+ * which vendor answered, because that answer is not useful to a user and is
+ * useful to someone probing the deployment.
+ *
+ * All three providers speak the OpenAI chat-completions shape, so one streaming
+ * parser covers them and a fallback chain is a list rather than three code
+ * paths.
+ */
+
+export type ProviderId = "openrouter" | "groq" | "deepseek";
+
+export type Provider = {
+  id: ProviderId;
+  endpoint: string;
+  model: string;
+  keyName: "OPENROUTER_API_KEY" | "GROQ_API_KEY" | "DEEPSEEK_API_KEY";
+};
+
+export type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
+const OPENROUTER: Provider = {
+  id: "openrouter",
+  endpoint: "https://openrouter.ai/api/v1/chat/completions",
+  model: "openai/gpt-4o-mini",
+  keyName: "OPENROUTER_API_KEY",
+};
+
+const GROQ: Provider = {
+  id: "groq",
+  endpoint: "https://api.groq.com/openai/v1/chat/completions",
+  model: "llama-3.3-70b-versatile",
+  keyName: "GROQ_API_KEY",
+};
+
+const DEEPSEEK: Provider = {
+  id: "deepseek",
+  endpoint: "https://api.deepseek.com/chat/completions",
+  model: "deepseek-chat",
+  keyName: "DEEPSEEK_API_KEY",
+};
+
+/** Ordered per capability: the first configured provider that succeeds wins. */
+const CHAINS: Record<ModelId, Provider[]> = {
+  auto: [OPENROUTER, GROQ, DEEPSEEK],
+  code: [GROQ, OPENROUTER, DEEPSEEK],
+  flash: [DEEPSEEK, GROQ, OPENROUTER],
+};
+
+export const MAX_COMPLETION_TOKENS = 2_000;
+
+export class ProviderError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status = 0) {
+    super(message);
+    this.name = "ProviderError";
+    this.status = status;
+  }
+}
+
+export function providerKey(
+  provider: Provider,
+  env: Record<string, string | undefined> = process.env
+): string {
+  return (env[provider.keyName] ?? "").trim();
+}
+
+/** The providers this deployment can actually call, in preference order. */
+export function providersFor(
+  model: ModelId,
+  env: Record<string, string | undefined> = process.env
+): Provider[] {
+  return CHAINS[model].filter((provider) => providerKey(provider, env).length > 0);
+}
+
+export function providersConfigured(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  return providersFor("auto", env).length > 0;
+}
+
+/**
+ * Streams text deltas from one provider.
+ *
+ * An abort signal is passed straight through to `fetch`, so a user pressing
+ * Stop ends the upstream request rather than only hiding the output. That is
+ * the difference between stopping and pretending to stop.
+ */
+export async function* streamCompletion({
+  provider,
+  apiKey,
+  messages,
+  signal,
+}: {
+  provider: Provider;
+  apiKey: string;
+  messages: ChatMessage[];
+  signal: AbortSignal;
+}): AsyncGenerator<string> {
+  const response = await fetch(provider.endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "text/event-stream",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      messages,
+      stream: true,
+      temperature: 0.2,
+      max_tokens: MAX_COMPLETION_TOKENS,
+    }),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    // The body is not surfaced to the browser; it can contain the key prefix or
+    // an upstream trace, and the UI only needs to know which kind of failure it
+    // was.
+    throw new ProviderError(
+      response.status === 401 || response.status === 403
+        ? "The provider rejected the server's key."
+        : response.status === 429
+          ? "The provider is rate limiting this deployment."
+          : `The provider answered ${response.status}.`,
+      response.status
+    );
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf("\n\n");
+
+      for (const line of block.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload.length === 0) continue;
+        if (payload === "[DONE]") return;
+
+        try {
+          const parsed = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+          };
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta.length > 0) yield delta;
+        } catch {
+          // Keepalives and provider-specific frames are not answers. Skipping a
+          // frame we cannot read is honest; inventing text from it is not.
+        }
+      }
+    }
+  }
+}

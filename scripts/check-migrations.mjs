@@ -58,8 +58,12 @@ const SHIM = `
   -- them every policy is inert because the role cannot reach the table. This
   -- runs after the roles exist, or the grant itself is the error.
   grant usage on schema public to anon, authenticated;
+  grant usage on schema auth to anon, authenticated;
   grant usage, select on all sequences in schema public to anon, authenticated;
   grant execute on all functions in schema public to anon, authenticated;
+  -- Supabase grants these on its own auth schema. Without them a policy that
+  -- calls auth.uid() works, but a function body that calls it does not.
+  grant execute on function auth.uid() to anon, authenticated;
   alter default privileges in schema public
     grant all on tables to anon, authenticated;
 

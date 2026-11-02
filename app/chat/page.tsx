@@ -2,11 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
+import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { RepoPicker } from "@/components/RepoPicker";
 import { Sidebar } from "@/components/Sidebar";
 import { Workspace } from "@/components/Workspace";
 import {
+  MAX_PATH_INDEX,
   describeGithubError,
   getFile,
   getRepo,
@@ -20,6 +22,9 @@ import {
 } from "@/lib/github/read";
 import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
+import { listMessages } from "@/lib/messages";
+import { DEFAULT_MODEL, MODELS, isModelId } from "@/lib/models";
+import { providersConfigured } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
 import { createChat, emptyTrash, purgeChat, restoreChat } from "./actions";
@@ -42,6 +47,7 @@ type SearchParams = {
   path?: string;
   line?: string;
   q?: string;
+  view?: string;
 };
 
 type SignedIn = Extract<Awaited<ReturnType<typeof getSession>>, { state: "signed-in" }>;
@@ -365,6 +371,67 @@ async function RepoSurface({
   }
 }
 
+async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
+  const messages = await listMessages(session.supabase, chat.id);
+
+  let repo: { fullName: string; branch: string; sha: string } | null = null;
+  let validPaths: string[] = [];
+
+  if (chat.repo_full_name && chat.repo_base_sha) {
+    repo = {
+      fullName: chat.repo_full_name,
+      branch: chat.repo_branch ?? "",
+      sha: chat.repo_base_sha,
+    };
+
+    // Citations are checked against the tree at the pinned commit, so a link
+    // only appears when the path exists there. If this read fails, the
+    // transcript still renders and citations stay plain text.
+    try {
+      const github = await readToken(session.supabase, session.user.id);
+      if (github) {
+        const tree = await getTree(github.token, chat.repo_full_name, chat.repo_base_sha);
+        validPaths = tree.entries
+          .filter((entry) => entry.type === "blob")
+          .map((entry) => entry.path)
+          .slice(0, MAX_PATH_INDEX);
+      }
+    } catch {
+      validPaths = [];
+    }
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {!repo && (
+        <p className="mb-2 rounded-lg border border-line bg-raised px-3 py-2 text-[11.5px] text-mid">
+          No repository attached, so answers have nothing to cite.{" "}
+          <Link
+            href={`/chat?chat=${chat.id}&view=repos`}
+            className="text-accent underline-offset-2 hover:underline"
+          >
+            Pick one
+          </Link>
+          .
+        </p>
+      )}
+
+      <div className="min-h-0 flex-1">
+        <ChatPanel
+          chatId={chat.id}
+          repo={repo}
+          models={MODELS}
+          initialModel={isModelId(chat.model) ? chat.model : DEFAULT_MODEL}
+          initialMessages={messages}
+          validPaths={validPaths}
+          pinnedPath={null}
+          providerReady={providersConfigured()}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default async function ChatPage({
   searchParams,
 }: {
@@ -432,11 +499,17 @@ export default async function ChatPage({
 
   const eyebrow = trashView ? "Trash" : params.repo ? "Workspace" : "Chats";
 
+  // The workspace is a second view of the same chat, not a second page: a
+  // citation opens the file beside the conversation, and the URL says which.
+  const workspaceView = params.view === "files" || params.view === "repos";
+
   let body: React.ReactNode;
   if (trashView) {
     body = <TrashList chats={trashedChats} />;
   } else if (!connection) {
     body = <ConnectPanel />;
+  } else if (activeChat && !workspaceView) {
+    body = await ChatView({ session, chat: activeChat });
   } else {
     body = await RepoSurface({ session, params, chat: activeChat });
   }
@@ -464,6 +537,14 @@ export default async function ChatPage({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
+            {activeChat?.repo_full_name && activeChat.repo_base_sha && (
+              <Link
+                href={`/chat?chat=${activeChat.id}&repo=${encodeURIComponent(activeChat.repo_full_name)}&branch=${encodeURIComponent(activeChat.repo_branch ?? "")}&sha=${activeChat.repo_base_sha}&view=files`}
+                className="text-[12px] text-mid hover:text-hi"
+              >
+                Files
+              </Link>
+            )}
             <span
               title="Billing arrives in phase 7"
               className="rounded-full border border-line bg-chip px-2.5 py-1 font-mono text-[11px] text-low"
