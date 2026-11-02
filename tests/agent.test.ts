@@ -123,6 +123,31 @@ test("tool arguments are validated before any read", async () => {
   expect(shortQuery.ok).toBe(false);
 });
 
+test("propose_edits validates before it can store anything", async () => {
+  const context = { token: "unused", fullName: "octocat/hello", sha: "abc1234", paths: ["a.ts"] };
+
+  const tooMany = await runTool(
+    "propose_edits",
+    {
+      edits: Array.from({ length: 7 }, (_, index) => ({
+        path: `lib/${index}.ts`,
+        mode: "write",
+        content: "x",
+      })),
+    },
+    context
+  );
+  expect(tooMany.ok).toBe(false);
+
+  const noHandler = await runTool(
+    "propose_edits",
+    { edits: [{ path: "lib/a.ts", mode: "write", content: "x" }] },
+    context
+  );
+  expect(noHandler.ok).toBe(false);
+  if (!noHandler.ok) expect(noHandler.error).toContain("unavailable");
+});
+
 test("list_files caps and reports honestly without a network call", async () => {
   const paths = Array.from({ length: MAX_LIST_FILES + 25 }, (_, index) => `src/f-${index}.ts`);
   const result = await runTool("list_files", {}, {

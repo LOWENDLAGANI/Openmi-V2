@@ -9,8 +9,8 @@ tests, and it says so.
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–4 are
-built; review, changesets and billing are next.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–5 are
+built; the approval-to-pull-request path and billing are next.
 
 ---
 
@@ -78,7 +78,8 @@ NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 `bun run test` runs the real migrations against Postgres and queries as two
 different accounts and as `anon`. It also covers the seal/unseal path and its
 tamper cases, the GET-only GitHub client, the context budget, the turn envelope,
-and the tool surface.
+the diff engine and edit rules, both directions of the changeset signature, and
+the tool surface.
 
 ## What is built
 
@@ -89,8 +90,8 @@ and the tool surface.
 | 2 | done | GitHub connect with sealed tokens, repo picker, pinned tree + file viewer, code search |
 | 3 | done | Streaming chat, capability modes, per-chat sequence, context budget, citation links |
 | 4 | done | Read-only agent tools, step budget with compare-and-set, signed continuation, truthful caps |
-| 5 | next | Changesets, unified diff, review UI |
-| 6 | — | Approval → branch → pull request, default-branch refusal |
+| 5 | done | Proposed edits, unified diff, per-file review, signed changesets |
+| 6 | next | Approval → branch → pull request, default-branch refusal |
 | 7 | — | Dew: hourly sessions, ledger, daily free bucket, activity, invites |
 | 8–9 | — | Setup/about truth surface, hardening, launch |
 
@@ -112,11 +113,35 @@ The turn stops at one of three caps, and the transcript says which:
 Replaying an older continuation is refused in Postgres, not in the route: the
 step counter advances by compare-and-set, so a stale token matches no row.
 
+## Propose and review
+
+The agent can call a fourth tool, `propose_edits`. A call carries at most six
+edits, each either a whole-file write or an exact string replacement, and each
+file is capped at 120,000 bytes. A replacement whose anchor is absent, or
+appears more than once, fails that file with a message rather than editing the
+wrong line. A changeset holds at most 24 files.
+
+Each file is rendered as a unified diff with three lines of context, capped at
+60,000 characters and 2,000 lines; a clipped diff says it is clipped, and the
+proposed file is stored in full. You accept or reject files individually and
+the card says which are in the set.
+
+A signed changeset is an HMAC over `changeset_id + base_sha + content_hash`,
+where the hash covers the accepted files only. Rejecting a file re-signs the
+smaller set; editing one byte leaves the signature stale. `status` is not in
+the signature, so moving from ready to approved does not invalidate it. A
+changeset expires six hours after it is proposed, and expiry is read from the
+clock, not stored as a hopeful flag.
+
+**Approval does not write to GitHub.** It records the signed set and stops;
+phase 5 has no branch, commit or pull request, and the card says so.
+
 ## Known limits
 
 - Nothing in this app executes code. There is no sandbox and no test runner, and
   no surface claims otherwise.
-- No diff or approval yet: the agent reads and cites, it does not propose edits.
+- No commit path yet: approving records a signed set of files, and no branch,
+  commit or pull request is created.
 - GitHub code search runs against the default branch while line numbers are
   resolved at the pinned commit; the UI says both.
 - Repository access is API calls, not a clone. There is no mirror to go stale,

@@ -9,6 +9,13 @@ import {
   verifyEnvelope,
 } from "@/lib/agent/envelope";
 import { runAgent } from "@/lib/agent/run";
+import type { EditRequest } from "@/lib/changesets";
+import {
+  addEdits,
+  createChangeset,
+  finalizeChangeset,
+  findDraftChangeset,
+} from "@/lib/changesets/store";
 import { assembleContext } from "@/lib/context";
 import { serverEnv } from "@/lib/env";
 import { getFile, getTree, isRepoFullName, MAX_PATH_INDEX } from "@/lib/github/read";
@@ -257,6 +264,7 @@ export async function POST(request: Request) {
     sha,
     context: context.text,
     notes: context.notes,
+    edits: Boolean(repoFullName && sha && sealKey),
   });
 
   const plainMessages: ChatMessage[] = [
@@ -311,6 +319,85 @@ export async function POST(request: Request) {
 
       const startedAt = Date.now();
 
+      // A proposal is a row, created on first use and signed when the turn
+      // settles. A paused turn keeps its draft so the continuation adds to the
+      // same card instead of starting a second one.
+      let changesetId: string | null = null;
+      let changesetFiles = 0;
+      let changesetSettled = false;
+
+      const propose = async (
+        edits: EditRequest[]
+      ): Promise<{ ok: true; text: string } | { ok: false; error: string }> => {
+        if (!repoFullName || !sha || !githubToken) {
+          return {
+            ok: false,
+            error: "no repository is pinned to this chat, so there is nothing to edit",
+          };
+        }
+
+        if (!sealKey) {
+          return {
+            ok: false,
+            error: "this deployment cannot sign a changeset without GITHUB_TOKEN_KEY",
+          };
+        }
+
+        if (!changesetId) {
+          changesetId = await findDraftChangeset(session.supabase, turnId);
+        }
+
+        if (!changesetId) {
+          const created = await createChangeset(session.supabase, {
+            owner: session.user.id,
+            chatId,
+            turnId,
+            repo: repoFullName,
+            baseSha: sha,
+          });
+
+          if (!created.ok) return { ok: false, error: created.error };
+          changesetId = created.id;
+        }
+
+        const result = await addEdits(session.supabase, {
+          changesetId,
+          owner: session.user.id,
+          token: githubToken,
+          repo: repoFullName,
+          sha,
+          edits,
+        });
+
+        if (!result.ok) return { ok: false, error: result.error };
+
+        changesetFiles += result.added;
+        return { ok: true, text: result.text };
+      };
+
+      const settleChangeset = async () => {
+        if (!changesetId || changesetSettled) return;
+        changesetSettled = true;
+
+        try {
+          const finalized = await finalizeChangeset(session.supabase, {
+            changesetId,
+            baseSha: sha ?? "",
+            sealKey: sealKey ?? null,
+          });
+
+          send("changeset", {
+            id: changesetId,
+            status: finalized.status,
+            files: finalized.files,
+          });
+        } catch (caught) {
+          send("notice", {
+            message: `The changeset could not be prepared: ${messageOf(caught)}`,
+          });
+        }
+      };
+
       if (repoFullName && sha && githubToken) {
         const result = await runAgent({
           githubToken,
@@ -337,11 +424,25 @@ export async function POST(request: Request) {
           },
           emitText: (text) => send("delta", { text }),
           emitStep: (event) => send("step", event),
+          propose,
           signal: abort.signal,
           startedAt,
         });
 
         if (result.notice) send("notice", { message: result.notice });
+
+        if (result.stopped === "paused") {
+          // Still a draft: the signed continuation is what may add to it.
+          if (changesetId) {
+            send("changeset", {
+              id: changesetId,
+              status: "draft",
+              files: changesetFiles,
+            });
+          }
+        } else {
+          await settleChangeset();
+        }
 
         if (result.stopped === "paused") {
           if (result.text.length > 0) {

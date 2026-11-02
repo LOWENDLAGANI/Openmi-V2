@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  approveChangeset,
+  reviewChangesetFile,
+} from "@/lib/changesets/store";
+import { serverEnv } from "@/lib/env";
 import { getSession } from "@/lib/session";
 
 // Every mutation below relies on RLS for authorization and additionally keys
@@ -185,4 +190,69 @@ export async function emptyTrash() {
 
   revalidatePath("/chat");
   redirect("/chat?trash=1");
+}
+
+// ── Changeset review ─────────────────────────────────────────────────────────
+//
+// Accepting or rejecting a file re-signs the accepted set, because the
+// signature covers the content of exactly those files. Approving re-derives
+// that hash and checks the signature before the status moves, and then stops:
+// phase 5 has no branch, commit or pull request, and the card says so.
+
+function chatHref(chatId: string): string {
+  return chatId ? `/chat?chat=${encodeURIComponent(chatId)}` : "/chat";
+}
+
+async function decideFile(formData: FormData, accepted: boolean) {
+  const { supabase, user } = await acting();
+  const changesetId = field(formData, "changesetId");
+  const chatId = field(formData, "chatId");
+  const fileId = field(formData, "fileId");
+
+  if (!changesetId || !fileId) fail("That file is no longer part of a changeset.");
+
+  const result = await reviewChangesetFile(supabase, {
+    owner: user.id,
+    changesetId,
+    fileId,
+    accepted,
+    sealKey: serverEnv().githubTokenKey,
+  });
+
+  revalidatePath("/chat");
+
+  if (!result.ok) {
+    redirect(`${chatHref(chatId)}${chatId ? "&" : "?"}error=${encodeURIComponent(result.error)}`);
+  }
+
+  redirect(chatHref(chatId));
+}
+
+export async function acceptChange(formData: FormData) {
+  await decideFile(formData, true);
+}
+
+export async function rejectChange(formData: FormData) {
+  await decideFile(formData, false);
+}
+
+export async function approveProposal(formData: FormData) {
+  const { supabase } = await acting();
+  const changesetId = field(formData, "changesetId");
+  const chatId = field(formData, "chatId");
+
+  if (!changesetId) fail("That changeset no longer exists.");
+
+  const result = await approveChangeset(supabase, {
+    changesetId,
+    sealKey: serverEnv().githubTokenKey,
+  });
+
+  revalidatePath("/chat");
+
+  if (!result.ok) {
+    redirect(`${chatHref(chatId)}${chatId ? "&" : "?"}error=${encodeURIComponent(result.error)}`);
+  }
+
+  redirect(chatHref(chatId));
 }

@@ -9,7 +9,13 @@ import {
 } from "@/lib/providers";
 
 import { CONTINUE_AT_MS, MAX_STEPS, MAX_TURN_TOKENS } from "./envelope";
-import { TOOL_SPECS, describeToolCall, parseArguments, runTool } from "./tools";
+import {
+  TOOL_SPECS,
+  describeToolCall,
+  parseArguments,
+  runTool,
+  type ToolContext,
+} from "./tools";
 
 export type AgentStepEvent = {
   type: "step";
@@ -38,6 +44,7 @@ type RunOptions = {
   consume: (expectedSteps: number) => Promise<number | null>;
   emitText: (text: string) => void;
   emitStep: (event: AgentStepEvent) => void;
+  propose?: ToolContext["propose"];
   signal: AbortSignal;
   startedAt: number;
 };
@@ -195,6 +202,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
         fullName: options.repo,
         sha: options.sha,
         paths: options.paths,
+        propose: options.propose,
       });
 
       messages.push({

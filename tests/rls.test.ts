@@ -201,6 +201,58 @@ test("a GitHub connection is invisible to another account", async () => {
   expect(other.rows).toEqual([]);
 });
 
+test("a changeset and its files are invisible to another account", async () => {
+  await actAs("authenticated", USER_A);
+
+  const created = await db.query(
+    `insert into public.changesets
+       (owner, chat_id, repo_full_name, base_sha, status, content_hash, signature, expires_at)
+     values ($1, $2, $3, $4, 'ready', $5, $6, now() + interval '6 hours')
+     returning id`,
+    [USER_A, chatA, "octocat/hello", "a".repeat(40), "hash", "signature"]
+  );
+  const changesetId = (created.rows[0] as { id: string }).id;
+
+  await db.query(
+    `insert into public.changeset_files
+       (changeset_id, owner, path, mode, proposed_content, diff, additions)
+     values ($1, $2, 'lib/a.ts', 'write', 'export const a = 1;', '@@ -0,0 +1,1 @@\n+export const a = 1;', 1)`,
+    [changesetId, USER_A]
+  );
+
+  const own = await db.query("select count(*)::int as count from public.changeset_files");
+  expect((own.rows[0] as { count: number }).count).toBe(1);
+
+  await actAs("authenticated", USER_B);
+  const otherRows = await db.query("select id from public.changesets");
+  const otherFiles = await db.query("select id from public.changeset_files");
+
+  expect(otherRows.rows).toEqual([]);
+  expect(otherFiles.rows).toEqual([]);
+
+  await expect(
+    db.query(
+      `insert into public.changeset_files
+         (changeset_id, owner, path, mode, proposed_content, diff)
+       values ($1, $2, 'hijack.ts', 'write', 'x', '')`,
+      [changesetId, USER_B]
+    )
+  ).rejects.toThrow(/row-level security/);
+});
+
+test("a changeset cannot be marked ready without a signature", async () => {
+  await actAs("authenticated", USER_A);
+
+  await expect(
+    db.query(
+      `insert into public.changesets
+         (owner, chat_id, repo_full_name, base_sha, status, expires_at)
+       values ($1, $2, $3, $4, 'ready', now() + interval '6 hours')`,
+      [USER_A, chatA, "octocat/hello", "b".repeat(40)]
+    )
+  ).rejects.toThrow(/changesets_signed_when_reviewable/);
+});
+
 test("append_message assigns a per-chat sequence and refuses another account", async () => {
   await actAs("authenticated", USER_A);
   const created = await db.query(

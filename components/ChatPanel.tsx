@@ -194,6 +194,13 @@ export function ChatPanel({
           return;
         }
 
+        // The review card is rendered on the server from the stored rows. The
+        // event is only a cue to re-read them; no card state is invented here.
+        if (event === "changeset") {
+          router.refresh();
+          return;
+        }
+
         if (event === "done") {
           const id = typeof payload.id === "string" ? payload.id : `assistant-${Date.now()}`;
           const seq = typeof payload.seq === "number" ? payload.seq : null;

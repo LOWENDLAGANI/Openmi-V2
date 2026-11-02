@@ -1,3 +1,4 @@
+import { MAX_EDITS_PER_CALL, validateEdits, type EditRequest } from "../changesets";
 import { getFile, searchCode } from "../github/read";
 
 /**
@@ -16,7 +17,7 @@ export const MAX_LIST_FILES = 200;
 export const MAX_READ_FILE_BYTES = 200_000;
 export const MAX_SEARCH_CANDIDATES = 10;
 
-export type ToolName = "list_files" | "read_file" | "search_code";
+export type ToolName = "list_files" | "read_file" | "search_code" | "propose_edits";
 
 export type ToolDefinition = {
   name: ToolName;
@@ -70,6 +71,52 @@ export const TOOL_SPECS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "propose_edits",
+    description:
+      "Propose edits for the user to review. Nothing is written to GitHub. A call carries one to six edits; each is a whole-file write or an exact string replacement at the pinned commit.",
+    parameters: {
+      type: "object",
+      properties: {
+        edits: {
+          type: "array",
+          maxItems: MAX_EDITS_PER_CALL,
+          items: {
+            type: "object",
+            properties: {
+              path: {
+                type: "string",
+                description: "Repository-relative path, for example 'lib/context.ts'.",
+              },
+              mode: {
+                type: "string",
+                enum: ["write", "replace"],
+                description:
+                  "write replaces the whole file; replace swaps one exact, unique piece of text.",
+              },
+              content: {
+                type: "string",
+                description: "The complete new file for mode write.",
+              },
+              find: {
+                type: "string",
+                description:
+                  "For mode replace: the exact text at the base commit. It must appear exactly once.",
+              },
+              replace: {
+                type: "string",
+                description: "For mode replace: the text that takes its place.",
+              },
+            },
+            required: ["path", "mode"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["edits"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export type ToolContext = {
@@ -77,6 +124,8 @@ export type ToolContext = {
   fullName: string;
   sha: string;
   paths: string[];
+  /** Absent when this turn cannot persist a proposal (no pin or no signing key). */
+  propose?: (edits: EditRequest[]) => Promise<ToolResult>;
 };
 
 export type ToolResult =
@@ -112,6 +161,9 @@ export function parseArguments(raw: string): Record<string, unknown> | null {
 
 export function describeToolCall(name: string, args: Record<string, unknown>): string {
   if (name === "read_file" && typeof args.path === "string") return `read ${args.path}`;
+  if (name === "propose_edits" && Array.isArray(args.edits)) {
+    return `propose ${args.edits.length} file(s)`;
+  }
   if (name === "search_code" && typeof args.query === "string") return `search ${JSON.stringify(args.query)}`;
   if (name === "list_files" && typeof args.prefix === "string") return `list ${args.prefix}`;
   return name;
@@ -206,6 +258,23 @@ export async function runTool(
         error: caught instanceof Error ? caught.message : "the search failed",
       };
     }
+  }
+
+  if (name === "propose_edits") {
+    if (!onlyKeys(args, ["edits"])) return badInput("unexpected argument");
+
+    const validated = validateEdits(args.edits);
+    if (!validated.ok) return badInput(validated.error);
+
+    if (!context.propose) {
+      return {
+        ok: false,
+        error:
+          "unavailable: proposing edits needs a pinned repository and GITHUB_TOKEN_KEY",
+      };
+    }
+
+    return context.propose(validated.edits);
   }
 
   return badInput(`unknown tool: ${name}`);

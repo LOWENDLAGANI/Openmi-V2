@@ -5,6 +5,7 @@ import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { RepoPicker } from "@/components/RepoPicker";
+import { ReviewPanel } from "@/components/ReviewPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { Workspace } from "@/components/Workspace";
 import {
@@ -20,6 +21,7 @@ import {
   resolveBranchSha,
   searchCode,
 } from "@/lib/github/read";
+import { loadChangesets } from "@/lib/changesets/store";
 import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
@@ -372,7 +374,10 @@ async function RepoSurface({
 }
 
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
-  const messages = await listMessages(session.supabase, chat.id);
+  const [messages, changesets] = await Promise.all([
+    listMessages(session.supabase, chat.id),
+    loadChangesets(session.supabase, chat.id),
+  ]);
 
   let repo: { fullName: string; branch: string; sha: string } | null = null;
   let validPaths: string[] = [];
@@ -414,6 +419,16 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           </Link>
           .
         </p>
+      )}
+
+      {changesets.length > 0 && (
+        <div className="mb-2 max-h-[46vh] shrink-0 overflow-y-auto">
+          <ReviewPanel
+            changesets={changesets}
+            chatId={chat.id}
+            chatSha={chat.repo_base_sha}
+          />
+        </div>
       )}
 
       <div className="min-h-0 flex-1">
