@@ -9,8 +9,9 @@ tests, and it says so.
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–8 are
-built; hardening and launch are next.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–9 are
+built. Phase 10 (execution) is gated, not built — four decisions are missing and
+inventing them would ship a sandbox nobody priced.
 
 ---
 
@@ -74,6 +75,8 @@ Vercel does not run migrations. The order is always **migrate, then deploy**.
 bun run typecheck
 bun run test
 bun run check:migrations
+bun run check:contrast
+bun run test:rls
 NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 ```
 
@@ -98,7 +101,8 @@ detection, probe classification, and the tool surface.
 | 6 | done | Approval → agent branch → one commit → pull request, default-branch refusal |
 | 7 | done | Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
 | 8 | done | Setup env, migration drift and live probes; `/about` truth surface |
-| 9 | next | Hardening and launch |
+| 9 | done | RLS audit, contrast gate, shared rate limiter, Vercel route config |
+| 10 | gated | Execution — not buildable; D6.1–D6.4 are open |
 
 ## The agent, and its limits
 
@@ -212,6 +216,71 @@ branch writes, no merges, no card payments, and no claim of verification.
   resolved at the pinned commit; the UI says both.
 - Repository access is API calls, not a clone. There is no mirror to go stale,
   and no offline mode.
+- The rate limiter degrades to allowing a request when neither Upstash nor the
+  Postgres function is reachable. The setup page shows which backend is live.
+- Execution is gated (phase 10). There is no sandbox, no test runner and no
+  preview server, and no card may imply one exists.
+
+## Rate limits
+
+One counter per account per kind, shared by every instance: 20 chat turns and 10
+approvals per minute. `supabase/migrations/010_rate_limit.sql` owns the counter,
+and `rate_limit_hit(bucket, window_start, max)` increments and checks the cap in
+a single statement, so two instances firing at once cannot both take the last
+slot. Upstash REST is used when both of its variables are set; otherwise the
+Postgres function is the backend. If neither answers, the request is allowed and
+the result says `degraded` — a limiter that fails closed turns a database blip
+into an outage.
+
+## Accessibility
+
+Semantic tokens only, and three appearances. `node scripts/check-contrast.mjs`
+resolves every text token against every surface in all three themes and exits 1
+below 4.5:1; `bun run test` runs the same script. Accent fills use `--on-accent`,
+and accent *text* uses `--accent-text`, because one colour cannot clear 4.5:1
+both as a light fill and as dark text on paper. Focus rings come from a single
+`:focus-visible` rule, and reduced motion is honoured globally.
+
+## Deploy runbook
+
+1. Create the Supabase project; copy the URL, the anon key and the service-role
+   key.
+2. Generate `GITHUB_TOKEN_KEY` with `openssl rand -base64 32`.
+3. Add `https://<domain>/auth/callback` and the localhost equivalent in
+   Supabase → Authentication → URL configuration.
+4. Import the repo into Vercel and set every key in §6 for **Preview** and
+   **Production** separately.
+5. Apply migrations with `supabase link --project-ref <ref> && supabase db push`.
+   Vercel does not run them; the order is always migrate, then deploy.
+6. Deploy, then open `/setup` and make every row green.
+7. Connect GitHub with a fine-grained token: contents read/write, pull requests
+   read/write, metadata read.
+8. Pick a repo, send a message, approve one trivial change and confirm the pull
+   request's head is `openmi/agent/…`.
+
+## Manual test steps
+
+These need a real project and token, so they are steps rather than specs:
+
+1. Sign in, sign out, sign in again; `/chat` is gated by the cookie and RLS.
+2. Connect GitHub; confirm only the last four characters are shown afterwards.
+3. Pick a repository, open a file from a citation, search the code.
+4. Send a message, stop one mid-stream, and check the Dew chip and `/activity`.
+5. Ask for an edit, reject one file, accept another, then approve.
+6. Confirm one branch exists, one PR is open, and its base is the default branch.
+7. Try to approve with a read-only token; the refusal names the missing scopes.
+8. Open `/setup` and confirm the probes report per-service state, not "error".
+
+## Phase 10 is gated
+
+Execution is **not buildable** without four decisions: what may run (D6.1), what
+sandbox time costs in Dew (D6.2), which secrets are absent from it (D6.3), and
+what the card says when it cannot start (D6.4). The rule that cannot be relaxed
+is that every card state must come from a real observation: timed out says timed
+out, cannot start says cannot start, and there is no optimistic default.
+
+Nothing in this build runs code, and `tests/execution-gate.test.ts` fails if a
+surface starts claiming otherwise or a sandbox dependency appears.
 
 ## Rules for contributors
 

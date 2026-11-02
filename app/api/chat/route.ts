@@ -31,7 +31,9 @@ import {
   streamCompletion,
   type ChatMessage,
 } from "@/lib/providers";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,10 +49,14 @@ type ChatRequest = {
   turn?: unknown;
 };
 
-function json(body: unknown, status: number) {
+function json(
+  body: unknown,
+  status: number,
+  extra: Record<string, string> = {}
+) {
   return NextResponse.json(body, {
     status,
-    headers: { "cache-control": "no-store" },
+    headers: { "cache-control": "no-store", ...extra },
   });
 }
 
@@ -68,6 +74,22 @@ export async function POST(request: Request) {
   }
 
   if (session.state !== "signed-in") return json({ error: "Sign in to chat." }, 401);
+
+  // Before the body is read and before any provider call: one shared counter per
+  // account per minute. A degraded limiter allows the turn and reports itself on
+  // /setup, rather than turning a missing variable into a failed request.
+  const limited = await checkRateLimit(supabaseAdmin(), "chat", session.user.id);
+
+  if (!limited.allowed) {
+    return json(
+      {
+        error: `Too many messages. Try again in ${limited.retryAfterSeconds} seconds.`,
+        code: "rate-limited",
+      },
+      429,
+      { "retry-after": String(limited.retryAfterSeconds) }
+    );
+  }
 
   const body = (await request.json().catch(() => null)) as ChatRequest | null;
 

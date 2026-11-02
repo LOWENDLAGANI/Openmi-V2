@@ -10,8 +10,11 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "check:migrations": "node scripts/check-migrations.mjs"
+    "test": "bun test tests",
+    "test:rls": "bun test tests/rls.test.ts tests/rls-audit.test.ts",
+    "test:e2e": "playwright test",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
@@ -23,6 +26,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.0",
+    "@playwright/test": "1.49.1",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/bun": "^1.4.4",
     "@types/node": "^22.0.0",

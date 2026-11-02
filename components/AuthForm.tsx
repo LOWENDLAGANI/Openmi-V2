@@ -208,7 +208,7 @@ export function AuthForm({
         {notice && (
           <p
             role="status"
-            className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-[12px] text-accent"
+            className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-[12px] text-accent-text"
           >
             {notice}
           </p>

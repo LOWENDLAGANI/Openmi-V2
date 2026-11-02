@@ -33,7 +33,7 @@ function DiffBlock({ text }: { text: string }) {
     <pre className="max-h-64 overflow-auto rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[11px] leading-[1.55]">
       {text.split("\n").map((line, index) => {
         const tone = line.startsWith("+")
-          ? "text-accent"
+          ? "text-accent-text"
           : line.startsWith("-")
             ? "text-danger"
             : line.startsWith("@@")
@@ -194,7 +194,7 @@ export function ReviewPanel({
                         href={changeset.pr_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-accent underline-offset-2 hover:underline"
+                        className="text-accent-text underline-offset-2 hover:underline"
                       >
                         Pull request #{changeset.pr_number}
                       </a>{" "}
@@ -275,7 +275,7 @@ export function ReviewPanel({
                       href={changeset.pr_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-accent underline-offset-2 hover:underline"
+                      className="text-accent-text underline-offset-2 hover:underline"
                     >
                       Pull request #{changeset.pr_number}
                     </a>

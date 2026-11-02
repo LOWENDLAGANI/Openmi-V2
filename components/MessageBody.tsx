@@ -85,7 +85,7 @@ export function MessageBody({
           <Link
             key={index}
             href={`/chat?${params.toString()}`}
-            className="rounded bg-accent-soft px-1 font-mono text-[12px] text-accent underline-offset-2 hover:underline"
+            className="rounded bg-accent-soft px-1 font-mono text-[12px] text-accent-text underline-offset-2 hover:underline"
             title={`Open ${segment.path} at line ${segment.line}`}
           >
             {segment.text}

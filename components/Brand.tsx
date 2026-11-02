@@ -3,7 +3,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
     <span className="inline-flex items-center gap-2.5">
       <span
         aria-hidden="true"
-        className="grid size-7 place-items-center rounded-lg border border-line bg-chip font-mono text-[13px] font-semibold text-accent"
+        className="grid size-7 place-items-center rounded-lg border border-line bg-chip font-mono text-[13px] font-semibold text-accent-text"
       >
         O
       </span>

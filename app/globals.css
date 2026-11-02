@@ -26,9 +26,13 @@
   --text-hi: #eef5f0;
   --text: #cddfd4;
   --text-mid: #8ba396;
-  --text-low: #6f8478;
+  --text-low: #7b9184;
 
   --accent: #6ec294;
+  /* Text sits on the accent-coloured surfaces above; a fill sits under
+     --on-accent. They are separate tokens because one colour cannot clear
+     4.5:1 in both directions on a light theme. */
+  --accent-text: #6ec294;
   --accent-soft: rgba(110, 194, 148, 0.14);
   --on-accent: #15130f;
 
@@ -54,9 +58,12 @@ html[data-theme="paper"] {
   --text-hi: #15130f;
   --text: #2b2722;
   --text-mid: #6b6154;
-  --text-low: #756b5d;
+  --text-low: #6f6557;
 
   --accent: #f55036;
+  /* The fill stays light enough for near-black text; the ink is dark enough to
+     be read as text on white. See scripts/check-contrast.mjs. */
+  --accent-text: #b8361f;
   --accent-soft: rgba(245, 80, 54, 0.1);
   --on-accent: #15130f;
 
@@ -82,9 +89,10 @@ html[data-theme="ink"] {
   --text-hi: #f2f0f6;
   --text: #dcd9e6;
   --text-mid: #a6a1b6;
-  --text-low: #8a85a0;
+  --text-low: #9791ad;
 
   --accent: #a09ad8;
+  --accent-text: #a09ad8;
   --accent-soft: rgba(160, 154, 216, 0.16);
   --on-accent: #15130f;
 
@@ -112,6 +120,7 @@ html[data-theme="ink"] {
   --color-low: var(--text-low);
 
   --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
 

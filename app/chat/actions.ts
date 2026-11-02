@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import { reviewChangesetFile } from "@/lib/changesets/store";
 import { serverEnv } from "@/lib/env";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Every mutation below relies on RLS for authorization and additionally keys
 // its writes on the session owner. The second part is not redundant: it makes
@@ -240,6 +242,13 @@ export async function approveProposal(formData: FormData) {
   const chatId = field(formData, "chatId");
 
   if (!changesetId) fail("That changeset no longer exists.");
+
+  // Approvals are writes to GitHub, so they are limited even when the chat
+  // counter is free. The refusal happens before the changeset is read.
+  const limited = await checkRateLimit(supabaseAdmin(), "approval", user.id);
+  if (!limited.allowed) {
+    fail(`Too many approvals. Try again in ${limited.retryAfterSeconds} seconds.`);
+  }
 
   const result = await approveChangesetAndOpenPullRequest(supabase, {
     changesetId,

@@ -1,5 +1,5 @@
 const TONES = {
-  ok: "border-accent/40 bg-accent-soft text-accent",
+  ok: "border-accent/40 bg-accent-soft text-accent-text",
   missing: "border-danger/40 bg-danger/10 text-danger",
   optional: "border-line bg-chip text-mid",
   pending: "border-warn/40 bg-warn/10 text-warn",

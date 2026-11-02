@@ -424,7 +424,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           No repository attached, so answers have nothing to cite.{" "}
           <Link
             href={`/chat?chat=${chat.id}&view=repos`}
-            className="text-accent underline-offset-2 hover:underline"
+            className="text-accent-text underline-offset-2 hover:underline"
           >
             Pick one
           </Link>

@@ -24,6 +24,16 @@ jobs:
       - name: Tests
         run: bun run test
 
+      # Every semantic text token against every surface, in all three themes.
+      # Also runs inside `bun run test`; this step names the gate explicitly.
+      - name: Contrast
+        run: bun run check:contrast
+
+      # The exhaustive audit: every public table has RLS enabled, the anon role
+      # reads nothing, and a second account sees no row it does not own.
+      - name: RLS audit
+        run: bun run test:rls
+
       # Applies every migration to an in-memory Postgres, then applies them
       # again and requires the second pass to be a no-op. This is the check that
       # makes "migrate, then deploy" safe to run on every release.

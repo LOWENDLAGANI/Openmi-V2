@@ -113,7 +113,7 @@ export default function AboutPage() {
           A refund is recorded when a provider fails or a turn is stopped before
           the first token. An hour that produced part of an answer is not
           refunded. Everything is an append-only ledger row on{" "}
-          <Link href="/activity" className="text-accent underline-offset-2 hover:underline">
+          <Link href="/activity" className="text-accent-text underline-offset-2 hover:underline">
             the activity page
           </Link>
           .
@@ -130,7 +130,7 @@ export default function AboutPage() {
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Full environment and migration status live on{" "}
-          <Link href="/setup" className="text-accent underline-offset-2 hover:underline">
+          <Link href="/setup" className="text-accent-text underline-offset-2 hover:underline">
             the setup page
           </Link>
           .

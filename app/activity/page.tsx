@@ -189,7 +189,7 @@ export default async function ActivityPage({
       {params.saved && (
         <p
           role="status"
-          className="mt-4 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-[12px] text-accent"
+          className="mt-4 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-[12px] text-accent-text"
         >
           {params.saved === "timezone" ? "Timezone saved." : params.saved}
         </p>
@@ -295,7 +295,7 @@ export default async function ActivityPage({
                 {purchases.map((row) => (
                   <li key={row.id} className="flex justify-between gap-3 font-mono">
                     <span>{utc(row.created_at)}</span>
-                    <span className="text-accent">
+                    <span className="text-accent-text">
                       +{formatDew(Number(row.amount))}
                     </span>
                   </li>
@@ -341,7 +341,7 @@ export default async function ActivityPage({
                       <td className="text-body">{KIND_LABEL[row.kind] ?? row.kind}</td>
                       <td
                         className={`text-right font-mono ${
-                          amount < 0 ? "text-danger" : "text-accent"
+                          amount < 0 ? "text-danger" : "text-accent-text"
                         }`}
                       >
                         {amount > 0 ? "+" : ""}
