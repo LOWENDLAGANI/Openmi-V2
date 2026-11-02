@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Tests
+        run: bun run test
+
+      # Applies every migration to an in-memory Postgres, then applies them
+      # again and requires the second pass to be a no-op. This is the check that
+      # makes "migrate, then deploy" safe to run on every release.
+      - name: Migrations apply twice
+        run: bun run check:migrations
+
+      # No secrets in scope on purpose: a build that needs one is a build that
+      # cannot be verified by a contributor without production credentials.
+      - name: Build with no secrets
+        run: NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build

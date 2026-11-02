@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+/* ── Palettes ─────────────────────────────────────────────────────────────────
+   Three appearances, one token set. Components never use a literal colour:
+   they use a semantic alias (`bg-canvas`, `text-low`, `border-line`) and the
+   palette decides what that means. There is no override block anywhere in this
+   file, and there will not be one — a colour that has no token gets a token in
+   all three palettes instead.
+
+   Every text pair below clears 4.5:1 on its own canvas, and `--on-accent` is
+   near-black on all three because both accents are light fills. Contrast is
+   asserted in CI rather than trusted. */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0b1310;
+  --bg-raised: #111a16;
+  --card: #111a16;
+  --chip: #16211c;
+  --hover: #17231d;
+
+  --line: rgba(238, 245, 240, 0.09);
+  --line-strong: rgba(238, 245, 240, 0.18);
+
+  --text-hi: #eef5f0;
+  --text: #cddfd4;
+  --text-mid: #8ba396;
+  --text-low: #6f8478;
+
+  --accent: #6ec294;
+  --accent-soft: rgba(110, 194, 148, 0.14);
+  --on-accent: #15130f;
+
+  --bubble-user: #1f2a24;
+  --bubble-user-text: #ffffff;
+
+  --danger: #e8a09a;
+  --warn: #e0b26b;
+}
+
+html[data-theme="paper"] {
+  color-scheme: light;
+
+  --bg: #f8f6f2;
+  --bg-raised: #ffffff;
+  --card: #ffffff;
+  --chip: #f0ece5;
+  --hover: #ece7de;
+
+  --line: rgba(43, 39, 34, 0.12);
+  --line-strong: rgba(43, 39, 34, 0.22);
+
+  --text-hi: #15130f;
+  --text: #2b2722;
+  --text-mid: #6b6154;
+  --text-low: #756b5d;
+
+  --accent: #f55036;
+  --accent-soft: rgba(245, 80, 54, 0.1);
+  --on-accent: #15130f;
+
+  --bubble-user: #f55036;
+  --bubble-user-text: #15130f;
+
+  --danger: #a8382c;
+  --warn: #8a5a12;
+}
+
+html[data-theme="ink"] {
+  color-scheme: dark;
+
+  --bg: #1b1826;
+  --bg-raised: #211e2f;
+  --card: #211e2f;
+  --chip: #262232;
+  --hover: #2a2538;
+
+  --line: rgba(238, 236, 248, 0.09);
+  --line-strong: rgba(238, 236, 248, 0.18);
+
+  --text-hi: #f2f0f6;
+  --text: #dcd9e6;
+  --text-mid: #a6a1b6;
+  --text-low: #8a85a0;
+
+  --accent: #a09ad8;
+  --accent-soft: rgba(160, 154, 216, 0.16);
+  --on-accent: #15130f;
+
+  --bubble-user: #4a4670;
+  --bubble-user-text: #ffffff;
+
+  --danger: #e8a0b4;
+  --warn: #e0b26b;
+}
+
+/* Semantic names become real Tailwind utilities: bg-canvas, text-low, etc. */
+@theme inline {
+  --color-canvas: var(--bg);
+  --color-raised: var(--bg-raised);
+  --color-card: var(--card);
+  --color-chip: var(--chip);
+  --color-hover: var(--hover);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-hi: var(--text-hi);
+  --color-body: var(--text);
+  --color-mid: var(--text-mid);
+  --color-low: var(--text-low);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    background-color: var(--bg);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--text-hi);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+
+  /* Motion is decoration here; nothing in the product depends on it. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
