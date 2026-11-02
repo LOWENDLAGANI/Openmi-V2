@@ -36,7 +36,7 @@ export function ChatPanel({
   providerReady,
   initialRunning,
 }: {
-  chatId: string;
+  chatId: string | null;
   repo: RepoRef;
   models: ModelCapability[];
   initialModel: ModelId;
@@ -68,7 +68,9 @@ export function ChatPanel({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
   const [atBottom, setAtBottom] = useState(true);
+  const [activeChatId, setActiveChatId] = useState<string | null>(chatId);
 
+  const createdChatRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const busyRef = useRef(false);
@@ -79,12 +81,12 @@ export function ChatPanel({
   // it is still going and re-read the transcript when it stops. This is the
   // half that makes closing the tab safe.
   useEffect(() => {
-    if (streaming || !backgroundRunning) return;
+    if (!activeChatId || streaming || !backgroundRunning) return;
 
     let cancelled = false;
 
     const timer = window.setInterval(() => {
-      void fetch(`/api/chat/turn?chatId=${encodeURIComponent(chatId)}`, {
+      void fetch(`/api/chat/turn?chatId=${encodeURIComponent(activeChatId)}`, {
         cache: "no-store",
       })
         .then((response) => (response.ok ? response.json() : null))
@@ -103,7 +105,7 @@ export function ChatPanel({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [backgroundRunning, streaming, chatId, router]);
+  }, [backgroundRunning, streaming, activeChatId, router]);
 
   // Follow the transcript only while the reader is already at the end. A
   // smooth scroll per token is a stutter, so streaming moves instantly and a
@@ -203,8 +205,8 @@ export function ChatPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           continuation
-            ? { chatId, turn: turnToken }
-            : { chatId, content, model, path: pinnedPath }
+            ? { chatId: activeChatId, turn: turnToken }
+            : { chatId: activeChatId ?? undefined, content, model, path: pinnedPath }
         ),
         signal: controller.signal,
       });
@@ -236,6 +238,14 @@ export function ChatPanel({
         try {
           payload = JSON.parse(dataLine.slice(5).trim()) as Record<string, unknown>;
         } catch {
+          return;
+        }
+
+        if (event === "chat") {
+          const id = typeof payload.id === "string" ? payload.id : null;
+          if (!id) return;
+          createdChatRef.current = id;
+          setActiveChatId(id);
           return;
         }
 
@@ -307,6 +317,17 @@ export function ChatPanel({
             { id, role: "assistant", content: assembled, seq, model },
           ]);
           setPending("");
+
+          // The chat did not exist until this turn, so its URL is adopted once
+          // the answer is safe to re-read. Doing it mid-stream would replace
+          // the page underneath the stream.
+          if (createdChatRef.current) {
+            router.replace(`/chat?chat=${createdChatRef.current}`, {
+              scroll: false,
+            });
+            createdChatRef.current = null;
+          }
+
           router.refresh();
           return;
         }
@@ -355,13 +376,15 @@ export function ChatPanel({
   function stop() {
     // Tell the server first: aborting this fetch only ends the stream, and the
     // turn is deliberately not tied to it. The flag is what stops the work.
-    void fetch("/api/chat/stop", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chatId }),
-    }).catch(() => {
-      // The abort below still ends this view.
-    });
+    if (activeChatId) {
+      void fetch("/api/chat/stop", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chatId: activeChatId }),
+      }).catch(() => {
+        // The abort below still ends this view.
+      });
+    }
 
     abortRef.current?.abort();
   }
@@ -371,7 +394,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
+    <div className="fade-in mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-card px-3 py-1">
@@ -386,15 +409,6 @@ export function ChatPanel({
             </span>
           </span>
 
-          {repo ? (
-            <span className="hidden font-mono text-[10px] text-low sm:inline">
-              {repo.branch || "detached"} @ {repo.sha.slice(0, 7)}
-            </span>
-          ) : (
-            <span className="hidden text-[11px] text-low sm:inline">
-              answers cannot cite files
-            </span>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -423,16 +437,6 @@ export function ChatPanel({
         </div>
       </div>
 
-      {meter && meter.notes.length > 0 && (
-        <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2">
-          {meter.notes.map((note) => (
-            <li key={note} className="text-[10.5px] leading-relaxed text-low">
-              {note}
-            </li>
-          ))}
-        </ul>
-      )}
-
       <div
         ref={scrollRef}
         aria-live="polite"
@@ -446,24 +450,17 @@ export function ChatPanel({
       >
         {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-10 text-center">
-            <span
-              aria-hidden="true"
-              className="grid size-11 place-items-center rounded-full bg-accent-soft text-[18px] text-accent-text"
-            >
-              ✳
-            </span>
-            <p className="eyebrow mt-5">empty conversation</p>
-            <h2 className="mt-2 text-[27px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-              Ask the repository anything.
+            <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+              {repo ? "Ask about this repo." : "What are you building?"}
             </h2>
-            <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-mid">
+            <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-low">
               {repo
-                ? "It reads the code at the pinned commit and answers with path:line. Edits arrive as a diff you review."
-                : "Attach a repository first, or ask a general question. Without a repository there is nothing to cite."}
+                ? "Answers cite files. Nothing is pushed."
+                : "Pick a repository for answers that cite code."}
             </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              {suggestions.map((suggestion) => (
+              {suggestions.slice(0, 2).map((suggestion) => (
                 <button
                   key={suggestion.label}
                   type="button"
@@ -500,16 +497,12 @@ export function ChatPanel({
                   </button>
                 </article>
               ) : (
-                <article key={message.id} className="rise-in max-w-[94%]">
-                  <div className="flex items-center justify-between gap-3 pb-1.5">
-                    <p className="eyebrow text-accent-text">
-                      {message.role === "system" ? "system" : "openmi"}
-                      {message.seq === null ? " · saving" : ""}
-                    </p>
+                <article key={message.id} className="rise-in group max-w-[94%]">
+                  <div className="flex justify-end pb-0.5">
                     <button
                       type="button"
                       onClick={() => void copy(message.id, message.content)}
-                      className="eyebrow hover:text-hi"
+                      className="eyebrow opacity-0 hover:text-hi focus-visible:opacity-100 group-hover:opacity-100"
                     >
                       {copiedId === message.id ? "copied" : "copy"}
                     </button>
@@ -518,7 +511,7 @@ export function ChatPanel({
                     content={message.content}
                     repo={repo}
                     validPaths={validPaths}
-                    chatId={chatId}
+                    chatId={activeChatId ?? ""}
                   />
                 </article>
               )
@@ -526,7 +519,6 @@ export function ChatPanel({
 
             {(steps.length > 0 || pending.length > 0 || backgroundRunning) && (
               <article className="max-w-[94%]" aria-live="polite">
-                <p className="eyebrow pb-1.5 text-accent-text">openmi</p>
 
                 {steps.length > 0 && (
                   <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2.5 font-mono text-[10.5px] leading-relaxed text-low">
@@ -555,7 +547,7 @@ export function ChatPanel({
                     content={pending}
                     repo={repo}
                     validPaths={validPaths}
-                    chatId={chatId}
+                    chatId={activeChatId ?? ""}
                   />
                 )}
               </article>
@@ -600,22 +592,6 @@ export function ChatPanel({
         }}
         className="pt-2"
       >
-        {messages.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion.label}
-                type="button"
-                onClick={() => void send(suggestion.prompt)}
-                disabled={streaming}
-                className="rounded-full border border-line bg-card px-3 py-1 text-[11.5px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
-              >
-                {suggestion.label}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="rounded-[28px] border border-line-strong/70 bg-card p-2 shadow-[0_18px_40px_-32px_rgba(22,18,12,0.6)] focus-within:border-accent/45">
           <textarea
             ref={textareaRef}
@@ -637,10 +613,6 @@ export function ChatPanel({
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-1">
-            <p className="eyebrow hidden sm:block">
-              enter sends · shift+enter adds a line
-            </p>
-
             <div className="ml-auto flex items-center gap-2">
               {streaming && (
                 <button
@@ -663,11 +635,6 @@ export function ChatPanel({
           </div>
         </div>
 
-        <p className="mt-2.5 text-center font-mono text-[9.5px] uppercase tracking-[0.15em] text-low">
-          {streaming || backgroundRunning
-            ? "answering on the server · you can leave this page"
-            : "answers cite path:line · nothing is pushed without approval"}
-        </p>
       </form>
     </div>
   );

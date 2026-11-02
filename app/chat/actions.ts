@@ -30,21 +30,6 @@ function fail(message: string): never {
   redirect(`/chat?error=${encodeURIComponent(message)}`);
 }
 
-export async function createChat() {
-  const { supabase, user } = await acting();
-
-  const { data, error } = await supabase
-    .from("chats")
-    .insert({ owner: user.id, title: "New chat" })
-    .select("id")
-    .single();
-
-  if (error || !data) fail(error?.message ?? "Could not create a chat.");
-
-  revalidatePath("/chat");
-  redirect(`/chat?chat=${data.id}`);
-}
-
 export async function createFolder(formData: FormData) {
   const { supabase, user } = await acting();
   const name = field(formData, "name");

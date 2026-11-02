@@ -93,13 +93,38 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as ChatRequest | null;
 
-  if (!body || typeof body.chatId !== "string") {
-    return json({ error: "Malformed request." }, 400);
-  }
+  if (!body) return json({ error: "Malformed request." }, 400);
 
-  const chatId = body.chatId;
   const continuationToken = typeof body.turn === "string" ? body.turn : null;
   const content = typeof body.content === "string" ? body.content.trim() : "";
+
+  let chatId =
+    typeof body.chatId === "string" && body.chatId.length > 0 ? body.chatId : "";
+  let createdChat = false;
+
+  if (chatId.length === 0) {
+    if (continuationToken) {
+      return json({ error: "A continuation needs its chat." }, 400);
+    }
+
+    // Created on the first message, not when "New chat" is clicked. An empty
+    // chat is not a conversation, and it should not appear in history.
+    const { data: created, error: createError } = await session.supabase
+      .from("chats")
+      .insert({ owner: session.user.id, title: "New chat" })
+      .select("id")
+      .single();
+
+    if (createError || !created) {
+      return json(
+        { error: createError?.message ?? "Could not start a chat." },
+        500
+      );
+    }
+
+    chatId = String((created as { id: string }).id);
+    createdChat = true;
+  }
 
   if (!continuationToken) {
     if (content.length === 0) return json({ error: "Write something first." }, 400);
@@ -407,6 +432,8 @@ export async function POST(request: Request) {
             if (row?.cancel_requested) abort.abort();
           });
       }, 2_000);
+
+      if (createdChat) send("chat", { id: chatId });
 
       if (userMessage && userSeq !== null) {
         send("user", { id: userMessage.id, seq: userSeq });

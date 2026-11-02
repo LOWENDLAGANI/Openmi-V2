@@ -65,12 +65,10 @@ export default function HomePage() {
         </h1>
 
         <div className="mt-10 grid gap-8 sm:mt-14 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-          <p className="max-w-xl text-[15px] leading-relaxed text-mid">
-            Openmi is a chat client welded to a GitHub repository. It reads the
-            code, proposes edits as a diff, and opens a pull request only after
-            you approve one. It never runs your tests
+          <p className="max-w-md text-[15px] leading-relaxed text-mid">
+            Chat with your repository. Review the diff. Approve the pull request
             <span aria-hidden="true" className="mx-1 inline-block size-2.5 translate-y-[-1px] bg-accent" />
-            and it says so.
+            or don&apos;t.
           </p>
 
           <div className="flex flex-wrap gap-2">

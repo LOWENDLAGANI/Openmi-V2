@@ -121,6 +121,7 @@ const REQUIRED_COLUMNS = [
   ["chats", "repo_branch"],
   ["chats", "repo_base_sha"],
   ["chats", "deleted_at"],
+  ["chats", "last_message_at"],
   ["messages", "seq"],
   ["messages", "usage_tokens"],
   ["agent_turns", "status"],

@@ -32,7 +32,7 @@ import { DEFAULT_MODEL, MODELS, isModelId } from "@/lib/models";
 import { providersConfigured } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
-import { createChat, emptyTrash, purgeChat, restoreChat } from "./actions";
+import { emptyTrash, purgeChat, restoreChat } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,7 @@ export const metadata = {
 
 type SearchParams = {
   chat?: string;
+  new?: string;
   trash?: string;
   error?: string;
   connected?: string;
@@ -466,7 +467,25 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   );
 }
 
-export default async function ChatPage({
+export default function DraftChat() {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <ChatPanel
+        chatId={null}
+        repo={null}
+        models={MODELS}
+        initialModel={DEFAULT_MODEL}
+        initialMessages={[]}
+        validPaths={[]}
+        pinnedPath={null}
+        providerReady={providersConfigured()}
+        initialRunning={false}
+      />
+    </div>
+  );
+}
+
+async function ChatPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
@@ -508,7 +527,7 @@ export default async function ChatPage({
     supabase
       .from("chats")
       .select(
-        "id, title, folder_id, repo_full_name, repo_branch, repo_base_sha, model, created_at, updated_at, deleted_at"
+        "id, title, folder_id, repo_full_name, repo_branch, repo_base_sha, model, created_at, updated_at, deleted_at, last_message_at"
       )
       .order("updated_at", { ascending: false }),
     readConnection(supabase, user.id),
@@ -520,25 +539,41 @@ export default async function ChatPage({
   );
 
   const folders = (foldersResult.data ?? []) as Folder[];
-  const allChats = (chatsResult.data ?? []) as Chat[];
+  const allChats = (chatsResult.data ?? []) as Array<
+    Chat & { last_message_at: string | null }
+  >;
 
   const liveChats = allChats.filter((chat) => !chat.deleted_at);
+
+  // A conversation exists once it has a message. Chats created by the old
+  // "instant row on click" behaviour stay in the database but leave the list.
+  const historyChats = liveChats.filter((chat) => chat.last_message_at !== null);
   const trashedChats = allChats.filter((chat) => chat.deleted_at);
   const activeChat = params.chat
     ? liveChats.find((chat) => chat.id === params.chat) ?? null
     : null;
 
+  const draft = params.new === "1";
+
   const heading = trashView
     ? "Deleted chats"
-    : params.repo
-      ? params.repo
-      : activeChat
-        ? activeChat.title
-        : connection
-          ? "Pick a repository"
-          : "Connect GitHub";
+    : draft
+      ? "New chat"
+      : params.repo
+        ? params.repo
+        : activeChat
+          ? activeChat.title
+          : connection
+            ? "Pick a repository"
+            : "Connect GitHub";
 
-  const eyebrow = trashView ? "Trash" : params.repo ? "Workspace" : "Chats";
+  const eyebrow = trashView
+    ? "Trash"
+    : draft
+      ? "Chats"
+      : params.repo
+        ? "Workspace"
+        : "Chats";
 
   // The workspace is a second view of the same chat, not a second page: a
   // citation opens the file beside the conversation, and the URL says which.
@@ -549,6 +584,8 @@ export default async function ChatPage({
     body = <TrashList chats={trashedChats} />;
   } else if (!connection) {
     body = <ConnectPanel />;
+  } else if (draft) {
+    body = <DraftChat />;
   } else if (activeChat && !workspaceView) {
     body = await ChatView({ session, chat: activeChat });
   } else {
@@ -584,7 +621,7 @@ export default async function ChatPage({
         <Sidebar
           email={user.email ?? "signed in"}
           folders={folders}
-          chats={liveChats}
+          chats={historyChats}
           activeChatId={activeChat?.id}
           trashView={trashView}
           trashedCount={trashedChats.length}
@@ -617,21 +654,11 @@ export default async function ChatPage({
             dew {formatDew(dewBalance)}
           </Link>
 
-          <Link href="/setup" className="btn btn-quiet hidden px-3 py-1.5 text-[11.5px] sm:inline-flex">
-            Setup
-          </Link>
         </>
       }
     >
       {body}
 
-      {!trashView && !params.repo && !activeChat && !connection && (
-        <form action={createChat} className="mx-auto mt-6 w-fit">
-          <button className="btn px-4 py-1.5 text-[12px]">
-            Start a chat without a repository
-          </button>
-        </form>
-      )}
     </AppShell>
   );
 }

@@ -315,7 +315,7 @@
   summary {
     transition-property: color, background-color, border-color, opacity,
       box-shadow, transform;
-    transition-duration: 160ms;
+    transition-duration: 220ms;
     transition-timing-function: cubic-bezier(0.22, 0.8, 0.2, 1);
   }
 

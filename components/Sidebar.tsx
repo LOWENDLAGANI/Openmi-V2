@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Brand } from "@/components/Brand";
 import type { Chat, Folder } from "@/lib/types";
 import {
-  createChat,
   createFolder,
   deleteFolder,
   moveChatToFolder,
@@ -115,25 +114,23 @@ export function Sidebar({
       </div>
 
       <div className="px-3">
-        <form action={createChat}>
-          <button className="btn btn-primary w-full py-2.5 text-[13px]">
-            <span aria-hidden="true" className="text-[15px] leading-none">
-              +
-            </span>
-            New chat
-          </button>
-        </form>
+        <Link
+          href="/chat?new=1"
+          className="btn btn-primary w-full py-2.5 text-[13px]"
+        >
+          <span aria-hidden="true" className="text-[15px] leading-none">
+            +
+          </span>
+          New chat
+        </Link>
       </div>
 
       <nav aria-label="Chats" className="mt-6 min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-        <p className="eyebrow flex items-center justify-between px-3 pb-2">
-          <span>Chats</span>
-          <span className="text-low/80">{chats.length}</span>
-        </p>
+        <p className="eyebrow px-3 pb-2">Chats</p>
 
         {ungrouped.length === 0 ? (
           <p className="px-3 pb-2 text-[11.5px] leading-relaxed text-low">
-            No chats outside folders yet.
+            Nothing here yet.
           </p>
         ) : (
           <div className="space-y-0.5">

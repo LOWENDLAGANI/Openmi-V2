@@ -132,7 +132,7 @@ export function Workspace(props: WorkspaceProps) {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-5">
+    <div className="fade-in mx-auto w-full max-w-6xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="eyebrow">workspace</p>
