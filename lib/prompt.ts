@@ -4,7 +4,7 @@
  * Two sentences here do real work. The citation rule keeps an answer
  * checkable, and the no-execution clause is the product's central honesty
  * claim: nothing in this app runs code, so nothing may say it did. Both are
- * asserted in tests/prompt.test.ts, and the UI copy is checked for the same
+ * asserted in tests/context.test.ts, and the UI copy is checked for the same
  * claim rather than trusted.
  */
 
