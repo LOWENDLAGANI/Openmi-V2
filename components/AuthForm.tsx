@@ -86,18 +86,15 @@ export function AuthForm({
 
   if (!configured) {
     return (
-      <div className="mt-6 rounded-xl border border-line bg-card p-4">
-        <p className="text-[13px] font-medium text-hi">
+      <div className="panel mt-8 p-5">
+        <p className="text-[13.5px] font-semibold text-hi">
           Supabase is not configured
         </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-mid">
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
           Sign-in needs a project URL and an anon key. The setup page lists
           exactly what is missing and where each value comes from.
         </p>
-        <a
-          href="/setup"
-          className="mt-3 inline-block rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] font-medium text-body hover:bg-hover"
-        >
+        <a href="/setup" className="btn mt-4">
           Open setup
         </a>
       </div>
@@ -105,11 +102,11 @@ export function AuthForm({
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-line bg-card p-5">
+    <div className="panel mt-8 p-4 sm:p-5">
       <div
         role="tablist"
         aria-label="Sign in or create an account"
-        className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-canvas p-1"
+        className="grid grid-cols-2 gap-1 rounded-full bg-canvas p-1"
       >
         {(["signin", "signup"] as const).map((value) => (
           <button
@@ -122,9 +119,9 @@ export function AuthForm({
               setError(null);
               setNotice(null);
             }}
-            className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+            className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
               mode === value
-                ? "bg-chip text-hi"
+                ? "bg-card text-hi shadow-[0_1px_2px_rgba(22,18,12,0.08)]"
                 : "text-mid hover:text-hi"
             }`}
           >
@@ -133,12 +130,9 @@ export function AuthForm({
         ))}
       </div>
 
-      <form onSubmit={submit} className="mt-4 space-y-3">
+      <form onSubmit={submit} className="mt-5 space-y-4">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-[11px] uppercase tracking-[0.12em] text-low"
-          >
+          <label htmlFor="email" className="eyebrow block px-1 pb-1.5">
             Email
           </label>
           <input
@@ -149,16 +143,13 @@ export function AuthForm({
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-body placeholder:text-low focus:border-line-strong"
+            className="field py-2.5"
             placeholder="you@example.com"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-[11px] uppercase tracking-[0.12em] text-low"
-          >
+          <label htmlFor="password" className="eyebrow block px-1 pb-1.5">
             Password
           </label>
           <input
@@ -170,17 +161,14 @@ export function AuthForm({
             autoComplete={mode === "signin" ? "current-password" : "new-password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-body placeholder:text-low focus:border-line-strong"
+            className="field py-2.5"
             placeholder="At least 8 characters"
           />
         </div>
 
         {mode === "signup" && (
           <div>
-            <label
-              htmlFor="invite-code"
-              className="block text-[11px] uppercase tracking-[0.12em] text-low"
-            >
+            <label htmlFor="invite-code" className="eyebrow block px-1 pb-1.5">
               Invite code (optional)
             </label>
             <input
@@ -191,7 +179,7 @@ export function AuthForm({
               maxLength={64}
               autoComplete="off"
               spellCheck={false}
-              className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[12px] text-body placeholder:text-low focus:border-line-strong"
+              className="field py-2.5 font-mono text-[12px]"
               placeholder="From the account that invited you"
             />
           </div>
@@ -200,7 +188,7 @@ export function AuthForm({
         {error && (
           <p
             role="alert"
-            className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[12px] text-danger"
+            className="rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
           >
             {error}
           </p>
@@ -208,7 +196,7 @@ export function AuthForm({
         {notice && (
           <p
             role="status"
-            className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-[12px] text-accent-text"
+            className="rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
           >
             {notice}
           </p>
@@ -217,7 +205,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary w-full py-2.5 text-[13px]"
         >
           {busy
             ? "Working…"
@@ -227,7 +215,7 @@ export function AuthForm({
         </button>
       </form>
 
-      <p className="mt-4 text-[11px] leading-relaxed text-low">
+      <p className="mt-4 px-1 text-[11px] leading-relaxed text-low">
         Passwords are handled by Supabase Auth and never reach this app&apos;s
         database.
       </p>

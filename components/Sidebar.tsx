@@ -22,35 +22,45 @@ function ChatRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-0.5 rounded-lg ${
-        active ? "bg-chip" : "hover:bg-hover"
+      className={`group relative flex items-center rounded-full pr-1 ${
+        active ? "bg-accent-soft" : "hover:bg-hover"
       }`}
     >
+      <span
+        aria-hidden="true"
+        className={`ml-3 size-1.5 shrink-0 rounded-full ${
+          active ? "bg-accent" : "bg-line-strong"
+        }`}
+      />
+
       <Link
         href={`/chat?chat=${chat.id}`}
         aria-current={active ? "page" : undefined}
-        className={`min-w-0 flex-1 truncate px-2 py-1.5 text-[12.5px] ${
-          active ? "font-medium text-hi" : "text-body"
+        title={chat.title}
+        className={`min-w-0 flex-1 truncate px-2.5 py-2 text-[12.5px] ${
+          active
+            ? "font-semibold text-hi"
+            : "text-mid group-hover:text-hi"
         }`}
       >
         {chat.title}
       </Link>
 
-      <details className="shrink-0">
+      <details className="relative shrink-0">
         <summary
-          className="cursor-pointer list-none px-1.5 py-1 text-[11px] text-low hover:text-hi"
+          className="grid size-7 cursor-pointer list-none place-items-center rounded-full text-[14px] leading-none text-low opacity-0 transition-opacity hover:bg-canvas hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
           aria-label={`Options for ${chat.title}`}
         >
           ⋯
         </summary>
-        <div className="mt-1 w-52 rounded-lg border border-line bg-card p-2">
-          <form action={moveChatToFolder} className="flex gap-1">
+        <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-2xl border border-line bg-card p-2 shadow-[0_18px_40px_rgba(22,18,12,0.16)]">
+          <form action={moveChatToFolder} className="flex gap-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <select
               name="folderId"
               defaultValue={chat.folder_id ?? ""}
               aria-label="Folder"
-              className="min-w-0 flex-1 rounded border border-line bg-canvas px-1.5 py-1 text-[11px] text-body"
+              className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
             >
               <option value="">No folder</option>
               {folders.map((folder) => (
@@ -59,14 +69,12 @@ function ChatRow({
                 </option>
               ))}
             </select>
-            <button className="rounded border border-line bg-chip px-1.5 py-1 text-[11px] text-mid hover:text-hi">
-              Move
-            </button>
+            <button className="btn px-2 py-1 text-[11px]">Move</button>
           </form>
 
           <form action={trashChat} className="mt-1.5 border-t border-line pt-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
-            <button className="w-full text-left text-[11px] text-mid hover:text-hi">
+            <button className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-mid hover:bg-hover hover:text-hi">
               Move to trash
             </button>
           </form>
@@ -96,51 +104,64 @@ export function Sidebar({
     chats.filter((chat) => chat.folder_id === folderId);
 
   return (
-    <aside className="flex h-full min-h-0 flex-col gap-3 border-b border-line bg-raised p-3 md:border-b-0 md:border-r">
-      <div className="flex items-center justify-between px-1">
+    <aside className="flex h-full min-h-0 flex-col bg-raised md:border-r md:border-line">
+      <div className="flex items-center justify-between gap-2 px-5 pb-4 pt-5">
         <Link href="/" aria-label="Openmi home">
           <Brand compact />
         </Link>
+        <Link href="/setup" className="eyebrow hover:text-hi">
+          setup
+        </Link>
       </div>
 
-      <form action={createChat}>
-        <button className="w-full rounded-lg border border-line bg-chip px-3 py-2 text-left text-[13px] font-medium text-body hover:bg-hover">
-          + New chat
-        </button>
-      </form>
+      <div className="px-3">
+        <form action={createChat}>
+          <button className="btn btn-primary w-full py-2.5 text-[13px]">
+            <span aria-hidden="true" className="text-[15px] leading-none">
+              +
+            </span>
+            New chat
+          </button>
+        </form>
+      </div>
 
-      <nav aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <p className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-[0.14em] text-low">
-          Chats
+      <nav aria-label="Chats" className="mt-6 min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <p className="eyebrow flex items-center justify-between px-3 pb-2">
+          <span>Chats</span>
+          <span className="text-low/80">{chats.length}</span>
         </p>
 
         {ungrouped.length === 0 ? (
-          <p className="px-2 py-1 text-[11px] text-low">No chats outside folders.</p>
+          <p className="px-3 pb-2 text-[11.5px] leading-relaxed text-low">
+            No chats outside folders yet.
+          </p>
         ) : (
-          ungrouped.map((chat) => (
-            <ChatRow
-              key={chat.id}
-              chat={chat}
-              active={chat.id === activeChatId}
-              folders={folders}
-            />
-          ))
+          <div className="space-y-0.5">
+            {ungrouped.map((chat) => (
+              <ChatRow
+                key={chat.id}
+                chat={chat}
+                active={chat.id === activeChatId}
+                folders={folders}
+              />
+            ))}
+          </div>
         )}
 
         {folders.map((folder) => {
           const items = inFolder(folder.id);
           return (
-            <details key={folder.id} open className="mt-1">
-              <summary className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-[12px] text-mid hover:bg-hover">
-                <span className="truncate">{folder.name}</span>
-                <span className="ml-2 font-mono text-[10px] text-low">
+            <details key={folder.id} open className="mt-5">
+              <summary className="eyebrow flex cursor-pointer list-none items-center gap-2 rounded-full px-3 py-1.5 hover:text-hi">
+                <span className="min-w-0 truncate">{folder.name}</span>
+                <span className="ml-auto font-mono text-[10px] text-low">
                   {items.length}
                 </span>
               </summary>
 
-              <div className="ml-1.5 border-l border-line pl-1.5">
+              <div className="mt-0.5 space-y-0.5 border-l border-line pl-1.5">
                 {items.length === 0 ? (
-                  <p className="px-2 py-1 text-[11px] text-low">Empty folder.</p>
+                  <p className="px-3 py-1 text-[11px] text-low">Empty folder.</p>
                 ) : (
                   items.map((chat) => (
                     <ChatRow
@@ -153,11 +174,11 @@ export function Sidebar({
                 )}
 
                 <details className="mt-1">
-                  <summary className="cursor-pointer px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-low">
-                    Folder options
+                  <summary className="eyebrow cursor-pointer list-none px-3 py-1 hover:text-hi">
+                    settings
                   </summary>
 
-                  <form action={renameFolder} className="mt-1 flex gap-1 px-1">
+                  <form action={renameFolder} className="mt-1 flex gap-1.5 px-2">
                     <input type="hidden" name="folderId" value={folder.id} />
                     <input
                       name="name"
@@ -165,14 +186,12 @@ export function Sidebar({
                       required
                       maxLength={60}
                       aria-label={`Rename ${folder.name}`}
-                      className="min-w-0 flex-1 rounded border border-line bg-canvas px-1.5 py-1 text-[11px] text-body"
+                      className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
                     />
-                    <button className="rounded border border-line bg-chip px-1.5 py-1 text-[11px] text-mid hover:text-hi">
-                      Save
-                    </button>
+                    <button className="btn px-2 py-1 text-[11px]">Save</button>
                   </form>
 
-                  <form action={deleteFolder} className="px-1 pt-1">
+                  <form action={deleteFolder} className="px-2 pt-1.5 pb-1">
                     <input type="hidden" name="folderId" value={folder.id} />
                     <button className="text-[11px] text-danger hover:underline">
                       Delete folder (chats kept)
@@ -184,45 +203,46 @@ export function Sidebar({
           );
         })}
 
-        <form action={createFolder} className="mt-3 flex gap-1.5 px-1">
+        <form action={createFolder} className="mt-6 flex gap-1.5 px-1">
           <input
             name="name"
             required
             maxLength={60}
             placeholder="New folder"
             aria-label="New folder name"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2 py-1.5 text-[11px] text-body placeholder:text-low"
+            className="field min-w-0 flex-1 px-3 py-1.5 text-[11px]"
           />
-          <button className="rounded-lg border border-line bg-chip px-2 py-1.5 text-[11px] text-mid hover:text-hi">
-            Add
-          </button>
+          <button className="btn px-3 py-1.5 text-[11px]">Add</button>
         </form>
       </nav>
 
-      <div className="border-t border-line pt-3">
+      <div className="border-t border-line px-2 py-3">
         <Link
           href="/activity"
-          className="block rounded-lg px-2 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
+          className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
         >
           Dew &amp; activity
+          <span aria-hidden="true" className="text-low">
+            ↗
+          </span>
         </Link>
 
         <Link
           href={trashView ? "/chat" : "/chat?trash=1"}
-          className="block rounded-lg px-2 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
+          className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
         >
-          {trashView ? "Back to chats" : `Trash · ${trashedCount}`}
+          {trashView ? "Back to chats" : "Trash"}
+          <span className="font-mono text-[10px] text-low">{trashedCount}</span>
         </Link>
 
-        <p className="mt-2 truncate px-2 text-[11px] text-low" title={email}>
-          {email}
-        </p>
-
-        <form action="/auth/signout" method="post">
-          <button className="mt-1 px-2 py-1 text-[11px] text-mid hover:text-hi">
-            Sign out
-          </button>
-        </form>
+        <div className="mt-2 flex items-center justify-between gap-2 border-t border-line px-3 pt-3">
+          <p className="min-w-0 truncate text-[11px] text-low" title={email}>
+            {email}
+          </p>
+          <form action="/auth/signout" method="post">
+            <button className="text-[11px] text-mid hover:text-hi">Sign out</button>
+          </form>
+        </div>
       </div>
     </aside>
   );

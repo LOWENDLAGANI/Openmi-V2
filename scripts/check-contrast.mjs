@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 // ── Contrast is a gate, not a claim ──────────────────────────────────────────
 //
-// Every semantic text token must clear 4.5:1 on every surface it is used on, in
-// all three appearances, and an accent fill must clear 4.5:1 against the text
-// placed on it. The CSS comment says so; this script is what makes it true.
+// Every semantic text token must clear 4.5:1 on every surface it is used on,
+// and an accent fill must clear 4.5:1 against the text placed on it. The CSS
+// comment says so; this script is what makes it true.
 //
 // It reads `app/globals.css`, resolves the rgba() tokens over the opaque surface
 // beneath them, and exits 1 listing every pair that regressed. No dependencies,
 // no browser, no network: a contributor can run it before opening a PR.
 //
 //   node scripts/check-contrast.mjs
+//
+// There is one appearance — warm paper — so there is one block to check. The
+// script still reads the stylesheet rather than hardcoding values, so a changed
+// token is checked rather than assumed.
 //
 // It also refuses a stylesheet that lost its visible focus ring or its
 // reduced-motion block, because both are part of the same accessibility gate.
@@ -24,11 +28,7 @@ const css = readFileSync(cssPath, "utf8");
 
 const MIN_RATIO = 4.5;
 
-const THEMES = [
-  { name: "dark", selector: ":root" },
-  { name: "paper", selector: 'html[data-theme="paper"]' },
-  { name: "ink", selector: 'html[data-theme="ink"]' },
-];
+const THEMES = [{ name: "paper", selector: ":root" }];
 
 /** Text tokens, and the surfaces each is rendered on. */
 const TEXT_PAIRS = [
@@ -49,9 +49,24 @@ const FILL_PAIRS = [
 
 const NAMED = {
   ...Object.fromEntries(
-    ["bg", "bg-raised", "card", "chip", "accent", "accent-soft", "text-hi", "text", "text-mid", "text-low", "danger", "warn", "on-accent", "bubble-user", "bubble-user-text", "accent-text"].map(
-      (name) => [name, `--${name}`]
-    )
+    [
+      "bg",
+      "bg-raised",
+      "card",
+      "chip",
+      "accent",
+      "accent-soft",
+      "text-hi",
+      "text",
+      "text-mid",
+      "text-low",
+      "danger",
+      "warn",
+      "on-accent",
+      "bubble-user",
+      "bubble-user-text",
+      "accent-text",
+    ].map((name) => [name, `--${name}`])
   ),
   raised: "--bg-raised",
 };
@@ -154,26 +169,6 @@ for (const theme of THEMES) {
 
   let worst = { ratio: Infinity, pair: "—" };
 
-  const check = (label, fgValue, bgValue) => {
-    const fg = parseColor(fgValue);
-    const bgRaw = parseColor(bgValue);
-    if (!fg || !bgRaw) {
-      failures.push(`${theme.name}: ${label} does not resolve to a colour`);
-      return;
-    }
-
-    const bg = over(bgRaw, { r: 255, g: 255, b: 255, a: 1 });
-    const blended = over(fg, bg);
-    const value = ratio(blended, bg);
-
-    if (value < worst.ratio) worst = { ratio: value, pair: label };
-    if (value < MIN_RATIO) {
-      failures.push(
-        `${theme.name}: ${label} is ${value.toFixed(2)}:1, below ${MIN_RATIO}:1`
-      );
-    }
-  };
-
   for (const [textName, surfaces] of TEXT_PAIRS) {
     const fg = resolve(textName);
     if (!fg) {
@@ -211,7 +206,8 @@ for (const theme of THEMES) {
       continue;
     }
 
-    const fill = over(bg, parseColor(theme.name === "paper" ? "#ffffff" : "#000000"));
+    // The fills are opaque light surfaces, composited over the page.
+    const fill = over(bg, { r: 255, g: 255, b: 255, a: 1 });
     const value = ratio(over(fg, fill), fill);
 
     if (value < worst.ratio) worst = { ratio: value, pair: `${fgName} on ${bgName}` };
@@ -245,5 +241,5 @@ if (failures.length > 0) {
   console.error("");
   process.exitCode = 1;
 } else {
-  console.log(`  Pass — every pair clears ${MIN_RATIO}:1 in all three themes.`);
+  console.log(`  Pass — every pair clears ${MIN_RATIO}:1.`);
 }

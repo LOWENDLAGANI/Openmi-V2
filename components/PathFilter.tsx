@@ -45,25 +45,25 @@ export function PathFilter({
   }
 
   return (
-    <div className="rounded-xl border border-line bg-card p-2">
+    <div className="panel p-2">
       <input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Filter by path"
         aria-label="Filter files by path"
-        className="w-full rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[12px] text-body placeholder:text-low"
+        className="field bg-canvas px-3 py-1.5 text-[12px]"
       />
 
       {query.trim().length > 0 && (
         matches.length === 0 ? (
-          <p className="px-1 pt-1.5 text-[11px] text-mid">No path matches.</p>
+          <p className="px-2 pt-2 text-[11px] text-mid">No path matches.</p>
         ) : (
-          <ul className="mt-1.5 max-h-[30vh] overflow-y-auto text-[11.5px]">
+          <ul className="mt-2 max-h-[30vh] overflow-y-auto">
             {matches.map((path) => (
               <li key={path}>
                 <Link
                   href={hrefFor(path)}
-                  className="block truncate rounded px-1.5 py-1 font-mono text-body hover:bg-hover hover:text-hi"
+                  className="block truncate rounded-full px-3 py-1.5 font-mono text-[11px] text-body hover:bg-hover hover:text-hi"
                 >
                   {path}
                 </Link>
@@ -74,7 +74,7 @@ export function PathFilter({
       )}
 
       {truncated && (
-        <p className="px-1 pt-1 text-[10px] leading-relaxed text-low">
+        <p className="px-2 pt-2 text-[10px] leading-relaxed text-low">
           Filtering the first {paths.length} paths in this commit.
         </p>
       )}

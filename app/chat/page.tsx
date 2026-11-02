@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
+import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
@@ -68,14 +69,12 @@ function Panel({
   action?: string;
 }) {
   return (
-    <div className="mx-auto max-w-md py-16 text-center">
-      <h2 className="text-[15px] font-semibold text-hi">{title}</h2>
+    <div className="mx-auto max-w-md py-20 text-center">
+      <p className="eyebrow">stop</p>
+      <h2 className="mt-2 text-[19px] font-semibold tracking-[-0.02em] text-hi">{title}</h2>
       <p className="mt-2 text-[13px] leading-relaxed text-mid">{message}</p>
       {href && action && (
-        <Link
-          href={href}
-          className="mt-5 inline-block rounded-lg border border-line bg-card px-4 py-2 text-[13px] font-medium text-body hover:bg-hover"
-        >
+        <Link href={href} className="btn mt-6">
           {action}
         </Link>
       )}
@@ -85,29 +84,29 @@ function Panel({
 
 function ConnectPanel() {
   return (
-    <div className="mx-auto max-w-xl py-8">
-      <h2 className="text-[15px] font-semibold text-hi">Connect GitHub</h2>
-      <p className="mt-2 text-[13px] leading-relaxed text-mid">
+    <div className="mx-auto w-full max-w-xl py-8">
+      <p className="eyebrow">step one</p>
+      <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
+        Connect GitHub
+      </h2>
+      <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
         Openmi reads repositories through the GitHub API with a token you
         provide. Create a fine-grained token with{" "}
-        <span className="font-mono text-[12px] text-body">
+        <span className="font-mono text-[12.5px] text-body">
           Contents: read and write
         </span>
         {", "}
-        <span className="font-mono text-[12px] text-body">
+        <span className="font-mono text-[12.5px] text-body">
           Pull requests: read and write
         </span>
         {", and "}
-        <span className="font-mono text-[12px] text-body">Metadata: read</span>,
+        <span className="font-mono text-[12.5px] text-body">Metadata: read</span>,
         then paste it once. It is sealed with AES-256-GCM before it is stored, and
         only its last four characters are ever shown again.
       </p>
 
-      <form action={connectGithub} className="mt-4 space-y-2">
-        <label
-          htmlFor="github-token"
-          className="block text-[12px] font-medium text-mid"
-        >
+      <form action={connectGithub} className="panel mt-6 space-y-3 p-4">
+        <label htmlFor="github-token" className="eyebrow block px-1">
           Personal access token
         </label>
         <input
@@ -118,20 +117,24 @@ function ConnectPanel() {
           autoComplete="off"
           spellCheck={false}
           placeholder="github_pat_… or ghp_…"
-          className="w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-[12px] text-body placeholder:text-low"
+          className="field py-2.5 font-mono text-[12px]"
         />
-        <button className="rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold text-on-accent hover:opacity-90">
+        <button className="btn btn-primary w-full py-2.5 text-[13px]">
           Seal and connect
         </button>
       </form>
 
-      <ul className="mt-5 space-y-1 text-[11.5px] leading-relaxed text-low">
-        <li>The token is sent once over HTTPS and never returned to the browser.</li>
-        <li>
-          Writes happen only after you approve a changeset, and only on an
-          openmi/agent/ branch.
-        </li>
-        <li>Disconnecting deletes the sealed value immediately.</li>
+      <ul className="mt-6 space-y-2">
+        {[
+          "The token is sent once over HTTPS and never returned to the browser.",
+          "Writes happen only after you approve a changeset, and only on an openmi/agent/ branch.",
+          "Disconnecting deletes the sealed value immediately.",
+        ].map((line) => (
+          <li key={line} className="flex items-start gap-2.5 text-[11.5px] leading-relaxed text-low">
+            <span aria-hidden="true" className="mt-[7px] size-1 shrink-0 rounded-full bg-accent" />
+            {line}
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -140,16 +143,16 @@ function ConnectPanel() {
 function TrashList({ chats }: { chats: Chat[] }) {
   if (chats.length === 0) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center">
-        <h2 className="text-[15px] font-semibold text-hi">Trash is empty</h2>
+      <div className="mx-auto max-w-md py-20 text-center">
+        <p className="eyebrow">trash</p>
+        <h2 className="mt-2 text-[20px] font-semibold tracking-[-0.02em] text-hi">
+          Trash is empty
+        </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Deleted chats wait here until you purge them. Restoring one puts it
           back in the sidebar, in its folder.
         </p>
-        <Link
-          href="/chat"
-          className="mt-5 inline-block rounded-lg border border-line bg-card px-4 py-2 text-[13px] font-medium text-body hover:bg-hover"
-        >
+        <Link href="/chat" className="btn mt-6">
           Back to chats
         </Link>
       </div>
@@ -157,23 +160,21 @@ function TrashList({ chats }: { chats: Chat[] }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto w-full max-w-2xl">
       <p className="text-[13px] leading-relaxed text-mid">
         Deleted chats keep their messages and folder until you purge them.
         Purging is permanent.
       </p>
 
-      <ul className="mt-4 space-y-2">
+      <ul className="panel mt-5 divide-y divide-line overflow-hidden">
         {chats.map((chat) => (
           <li
             key={chat.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
           >
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-medium text-hi">
-                {chat.title}
-              </p>
-              <p className="mt-0.5 font-mono text-[11px] text-low">
+              <p className="truncate text-[13px] font-medium text-hi">{chat.title}</p>
+              <p className="mt-0.5 font-mono text-[10.5px] text-low">
                 deleted {chat.deleted_at?.slice(0, 10) ?? "—"}
               </p>
             </div>
@@ -181,16 +182,14 @@ function TrashList({ chats }: { chats: Chat[] }) {
             <div className="flex items-center gap-2">
               <form action={restoreChat}>
                 <input type="hidden" name="chatId" value={chat.id} />
-                <button className="rounded-lg border border-line bg-raised px-2.5 py-1 text-[11px] text-mid hover:text-hi">
-                  Restore
-                </button>
+                <button className="btn px-3 py-1 text-[11px]">Restore</button>
               </form>
 
               <form action={purgeChat}>
                 <input type="hidden" name="chatId" value={chat.id} />
                 <ConfirmSubmit
                   message="Permanently delete this chat and its messages?"
-                  className="rounded-lg border border-danger/40 bg-danger/10 px-2.5 py-1 text-[11px] text-danger hover:opacity-90"
+                  className="rounded-full border border-danger/30 bg-danger/8 px-3 py-1 text-[11px] text-danger hover:opacity-90"
                 >
                   Delete forever
                 </ConfirmSubmit>
@@ -203,7 +202,7 @@ function TrashList({ chats }: { chats: Chat[] }) {
       <form action={emptyTrash} className="mt-4">
         <ConfirmSubmit
           message="Permanently delete every chat in the trash?"
-          className="rounded-lg border border-line bg-card px-3 py-1.5 text-[12px] text-mid hover:text-hi"
+          className="btn px-4 py-1.5 text-[12px]"
         >
           Empty trash
         </ConfirmSubmit>
@@ -308,35 +307,33 @@ async function RepoSurface({
     }
 
     return (
-      <div className="mx-auto max-w-3xl">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-semibold text-hi">Pick a repository</h2>
-            <p className="mt-1 text-[12px] text-mid">
-              Connected as{" "}
-              <span className="font-mono text-body">@{github.connection.login}</span>
-              {" · "}
+            <p className="eyebrow">pick a repository</p>
+            <h2 className="mt-1.5 text-[24px] font-semibold tracking-[-0.02em] text-hi">
+              One chat, one repository.
+            </h2>
+            <p className="mt-2 font-mono text-[10.5px] text-low">
+              @{github.connection.login} ·{" "}
               {github.connection.scopes.length > 0
                 ? github.connection.scopes.join(", ")
-                : "fine-grained token"}
-              {" · ends "}
-              <span className="font-mono text-body">
-                {github.connection.lastFour}
-              </span>
+                : "fine-grained token"}{" "}
+              · ends {github.connection.lastFour}
             </p>
           </div>
 
           <form action={disconnectGithub}>
             <ConfirmSubmit
               message="Disconnect GitHub? The sealed token is deleted and the workspace stops reading repositories."
-              className="rounded-lg border border-line bg-card px-3 py-1.5 text-[12px] text-mid hover:text-hi"
+              className="btn px-3 py-1.5 text-[11.5px]"
             >
               Disconnect
             </ConfirmSubmit>
           </form>
         </div>
 
-        <p className="mt-4 text-[13px] leading-relaxed text-mid">
+        <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-mid">
           A chat is anchored to one repository, so a proposed diff always has
           exactly one base. Nothing is cloned; every read is an API call at the
           commit shown in the workspace.
@@ -350,7 +347,7 @@ async function RepoSurface({
             message="This token cannot read any repository. Check its repository access, or make a new token."
           />
         ) : (
-          <div className="mt-4">
+          <div className="mt-6">
             <RepoPicker repos={repos} chatId={chat?.id} />
           </div>
         )}
@@ -420,20 +417,20 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {!repo && (
-        <p className="mb-2 rounded-lg border border-line bg-raised px-3 py-2 text-[11.5px] text-mid">
-          No repository attached, so answers have nothing to cite.{" "}
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-[11.5px] text-mid">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-line-strong" />
+          No repository attached, so answers have nothing to cite.
           <Link
             href={`/chat?chat=${chat.id}&view=repos`}
-            className="text-accent-text underline-offset-2 hover:underline"
+            className="font-medium text-accent-text hover:underline"
           >
             Pick one
           </Link>
-          .
         </p>
       )}
 
       {changesets.length > 0 && (
-        <div className="mb-2 max-h-[46vh] shrink-0 overflow-y-auto">
+        <div className="mb-3 max-h-[46vh] shrink-0 overflow-y-auto">
           <ReviewPanel
             changesets={changesets}
             chatId={chat.id}
@@ -473,17 +470,15 @@ export default async function ChatPage({
   if (session.state === "unconfigured") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-        <h1 className="text-xl font-semibold text-hi">
+        <p className="eyebrow">not configured</p>
+        <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
           The workspace needs Supabase
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Chats, folders and the trash live in Postgres behind row-level
           security. Without a project configured there is nowhere to put them.
         </p>
-        <Link
-          href="/setup"
-          className="mt-5 inline-block w-fit rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold text-on-accent"
-        >
+        <Link href="/setup" className="btn btn-primary mt-6 w-fit px-4 py-2">
           Open setup
         </Link>
       </main>
@@ -549,82 +544,83 @@ export default async function ChatPage({
     body = await RepoSurface({ session, params, chat: activeChat });
   }
 
-  return (
-    <div className="md:grid md:h-dvh md:grid-cols-[280px_1fr]">
-      <Sidebar
-        email={user.email ?? "signed in"}
-        folders={folders}
-        chats={liveChats}
-        activeChatId={activeChat?.id}
-        trashView={trashView}
-        trashedCount={trashedChats.length}
-      />
+  const lowBalance = isLowBalance(dewBalance);
 
-      <main className="flex min-h-dvh flex-col md:min-h-0">
-        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-low">
-              {eyebrow}
-            </p>
-            <h1 className="truncate text-[15px] font-semibold text-hi">
-              {heading}
-            </h1>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-3">
-            {activeChat?.repo_full_name && activeChat.repo_base_sha && (
-              <Link
-                href={`/chat?chat=${activeChat.id}&repo=${encodeURIComponent(activeChat.repo_full_name)}&branch=${encodeURIComponent(activeChat.repo_branch ?? "")}&sha=${activeChat.repo_base_sha}&view=files`}
-                className="text-[12px] text-mid hover:text-hi"
-              >
-                Files
-              </Link>
-            )}
-            <Link
-              href="/activity"
-              title={`An hour of chat costs ${DEW_PER_HOUR} Dew. Low balance shows amber below ${LOW_BALANCE_DEW}.`}
-              className={`rounded-full border px-2.5 py-1 font-mono text-[11px] ${
-                isLowBalance(dewBalance)
-                  ? "border-warn/40 bg-warn/10 text-warn"
-                  : "border-line bg-chip text-low"
-              }`}
-            >
-              Dew · {formatDew(dewBalance)}
-            </Link>
-            <Link href="/setup" className="text-[12px] text-mid hover:text-hi">
-              Setup
-            </Link>
-          </div>
-        </header>
-
-        {params.error && (
-          <p
-            role="alert"
-            className="border-b border-danger/30 bg-danger/10 px-5 py-2 text-[12px] text-danger"
-          >
-            {params.error}
-          </p>
-        )}
-
-        {params.connected && !params.error && (
-          <p className="border-b border-line bg-raised px-5 py-2 text-[12px] text-mid">
+  const banner =
+    params.error || (params.connected && !params.error) ? (
+      <p
+        role={params.error ? "alert" : "status"}
+        className={`border-b px-4 py-2 text-[11.5px] md:px-7 ${
+          params.error
+            ? "border-danger/25 bg-danger/8 text-danger"
+            : "border-line bg-raised text-mid"
+        }`}
+      >
+        {params.error ? (
+          params.error
+        ) : (
+          <>
             GitHub connected as{" "}
             <span className="font-mono text-hi">{params.connected}</span>.
-          </p>
+          </>
         )}
+      </p>
+    ) : undefined;
 
-        <div className="flex-1 overflow-y-auto p-5">
-          {body}
-
-          {!trashView && !params.repo && !activeChat && !connection && (
-            <form action={createChat} className="mx-auto mt-6 w-fit">
-              <button className="text-[12px] text-mid underline-offset-2 hover:text-hi hover:underline">
-                Start a chat without a repository
-              </button>
-            </form>
+  return (
+    <AppShell
+      sidebar={
+        <Sidebar
+          email={user.email ?? "signed in"}
+          folders={folders}
+          chats={liveChats}
+          activeChatId={activeChat?.id}
+          trashView={trashView}
+          trashedCount={trashedChats.length}
+        />
+      }
+      eyebrow={eyebrow}
+      title={heading}
+      banner={banner}
+      actions={
+        <>
+          {activeChat?.repo_full_name && activeChat.repo_base_sha && (
+            <Link
+              href={`/chat?chat=${activeChat.id}&repo=${encodeURIComponent(activeChat.repo_full_name)}&branch=${encodeURIComponent(activeChat.repo_branch ?? "")}&sha=${activeChat.repo_base_sha}&view=files`}
+              className="btn hidden px-3 py-1.5 text-[11.5px] sm:inline-flex"
+            >
+              Files
+            </Link>
           )}
-        </div>
-      </main>
-    </div>
+
+          <Link
+            href="/activity"
+            title={`An hour of chat costs ${DEW_PER_HOUR} Dew. Low balance shows amber below ${LOW_BALANCE_DEW}.`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
+              lowBalance
+                ? "border-warn/35 bg-warn/8 text-warn"
+                : "border-line bg-card text-low"
+            }`}
+          >
+            <span aria-hidden="true" className="size-1 rounded-full bg-current" />
+            dew {formatDew(dewBalance)}
+          </Link>
+
+          <Link href="/setup" className="btn btn-quiet hidden px-3 py-1.5 text-[11.5px] sm:inline-flex">
+            Setup
+          </Link>
+        </>
+      }
+    >
+      {body}
+
+      {!trashView && !params.repo && !activeChat && !connection && (
+        <form action={createChat} className="mx-auto mt-6 w-fit">
+          <button className="btn px-4 py-1.5 text-[12px]">
+            Start a chat without a repository
+          </button>
+        </form>
+      )}
+    </AppShell>
   );
 }

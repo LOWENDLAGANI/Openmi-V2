@@ -30,7 +30,7 @@ function DiffBlock({ text }: { text: string }) {
   if (text.length === 0) return null;
 
   return (
-    <pre className="max-h-64 overflow-auto rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[11px] leading-[1.55]">
+    <pre className="max-h-64 overflow-auto rounded-xl border border-line bg-canvas px-3 py-2 font-mono text-[11px] leading-[1.6]">
       {text.split("\n").map((line, index) => {
         const tone = line.startsWith("+")
           ? "text-accent-text"
@@ -77,20 +77,23 @@ export function ReviewPanel({
           <details
             key={changeset.id}
             open={status === "ready" || status === "draft"}
-            className="rounded-xl border border-line bg-card"
+            className="panel overflow-hidden"
           >
-            <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-              <span className="text-[12.5px] font-medium text-hi">
-                Proposed changes
+            <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <span className="flex items-center gap-2">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
+                <span className="text-[12.5px] font-semibold text-hi">
+                  Proposed changes
+                </span>
               </span>
-              <span className="font-mono text-[10.5px] text-low">
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-low">
                 {changeset.files.length} file(s) · +{additions} −{deletions} ·{" "}
                 {STATUS_LABEL[status]}
               </span>
             </summary>
 
             <div className="space-y-3 border-t border-line px-4 py-3">
-              <p className="font-mono text-[10.5px] text-low">
+              <p className="eyebrow">
                 base {changeset.base_sha.slice(0, 7)} · expires{" "}
                 {changeset.expires_at.slice(0, 16).replace("T", " ")} UTC
               </p>
@@ -98,7 +101,7 @@ export function ReviewPanel({
               {stale && chatSha && (
                 <p
                   role="status"
-                  className="rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-warn"
+                  className="rounded-2xl border border-warn/25 bg-warn/8 px-4 py-2.5 text-[11px] leading-relaxed text-warn"
                 >
                   This diff was computed at {changeset.base_sha.slice(0, 7)}, but
                   the chat is pinned at {chatSha.slice(0, 7)} now. Re-ask before
@@ -110,9 +113,9 @@ export function ReviewPanel({
                 {changeset.files.map((file) => (
                   <li
                     key={file.id}
-                    className="overflow-hidden rounded-lg border border-line bg-raised"
+                    className="overflow-hidden rounded-2xl border border-line bg-raised"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
                       <p className="min-w-0 truncate font-mono text-[11.5px] text-body">
                         {file.path}
                       </p>
@@ -127,13 +130,11 @@ export function ReviewPanel({
                         </span>
 
                         {reviewable && (
-                          <form
-                            action={file.accepted ? rejectChange : acceptChange}
-                          >
+                          <form action={file.accepted ? rejectChange : acceptChange}>
                             <input type="hidden" name="changesetId" value={changeset.id} />
                             <input type="hidden" name="chatId" value={chatId} />
                             <input type="hidden" name="fileId" value={file.id} />
-                            <button className="rounded border border-line bg-card px-2 py-0.5 text-[10.5px] text-mid hover:text-hi">
+                            <button className="btn px-3 py-0.5 text-[10.5px]">
                               {file.accepted ? "Reject" : "Accept"}
                             </button>
                           </form>
@@ -169,7 +170,7 @@ export function ReviewPanel({
                   </p>
 
                   {accepted.length > 0 && (
-                    <button className="rounded-lg bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent hover:opacity-90">
+                    <button className="btn btn-primary px-4 py-1.5 text-[11.5px]">
                       Approve and open PR
                     </button>
                   )}
@@ -210,7 +211,7 @@ export function ReviewPanel({
                       {changeset.failure && (
                         <p
                           role="alert"
-                          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[11px] leading-relaxed text-danger"
+                          className="rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[11px] leading-relaxed text-danger"
                         >
                           {changeset.failure}
                         </p>
@@ -232,7 +233,7 @@ export function ReviewPanel({
                           pull request.
                         </p>
 
-                        <button className="rounded-lg border border-line bg-card px-3 py-1.5 text-[11.5px] text-mid hover:text-hi">
+                        <button className="btn px-4 py-1.5 text-[11.5px]">
                           Retry approval
                         </button>
                       </form>

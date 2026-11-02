@@ -70,15 +70,15 @@ export default async function ActivityPage({
   if (session.state === "unconfigured") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-        <h1 className="text-xl font-semibold text-hi">Activity needs Supabase</h1>
+        <p className="eyebrow">not configured</p>
+        <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
+          Activity needs Supabase
+        </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Dew balances and the ledger live in Postgres behind row-level
           security. Without a project configured there is nothing to show.
         </p>
-        <Link
-          href="/setup"
-          className="mt-5 inline-block w-fit rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold text-on-accent"
-        >
+        <Link href="/setup" className="btn btn-primary mt-6 w-fit px-4 py-2">
           Open setup
         </Link>
       </main>
@@ -155,24 +155,22 @@ export default async function ActivityPage({
     : false;
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-4xl px-6 py-8">
+    <main className="mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Link href="/chat" aria-label="Back to chats">
             <Brand compact />
           </Link>
+          <span aria-hidden="true" className="h-4 w-px bg-line-strong" />
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-low">
-              Dew
-            </p>
-            <h1 className="text-[17px] font-semibold text-hi">Balance &amp; activity</h1>
+            <p className="eyebrow">dew</p>
+            <h1 className="text-[17px] font-semibold tracking-[-0.02em] text-hi">
+              Balance &amp; activity
+            </h1>
           </div>
         </div>
 
-        <Link
-          href="/chat"
-          className="rounded-lg border border-line bg-card px-3 py-1.5 text-[12px] text-mid hover:text-hi"
-        >
+        <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
           Back to chats
         </Link>
       </header>
@@ -180,7 +178,7 @@ export default async function ActivityPage({
       {params.error && (
         <p
           role="alert"
-          className="mt-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger"
+          className="mt-5 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
         >
           {params.error}
         </p>
@@ -189,31 +187,32 @@ export default async function ActivityPage({
       {params.saved && (
         <p
           role="status"
-          className="mt-4 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-[12px] text-accent-text"
+          className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
         >
           {params.saved === "timezone" ? "Timezone saved." : params.saved}
         </p>
       )}
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-low">
-          Balance
-        </p>
+      <section className="mt-6 rounded-3xl border border-line bg-card px-5 py-6 sm:px-7">
+        <p className="eyebrow">balance</p>
         <p
-          className={`mt-1 text-3xl font-semibold ${
+          className={`mt-1 text-[clamp(2.2rem,6vw,3rem)] font-semibold leading-none tracking-[-0.04em] ${
             isLowBalance(profile.balance) ? "text-warn" : "text-hi"
           }`}
         >
-          {formatDew(profile.balance)} Dew
+          {formatDew(profile.balance)}{" "}
+          <span className="text-[0.42em] font-medium uppercase tracking-[0.08em] text-low">
+            dew
+          </span>
         </p>
-        <p className="mt-2 text-[12px] leading-relaxed text-mid">
+        <p className="mt-3 max-w-xl text-[12.5px] leading-relaxed text-mid">
           An hour of chat costs {DEW_PER_HOUR} Dew, charged before the provider is
           called. The daily allowance is {dailyAllowance(profile.hasPaid)} Dew,
           settled at local midnight in {profile.timezone}.
         </p>
 
         {isLowBalance(profile.balance) && (
-          <p className="mt-2 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-[11.5px] leading-relaxed text-warn">
+          <p className="mt-3 max-w-xl rounded-2xl border border-warn/25 bg-warn/8 px-4 py-2.5 text-[11.5px] leading-relaxed text-warn">
             Below {LOW_BALANCE_DEW} Dew. A chat turn will be refused once the
             balance cannot cover an hour; redeem a code below or wait for the
             daily refill.
@@ -231,9 +230,11 @@ export default async function ActivityPage({
         </p>
       </section>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <section className="rounded-xl border border-line bg-card p-4">
-          <h2 className="text-[13px] font-semibold text-hi">Redeem a code</h2>
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
+        <section className="panel p-5">
+          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
+            Redeem a code
+          </h2>
           <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
             Codes are issued by an operator. Each one can be redeemed once.
           </p>
@@ -247,21 +248,17 @@ export default async function ActivityPage({
               spellCheck={false}
               placeholder="TOPUP-…"
               aria-label="Dew code"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 font-mono text-[12px] text-body placeholder:text-low"
+              className="field min-w-0 flex-1 bg-canvas py-1.5 font-mono text-[12px]"
             />
-            <button className="rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] text-mid hover:text-hi">
-              Redeem
-            </button>
+            <button className="btn px-3 py-1.5 text-[12px]">Redeem</button>
           </form>
 
-          <p className="mt-3 text-[10.5px] uppercase tracking-[0.12em] text-low">
-            Top-up packs
-          </p>
-          <ul className="mt-1 flex flex-wrap gap-2">
+          <p className="eyebrow mt-4">top-up packs</p>
+          <ul className="mt-2 flex flex-wrap gap-2">
             {TOPUP_PACKS.map((dew) => (
               <li
                 key={dew}
-                className="rounded-full border border-line bg-chip px-2.5 py-1 font-mono text-[11px] text-mid"
+                className="rounded-full border border-line bg-chip px-3 py-1 font-mono text-[11px] text-mid"
               >
                 {dew} Dew
               </li>
@@ -273,25 +270,25 @@ export default async function ActivityPage({
           </p>
         </section>
 
-        <section className="rounded-xl border border-line bg-card p-4">
-          <h2 className="text-[13px] font-semibold text-hi">Invite</h2>
+        <section className="panel p-5">
+          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
+            Invite
+          </h2>
           <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
             Share this code at sign-up. Both sides get {INVITE_REWARD_DEW} Dew,
             once per account, up to {MAX_INVITES_PER_ACCOUNT} rewarded accounts.
           </p>
-          <p className="mt-2 rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[14px] tracking-[0.12em] text-hi">
+          <p className="mt-3 rounded-2xl bg-canvas px-4 py-2.5 font-mono text-[15px] tracking-[0.14em] text-hi">
             {profile.inviteCode ?? "—"}
           </p>
-          <p className="mt-1 text-[10.5px] text-low">
+          <p className="mt-1.5 text-[10.5px] text-low">
             {invited} / {MAX_INVITES_PER_ACCOUNT} rewarded
           </p>
 
           {purchases.length > 0 && (
             <>
-              <p className="mt-3 text-[10.5px] uppercase tracking-[0.12em] text-low">
-                Purchase history
-              </p>
-              <ul className="mt-1 space-y-0.5 text-[11px] text-mid">
+              <p className="eyebrow mt-4">purchase history</p>
+              <ul className="mt-1.5 space-y-1 text-[11px] text-mid">
                 {purchases.map((row) => (
                   <li key={row.id} className="flex justify-between gap-3 font-mono">
                     <span>{utc(row.created_at)}</span>
@@ -306,29 +303,29 @@ export default async function ActivityPage({
         </section>
       </div>
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-[13px] font-semibold text-hi">Ledger</h2>
+      <section className="panel mt-5 overflow-hidden">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pb-3 pt-5">
+          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">Ledger</h2>
           <p className="text-[10.5px] text-low">
             Every balance change is a row; the amounts sum to the balance above.
           </p>
         </div>
 
         {ledger.length === 0 ? (
-          <p className="mt-3 text-[12px] text-mid">
+          <p className="px-5 pb-5 text-[12px] text-mid">
             No Dew activity yet. The trial credit appears here the moment the
             account exists.
           </p>
         ) : (
-          <div className="mt-2 overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[540px] text-left text-[11.5px]">
               <thead>
-                <tr className="font-mono text-[10px] uppercase tracking-[0.1em] text-low">
-                  <th className="py-1 pr-3 font-normal">When (UTC)</th>
+                <tr className="eyebrow border-t border-line">
+                  <th className="py-2 pl-5 pr-3 font-normal">When (UTC)</th>
                   <th className="font-normal">Kind</th>
                   <th className="text-right font-normal">Amount</th>
                   <th className="text-right font-normal">Balance</th>
-                  <th className="pl-3 font-normal">Reference</th>
+                  <th className="pl-3 pr-5 font-normal">Reference</th>
                 </tr>
               </thead>
               <tbody>
@@ -337,7 +334,9 @@ export default async function ActivityPage({
 
                   return (
                     <tr key={row.id} className="border-t border-line">
-                      <td className="py-1.5 pr-3 text-low">{utc(row.created_at)}</td>
+                      <td className="py-2 pl-5 pr-3 font-mono text-[10.5px] text-low">
+                        {utc(row.created_at)}
+                      </td>
                       <td className="text-body">{KIND_LABEL[row.kind] ?? row.kind}</td>
                       <td
                         className={`text-right font-mono ${
@@ -350,7 +349,7 @@ export default async function ActivityPage({
                       <td className="text-right font-mono text-mid">
                         {formatDew(Number(row.balance_after))}
                       </td>
-                      <td className="max-w-[180px] truncate pl-3 font-mono text-[10.5px] text-low">
+                      <td className="max-w-[180px] truncate pl-3 pr-5 font-mono text-[10.5px] text-low">
                         {row.reference ?? "—"}
                       </td>
                     </tr>
@@ -362,9 +361,11 @@ export default async function ActivityPage({
         )}
       </section>
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-4">
+      <section className="panel mt-5 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-[13px] font-semibold text-hi">Recent per-chat usage</h2>
+          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
+            Recent per-chat usage
+          </h2>
           <p className="text-[10.5px] text-low">
             Token estimates from the last 1,000 messages. Dew is charged per
             hour, not per token.
@@ -374,11 +375,11 @@ export default async function ActivityPage({
         {perChat.length === 0 ? (
           <p className="mt-3 text-[12px] text-mid">No messages yet.</p>
         ) : (
-          <ul className="mt-2 divide-y divide-line text-[11.5px]">
+          <ul className="mt-2 divide-y divide-line text-[12px]">
             {perChat.map((row) => (
-              <li key={row.chatId} className="flex justify-between gap-3 py-1.5">
+              <li key={row.chatId} className="flex justify-between gap-3 py-2">
                 <span className="min-w-0 truncate text-body">{row.title}</span>
-                <span className="shrink-0 font-mono text-mid">
+                <span className="shrink-0 font-mono text-[10.5px] text-mid">
                   ~{row.tokens.toLocaleString()} tokens
                 </span>
               </li>
@@ -387,8 +388,10 @@ export default async function ActivityPage({
         )}
       </section>
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-4">
-        <h2 className="text-[13px] font-semibold text-hi">Daily refill timezone</h2>
+      <section className="panel mt-5 p-5">
+        <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
+          Daily refill timezone
+        </h2>
         <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
           The refill happens at local midnight in this zone, and a day that is
           ahead of it never refills.
@@ -399,7 +402,7 @@ export default async function ActivityPage({
             name="timezone"
             defaultValue={profile.timezone}
             aria-label="Timezone"
-            className="rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[12px] text-body"
+            className="field w-auto bg-canvas py-1.5 text-[12px]"
           >
             {TIMEZONES.map((zone) => (
               <option key={zone} value={zone}>
@@ -407,13 +410,11 @@ export default async function ActivityPage({
               </option>
             ))}
           </select>
-          <button className="rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] text-mid hover:text-hi">
-            Save timezone
-          </button>
+          <button className="btn px-3 py-1.5 text-[12px]">Save timezone</button>
         </form>
       </section>
 
-      <p className="mt-6 text-[10.5px] leading-relaxed text-low">
+      <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
         Refunds are recorded when a provider fails or a turn is stopped before
         the first token. An hour that produced part of an answer is not
         refunded. Operator corrections are the only other path, and they appear

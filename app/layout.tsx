@@ -11,7 +11,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en">
       <body className="min-h-dvh bg-canvas text-body antialiased">{children}</body>
     </html>
   );

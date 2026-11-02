@@ -35,54 +35,75 @@ const DOES_NOT = [
 
 export default function AboutPage() {
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+    <main className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
       <header className="flex items-center justify-between">
-        <Brand compact />
-        <div className="flex items-center gap-4 text-[13px] text-mid">
-          <Link href="/setup" className="transition-colors hover:text-hi">
+        <Link href="/" aria-label="Openmi home">
+          <Brand compact />
+        </Link>
+        <nav className="flex items-center gap-1.5">
+          <Link href="/setup" className="btn btn-quiet px-3 py-1.5 text-[12px]">
             Setup
           </Link>
-          <Link href="/" className="transition-colors hover:text-hi">
-            Back
+          <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
+            Open workspace
           </Link>
-        </div>
+        </nav>
       </header>
 
-      <h1 className="mt-10 text-2xl font-semibold tracking-tight text-hi">
-        What Openmi does, and what it does not
+      <p className="eyebrow mt-14">the contract</p>
+      <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
+        What Openmi does, and what it does not.
       </h1>
-      <p className="mt-3 text-[14px] leading-relaxed text-mid">
+      <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-mid">
         Openmi is a chat client welded to one GitHub repository. It reads the
         code, answers with real paths and line numbers, and proposes edits for
         you to review. Nothing reaches GitHub until you approve it.
       </p>
 
-      <section className="mt-8 rounded-xl border border-line bg-card p-5">
-        <h2 className="text-[14px] font-semibold text-hi">What it does</h2>
-        <ul className="mt-3 space-y-2">
+      <section className="mt-12 border-t border-line pt-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
+            What it does
+          </h2>
+          <span className="eyebrow">05 things</span>
+        </div>
+        <ul className="mt-4 divide-y divide-line">
           {DOES.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-[13px] leading-relaxed text-mid">
-              <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" />
-              <span>{item}</span>
+            <li key={item} className="flex items-start gap-3 py-3">
+              <span
+                aria-hidden="true"
+                className="mt-[7px] size-1.5 shrink-0 rounded-full bg-accent"
+              />
+              <span className="text-[13px] leading-relaxed text-mid">{item}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-5">
-        <h2 className="text-[14px] font-semibold text-hi">What it does not do</h2>
-        <ul className="mt-3 space-y-2">
+      <section className="mt-12 border-t border-line pt-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
+            What it does not do
+          </h2>
+          <span className="eyebrow">refusals</span>
+        </div>
+        <ul className="mt-4 divide-y divide-line">
           {DOES_NOT.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-[13px] leading-relaxed text-mid">
-              <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-danger" />
-              <span>{item}</span>
+            <li key={item} className="flex items-start gap-3 py-3">
+              <span
+                aria-hidden="true"
+                className="mt-[7px] size-1.5 shrink-0 rounded-full bg-danger"
+              />
+              <span className="text-[13px] leading-relaxed text-mid">{item}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-5">
-        <h2 className="text-[14px] font-semibold text-hi">Branch policy</h2>
+      <section className="mt-12 border-t border-line pt-6">
+        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
+          Branch policy
+        </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           The head branch is derived from the changeset, never supplied by the
           caller:{" "}
@@ -98,8 +119,10 @@ export default function AboutPage() {
         </p>
       </section>
 
-      <section className="mt-4 rounded-xl border border-line bg-card p-5">
-        <h2 className="text-[14px] font-semibold text-hi">What an hour costs</h2>
+      <section className="mt-12 border-t border-line pt-6">
+        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
+          What an hour costs
+        </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           One hour of chat costs {DEW_PER_HOUR} Dew, charged once before the
           provider call. More turns inside the hour are free. The daily allowance
@@ -120,8 +143,10 @@ export default function AboutPage() {
         </p>
       </section>
 
-      <section className="mt-4 rounded-xl border-2 border-line-strong bg-raised p-5">
-        <h2 className="text-[14px] font-semibold text-hi">The honesty rule</h2>
+      <section className="mt-12 rounded-2xl border border-line bg-card p-5 shadow-[inset_3px_0_0_var(--accent)]">
+        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
+          The honesty rule
+        </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           The review card states what the model proposed and what you approved.
           It never claims a build, test, check or deployment ran. There is no
@@ -136,6 +161,13 @@ export default function AboutPage() {
           .
         </p>
       </section>
+
+      <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
+        <p className="eyebrow">openmi · review before push</p>
+        <Link href="/" className="eyebrow hover:text-hi">
+          back to the start
+        </Link>
+      </footer>
     </main>
   );
 }

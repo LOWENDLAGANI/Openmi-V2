@@ -65,23 +65,26 @@ export default async function SetupPage() {
         : "unreachable";
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-10">
+    <main className="mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
       <header className="flex items-center justify-between">
-        <Brand compact />
-        <div className="flex items-center gap-4 text-[13px] text-mid">
-          <Link href="/about" className="transition-colors hover:text-hi">
+        <Link href="/" aria-label="Openmi home">
+          <Brand compact />
+        </Link>
+        <nav className="flex items-center gap-1.5">
+          <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12px]">
             About
           </Link>
-          <Link href="/" className="transition-colors hover:text-hi">
-            Back
+          <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
+            Workspace
           </Link>
-        </div>
+        </nav>
       </header>
 
-      <h1 className="mt-10 text-2xl font-semibold tracking-tight text-hi">
+      <p className="eyebrow mt-14">deployment truth</p>
+      <h1 className="mt-3 text-[clamp(1.9rem,5vw,2.7rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
         Setup
       </h1>
-      <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-mid">
+      <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-mid">
         Everything this deployment needs, whether it is present, whether the
         database schema matches this checkout, and which live services answer.
         Values are never read back — only whether a key is set. The app starts
@@ -89,12 +92,12 @@ export default async function SetupPage() {
         working?&rdquo;
       </p>
 
-      <section
-        aria-labelledby="config-heading"
-        className="mt-8 rounded-xl border border-line bg-card"
-      >
+      <section aria-labelledby="config-heading" className="panel mt-10 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 id="config-heading" className="text-[14px] font-semibold text-hi">
+          <h2
+            id="config-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
             Configuration
           </h2>
           <StatusPill tone={report.ready ? "ok" : "pending"}>
@@ -106,11 +109,11 @@ export default async function SetupPage() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-[13px]">
             <thead>
-              <tr className="text-[11px] uppercase tracking-[0.12em] text-low">
-                <th className="px-5 py-3 font-medium">Key</th>
-                <th className="px-5 py-3 font-medium">Scope</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium">Unlocks</th>
+              <tr className="eyebrow">
+                <th className="px-5 py-3 font-normal">Key</th>
+                <th className="px-5 py-3 font-normal">Scope</th>
+                <th className="px-5 py-3 font-normal">Status</th>
+                <th className="px-5 py-3 font-normal">Unlocks</th>
               </tr>
             </thead>
             <tbody>
@@ -141,9 +144,7 @@ export default async function SetupPage() {
               ))}
               <tr className="border-t border-line align-top">
                 <td className="px-5 py-3">
-                  <span className="font-mono text-[12px] text-hi">
-                    AI provider
-                  </span>
+                  <span className="font-mono text-[12px] text-hi">AI provider</span>
                   <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-low">
                     {providerList}
                   </p>
@@ -166,12 +167,12 @@ export default async function SetupPage() {
         </div>
       </section>
 
-      <section
-        aria-labelledby="migrations-heading"
-        className="mt-6 rounded-xl border border-line bg-card p-5"
-      >
+      <section aria-labelledby="migrations-heading" className="panel mt-5 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="migrations-heading" className="text-[14px] font-semibold text-hi">
+          <h2
+            id="migrations-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
             Migrations
           </h2>
           <StatusPill tone={migrationTone}>{migrationLabel}</StatusPill>
@@ -184,7 +185,7 @@ export default async function SetupPage() {
         {migrations.drifted > 0 && (
           <p
             role="alert"
-            className="mt-3 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-[12px] leading-relaxed text-warn"
+            className="mt-3 rounded-2xl border border-warn/25 bg-warn/8 px-4 py-2.5 text-[12px] leading-relaxed text-warn"
           >
             A local migration no longer matches what was applied. Do not edit an
             applied migration: add a new file so the database and this checkout
@@ -192,9 +193,9 @@ export default async function SetupPage() {
           </p>
         )}
 
-        <ul className="mt-4 space-y-1.5">
+        <ul className="mt-4 divide-y divide-line">
           {migrations.entries.length === 0 ? (
-            <li className="text-[12px] text-low">
+            <li className="py-2 text-[12px] text-low">
               No migration files found in{" "}
               <span className="font-mono">supabase/migrations</span>.
             </li>
@@ -202,13 +203,13 @@ export default async function SetupPage() {
             migrations.entries.map((migration) => (
               <li
                 key={`${migration.version}-${migration.name}`}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-raised px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-3 py-2.5"
               >
                 <span className="font-mono text-[12px] text-body">
                   {migration.name}
                 </span>
                 <span className="flex items-center gap-3">
-                  <span className="font-mono text-[11px] text-low">
+                  <span className="font-mono text-[10.5px] text-low">
                     v{migration.version}
                   </span>
                   <StatusPill tone={ENTRY_TONE[migration.state]}>
@@ -231,12 +232,12 @@ export default async function SetupPage() {
         </p>
       </section>
 
-      <section
-        aria-labelledby="probes-heading"
-        className="mt-6 rounded-xl border border-line bg-card p-5"
-      >
+      <section aria-labelledby="probes-heading" className="panel mt-5 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="probes-heading" className="text-[14px] font-semibold text-hi">
+          <h2
+            id="probes-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
             Live probes
           </h2>
           <StatusPill
@@ -261,14 +262,9 @@ export default async function SetupPage() {
 
         <ul className="mt-4 space-y-2">
           {probes.map((probe) => (
-            <li
-              key={probe.id}
-              className="rounded-lg border border-line bg-raised px-3 py-2"
-            >
+            <li key={probe.id} className="rounded-2xl bg-raised px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-mono text-[12px] text-body">
-                  {probe.label}
-                </span>
+                <span className="font-mono text-[12px] text-body">{probe.label}</span>
                 <StatusPill
                   tone={
                     probe.state === "ok"
@@ -283,7 +279,7 @@ export default async function SetupPage() {
                   {probe.state}
                 </StatusPill>
               </div>
-              <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-mid">
                 {probe.detail}
               </p>
               {probe.fix && (
@@ -297,20 +293,20 @@ export default async function SetupPage() {
       </section>
 
       {report.missingRequired.length > 0 && (
-        <section
-          aria-labelledby="missing-heading"
-          className="mt-6 rounded-xl border border-line bg-card p-5"
-        >
-          <h2 id="missing-heading" className="text-[14px] font-semibold text-hi">
+        <section aria-labelledby="missing-heading" className="panel mt-5 p-5">
+          <h2
+            id="missing-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
             Still missing
           </h2>
           <ul className="mt-3 space-y-1.5">
             {report.missingRequired.map((key) => (
-              <li
-                key={key}
-                className="flex items-start gap-2 text-[13px] text-mid"
-              >
-                <span aria-hidden="true" className="mt-1.5 size-1.5 rounded-full bg-danger" />
+              <li key={key} className="flex items-start gap-2.5 text-[13px] text-mid">
+                <span
+                  aria-hidden="true"
+                  className="mt-[7px] size-1.5 shrink-0 rounded-full bg-danger"
+                />
                 <span className="font-mono text-[12px] text-body">{key}</span>
               </li>
             ))}
@@ -324,6 +320,13 @@ export default async function SetupPage() {
           </p>
         </section>
       )}
+
+      <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
+        <p className="eyebrow">nothing here is a secret value</p>
+        <Link href="/chat" className="eyebrow hover:text-hi">
+          open the workspace ›
+        </Link>
+      </footer>
     </main>
   );
 }

@@ -63,10 +63,48 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [meter, setMeter] = useState<ContextMeter | null>(null);
   const [lastSent, setLastSent] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const continuedRef = useRef(false);
+
+  const suggestions = repo
+    ? [
+        {
+          label: "Explain this repo",
+          prompt: "Explain what this repository does and how it is structured.",
+        },
+        {
+          label: "Find a bug",
+          prompt:
+            "Look for a likely bug in this repository and point at the file and line.",
+        },
+        {
+          label: "Review a file",
+          prompt: "Review the most important file in this repository and its risks.",
+        },
+      ]
+    : [
+        {
+          label: "What can you do?",
+          prompt: "What can you do, and what do you refuse to do?",
+        },
+        {
+          label: "Attach a repository",
+          prompt: "How do I attach a GitHub repository to this chat?",
+        },
+      ];
+
+  async function copy(id: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId(null), 1600);
+    } catch {
+      setCopiedId(null);
+    }
+  }
 
   async function send(content: string, turnToken?: string) {
     const continuation = typeof turnToken === "string";
@@ -263,27 +301,40 @@ export function ChatPanel({
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
-        <p className="text-[11px] text-low">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-card px-3 py-1">
+            <span
+              aria-hidden="true"
+              className={`size-1.5 shrink-0 rounded-full ${
+                repo ? "bg-accent" : "bg-line-strong"
+              }`}
+            />
+            <span className="truncate font-mono text-[10px] uppercase tracking-[0.1em] text-mid">
+              {repo ? repo.fullName : "no repository"}
+            </span>
+          </span>
+
           {repo ? (
-            <>
-              Reading <span className="font-mono text-mid">{repo.fullName}</span> at{" "}
-              <span className="font-mono text-mid">{repo.sha.slice(0, 7)}</span>
-            </>
+            <span className="hidden font-mono text-[10px] text-low sm:inline">
+              {repo.branch || "detached"} @ {repo.sha.slice(0, 7)}
+            </span>
           ) : (
-            "No repository attached, so answers cannot cite files."
+            <span className="hidden text-[11px] text-low sm:inline">
+              answers cannot cite files
+            </span>
           )}
-        </p>
+        </div>
 
         <div className="flex items-center gap-2">
           {meter && (
             <span
-              className="font-mono text-[10px] text-low"
+              className="eyebrow"
               title="Characters of repository context sent with the last turn."
             >
-              {Math.round(meter.usedChars / 1000)}k /{" "}
-              {Math.round(meter.budgetChars / 1000)}k context
+              {Math.round(meter.usedChars / 1000)}k/
+              {Math.round(meter.budgetChars / 1000)}k ctx
             </span>
           )}
 
@@ -291,7 +342,7 @@ export function ChatPanel({
             value={model}
             onChange={(event) => setModel(event.target.value as ModelId)}
             aria-label="Model"
-            className="rounded-lg border border-line bg-card px-2 py-1 text-[11.5px] text-body"
+            className="field w-auto py-1 text-[11.5px]"
           >
             {models.map((option) => (
               <option key={option.id} value={option.id}>
@@ -303,57 +354,101 @@ export function ChatPanel({
       </div>
 
       {meter && meter.notes.length > 0 && (
-        <ul className="mb-2 space-y-0.5 rounded-lg border border-line bg-raised px-3 py-2 text-[10.5px] leading-relaxed text-low">
+        <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2">
           {meter.notes.map((note) => (
-            <li key={note}>{note}</li>
+            <li key={note} className="text-[10.5px] leading-relaxed text-low">
+              {note}
+            </li>
           ))}
         </ul>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        {messages.length === 0 && pending.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line px-6 py-12 text-center">
-            <p className="text-[13px] font-medium text-hi">Nothing asked yet</p>
-            <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-mid">
+        {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center py-10 text-center">
+            <span
+              aria-hidden="true"
+              className="grid size-11 place-items-center rounded-full bg-accent-soft text-[18px] text-accent-text"
+            >
+              ✳
+            </span>
+            <p className="eyebrow mt-5">empty conversation</p>
+            <h2 className="mt-2 text-[27px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+              Ask the repository anything.
+            </h2>
+            <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-mid">
               {repo
-                ? "Ask about a file, a function or where something is defined. The agent reads the repository, and answers cite path:line."
+                ? "It reads the code at the pinned commit and answers with path:line. Edits arrive as a diff you review."
                 : "Attach a repository first, or ask a general question. Without a repository there is nothing to cite."}
             </p>
+
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.label}
+                  type="button"
+                  onClick={() => void send(suggestion.prompt)}
+                  disabled={streaming}
+                  className="group flex items-center gap-2 rounded-full border border-line-strong bg-card px-4 py-2 text-[12px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="size-1.5 rounded-full bg-accent/60 group-hover:bg-accent"
+                  />
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <article
-                key={message.id}
-                className={
-                  message.role === "user"
-                    ? "ml-auto max-w-[90%] rounded-xl rounded-br-sm bg-chip px-3.5 py-2.5"
-                    : "max-w-full rounded-xl px-1 py-1"
-                }
-              >
-                <p className="pb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
-                  {message.role === "user" ? "You" : "Openmi"}
-                  {message.seq === null ? " · saving" : ""}
-                </p>
-                <MessageBody
-                  content={message.content}
-                  repo={repo}
-                  validPaths={validPaths}
-                  chatId={chatId}
-                />
-              </article>
-            ))}
+          <div className="space-y-7">
+            {messages.map((message) =>
+              message.role === "user" ? (
+                <article key={message.id} className="flex flex-col items-end gap-1">
+                  <div className="max-w-[88%] whitespace-pre-wrap rounded-[26px] rounded-br-lg bg-bubble px-4 py-2.5 text-[14px] leading-[1.6] text-bubble-text">
+                    {message.content}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(message.content)}
+                    className="eyebrow mr-2 hover:text-hi"
+                  >
+                    edit
+                  </button>
+                </article>
+              ) : (
+                <article key={message.id} className="max-w-[94%]">
+                  <div className="flex items-center justify-between gap-3 pb-1.5">
+                    <p className="eyebrow text-accent-text">
+                      {message.role === "system" ? "system" : "openmi"}
+                      {message.seq === null ? " · saving" : ""}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void copy(message.id, message.content)}
+                      className="eyebrow hover:text-hi"
+                    >
+                      {copiedId === message.id ? "copied" : "copy"}
+                    </button>
+                  </div>
+                  <MessageBody
+                    content={message.content}
+                    repo={repo}
+                    validPaths={validPaths}
+                    chatId={chatId}
+                  />
+                </article>
+              )
+            )}
 
             {(steps.length > 0 || pending.length > 0) && (
-              <article className="max-w-full px-1 py-1">
-                <p className="pb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
-                  Openmi · working
-                </p>
+              <article className="max-w-[94%]">
+                <p className="eyebrow pb-1.5 text-accent-text">openmi</p>
 
                 {steps.length > 0 && (
-                  <ul className="mb-2 space-y-0.5 rounded-lg border border-line bg-card px-3 py-2 font-mono text-[10.5px] text-low">
+                  <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2.5 font-mono text-[10.5px] leading-relaxed text-low">
                     {steps.map((step, index) => (
-                      <li key={`${step.detail}-${index}`}>
+                      <li key={`${step.detail}-${index}`} className="truncate">
                         <span aria-hidden="true">
                           {step.state === "done" ? "✓" : step.state === "error" ? "✕" : "…"}
                         </span>{" "}
@@ -363,7 +458,16 @@ export function ChatPanel({
                   </ul>
                 )}
 
-                {pending.length > 0 && (
+                {pending.length === 0 ? (
+                  <div className="computing flex w-fit items-center gap-2.5 rounded-full bg-accent-soft px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-text">
+                    <span className="flex gap-1 text-[13px] leading-none" aria-hidden="true">
+                      <span>•</span>
+                      <span>•</span>
+                      <span>•</span>
+                    </span>
+                    computing…
+                  </div>
+                ) : (
                   <MessageBody
                     content={pending}
                     repo={repo}
@@ -378,9 +482,11 @@ export function ChatPanel({
       </div>
 
       {notices.length > 0 && (
-        <ul className="mb-2 space-y-0.5 rounded-lg border border-line bg-raised px-3 py-2 text-[10.5px] leading-relaxed text-mid">
+        <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2">
           {notices.map((notice, index) => (
-            <li key={`${notice}-${index}`}>{notice}</li>
+            <li key={`${notice}-${index}`} className="text-[10.5px] leading-relaxed text-mid">
+              {notice}
+            </li>
           ))}
         </ul>
       )}
@@ -388,15 +494,15 @@ export function ChatPanel({
       {error && (
         <div
           role="alert"
-          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger"
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
         >
-          <span>{error}</span>
+          <span className="min-w-0">{error}</span>
           {lastSent.length > 0 && (
             <button
               type="button"
               onClick={retry}
               disabled={streaming}
-              className="rounded border border-danger/40 px-2 py-0.5 text-[11px] hover:opacity-90 disabled:opacity-50"
+              className="rounded-full border border-danger/40 px-2.5 py-0.5 text-[11px] hover:opacity-90 disabled:opacity-50"
             >
               Retry
             </button>
@@ -409,51 +515,73 @@ export function ChatPanel({
           event.preventDefault();
           void send(draft);
         }}
-        className="pt-1"
+        className="pt-2"
       >
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              void send(draft);
-            }
-          }}
-          rows={3}
-          placeholder={
-            providerReady
-              ? "Ask about this repository…"
-              : "No provider key is configured — the setup page lists what is missing."
-          }
-          className="w-full resize-y rounded-xl border border-line bg-card px-3 py-2.5 text-[13px] leading-relaxed text-body placeholder:text-low"
-        />
-
-        <div className="mt-1.5 flex items-center justify-between gap-2">
-          <p className="text-[10.5px] text-low">
-            Enter sends · Shift+Enter adds a line
-            {meter ? "" : " · context is measured per turn"}
-          </p>
-
-          <div className="flex items-center gap-2">
-            {streaming && (
+        {messages.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {suggestions.map((suggestion) => (
               <button
+                key={suggestion.label}
                 type="button"
-                onClick={stop}
-                className="rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] text-mid hover:text-hi"
+                onClick={() => void send(suggestion.prompt)}
+                disabled={streaming}
+                className="rounded-full border border-line bg-card px-3 py-1 text-[11.5px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
               >
-                Stop
+                {suggestion.label}
               </button>
-            )}
-            <button
-              type="submit"
-              disabled={streaming || draft.trim().length === 0}
-              className="rounded-lg bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-on-accent hover:opacity-90 disabled:opacity-40"
-            >
-              Send
-            </button>
+            ))}
+          </div>
+        )}
+
+        <div className="rounded-[28px] border border-line-strong/70 bg-card p-2 shadow-[0_18px_40px_-32px_rgba(22,18,12,0.6)] focus-within:border-accent/45">
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void send(draft);
+              }
+            }}
+            rows={2}
+            placeholder={
+              providerReady
+                ? "Message Openmi…"
+                : "No provider key is configured — the setup page lists what is missing."
+            }
+            className="w-full resize-none bg-transparent px-3 pt-1.5 text-[14px] leading-[1.6] text-body placeholder:text-low focus:outline-none"
+          />
+
+          <div className="flex items-center justify-between gap-2 px-1 pt-1">
+            <p className="eyebrow hidden sm:block">
+              enter sends · shift+enter adds a line
+            </p>
+
+            <div className="ml-auto flex items-center gap-2">
+              {streaming && (
+                <button
+                  type="button"
+                  onClick={stop}
+                  className="btn btn-quiet px-3 py-1.5 text-[12px]"
+                >
+                  Stop
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={streaming || draft.trim().length === 0}
+                className="btn btn-primary px-4 py-2 text-[12.5px]"
+              >
+                Send
+                <span aria-hidden="true">↗</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        <p className="mt-2.5 text-center font-mono text-[9.5px] uppercase tracking-[0.15em] text-low">
+          answers cite path:line · nothing is pushed without approval
+        </p>
       </form>
     </div>
   );
