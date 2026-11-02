@@ -265,9 +265,13 @@ export default async function ActivityPage({
             ))}
           </ul>
           <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-            There is no card payment in this build; a pack is a code an operator
-            gives you.
+            Or pay on the plans page and upload the receipt; an operator reviews
+            it and the Dew lands here.
           </p>
+
+          <Link href="/pay" className="btn mt-3 px-3 py-1.5 text-[11.5px]">
+            Plans &amp; receipts
+          </Link>
         </section>
 
         <section className="panel p-5">

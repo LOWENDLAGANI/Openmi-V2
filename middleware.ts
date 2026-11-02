@@ -31,5 +31,12 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/chat/:path*", "/activity/:path*"],
+  matcher: [
+    "/chat/:path*",
+    "/activity/:path*",
+    "/pay/:path*",
+    // A paint-saving redirect only. /admin decides the role on the server and
+    // answers 404 to a signed-in visitor without it.
+    "/admin/:path*",
+  ],
 };

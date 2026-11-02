@@ -104,6 +104,27 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "GitHub → Developer settings → OAuth Apps",
   },
   {
+    key: "ADMIN_EMAILS",
+    scope: "server",
+    required: false,
+    unlocks: "The hidden admin panel, by exact email",
+    hint: "Comma separated; ADMIN_EMAIL_DOMAIN covers a whole workspace",
+  },
+  {
+    key: "ADMIN_EMAIL_DOMAIN",
+    scope: "server",
+    required: false,
+    unlocks: "Admin panel for every account on one domain",
+    hint: "@mycompany.com (the verified Google address must end with it)",
+  },
+  {
+    key: "PAYMENT_LINK",
+    scope: "server",
+    required: false,
+    unlocks: "The hosted payment button on /pay",
+    hint: "Defaults to the Sociabuzz page in lib/billing/plans.ts",
+  },
+  {
     key: "UPSTASH_REDIS_REST_URL",
     scope: "server",
     required: false,

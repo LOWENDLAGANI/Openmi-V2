@@ -102,6 +102,8 @@ const REQUIRED_TABLES = [
   "dew_transactions",
   "dew_codes",
   "rate_limits",
+  "admin_users",
+  "payment_requests",
 ];
 
 const REQUIRED_FUNCTIONS = [
@@ -114,6 +116,11 @@ const REQUIRED_FUNCTIONS = [
   "rate_limit_hit",
   "openmi_migration_ledger",
   "openmi_schema_probe",
+  "is_admin",
+  "submit_payment_request",
+  "review_payment_request",
+  "admin_grant_dew",
+  "admin_set_admin",
 ];
 
 const REQUIRED_COLUMNS = [
@@ -129,6 +136,9 @@ const REQUIRED_COLUMNS = [
   ["agent_turns", "partial"],
   ["changesets", "pr_url"],
   ["profiles", "dew_balance"],
+  ["payment_requests", "status"],
+  ["payment_requests", "receipt_path"],
+  ["payment_requests", "dew_granted"],
 ];
 
 async function schemaProblems(db) {

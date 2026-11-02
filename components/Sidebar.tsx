@@ -215,6 +215,16 @@ export function Sidebar({
 
       <div className="border-t border-line px-2 py-3">
         <Link
+          href="/pay"
+          className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
+        >
+          Plans &amp; receipts
+          <span aria-hidden="true" className="text-low">
+            ↗
+          </span>
+        </Link>
+
+        <Link
           href="/activity"
           className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
         >
