@@ -67,8 +67,10 @@ export function ChatPanel({
   const [lastSent, setLastSent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
+  const [atBottom, setAtBottom] = useState(true);
 
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const continuedRef = useRef(false);
@@ -103,9 +105,28 @@ export function ChatPanel({
     };
   }, [backgroundRunning, streaming, chatId, router]);
 
+  // Follow the transcript only while the reader is already at the end. A
+  // smooth scroll per token is a stutter, so streaming moves instantly and a
+  // finished message eases in.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [messages, pending, steps, backgroundRunning]);
+    if (!atBottom) return;
+    const element = scrollRef.current;
+    if (!element) return;
+
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: pending.length > 0 ? "auto" : "smooth",
+    });
+  }, [messages, pending, steps, backgroundRunning, atBottom]);
+
+  // A composer that grows with the question instead of showing a scrollbar
+  // after two lines.
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
+  }, [draft]);
 
   const suggestions = repo
     ? [
@@ -164,6 +185,7 @@ export function ChatPanel({
     if (!continuation) {
       setLastSent(content);
       setDraft("");
+      textareaRef.current?.focus();
       optimisticId = `local-${Date.now()}`;
       const localId = optimisticId;
       setMessages((current) => [
@@ -411,8 +433,17 @@ export function ChatPanel({
         </ul>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        <div ref={bottomRef} />
+      <div
+        ref={scrollRef}
+        aria-live="polite"
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const distance =
+            element.scrollHeight - element.scrollTop - element.clientHeight;
+          setAtBottom(distance < 72);
+        }}
+        className="min-h-0 flex-1 overflow-y-auto py-2"
+      >
         {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-10 text-center">
             <span
@@ -453,7 +484,10 @@ export function ChatPanel({
           <div className="space-y-7">
             {messages.map((message) =>
               message.role === "user" ? (
-                <article key={message.id} className="flex flex-col items-end gap-1">
+                <article
+                  key={message.id}
+                  className="rise-in flex flex-col items-end gap-1"
+                >
                   <div className="max-w-[88%] whitespace-pre-wrap rounded-[26px] rounded-br-lg bg-bubble px-4 py-2.5 text-[14px] leading-[1.6] text-bubble-text">
                     {message.content}
                   </div>
@@ -466,7 +500,7 @@ export function ChatPanel({
                   </button>
                 </article>
               ) : (
-                <article key={message.id} className="max-w-[94%]">
+                <article key={message.id} className="rise-in max-w-[94%]">
                   <div className="flex items-center justify-between gap-3 pb-1.5">
                     <p className="eyebrow text-accent-text">
                       {message.role === "system" ? "system" : "openmi"}
@@ -491,7 +525,7 @@ export function ChatPanel({
             )}
 
             {(steps.length > 0 || pending.length > 0 || backgroundRunning) && (
-              <article className="max-w-[94%]">
+              <article className="max-w-[94%]" aria-live="polite">
                 <p className="eyebrow pb-1.5 text-accent-text">openmi</p>
 
                 {steps.length > 0 && (
@@ -584,6 +618,7 @@ export function ChatPanel({
 
         <div className="rounded-[28px] border border-line-strong/70 bg-card p-2 shadow-[0_18px_40px_-32px_rgba(22,18,12,0.6)] focus-within:border-accent/45">
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -592,13 +627,13 @@ export function ChatPanel({
                 void send(draft);
               }
             }}
-            rows={2}
+            rows={1}
             placeholder={
               providerReady
                 ? "Message Openmi…"
                 : "No provider key is configured — the setup page lists what is missing."
             }
-            className="w-full resize-none bg-transparent px-3 pt-1.5 text-[14px] leading-[1.6] text-body placeholder:text-low focus:outline-none"
+            className="max-h-[168px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-1.5 text-[14px] leading-[1.6] text-body placeholder:text-low focus:outline-none"
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-1">

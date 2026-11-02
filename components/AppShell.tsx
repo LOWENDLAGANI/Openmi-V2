@@ -45,9 +45,9 @@ export function AppShell({
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-[#16120c]/35 backdrop-blur-[2px]"
+            className="fade-in absolute inset-0 bg-[#16120c]/35 backdrop-blur-[2px]"
           />
-          <div className="absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-raised shadow-[0_24px_60px_rgba(22,18,12,0.28)]">
+          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-raised shadow-[0_24px_60px_rgba(22,18,12,0.28)]">
             {sidebar}
           </div>
         </div>
