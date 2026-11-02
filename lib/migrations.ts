@@ -1,75 +1,139 @@
-import "server-only";
-
-import { readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { supabaseAdmin } from "./supabase/admin";
+/**
+ * Migration files and drift detection.
+ *
+ * This module is deliberately free of `server-only` and of a database client:
+ * the comparison is pure and tested without a Supabase project. The reader that
+ * talks to Postgres lives in `lib/setup/migrations.ts`.
+ *
+ * Checksums are taken over normalized SQL: comments are stripped and whitespace
+ * collapsed. Reformatting a file is not drift; changing a statement is. The
+ * ledger side is the `statements` array Supabase stores, joined back into SQL
+ * before it is normalized the same way.
+ */
 
-export type MigrationFile = { name: string; version: string };
+export type LocalMigration = {
+  name: string;
+  version: string;
+  checksum: string;
+};
 
-/** Migration files as they exist in the repo, in apply order. */
-export async function listMigrationFiles(): Promise<MigrationFile[]> {
+export type AppliedMigration = {
+  version: string;
+  name: string | null;
+  checksum: string | null;
+};
+
+export type MigrationEntryState =
+  | "applied"
+  | "drift"
+  | "pending"
+  | "unknown"
+  | "orphaned";
+
+export type MigrationEntry = {
+  version: string;
+  name: string;
+  state: MigrationEntryState;
+};
+
+export async function listLocalMigrations(): Promise<LocalMigration[]> {
   try {
     const dir = path.join(process.cwd(), "supabase", "migrations");
     const entries = await readdir(dir);
-    return entries
-      .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .map((name) => ({ name, version: name.split("_")[0] ?? name }));
+
+    return await Promise.all(
+      entries
+        .filter((name) => name.endsWith(".sql"))
+        .sort()
+        .map(async (name) => ({
+          name,
+          version: name.split("_")[0] ?? name,
+          checksum: sqlChecksum(await readFile(path.join(dir, name), "utf8")),
+        }))
+    );
   } catch {
     return [];
   }
 }
 
-export type MigrationState = "unconfigured" | "not-applied" | "applied" | "error";
+/** Comments and formatting are not part of an applied migration. */
+export function normalizeSql(sql: string): string {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n\r]*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s*([(),;])\s*/g, "$1")
+    .replace(/;$/, "");
+}
 
-export type MigrationProbe = { state: MigrationState; detail: string };
+export function sqlChecksum(sql: string): string {
+  return createHash("sha256").update(normalizeSql(sql), "utf8").digest("hex");
+}
 
 /**
- * Asks the database whether the base migration has run.
+ * The checksum of a ledger row, from the statements Supabase recorded.
  *
- * This only reads a marker table, and it is the one place besides the migration
- * files where the service role is used. If the table is absent the answer is
- * "not applied", which is a useful fact rather than an error page.
+ * Null means the ledger did not record statements for this version, so drift
+ * cannot be judged. That is reported as `unknown`, never as "up to date".
  */
-export async function probeMigrations(): Promise<MigrationProbe> {
-  const admin = supabaseAdmin();
+export function statementsChecksum(statements: unknown): string | null {
+  if (!Array.isArray(statements)) return null;
 
-  if (!admin) {
-    return {
-      state: "unconfigured",
-      detail: "Supabase URL and service-role key are not both set.",
-    };
-  }
+  const parts = statements.filter(
+    (statement): statement is string => typeof statement === "string"
+  );
 
-  try {
-    const { data, error } = await admin
-      .from("openmi_meta")
-      .select("value")
-      .eq("key", "schema_version")
-      .maybeSingle();
+  if (parts.length === 0) return null;
 
-    if (error) {
+  return sqlChecksum(parts.join(";\n"));
+}
+
+export function diffMigrations(
+  local: LocalMigration[],
+  applied: AppliedMigration[]
+): MigrationEntry[] {
+  const ledger = new Map(applied.map((row) => [row.version, row]));
+  const entries: MigrationEntry[] = local.map((migration) => {
+    const row = ledger.get(migration.version);
+
+    if (!row) {
       return {
-        state: "not-applied",
-        detail: `openmi_meta is not readable: ${error.message}`,
+        version: migration.version,
+        name: migration.name,
+        state: "pending",
+      };
+    }
+
+    if (!row.checksum) {
+      return {
+        version: migration.version,
+        name: migration.name,
+        state: "unknown",
       };
     }
 
     return {
-      state: "applied",
-      detail:
-        data && typeof data.value === "string"
-          ? `schema_version = ${data.value}`
-          : "openmi_meta exists but has no schema_version row.",
+      version: migration.version,
+      name: migration.name,
+      state: row.checksum === migration.checksum ? "applied" : "drift",
     };
-  } catch (error) {
-    return {
-      state: "error",
-      detail:
-        error instanceof Error
-          ? error.message
-          : "The database could not be reached.",
-    };
+  });
+
+  const localVersions = new Set(local.map((migration) => migration.version));
+
+  for (const row of applied) {
+    if (localVersions.has(row.version)) continue;
+    entries.push({
+      version: row.version,
+      name: row.name ?? `${row.version} (not in this checkout)`,
+      state: "orphaned",
+    });
   }
+
+  return entries;
 }

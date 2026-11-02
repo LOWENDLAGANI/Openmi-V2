@@ -1,4 +1,10 @@
+import {
+  AGENT_BRANCH_PATTERN,
+  agentBranchName,
+} from "@/lib/branch";
 import { GITHUB_API, GITHUB_TIMEOUT_MS, isRepoFullName } from "./read";
+
+export { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
 
 /**
  * The only module in the app that writes to GitHub.
@@ -19,7 +25,6 @@ import { GITHUB_API, GITHUB_TIMEOUT_MS, isRepoFullName } from "./read";
  * honesty claim and it travels with the diff, not just the UI.
  */
 
-export const AGENT_BRANCH_PREFIX = "openmi/agent/";
 export const MAX_COMMIT_FILES = 24;
 export const MAX_COMMIT_FILE_BYTES = 120_000;
 
@@ -59,26 +64,13 @@ export type CommitOutcome = {
   prNumber: number;
 };
 
-/** The branch for one changeset. Lower case, within GitHub's branch rules. */
-export function agentBranchName(changesetId: string): string {
-  const slug = changesetId
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 48);
-
-  return `${AGENT_BRANCH_PREFIX}${slug}`;
-}
-
-const AGENT_BRANCH = /^openmi\/agent\/[a-z0-9][a-z0-9-]{0,63}$/;
-
 /**
  * Throws unless this is an Openmi agent branch and not the repository's default
  * branch. A default branch name, a user-supplied branch and a malformed name
  * all get the same refusal, because none of them is a thing this app commits.
  */
 export function assertAgentBranch(branch: string, defaultBranch: string): void {
-  if (branch === defaultBranch || !AGENT_BRANCH.test(branch)) {
+  if (branch === defaultBranch || !AGENT_BRANCH_PATTERN.test(branch)) {
     throw new GithubWriteError(
       "refused",
       "Openmi only commits to agent/ branches.",

@@ -90,6 +90,11 @@ export function providersConfigured(
   return providersFor("auto", env).length > 0;
 }
 
+/** Every provider, for the setup page to probe each configured key. */
+export function providerCatalogue(): Provider[] {
+  return [OPENROUTER, GROQ, DEEPSEEK];
+}
+
 /**
  * Streams text deltas from one provider.
  *

@@ -9,8 +9,8 @@ tests, and it says so.
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–7 are
-built; setup, hardening and launch are next.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–8 are
+built; hardening and launch are next.
 
 ---
 
@@ -82,7 +82,8 @@ different accounts and as `anon`. It also covers the seal/unseal path and its
 tamper cases, the GET-only GitHub client, the context budget, the turn envelope,
 the diff engine and edit rules, both directions of the changeset signature, the
 branch refusal and request shape of the write client, the Dew ledger, sessions,
-refunds, invites and redeem codes against a real Postgres, and the tool surface.
+refunds, invites and redeem codes against a real Postgres, migration drift
+detection, probe classification, and the tool surface.
 
 ## What is built
 
@@ -96,8 +97,8 @@ refunds, invites and redeem codes against a real Postgres, and the tool surface.
 | 5 | done | Proposed edits, unified diff, per-file review, signed changesets |
 | 6 | done | Approval → agent branch → one commit → pull request, default-branch refusal |
 | 7 | done | Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
-| 8 | next | Setup/about truth surface |
-| 9 | — | Hardening and launch |
+| 8 | done | Setup env, migration drift and live probes; `/about` truth surface |
+| 9 | next | Hardening and launch |
 
 ## The agent, and its limits
 
@@ -177,6 +178,23 @@ operator-issued redeem codes — there is no card payment in this build.
 invite code, the redeem form and the refill timezone. The sum of the ledger
 amounts equals the cached balance, and a test asserts it for every account.
 
+## Setup and about
+
+`/setup` reports every environment variable from the contract as present or
+missing, never its value, with the fix beside it. It reads the Supabase
+migration ledger through a service-role function and compares each applied row
+against this checkout: applied files are green, missing files are pending, and a
+file edited after it was applied is marked **drift** rather than up to date.
+Checksums are taken over normalized SQL, so reformatting is not drift.
+
+The same page runs read-only live probes: Supabase reachability, an RLS smoke
+test where the anon key must read zero profile rows, GitHub token decryption and
+acceptance, and a model-list request for each configured provider. Each probe
+reports its own failure with its own fix; none prints a key.
+
+`/about` states what the product does and does not do: no execution, no default
+branch writes, no merges, no card payments, and no claim of verification.
+
 ## Known limits
 
 - Nothing in this app executes code. There is no sandbox and no test runner, and
@@ -188,6 +206,8 @@ amounts equals the cached balance, and a test asserts it for every account.
   operator adjustment.
 - There is no card payment. Top-ups and gift Dew are operator-issued redeem
   codes, and there is no public way to create one.
+- `/setup` probes a provider with a model-list request, not a completion, so a
+  pass confirms the key authenticates rather than that a specific model works.
 - GitHub code search runs against the default branch while line numbers are
   resolved at the pinned commit; the UI says both.
 - Repository access is API calls, not a clone. There is no mirror to go stale,

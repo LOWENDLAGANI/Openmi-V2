@@ -26,6 +26,12 @@ export default function HomePage() {
         <Brand />
         <div className="flex items-center gap-3">
           <Link
+            href="/about"
+            className="text-[13px] font-medium text-mid transition-colors hover:text-hi"
+          >
+            About
+          </Link>
+          <Link
             href="/login"
             className="text-[13px] font-medium text-body transition-colors hover:text-hi"
           >
@@ -95,7 +101,7 @@ export default function HomePage() {
           Every phase is written down in{" "}
           <span className="font-mono text-mid">OPENMI_BUILD_PHASES.md</span>.
           Sign-in, repositories, chat, review, approval and Dew billing are
-          live; setup and launch hardening are next.
+          live; launch hardening is next.
         </p>
       </footer>
     </main>
