@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
+import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { Sidebar } from "@/components/Sidebar";
@@ -491,7 +493,11 @@ export default async function ChatPage({
   const { supabase, user } = session;
   const trashView = params.trash === "1";
 
-  const [foldersResult, chatsResult, connection] = await Promise.all([
+  // The daily allowance is settled before anything is rendered, so the chip
+  // shows the balance the next turn will actually use.
+  await refillDailyDew(supabase);
+
+  const [foldersResult, chatsResult, connection, profileResult] = await Promise.all([
     supabase.from("folders").select("id, name, created_at").order("name"),
     supabase
       .from("chats")
@@ -500,7 +506,12 @@ export default async function ChatPage({
       )
       .order("updated_at", { ascending: false }),
     readConnection(supabase, user.id),
+    supabase.from("profiles").select("dew_balance").eq("id", user.id).maybeSingle(),
   ]);
+
+  const dewBalance = Number(
+    (profileResult.data as { dew_balance?: number | string } | null)?.dew_balance ?? 0
+  );
 
   const folders = (foldersResult.data ?? []) as Folder[];
   const allChats = (chatsResult.data ?? []) as Chat[];
@@ -569,12 +580,17 @@ export default async function ChatPage({
                 Files
               </Link>
             )}
-            <span
-              title="Billing arrives in phase 7"
-              className="rounded-full border border-line bg-chip px-2.5 py-1 font-mono text-[11px] text-low"
+            <Link
+              href="/activity"
+              title={`An hour of chat costs ${DEW_PER_HOUR} Dew. Low balance shows amber below ${LOW_BALANCE_DEW}.`}
+              className={`rounded-full border px-2.5 py-1 font-mono text-[11px] ${
+                isLowBalance(dewBalance)
+                  ? "border-warn/40 bg-warn/10 text-warn"
+                  : "border-line bg-chip text-low"
+              }`}
             >
-              Dew · —
-            </span>
+              Dew · {formatDew(dewBalance)}
+            </Link>
             <Link href="/setup" className="text-[12px] text-mid hover:text-hi">
               Setup
             </Link>

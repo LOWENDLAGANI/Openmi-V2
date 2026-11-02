@@ -94,8 +94,8 @@ export default function HomePage() {
         <p>
           Every phase is written down in{" "}
           <span className="font-mono text-mid">OPENMI_BUILD_PHASES.md</span>.
-          Sign-in, folders and the trash are live; repositories arrive in phase 2
-          and chat in phase 3.
+          Sign-in, repositories, chat, review, approval and Dew billing are
+          live; setup and launch hardening are next.
         </p>
       </footer>
     </main>

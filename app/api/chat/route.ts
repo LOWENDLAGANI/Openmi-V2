@@ -17,6 +17,7 @@ import {
   findDraftChangeset,
 } from "@/lib/changesets/store";
 import { assembleContext } from "@/lib/context";
+import { refundDewSession, startDewSession } from "@/lib/dew/store";
 import { serverEnv } from "@/lib/env";
 import { getFile, getTree, isRepoFullName, MAX_PATH_INDEX } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
@@ -112,6 +113,19 @@ export async function POST(request: Request) {
       },
       409
     );
+  }
+
+  // Charged only after the deployment can actually answer, so a missing
+  // provider key never costs an hour. An hour that is still running is reused,
+  // so a second turn inside it costs nothing more.
+  const dew = await startDewSession(
+    session.supabase,
+    model,
+    typeof chat.repo_full_name === "string" ? chat.repo_full_name : null
+  );
+
+  if (!dew.ok) {
+    return json({ error: dew.error, code: "no-dew" }, 402);
   }
 
   const sealKey = serverEnv().githubTokenKey;
@@ -317,6 +331,28 @@ export async function POST(request: Request) {
           Math.ceil(text.length / 4)
         );
 
+      // A refund is only due for an hour charged by this request that produced
+      // no answer at all. The database allows one refund per session.
+      let refunded = false;
+
+      const refundTurn = async (reason: string) => {
+        if (refunded || !dew.session.started) return;
+        refunded = true;
+
+        const ok = await refundDewSession(
+          session.supabase,
+          dew.session.sessionId,
+          reason
+        );
+
+        if (!ok) {
+          send("notice", {
+            message:
+              "This hour could not be refunded automatically; the ledger still shows the charge.",
+          });
+        }
+      };
+
       const startedAt = Date.now();
 
       // A proposal is a row, created on first use and signed when the turn
@@ -428,6 +464,17 @@ export async function POST(request: Request) {
           signal: abort.signal,
           startedAt,
         });
+
+        if (
+          result.text.length === 0 &&
+          (result.stopped === "error" || result.stopped === "aborted")
+        ) {
+          await refundTurn(
+            result.stopped === "aborted"
+              ? "Stopped before the first token"
+              : "Provider failed before the first token"
+          );
+        }
 
         if (result.notice) send("notice", { message: result.notice });
 
@@ -541,6 +588,14 @@ export async function POST(request: Request) {
             failure = caught instanceof Error ? caught : new Error("The provider failed.");
             if (abort.signal.aborted) break;
           }
+        }
+
+        if (produced.length === 0 && (failure !== null || abort.signal.aborted)) {
+          await refundTurn(
+            abort.signal.aborted
+              ? "Stopped before the first token"
+              : "Provider failed before the first token"
+          );
         }
 
         if (produced.length > 0) {

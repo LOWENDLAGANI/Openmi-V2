@@ -9,8 +9,8 @@ tests, and it says so.
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–6 are
-built; billing is next.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–7 are
+built; setup, hardening and launch are next.
 
 ---
 
@@ -81,7 +81,8 @@ NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 different accounts and as `anon`. It also covers the seal/unseal path and its
 tamper cases, the GET-only GitHub client, the context budget, the turn envelope,
 the diff engine and edit rules, both directions of the changeset signature, the
-branch refusal and request shape of the write client, and the tool surface.
+branch refusal and request shape of the write client, the Dew ledger, sessions,
+refunds, invites and redeem codes against a real Postgres, and the tool surface.
 
 ## What is built
 
@@ -94,8 +95,9 @@ branch refusal and request shape of the write client, and the tool surface.
 | 4 | done | Read-only agent tools, step budget with compare-and-set, signed continuation, truthful caps |
 | 5 | done | Proposed edits, unified diff, per-file review, signed changesets |
 | 6 | done | Approval → agent branch → one commit → pull request, default-branch refusal |
-| 7 | next | Dew: hourly sessions, ledger, daily free bucket, activity, invites |
-| 8–9 | — | Setup/about truth surface, hardening, launch |
+| 7 | done | Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
+| 8 | next | Setup/about truth surface |
+| 9 | — | Hardening and launch |
 
 ## The agent, and its limits
 
@@ -143,13 +145,49 @@ commit's parent is the chat's pinned sha — a pin that has moved refuses instea
 of guessing. Retrying after a failure reuses the recorded branch, commit and
 pull request, so one approval cannot produce two PRs.
 
+## Dew
+
+One hour of chat costs 3 Dew, charged before the provider is called. A running
+hour is reused, so more turns inside it are free. The charge is made by
+`start_hour_session(model, repo)`, which has no price parameter.
+
+| Constant | Value |
+|---|---|
+| Hour price | 3 |
+| Daily free allowance | 10 |
+| Paid daily allowance | 15 |
+| Trial credit | 5 |
+| Low-balance warning | 10 |
+| Precision (decimals) | 3 |
+| Dust floor | 0.05 |
+
+On the first day the daily allowance is added to the trial credit; after that it
+tops the balance up to 10 Dew (15 once a top-up has been redeemed) at local
+midnight in the account's timezone. It never refills on a day that is ahead of
+the local date, so a clock that steps backwards mints nothing. The trial credit
+is a ledger row at signup, not an unrecorded default.
+
+An invite rewards both sides 5 Dew, once per invitee, up to 10 rewarded
+accounts. Refunds are one per session at the original price and are written for
+a provider failure or an abort before the first token; anything else is an
+operator adjustment, which is service-role only. Top-up packs are
+operator-issued redeem codes — there is no card payment in this build.
+
+`/activity` shows the ledger, the running hour, per-chat token estimates, the
+invite code, the redeem form and the refill timezone. The sum of the ledger
+amounts equals the cached balance, and a test asserts it for every account.
+
 ## Known limits
 
 - Nothing in this app executes code. There is no sandbox and no test runner, and
   no surface claims otherwise.
 - Writes are one branch and one pull request per approved changeset. There is
-  no merge, no push to the default branch, no branch cleanup, and no activity
-  log yet (phase 7).
+  no merge, no push to the default branch, and no branch cleanup.
+- Dew is charged per hour, not per answer. Only a provider failure or an abort
+  before the first token is refunded automatically; any other correction is an
+  operator adjustment.
+- There is no card payment. Top-ups and gift Dew are operator-issued redeem
+  codes, and there is no public way to create one.
 - GitHub code search runs against the default branch while line numbers are
   resolved at the pinned commit; the UI says both.
 - Repository access is API calls, not a clone. There is no mirror to go stale,

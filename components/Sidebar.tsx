@@ -201,6 +201,13 @@ export function Sidebar({
 
       <div className="border-t border-line pt-3">
         <Link
+          href="/activity"
+          className="block rounded-lg px-2 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
+        >
+          Dew &amp; activity
+        </Link>
+
+        <Link
           href={trashView ? "/chat" : "/chat?trash=1"}
           className="block rounded-lg px-2 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
         >

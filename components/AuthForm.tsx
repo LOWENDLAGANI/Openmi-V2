@@ -18,6 +18,7 @@ export function AuthForm({
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -54,6 +55,10 @@ export function AuthForm({
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          data:
+            inviteCode.trim().length > 0
+              ? { invite_code: inviteCode.trim() }
+              : undefined,
         },
       });
       if (signUpError) throw signUpError;
@@ -169,6 +174,28 @@ export function AuthForm({
             placeholder="At least 8 characters"
           />
         </div>
+
+        {mode === "signup" && (
+          <div>
+            <label
+              htmlFor="invite-code"
+              className="block text-[11px] uppercase tracking-[0.12em] text-low"
+            >
+              Invite code (optional)
+            </label>
+            <input
+              id="invite-code"
+              name="inviteCode"
+              value={inviteCode}
+              onChange={(event) => setInviteCode(event.target.value)}
+              maxLength={64}
+              autoComplete="off"
+              spellCheck={false}
+              className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[12px] text-body placeholder:text-low focus:border-line-strong"
+              placeholder="From the account that invited you"
+            />
+          </div>
+        )}
 
         {error && (
           <p
