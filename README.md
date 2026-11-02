@@ -9,8 +9,8 @@ tests, and it says so.
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–5 are
-built; the approval-to-pull-request path and billing are next.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–6 are
+built; billing is next.
 
 ---
 
@@ -43,9 +43,11 @@ https://<your-domain>/auth/callback
 
 ## Connect GitHub
 
-Paste a fine-grained token with **Contents: read** and **Metadata: read**. It is
-sent once, verified against GitHub, sealed with AES-256-GCM under
-`GITHUB_TOKEN_KEY`, and only its last four characters are ever shown again.
+Paste a fine-grained token with **Contents: read and write**, **Pull requests:
+read and write** and **Metadata: read**. It is sent once, verified against
+GitHub, sealed with AES-256-GCM under `GITHUB_TOKEN_KEY`, and only its last
+four characters are ever shown again. Read-only tokens still browse and chat;
+they are refused at approval with a message naming the missing scopes.
 `/api/github/status` reads a query that does not select the sealed column at all.
 
 Rotating `GITHUB_TOKEN_KEY` makes existing sealed tokens unopenable. That is the
@@ -78,8 +80,8 @@ NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 `bun run test` runs the real migrations against Postgres and queries as two
 different accounts and as `anon`. It also covers the seal/unseal path and its
 tamper cases, the GET-only GitHub client, the context budget, the turn envelope,
-the diff engine and edit rules, both directions of the changeset signature, and
-the tool surface.
+the diff engine and edit rules, both directions of the changeset signature, the
+branch refusal and request shape of the write client, and the tool surface.
 
 ## What is built
 
@@ -91,8 +93,8 @@ the tool surface.
 | 3 | done | Streaming chat, capability modes, per-chat sequence, context budget, citation links |
 | 4 | done | Read-only agent tools, step budget with compare-and-set, signed continuation, truthful caps |
 | 5 | done | Proposed edits, unified diff, per-file review, signed changesets |
-| 6 | next | Approval → branch → pull request, default-branch refusal |
-| 7 | — | Dew: hourly sessions, ledger, daily free bucket, activity, invites |
+| 6 | done | Approval → agent branch → one commit → pull request, default-branch refusal |
+| 7 | next | Dew: hourly sessions, ledger, daily free bucket, activity, invites |
 | 8–9 | — | Setup/about truth surface, hardening, launch |
 
 ## The agent, and its limits
@@ -133,15 +135,21 @@ the signature, so moving from ready to approved does not invalidate it. A
 changeset expires six hours after it is proposed, and expiry is read from the
 clock, not stored as a hopeful flag.
 
-**Approval does not write to GitHub.** It records the signed set and stops;
-phase 5 has no branch, commit or pull request, and the card says so.
+**Approval opens one branch and one pull request.** The head is always
+`openmi/agent/<changeset-id>`; there is no parameter that accepts a branch
+name, and the default branch is refused by the write client before any request.
+The PR base is the repository's default branch, read live from GitHub, and the
+commit's parent is the chat's pinned sha — a pin that has moved refuses instead
+of guessing. Retrying after a failure reuses the recorded branch, commit and
+pull request, so one approval cannot produce two PRs.
 
 ## Known limits
 
 - Nothing in this app executes code. There is no sandbox and no test runner, and
   no surface claims otherwise.
-- No commit path yet: approving records a signed set of files, and no branch,
-  commit or pull request is created.
+- Writes are one branch and one pull request per approved changeset. There is
+  no merge, no push to the default branch, no branch cleanup, and no activity
+  log yet (phase 7).
 - GitHub code search runs against the default branch while line numbers are
   resolved at the pinned commit; the UI says both.
 - Repository access is API calls, not a clone. There is no mirror to go stale,

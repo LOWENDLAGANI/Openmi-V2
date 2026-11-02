@@ -88,8 +88,14 @@ function ConnectPanel() {
       <p className="mt-2 text-[13px] leading-relaxed text-mid">
         Openmi reads repositories through the GitHub API with a token you
         provide. Create a fine-grained token with{" "}
-        <span className="font-mono text-[12px] text-body">Contents: read</span>{" "}
-        and{" "}
+        <span className="font-mono text-[12px] text-body">
+          Contents: read and write
+        </span>
+        {", "}
+        <span className="font-mono text-[12px] text-body">
+          Pull requests: read and write
+        </span>
+        {", and "}
         <span className="font-mono text-[12px] text-body">Metadata: read</span>,
         then paste it once. It is sealed with AES-256-GCM before it is stored, and
         only its last four characters are ever shown again.
@@ -119,7 +125,10 @@ function ConnectPanel() {
 
       <ul className="mt-5 space-y-1 text-[11.5px] leading-relaxed text-low">
         <li>The token is sent once over HTTPS and never returned to the browser.</li>
-        <li>Read scopes are enough here; writes arrive in phase 6.</li>
+        <li>
+          Writes happen only after you approve a changeset, and only on an
+          openmi/agent/ branch.
+        </li>
         <li>Disconnecting deletes the sealed value immediately.</li>
       </ul>
     </div>

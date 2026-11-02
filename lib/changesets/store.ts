@@ -7,7 +7,6 @@ import {
   changesetContentHash,
   changesetDisplayStatus,
   signChangeset,
-  verifyChangesetSignature,
   type ChangesetStatus,
   type EditRequest,
 } from "@/lib/changesets";
@@ -37,6 +36,11 @@ export type ChangesetRow = {
   repo_full_name: string;
   expires_at: string;
   created_at: string;
+  branch_name: string | null;
+  commit_sha: string | null;
+  pr_url: string | null;
+  pr_number: number | null;
+  failure: string | null;
 };
 
 export type ChangesetFileRow = {
@@ -388,119 +392,15 @@ export async function reviewChangesetFile(
   return { ok: true };
 }
 
-/**
- * The only approval path in this build.
- *
- * It re-derives the content hash from the rows as they are now and compares
- * both the hash and the signature before the status moves. It then stops: no
- * branch, commit or pull request exists in phase 5, and the card says so.
- */
-export async function approveChangeset(
-  supabase: Client,
-  input: { changesetId: string; sealKey: string | null }
-): Promise<{ ok: true } | Failure> {
-  if (!input.sealKey) {
-    return {
-      ok: false,
-      error: "GITHUB_TOKEN_KEY is not configured, so changesets cannot be verified.",
-    };
-  }
-
-  const { data: row, error } = await supabase
-    .from("changesets")
-    .select("id, status, base_sha, expires_at, content_hash, signature")
-    .eq("id", input.changesetId)
-    .maybeSingle();
-
-  if (error) return { ok: false, error: error.message };
-  if (!row) return { ok: false, error: "That changeset no longer exists." };
-
-  const changeset = row as {
-    id: string;
-    status: ChangesetStatus;
-    base_sha: string;
-    expires_at: string;
-    content_hash: string | null;
-    signature: string | null;
-  };
-  const status = changesetDisplayStatus(changeset);
-
-  if (status === "expired") {
-    return { ok: false, error: "That changeset expired after six hours. Ask for a fresh one." };
-  }
-
-  if (status !== "ready") {
-    return {
-      ok: false,
-      error: `That changeset is ${status}; only a ready changeset can be approved.`,
-    };
-  }
-
-  const { data: files, error: filesError } = await supabase
-    .from("changeset_files")
-    .select("path, proposed_content, error")
-    .eq("changeset_id", input.changesetId)
-    .eq("accepted", true);
-
-  if (filesError) return { ok: false, error: filesError.message };
-
-  const accepted = ((files ?? []) as Array<{
-    path: string;
-    proposed_content: string;
-    error: string | null;
-  }>).filter((file) => file.error === null);
-
-  if (accepted.length === 0) {
-    return { ok: false, error: "No files are accepted, so there is nothing to approve." };
-  }
-
-  const contentHash = changesetContentHash(
-    accepted.map((file) => ({ path: file.path, proposed: file.proposed_content }))
-  );
-
-  if (!changeset.content_hash || changeset.content_hash !== contentHash) {
-    return {
-      ok: false,
-      error: "The stored content hash does not match these files. Ask for a fresh changeset.",
-    };
-  }
-
-  if (
-    !changeset.signature ||
-    !verifyChangesetSignature(
-      {
-        changesetId: changeset.id,
-        baseSha: changeset.base_sha,
-        contentHash,
-      },
-      changeset.signature,
-      input.sealKey
-    )
-  ) {
-    return {
-      ok: false,
-      error: "The signature does not match this content. Ask for a fresh changeset.",
-    };
-  }
-
-  const { error: updateError } = await supabase
-    .from("changesets")
-    .update({ status: "approved" })
-    .eq("id", input.changesetId)
-    .eq("status", "ready");
-
-  if (updateError) return { ok: false, error: updateError.message };
-
-  return { ok: true };
-}
-
 export async function loadChangesets(
   supabase: Client,
   chatId: string
 ): Promise<ReviewChangeset[]> {
   const { data: rows } = await supabase
     .from("changesets")
-    .select("id, status, base_sha, repo_full_name, expires_at, created_at")
+    .select(
+      "id, status, base_sha, repo_full_name, expires_at, created_at, branch_name, commit_sha, pr_url, pr_number, failure"
+    )
     .eq("chat_id", chatId)
     .order("created_at", { ascending: false })
     .limit(MAX_REVIEW_CARDS);

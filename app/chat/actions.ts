@@ -3,10 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import {
-  approveChangeset,
-  reviewChangesetFile,
-} from "@/lib/changesets/store";
+import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
+import { reviewChangesetFile } from "@/lib/changesets/store";
 import { serverEnv } from "@/lib/env";
 import { getSession } from "@/lib/session";
 
@@ -237,14 +235,15 @@ export async function rejectChange(formData: FormData) {
 }
 
 export async function approveProposal(formData: FormData) {
-  const { supabase } = await acting();
+  const { supabase, user } = await acting();
   const changesetId = field(formData, "changesetId");
   const chatId = field(formData, "chatId");
 
   if (!changesetId) fail("That changeset no longer exists.");
 
-  const result = await approveChangeset(supabase, {
+  const result = await approveChangesetAndOpenPullRequest(supabase, {
     changesetId,
+    owner: user.id,
     sealKey: serverEnv().githubTokenKey,
   });
 

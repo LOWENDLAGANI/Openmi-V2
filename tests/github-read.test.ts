@@ -24,8 +24,11 @@ test("the GitHub read client has exactly one fetch call site", () => {
   expect(matches).toHaveLength(1);
 });
 
-test("every request under lib/github is a GET", () => {
-  for (const file of FILES) {
+test("every read request under lib/github is a GET", () => {
+  // write.ts is the one module allowed write verbs; it is the only file under
+  // lib/github that names a method other than GET, and the test below pins it
+  // to the three methods an approval needs.
+  for (const file of FILES.filter((name) => name !== "write.ts")) {
     const text = source(file);
     const methods = text.match(/method:\s*"[A-Z]+"/g) ?? [];
 
@@ -36,6 +39,15 @@ test("every request under lib/github is a GET", () => {
     expect(text).not.toMatch(/"(POST|PUT|PATCH|DELETE)"/);
     expect(text).not.toMatch(/\baxios\b/);
   }
+});
+
+test("the write client uses only the verbs an approval needs", () => {
+  const text = source("write.ts");
+
+  expect(text).toContain('type WriteMethod = "GET" | "POST" | "PATCH"');
+  expect(text).not.toMatch(/"(PUT|DELETE)"/);
+  expect(text).toContain("Openmi only commits to agent/ branches.");
+  expect(text).not.toMatch(/\baxios\b/);
 });
 
 test("the viewer and search caps are named constants", () => {

@@ -19,7 +19,7 @@ export const SYSTEM_PROMPT = [
   CITATION_CLAUSE,
   NO_EXECUTION_CLAUSE,
   "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
-  "Propose edits only by calling the propose_edits tool. Each proposal becomes a diff the user reviews; nothing is written to the repository, and you cannot run code or tests, so never say an edit was applied, verified or committed.",
+  "Propose edits only by calling the propose_edits tool. Each proposal becomes a diff the user reviews and may approve, which opens a pull request on an agent branch; you cannot write to GitHub yourself. Never say an edit was applied, verified, tested or committed.",
 ].join("\n\n");
 
 export function buildSystemPrompt({
@@ -46,7 +46,7 @@ export function buildSystemPrompt({
   if (repo && sha) {
     lines.push(
       edits
-        ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The user reviews each file as a diff; nothing is written to GitHub."
+        ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The user reviews each file and may approve it, which opens a pull request; only an approval writes to GitHub, and the default branch is never touched."
         : "Editing is unavailable in this turn. Answer with citations only, and say so if the user asks for a change."
     );
   }

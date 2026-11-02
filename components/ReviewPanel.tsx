@@ -20,7 +20,7 @@ import type { ReviewChangeset } from "@/lib/changesets/store";
 const STATUS_LABEL: Record<ChangesetStatus, string> = {
   draft: "Draft — not signed yet",
   ready: "Ready for review",
-  approved: "Approved — no commit path yet",
+  approved: "Approved",
   committed: "Committed",
   failed: "Failed — no file could be proposed",
   expired: "Expired",
@@ -165,12 +165,12 @@ export function ReviewPanel({
                   <p className="max-w-md text-[11px] leading-relaxed text-low">
                     {accepted.length === 0
                       ? "No files are accepted, so there is nothing to approve."
-                      : `${accepted.length} file(s) accepted. Approving records the signed set; no branch or pull request is opened in this build.`}
+                      : `${accepted.length} file(s) accepted. Approving opens one branch and one pull request; the default branch is not written to.`}
                   </p>
 
                   {accepted.length > 0 && (
                     <button className="rounded-lg bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent hover:opacity-90">
-                      Approve changes
+                      Approve and open PR
                     </button>
                   )}
                 </form>
@@ -185,10 +185,60 @@ export function ReviewPanel({
               )}
 
               {status === "approved" && (
-                <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
-                  Approved. Nothing has been written to GitHub; opening a pull
-                  request arrives in phase 6.
-                </p>
+                <div className="space-y-2 border-t border-line pt-3">
+                  {changeset.pr_url && typeof changeset.pr_number === "number" ? (
+                    <p className="text-[11px] leading-relaxed text-mid">
+                      Committed on{" "}
+                      <span className="font-mono text-body">{changeset.branch_name}</span>.{" "}
+                      <a
+                        href={changeset.pr_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent underline-offset-2 hover:underline"
+                      >
+                        Pull request #{changeset.pr_number}
+                      </a>{" "}
+                      The default branch was not modified.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] leading-relaxed text-mid">
+                        Approved, but GitHub has not confirmed a pull request
+                        yet.
+                      </p>
+
+                      {changeset.failure && (
+                        <p
+                          role="alert"
+                          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[11px] leading-relaxed text-danger"
+                        >
+                          {changeset.failure}
+                        </p>
+                      )}
+
+                      <form
+                        action={approveProposal}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <input type="hidden" name="changesetId" value={changeset.id} />
+                        <input type="hidden" name="chatId" value={chatId} />
+
+                        <p className="max-w-md text-[11px] leading-relaxed text-low">
+                          Retry reuses{" "}
+                          {changeset.branch_name
+                            ? `the branch ${changeset.branch_name}`
+                            : "the same branch"}{" "}
+                          and any commit already created; it never opens a second
+                          pull request.
+                        </p>
+
+                        <button className="rounded-lg border border-line bg-card px-3 py-1.5 text-[11.5px] text-mid hover:text-hi">
+                          Retry approval
+                        </button>
+                      </form>
+                    </>
+                  )}
+                </div>
               )}
 
               {status === "expired" && (
@@ -207,8 +257,32 @@ export function ReviewPanel({
 
               {status === "committed" && (
                 <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
-                  Committed on a branch. This build has no commit path; the label
-                  reflects a row written elsewhere.
+                  Committed on{" "}
+                  <span className="font-mono text-body">
+                    {changeset.branch_name ?? "an agent branch"}
+                  </span>
+                  {changeset.commit_sha ? (
+                    <>
+                      {" "}at{" "}
+                      <span className="font-mono text-body">
+                        {changeset.commit_sha.slice(0, 7)}
+                      </span>
+                    </>
+                  ) : null}
+                  .{" "}
+                  {changeset.pr_url && typeof changeset.pr_number === "number" ? (
+                    <a
+                      href={changeset.pr_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent underline-offset-2 hover:underline"
+                    >
+                      Pull request #{changeset.pr_number}
+                    </a>
+                  ) : (
+                    "No pull request is recorded."
+                  )}{" "}
+                  The default branch was not modified.
                 </p>
               )}
             </div>
