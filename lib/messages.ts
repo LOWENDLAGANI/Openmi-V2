@@ -44,6 +44,10 @@ export async function listMessages(
  * All writes go through the `append_message` function rather than an insert:
  * that function holds a lock on the chat row and is the only place a `seq` is
  * chosen, so two concurrent appends cannot collide.
+ *
+ * The usage estimate is passed into the same call. `messages` deliberately has
+ * no update policy, so a follow-up update would match zero rows and fail
+ * silently — which is exactly what used to happen.
  */
 export async function appendMessage(
   supabase: Client,
@@ -58,23 +62,13 @@ export async function appendMessage(
     p_role: role,
     p_content: content,
     p_model: model,
+    p_tokens: tokens,
   });
 
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  const row = data as MessageRow;
-
-  if (tokens !== null) {
-    // Usage is an estimate, and the column name says so. It is never shown as a
-    // price or a bill.
-    await supabase
-      .from("messages")
-      .update({ usage_tokens: tokens })
-      .eq("id", row.id);
-  }
-
-  return row;
+  return data as MessageRow;
 }
 
 /** The tail of a transcript, trimmed by characters rather than by a guess. */

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import {
   MAX_STEPS,
@@ -216,6 +216,16 @@ export async function POST(request: Request) {
   const turnId = continuation?.turnId ?? newTurnId();
   const expiresAt = continuation ? continuation.exp : Date.now() + TURN_TTL_MS;
 
+  if (continuation) {
+    // A continuation is the same turn, so it is running again. Without this the
+    // turn stays "paused" and the page cannot tell that work resumed.
+    await session.supabase
+      .from("agent_turns")
+      .update({ status: "running", cancel_requested: false, finished_at: null })
+      .eq("turn_id", turnId)
+      .eq("owner", session.user.id);
+  }
+
   let userMessage = null;
 
   if (!continuation) {
@@ -310,10 +320,29 @@ export async function POST(request: Request) {
 
   const userSeq = userMessage ? Number(userMessage.seq) : null;
 
+  // A turn outlives the tab that started it. `after()` keeps this invocation
+  // alive once the response is closed, so the answer is written down even when
+  // nobody is listening any more. `maxDuration` is still the ceiling, which is
+  // why the turn pauses at CONTINUE_AT_MS instead of running past it.
+  let settleTurn: (() => void) | null = null;
+  const turnFinished = new Promise<void>((resolve) => {
+    settleTurn = resolve;
+  });
+  // The race is a backstop: an invocation that never reaches `finish` must not
+  // hold the function open until the platform kills it.
+  after(() =>
+    Promise.race([
+      turnFinished,
+      new Promise<void>((resolve) => setTimeout(resolve, 60_000)),
+    ])
+  );
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const encoder = new TextEncoder();
       let closed = false;
+      let settled = false;
+      let turnText = "";
 
       const send = (event: string, data: unknown) => {
         if (closed) return;
@@ -326,9 +355,58 @@ export async function POST(request: Request) {
         }
       };
 
+      // Generation is deliberately NOT wired to request.signal. Closing the
+      // tab ends this stream, not the work. Only an explicit Stop — the
+      // cancel_requested flag on the turn row, set by /api/chat/stop — aborts
+      // the provider call, so "leave the page" and "stop" stay different acts.
       const abort = new AbortController();
-      const onAbort = () => abort.abort();
-      request.signal.addEventListener("abort", onAbort);
+
+      const finish = async (
+        status: "done" | "error" | "paused",
+        finalText: string
+      ) => {
+        if (settled) return;
+        settled = true;
+        closed = true;
+        clearInterval(watcher);
+
+        try {
+          await session.supabase
+            .from("agent_turns")
+            .update({
+              status,
+              partial: finalText.slice(0, 20_000),
+              finished_at: new Date().toISOString(),
+            })
+            .eq("turn_id", turnId)
+            .eq("owner", session.user.id);
+        } catch {
+          // The answer is already stored as a message. A status write that
+          // fails must not turn a finished turn into a broken stream.
+        }
+
+        try {
+          controller.close();
+        } catch {
+          // The reader went away; the work above is what mattered.
+        }
+
+        settleTurn?.();
+      };
+
+      const watcher = setInterval(() => {
+        if (abort.signal.aborted) return;
+
+        void session.supabase
+          .from("agent_turns")
+          .select("cancel_requested")
+          .eq("turn_id", turnId)
+          .maybeSingle()
+          .then(({ data }) => {
+            const row = data as { cancel_requested?: boolean } | null;
+            if (row?.cancel_requested) abort.abort();
+          });
+      }, 2_000);
 
       if (userMessage && userSeq !== null) {
         send("user", { id: userMessage.id, seq: userSeq });
@@ -549,9 +627,7 @@ export async function POST(request: Request) {
             });
           }
 
-          request.signal.removeEventListener("abort", onAbort);
-          closed = true;
-          controller.close();
+          await finish("paused", result.text);
           return;
         }
 
@@ -559,6 +635,8 @@ export async function POST(request: Request) {
           result.stopped === "aborted" && result.text.length > 0
             ? `${result.text}\n\n_(stopped before this answer finished)_`
             : result.text;
+
+        turnText = text;
 
         if (text.length > 0) {
           try {
@@ -625,6 +703,8 @@ export async function POST(request: Request) {
             ? `${produced}\n\n_(stopped before this answer finished)_`
             : produced;
 
+          turnText = text;
+
           try {
             const saved = await persist(text);
             send("done", {
@@ -650,9 +730,7 @@ export async function POST(request: Request) {
         }
       }
 
-      request.signal.removeEventListener("abort", onAbort);
-      closed = true;
-      controller.close();
+      await finish(turnText.length > 0 ? "done" : "error", turnText);
     },
   });
 

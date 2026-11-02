@@ -45,16 +45,18 @@ export default async function SetupPage() {
   ]);
 
   const providerList = AI_PROVIDER_KEYS.join(" · ");
+  const schemaMissing = migrations.schema.state === "missing";
   const migrationTone =
-    migrations.drifted > 0
-      ? "pending"
+    schemaMissing || migrations.drifted > 0
+      ? "missing"
       : migrations.state === "ok"
         ? "ok"
         : migrations.state === "unconfigured"
           ? "pending"
           : "missing";
-  const migrationLabel =
-    migrations.state === "ok"
+  const migrationLabel = schemaMissing
+    ? `${migrations.schema.missing.length} object(s) missing`
+    : migrations.state === "ok"
       ? migrations.drifted > 0
         ? `${migrations.drifted} drifted`
         : migrations.pending > 0
@@ -181,6 +183,41 @@ export default async function SetupPage() {
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           {migrations.detail}
         </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <StatusPill
+            tone={
+              migrations.schema.state === "ok"
+                ? "ok"
+                : migrations.schema.state === "missing"
+                  ? "missing"
+                  : "optional"
+            }
+          >
+            schema {migrations.schema.state}
+          </StatusPill>
+
+          {migrations.schema.missing.map((object) => (
+            <span
+              key={object}
+              className="rounded-full border border-danger/25 bg-danger/8 px-2.5 py-1 font-mono text-[10px] text-danger"
+            >
+              {object}
+            </span>
+          ))}
+        </div>
+
+        {schemaMissing && (
+          <p
+            role="alert"
+            className="mt-3 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] leading-relaxed text-danger"
+          >
+            The database is reachable but missing objects this build calls. Chat
+            will fail until the pending migrations are applied: run
+            <span className="font-mono"> supabase db push</span>, then reload this
+            page.
+          </p>
+        )}
 
         {migrations.drifted > 0 && (
           <p

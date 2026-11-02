@@ -41,7 +41,13 @@ function errorText(error: { message?: string } | null): string {
 }
 
 export async function refillDailyDew(supabase: Client): Promise<number | null> {
-  const { data, error } = await supabase.rpc("refill_daily_dew");
+  // The function's only argument has a default, but PostgREST resolves an RPC
+  // by the arguments it is given. Sending it explicitly (null means "the
+  // signed-in account") is what makes the call match; omitting it addressed a
+  // zero-argument function that does not exist.
+  const { data, error } = await supabase.rpc("refill_daily_dew", {
+    p_owner: null,
+  });
 
   if (error || data === null || data === undefined) return null;
   return Number(data);

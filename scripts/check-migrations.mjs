@@ -87,6 +87,96 @@ function checksum(sql) {
   return createHash("sha256").update(sql).digest("hex");
 }
 
+// The objects the application actually calls. A migration that forgets one of
+// these applies cleanly and then breaks a feature at runtime, which is the
+// failure mode this list exists to catch before it is deployed.
+const REQUIRED_TABLES = [
+  "folders",
+  "chats",
+  "messages",
+  "github_connections",
+  "agent_turns",
+  "changesets",
+  "changeset_files",
+  "hour_sessions",
+  "dew_transactions",
+  "dew_codes",
+  "rate_limits",
+];
+
+const REQUIRED_FUNCTIONS = [
+  "append_message",
+  "consume_agent_step",
+  "refill_daily_dew",
+  "start_hour_session",
+  "refund_hour_session",
+  "redeem_dew_code",
+  "rate_limit_hit",
+  "openmi_migration_ledger",
+  "openmi_schema_probe",
+];
+
+const REQUIRED_COLUMNS = [
+  ["chats", "repo_full_name"],
+  ["chats", "repo_branch"],
+  ["chats", "repo_base_sha"],
+  ["chats", "deleted_at"],
+  ["messages", "seq"],
+  ["messages", "usage_tokens"],
+  ["agent_turns", "status"],
+  ["agent_turns", "cancel_requested"],
+  ["agent_turns", "partial"],
+  ["changesets", "pr_url"],
+  ["profiles", "dew_balance"],
+];
+
+async function schemaProblems(db) {
+  const tables = new Set(
+    (
+      await db.query(
+        `select c.relname as name
+           from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relkind in ('r', 'p')`
+      )
+    ).rows.map((row) => row.name)
+  );
+
+  const functions = new Set(
+    (
+      await db.query(
+        `select p.proname as name
+           from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public'`
+      )
+    ).rows.map((row) => row.name)
+  );
+
+  const columns = new Set(
+    (
+      await db.query(
+        `select table_name, column_name
+           from information_schema.columns
+          where table_schema = 'public'`
+      )
+    ).rows.map((row) => `${row.table_name}.${row.column_name}`)
+  );
+
+  const problems = [];
+  for (const table of REQUIRED_TABLES) {
+    if (!tables.has(table)) problems.push(`table public.${table}`);
+  }
+  for (const fn of REQUIRED_FUNCTIONS) {
+    if (!functions.has(fn)) problems.push(`function public.${fn}()`);
+  }
+  for (const [table, column] of REQUIRED_COLUMNS) {
+    if (!columns.has(`${table}.${column}`)) problems.push(`column ${table}.${column}`);
+  }
+
+  return problems;
+}
+
 async function applyPass(db, label) {
   let applied = 0;
   let skipped = 0;
@@ -173,8 +263,43 @@ async function main() {
     const { rows } = await db.query(
       "select count(*)::int as count from supabase_migrations.schema_migrations"
     );
+
+    const problems = await schemaProblems(db);
+
+    // The probe is what /setup shows. If it disagrees with the objects this
+    // script just checked, the page is reporting the wrong thing, so both
+    // results have to be empty rather than only the list being right.
+    const probe = await db.query(
+      "select kind, object from public.openmi_schema_probe()"
+    );
+
+    console.log("");
+    console.log("  schema — objects the application calls");
+
+    if (problems.length > 0) {
+      for (const problem of problems) console.log(`    missing  ${problem}`);
+    } else {
+      console.log("    complete  every required table, function and column exists");
+    }
+
+    if (probe.rows.length > 0) {
+      for (const row of probe.rows) {
+        console.log(`    probe    reports missing ${row.kind} ${row.object}`);
+      }
+    } else {
+      console.log("    probe    openmi_schema_probe() reports nothing missing");
+    }
+
+    if (problems.length > 0 || probe.rows.length > 0) {
+      console.error(
+        `\n  FAIL ${problems.length} schema problem(s); the setup page and this check disagree if the probe also lists rows.\n`
+      );
+      process.exitCode = 1;
+      return;
+    }
+
     console.log(
-      `  Pass — ${rows[0].count} migration(s) recorded, second pass a no-op.`
+      `\n  Pass — ${rows[0].count} migration(s) recorded, second pass a no-op, schema complete.`
     );
   } finally {
     await db.close();

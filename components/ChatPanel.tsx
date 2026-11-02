@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { MessageBody } from "@/components/MessageBody";
 import type { ModelCapability, ModelId } from "@/lib/models";
@@ -34,6 +34,7 @@ export function ChatPanel({
   validPaths,
   pinnedPath,
   providerReady,
+  initialRunning,
 }: {
   chatId: string;
   repo: RepoRef;
@@ -43,6 +44,7 @@ export function ChatPanel({
   validPaths: string[];
   pinnedPath: string | null;
   providerReady: boolean;
+  initialRunning: boolean;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<UiMessage[]>(() =>
@@ -64,10 +66,46 @@ export function ChatPanel({
   const [meter, setMeter] = useState<ContextMeter | null>(null);
   const [lastSent, setLastSent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
 
+  const bottomRef = useRef<HTMLDivElement | null>(null);
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const continuedRef = useRef(false);
+
+  // While a turn is running without this tab driving it, ask the server whether
+  // it is still going and re-read the transcript when it stops. This is the
+  // half that makes closing the tab safe.
+  useEffect(() => {
+    if (streaming || !backgroundRunning) return;
+
+    let cancelled = false;
+
+    const timer = window.setInterval(() => {
+      void fetch(`/api/chat/turn?chatId=${encodeURIComponent(chatId)}`, {
+        cache: "no-store",
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { running?: boolean } | null) => {
+          if (cancelled || !payload) return;
+          if (payload.running) return;
+          setBackgroundRunning(false);
+          router.refresh();
+        })
+        .catch(() => {
+          // A failed poll is not a failed turn; the next tick retries.
+        });
+    }, 2_500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [backgroundRunning, streaming, chatId, router]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  }, [messages, pending, steps, backgroundRunning]);
 
   const suggestions = repo
     ? [
@@ -293,6 +331,16 @@ export function ChatPanel({
   }
 
   function stop() {
+    // Tell the server first: aborting this fetch only ends the stream, and the
+    // turn is deliberately not tied to it. The flag is what stops the work.
+    void fetch("/api/chat/stop", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chatId }),
+    }).catch(() => {
+      // The abort below still ends this view.
+    });
+
     abortRef.current?.abort();
   }
 
@@ -364,6 +412,7 @@ export function ChatPanel({
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
+        <div ref={bottomRef} />
         {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-10 text-center">
             <span
@@ -441,7 +490,7 @@ export function ChatPanel({
               )
             )}
 
-            {(steps.length > 0 || pending.length > 0) && (
+            {(steps.length > 0 || pending.length > 0 || backgroundRunning) && (
               <article className="max-w-[94%]">
                 <p className="eyebrow pb-1.5 text-accent-text">openmi</p>
 
@@ -580,7 +629,9 @@ export function ChatPanel({
         </div>
 
         <p className="mt-2.5 text-center font-mono text-[9.5px] uppercase tracking-[0.15em] text-low">
-          answers cite path:line · nothing is pushed without approval
+          {streaming || backgroundRunning
+            ? "answering on the server · you can leave this page"
+            : "answers cite path:line · nothing is pushed without approval"}
         </p>
       </form>
     </div>

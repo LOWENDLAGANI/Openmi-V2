@@ -382,9 +382,19 @@ async function RepoSurface({
 }
 
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
-  const [messages, changesets] = await Promise.all([
+  const [messages, changesets, runningTurn] = await Promise.all([
     listMessages(session.supabase, chat.id),
     loadChangesets(session.supabase, chat.id),
+    // A turn keeps running after the tab closes. Reading the flag here is what
+    // turns "the answer will arrive" into something the page can show.
+    session.supabase
+      .from("agent_turns")
+      .select("turn_id")
+      .eq("chat_id", chat.id)
+      .eq("status", "running")
+      .gt("expires_at", new Date().toISOString())
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   let repo: { fullName: string; branch: string; sha: string } | null = null;
@@ -449,6 +459,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           validPaths={validPaths}
           pinnedPath={null}
           providerReady={providersConfigured()}
+          initialRunning={Boolean(runningTurn.data)}
         />
       </div>
     </div>
