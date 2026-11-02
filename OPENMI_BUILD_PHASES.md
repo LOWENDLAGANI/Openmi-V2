@@ -1,521 +1,429 @@
 # Openmi — Build Phases
 
-**Source of truth:** `OPENMI_ARCHITECTURE_AUDIT.md`, taken from `LOWENDLAGANI/Openmi` branch `test` @ `08a049d`.
-**Scope:** the 15 findings in that register, sequenced into phases that can each be merged on their own.
-**Status:** ready to build from **Phase 0** through **Phase 5**. Phase 6 is design-gated and deliberately not buildable yet.
+**Target:** a greenfield Openmi web app on **Vercel** (hosting) and **Supabase** (Postgres, Auth, RLS).
+**Status:** nothing is built yet. This file is the build order: eleven phases, one merge window each, one task per pull request.
+**Repository state:** wiped at the start of this plan. See §1 for what was removed and what was kept.
 
 ---
 
 ## Contents
 
-1. [How to use this document](#1-how-to-use-this-document)
-2. [Verified baseline](#2-verified-baseline)
-3. [Invariants — do not "fix" these](#3-invariants--do-not-fix-these)
-4. [Phase map](#4-phase-map)
-5. [Phase 0 — Baseline and truth](#5-phase-0--baseline-and-truth)
-6. [Phase 1 — Accessibility gates](#6-phase-1--accessibility-gates)
-7. [Phase 2 — Money, identity and determinism](#7-phase-2--money-identity-and-determinism)
-8. [Phase 3 — Edge and abuse surface](#8-phase-3--edge-and-abuse-surface)
-9. [Phase 4 — Runtime confidence](#9-phase-4--runtime-confidence)
-10. [Phase 5 — Structural debt](#10-phase-5--structural-debt)
-11. [Phase 6 — Execution (gated)](#11-phase-6--execution-gated)
-12. [Coverage matrix](#12-coverage-matrix)
-13. [Open decisions](#13-open-decisions)
-14. [Per-PR gates](#14-per-pr-gates)
+1. [Wipe record](#1-wipe-record)
+2. [How to use this document](#2-how-to-use-this-document)
+3. [Target stack and topology](#3-target-stack-and-topology)
+4. [Product contract](#4-product-contract)
+5. [Invariants — do not "fix" these](#5-invariants--do-not-fix-these)
+6. [Environment contract](#6-environment-contract)
+7. [Data model and migration map](#7-data-model-and-migration-map)
+8. [Phase map](#8-phase-map)
+9. [Phase 0 — Foundation and truth](#9-phase-0--foundation-and-truth)
+10. [Phase 1 — Auth, shell, history](#10-phase-1--auth-shell-history)
+11. [Phase 2 — GitHub and repo workspace](#11-phase-2--github-and-repo-workspace)
+12. [Phase 3 — Chat core](#12-phase-3--chat-core)
+13. [Phase 4 — Repo agent](#13-phase-4--repo-agent)
+14. [Phase 5 — Changesets and review](#14-phase-5--changesets-and-review)
+15. [Phase 6 — Approval, branch, pull request](#15-phase-6--approval-branch-pull-request)
+16. [Phase 7 — Dew billing](#16-phase-7--dew-billing)
+17. [Phase 8 — Setup and about truth surface](#17-phase-8--setup-and-about-truth-surface)
+18. [Phase 9 — Hardening and launch](#18-phase-9--hardening-and-launch)
+19. [Phase 10 — Execution (gated, not v1)](#19-phase-10--execution-gated-not-v1)
+20. [Requirement coverage](#20-requirement-coverage)
+21. [Open decisions](#21-open-decisions)
+22. [Per-PR gates](#22-per-pr-gates)
+23. [Deploy runbook](#23-deploy-runbook)
+24. [Rollback](#24-rollback)
 
 ---
 
-## 1. How to use this document
+## 1. Wipe record
 
-**One phase = one merge window.** Phases are ordered so that each one can be verified against the last, and so that the cheap, high-confidence work lands before anything that touches money or the agent.
+Everything tracked was deleted before this plan was written. Nothing was migrated forward; there is no code to carry over.
 
-**One task = one pull request.** Task IDs are stable (`P2-T3`). Every task names its files, the change, the acceptance criterion that proves it, and the check that runs in CI. If a task cannot name a proving check, it is not ready to build and belongs in [§13](#13-open-decisions) instead.
+| Removed | What it was |
+|---|---|
+| `OPENMI_ARCHITECTURE_AUDIT.md` | 15-finding audit of the old `test` tree |
+| `OPENMI_ARCHITECTURAL_UI_UX_AUDIT.md` | Superseded, earlier product shape |
+| `OPENMI_BUILD_PHASES.md` | The old phase plan (replaced by this file) |
+| `patches/phase-0-1-verified.patch` | Patch for the old repo |
+| `README.md` | One line: `# Openmi-V2` |
 
-**Definition of ready (per task).** File paths exist at `08a049d`; the change is described as a diff-shaped instruction, not a goal; the acceptance criterion is measurable by a command or a test assertion.
-
-**Definition of done (per phase).** Every task merged; the phase gate in [§4](#4-phase-map) satisfied; no regression in `bun run test`; the phase's findings closed in the audit with the commit sha that closed them.
-
-**Branching.** Work branches from the current default branch as `phase-<n>/<task-id>-<slug>`. The agent's own branch policy (`agent/*`) is unrelated to this and must not be reused.
-
-**Everything below assumes the repository is `test` @ `08a049d`.** Line numbers are anchors for reading, not stable identifiers — re-grep before editing.
+**Kept, deliberately:** [`agent-push-requirements.md`](agent-push-requirements.md). Every push must configure the author as **`Openmi`** — no platform or system fallback handle. That rule applies to every task below.
 
 ---
 
-## 2. Verified baseline
+## 2. How to use this document
 
-Re-measured at `08a049d` while writing this plan. Where these differ from the audit, **these are correct** and the audit was approximate.
+**One phase = one merge window.** Phases are ordered so each one is verifiable against the last, and so the cheap, provable work lands before anything that touches money or GitHub writes.
 
-| Fact | Value | Location |
+**One task = one pull request.** Task IDs are stable (`P2-T3`). Each task names its work, its acceptance criterion, and the check that proves it in CI. A task that cannot name a proving check is not ready to build.
+
+**Definition of ready.** The files it touches exist in the tree; the change is described as a diff-shaped instruction, not a goal; acceptance is measurable by a command or an assertion.
+
+**Definition of done (per phase).** Every task merged; the phase gate in §8 satisfied; `bun run test` green; the phase's rows in §20 marked built.
+
+**Branching.** `phase-<n>/<task-id>-<slug>`, branched from `main`. Agent-authored branches are unrelated to this and must not be reused.
+
+**Line numbers in this file are anchors, not identifiers.** Re-grep before editing.
+
+---
+
+## 3. Target stack and topology
+
+| Layer | Choice | Why |
 |---|---|---|
-| `MAX_STEPS` | `40` | `lib/agent/turns.ts:17` |
-| `MAX_TURN_TOKENS` | `200_000` | `lib/agent/turns.ts:19` |
-| `TURN_TTL_MS` | `30 * 60_000` | `lib/agent/turns.ts:21` |
-| Client-held turn state | comment: "The client can read it and send it back" | `lib/agent/turns.ts:8` |
-| `--text-low` | `#5d7167` / `#8a8172` / `#837e96` | `app/globals.css:20`, `:81`, `:133` |
-| `--on-accent` | `#ffffff` / `#15130f` / `#ffffff` | `app/globals.css:27`, `:88`, `:140` |
-| `.on-accent` rule | `396`, light override `400` | `app/globals.css` |
-| Theme override block | lines **167–411**; **115** grouped selector rules; **49** `!important` declarations | `app/globals.css` |
-| Seal format | `v1.<iv>.<tag>.<ciphertext>` | `lib/github/crypto.ts:57–64`; open `:77–80` |
-| `GITHUB_TOKEN_KEY` reads | key, borrowed turn secret, borrowed seal fallback | `lib/github/crypto.ts:32`, `:46`, `:52` |
-| `PRODUCT_NAME` whitelist | `lib/models.ts:146`, silent `"Openmi"` fallback `:150` | `lib/models.ts` |
-| Message ordering | `nextMessageTime` | `lib/db.ts:404` |
-| Memory residue | `syncMemoryUp` `:800`, `syncMemoryDelete` `:821`, `loadMemoriesFromAccount` `:840`; `Memory` at `lib/types.ts:218` | `lib/cloudHistory.ts` — the Dexie store is **already** gone |
-| Rate limiter | Redis when `UPSTASH_*` is set, per-instance otherwise; presence reported at `lib/setupChecks.ts:72` | `lib/rateLimit.ts`, `lib/serverControl.ts:340–347` |
-| CSP | `script-src … 'unsafe-inline'`; `style-src … 'unsafe-inline'` | `next.config.mjs:82`, `:83` |
-| Last migration | `20261029000600_agent_runs_service_grants.sql` | `supabase/migrations/` |
-| Browser test tooling | none — no Playwright, Puppeteer, Vitest or Jest in `package.json` | `package.json` |
+| Framework | Next.js 15 App Router, React 19, TypeScript strict | Streaming route handlers, first-class Vercel target |
+| Styling | Tailwind CSS v4 + CSS custom properties per theme | Tokens, not literal colours (see §5.7) |
+| Package manager | Bun (`bun.lock`) | Matches existing repo conventions; Vercel supports it |
+| Database | Supabase Postgres | Managed Postgres + RLS is the authority for every table |
+| Auth | Supabase Auth, `@supabase/ssr` cookie sessions | Cookie session means middleware can gate `/chat` honestly |
+| Files in repos | GitHub API, read-only by construction | GitHub is the source of truth; no mirror to keep in sync |
+| Hosting | Vercel, Node runtime for route handlers | Streaming SSE, server-only secrets |
+| Secrets | Vercel env (Preview + Production), Supabase secrets | Never in the repo; never `NEXT_PUBLIC_` unless browser-safe |
 
-**Corrections to the audit, recorded so the plan does not inherit them:**
+**Vercel constraints that shape the design.** Route handlers are request-scoped; there is no daemon, no durable queue and no background worker. A turn therefore has a wall-clock ceiling (`maxDuration`: 60s on Hobby, 300s on Pro). The agent is therefore **bounded by design** (§Phase 4) and a turn that outlives the function returns a signed continuation token rather than dying silently. Nothing in this plan relies on a cron or a long-lived process.
 
-- The override block is **167–411**, not "209–330". It is **245 lines containing 115 grouped selector rules and 49 `!important` declarations** — dense, not the "~400 lines" the audit stated. The work is smaller than the audit implied but the mechanism and the risk are exactly as described.
-- The audit's suggested key envelope `v1.<keyid>.<iv>.<tag>.<ct>` reuses the version already in the wild for a **4-part** payload. Phase 2 uses **`v2`** for the keyed format and keeps `v1` readable, otherwise every stored token becomes undecryptable.
-
-**Literal-colour density per component** — the slicing order for Phase 1, measured by counting `text-white/`, `bg-white/`, `bg-[#`, `text-[#` occurrences:
-
-| File | Literals | | File | Literals |
-|---|---|---|---|---|
-| `AdminPanel.tsx` | 116 | | `AdminControls.tsx` | 35 |
-| `RepoPanel.tsx` | 81 | | `ReceiptUpload.tsx` | 26 |
-| `Sidebar.tsx` | 45 | | `SettingsPanel.tsx` | 23 |
-| `AccountSection.tsx` | 38 | | `AdminReceipts.tsx` | 21 |
-| `ChangeReview.tsx` | 37 | | `AuthDiagnostics.tsx` | 19 |
+**Supabase constraints that shape the design.** Every table gets `enable row level security` in the same migration that creates it. The service-role key is server-only and confined to one module. `security definer` functions set `search_path = public` and take no price parameters.
 
 ---
 
-## 3. Invariants — do not "fix" these
+## 4. Product contract
 
-Every phase below touches something adjacent to the following. None of these may be refactored, generalised or "simplified" on the way past. They are the parts of the product that are already correct.
+**What Openmi is.** A signed-in user connects GitHub, picks one repository, and chats with a model that can read that repository and propose edits. Answers cite real paths and line numbers. Proposed edits arrive as a reviewable diff. A commit happens only after an explicit approval click, and it lands on a new branch as a pull request — never on the default branch.
 
-1. **One charge function with no price parameter.** `start_hour_session()` takes no amount. Never add one back "for flexibility".
-2. **`hour_sessions.owner` is the primary key.** This is what makes two concurrent sessions structurally impossible. Do not replace it with a surrogate id plus a unique index.
-3. **Change-set signature covers `baseSha` + content hash and excludes `status`.** Lifecycle transitions must never invalidate an artefact.
-4. **The GitHub read client is GET-only by construction**, and one write module is the only path to a commit.
-5. **Service role stays confined** to `lib/supabaseAdmin.ts` and the `agent/runs*` routes.
-6. **CI runs build-with-no-secrets and apply-migrations-twice.** Keep both.
-7. **RLS is the authority**, not a route guard. Phase 3 adds defence in depth; it never moves the decision out of Postgres.
-8. **The agent never claims a build ran.** No phase may introduce text that implies verification the product does not perform.
+**What it is not, in v1.**
 
----
+- Not an executor: no sandbox, no `npm test`, no preview server. The UI never says a build ran.
+- Not an app generator: no "create a project from nothing".
+- Not per-message billing: one hour of chat costs a flat amount, however many messages it holds.
+- No guest mode.
 
-## 4. Phase map
-
-```
-P0 baseline ──┬── P1 accessibility ──┬── P4 runtime ──┐
-              │                      │               │
-              ├── P2 money/identity ─┴── P3 edge ────┼── P6 execution (gated)
-              │                      │               │
-              └──────────────────────┴── P5 structure┘
-```
-
-| Phase | Name | Findings | PRs | Depends on | Exit gate |
-|---|---|---|---|---|---|
-| **P0** | Baseline and truth | F-04 | 2 | — | Documented budgets equal exported constants, asserted in CI |
-| **P1** | Accessibility gates | F-01, F-02, F-03, F-11 | 7 | P0 | Every text pair ≥4.5:1; every accent fill ≥4.5:1; override block deleted |
-| **P2** | Money, identity, determinism | F-05, F-07, F-08, F-10 | 5 | P0 | Replayed turn rejected; keys rotatable; limiter survives restart; two-device order stable |
-| **P3** | Edge and abuse surface | F-06, F-09, F-13, F-14, F-15 | 5 | P2 | Signed-out `/chat` handled; share reads capped; no memory sync; CSP nonce |
-| **P4** | Runtime confidence | F-12 | 2 | P1 | Stream/stop/approve/commit-refusal covered in CI |
-| **P5** | Structural debt | — | 5 | P1, P2 | Largest files decomposed, tests unchanged |
-| **P6** | Execution | — | 4+ | P4, §13 D6 | Review card can truthfully say "tests passed" |
-
-**Why this order.** P0 first because a plan verified against a lying README is not verifiable. P1 before everything visible because it is the only phase whose defect is *measurable* rather than argued, and it is small. P2 before P3 because the limiter and the key ring are prerequisites for bounding anything new. P4 after P1 because the theme work stabilises the selectors a browser test needs. P5 last among the shippable phases because decomposing `app/chat/page.tsx` before the theme migration would collide with it in every slice.
+**The one claim the product must never make:** that it verified anything it did not run. The review card says what the model proposed and what the human approved. Nothing else.
 
 ---
 
-## 5. Phase 0 — Baseline and truth
+## 5. Invariants — do not "fix" these
 
-**Outcome:** a repository where the documented limits are the enforced limits, and a recorded baseline that later phases are measured against.
-**Finding:** F-04. **Contract:** no product behaviour changes in this phase.
-
-### P0-T1 — Establish the local baseline
-
-| | |
-|---|---|
-| **Change** | Run the exact CI command set on a clean clone of `08a049d` and record the output as the reference. No source edits. |
-| **Files** | none |
-| **Acceptance** | All five commands exit `0`; the test summary line and the contrast table are committed under `docs/baseline-08a049d.md`. |
-| **Verify** | the block below |
-
-```bash
-bun install --frozen-lockfile
-bun run typecheck
-bun run test
-bun run check:migrations
-NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
-```
-
-`--frozen-lockfile` is not optional: a drifted `bun.lock` is a hard CI failure, and the fix is to revert the drift, never to regenerate the lockfile into the PR.
-
-### P0-T2 — Make the limits documentary
-
-| | |
-|---|---|
-| **Change** | Replace the stale claims with the constants, and add a test that fails when they diverge again. |
-| **Files** | `README.md:71–72`; `docs/OVERHAUL_SPEC.md:36`, `:62`, `:89`, `:205`, `:362`, `:378`, `:425`; new `tests/limits-docs.test.ts` |
-| **Acceptance** | `README` states **40 steps / 200,000 tokens / 30-minute turn** and **3 Dew per hour, no per-message charge**; `OVERHAUL_SPEC` §5 and §9 agree; the new test asserts every documented number equals its exported constant and fails if either is edited alone. |
-| **Verify** | `bunx tsx tests/limits-docs.test.ts` and `bun run test` |
-
-The four specific lies to remove: "up to eight steps and 60k tokens per turn, one flat Code charge per turn" (`README:71–72`), "`MAX_STEPS` (8) and `MAX_TURN_TOKENS` (60k)" (`OVERHAUL_SPEC:89`), "flat per request, per model" (`:36`, `:378`), and the "twelve steps can be 60k tokens" price argument (`:425`). The `Corrected 2026-10-28` note at `:62` already fixes the *price*; it left the *budget* wrong beside it, which is why the section reads as current while being half-stale.
-
-Do not link the test to a single constant file. Read `MAX_STEPS` and `MAX_TURN_TOKENS` from `lib/agent/turns.ts` and `DEW_PER_HOUR` from `lib/dew.ts`, then assert the README text contains those exact values — the same source-contract style the repo already uses, which is why it will actually hold.
-
-**Phase gate:** `bun run test` green including the new suite; `docs/baseline-08a049d.md` present.
+1. **One charge function, no price parameter.** `start_hour_session()` takes a model and a repo, never an amount. A signed-in caller cannot buy an hour cheaply.
+2. **`hour_sessions.owner` is the primary key.** A second concurrent session is structurally impossible, not merely discouraged by a check.
+3. **The GitHub read client is GET-only by construction**, and one write module is the only path to a commit. A test asserts both.
+4. **Change-set signature covers `baseSha` + content hash and excludes `status`.** A lifecycle move can never invalidate an approved artefact, and a content change can never sneak past one.
+5. **RLS is the authority**, not the route guard. Middleware and route checks are defence in depth; the decision lives in Postgres.
+6. **No default-branch writes, ever.** The branch policy is enforcement in code, not a configuration toggle.
+7. **Service role stays confined** to `lib/supabase/admin.ts` and the migration/health surface.
+8. **No literal palette colours in components.** Semantic tokens only; a ratchet test enforces the direction of travel.
+9. **Nothing that costs money runs before the charge is recorded.** The gate is before the model call, not after.
+10. **No claim of verification the product does not perform** — in code, comments, docs or UI copy.
 
 ---
 
-## 6. Phase 1 — Accessibility gates
+## 6. Environment contract
 
-**Outcome:** every theme is readable, and the override block that makes theming fragile is gone.
-**Findings:** F-01, F-02, F-03, F-11. **Ship order matters:** T1 and T2 are one-session fixes with immediate user-visible benefit, so they land first and independently of the long migration.
+`.env.example` is the source of truth for names. The setup page (§Phase 8) reports presence, never values.
 
-### P1-T1 — Fix accent fill legibility (F-01)
-
-| | |
-|---|---|
-| **Change** | Set `--on-accent` to the near-black ink in `:root` and `html.ink`, matching what Paper already does. |
-| **Files** | `app/globals.css:27` (`#ffffff` → `#15130f`), `app/globals.css:140` (same) |
-| **Acceptance** | White-on-accent disappears from dark and ink. Computed: `#15130f` on sage `#6ec294` ≈ **8.66:1**; on lavender `#a09ad8` ≈ **7.16:1** (both above 4.5). Paper unchanged at 5.37. |
-| **Verify** | the contrast script from P1-T3, plus a visual pass over `.on-accent` (`:396`) and its light override (`:400`) |
-
-Why the constant and not "darken the accent": the accent is also used as *text* on the canvas at 8.80:1 (dark) and 6.73:1 (ink). Darkening it fixes the fill and breaks the text. Changing the ink is the only move that satisfies both, and it is the move Paper already made.
-
-Three surfaces to check after the flip, because they use accent fills rather than the class: the send control, the Dew chip's active state, and the user bubble (`--bubble-user`, which is *not* `--accent` and already measures 6.33:1 dark / 8.75:1 ink — leave it alone).
-
-### P1-T2 — Lift `--text-low` to AA (F-02)
-
-| | |
-|---|---|
-| **Change** | Raise the hint token until it clears 4.5:1 on its own canvas in all three themes. |
-| **Files** | `app/globals.css:20` (dark), `:81` (Paper), `:133` (ink) |
-| **Acceptance** | ≥4.5:1 in all three; no other token changes; hierarchy preserved (`--text-mid` stays visibly stronger). |
-| **Verify** | contrast script; grep the four call sites at `:497`, `:598`, `:710`, `:779` |
-
-Candidates that clear the floor (computed with the same formula, to be asserted rather than trusted):
-
-| Theme | Now | Ratio | Candidate | Ratio |
-|---|---|---|---|---|
-| dark | `#5d7167` | 3.61 | `#6f8478` | **4.71** |
-| Paper | `#8a8172` | 3.40 | `#756b5d` | **4.62** |
-| ink | `#837e96` | 4.47 | `#8a85a0` | **4.93** |
-
-The ink theme misses by 0.03 — it is the one that looks fine and is not. Do not skip it because the diff is a single hex.
-
-### P1-T3 — Enforce contrast in CI
-
-| | |
-|---|---|
-| **Change** | Parse the three palettes out of `globals.css`, compute WCAG ratios, fail below threshold. Land it in report mode in the same PR as T2, then flip to enforcing. |
-| **Files** | new `scripts/check-contrast.mjs`; `package.json` (`check:contrast`); `.github/workflows/ci.yml` (step in `verify`) |
-| **Acceptance** | Script exits `1` when `--on-accent` is reverted to `#ffffff`; exits `0` on the fixed tree; prints the full table so a reviewer sees the numbers, not just a pass. |
-| **Verify** | `node scripts/check-contrast.mjs` then `git stash` the token, re-run, confirm non-zero |
-
-Pairs and thresholds to encode: `--text-hi`/`--text`/`--text-mid`/`--text-low` on `--bg` **≥4.5**; `--on-accent` on `--accent` **≥4.5**; `--accent` on `--bg` **≥3.0** (UI/large only, which is how Paper's orange legitimately sits at 3.05); bubble text on `--bubble-user` **≥4.5**.
-
-Parse by block, not by file: `:root`, `html.light`, `html.ink`. A regex over the whole file would pick the wrong `--on-accent`, since all three define it.
-
-### P1-T4 — Ratchet the literal colours (F-03, part 1)
-
-| | |
-|---|---|
-| **Change** | Add a test that counts forbidden literal utilities per file and fails when any count rises. |
-| **Files** | new `tests/theme-literals.test.ts` |
-| **Acceptance** | Counts match [§2](#2-verified-baseline); adding `bg-[#111a16]` to any component fails the suite; lowering a count passes and the baseline must then be updated downward in the same PR. |
-| **Verify** | `bunx tsx tests/theme-literals.test.ts` |
-
-Forbidden patterns: `text-white/`, `bg-white/`, `border-white/`, `bg-[#`, `text-[#`, `border-[#`, `text-black/`. Ratchet table seeded from §2 with the remaining components added at their measured counts. This is the phase's load-bearing safety net — without it, every subsequent slice quietly re-adds a literal and the migration never converges.
-
-### P1-T5 → P1-T8 — Migrate literals in slices, deleting overrides as you go
-
-One PR per surface, highest count first, so the riskiest files are done while attention is highest and later slices get easier.
-
-| Task | Surface | Literals | Files |
+| Variable | Scope | Needed by | Required |
 |---|---|---|---|
-| **P1-T5** | Admin | 116 + 35 + 21 + 16 | `AdminPanel`, `AdminControls`, `AdminReceipts`, `AdminGate` |
-| **P1-T6** | Repository | 81 + 37 | `RepoPanel`, `ChangeReview` |
-| **P1-T7** | Shell and account | 45 + 38 + 23 | `Sidebar`, `AccountSection`, `SettingsPanel` |
-| **P1-T8** | Money and auth | 26 + 19 + 14 | `ReceiptUpload`, `AuthDiagnostics`, `SearchOverlay` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Browser + server | Supabase clients | yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser + server | Supabase clients | yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | migrations, health probe | yes |
+| `NEXT_PUBLIC_SITE_URL` | Browser + server | auth redirects, PR links | yes |
+| `GITHUB_TOKEN_KEY` | **server only** | sealing connected GitHub tokens (32-byte base64) | yes |
+| `OPENROUTER_API_KEY` | **server only** | `auto` mode primary | one provider |
+| `GROQ_API_KEY` | **server only** | `auto` fallback, `code` mode | one provider |
+| `DEEPSEEK_API_KEY` | **server only** | `flash` mode | one provider |
+| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | server | optional OAuth connect (P2-T6) | no |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | server | optional shared rate limiter | no |
 
-Each slice: replace literal utilities with the semantic aliases already defined in `tailwind.config.ts` (`bg-canvas`, `bg-raised`, `bg-card`, `bg-chip`, `bg-hover`, `border-line`, `text-hi`, `text-body`, `text-mid`, `text-low`, `accent`), delete the corresponding selector rules from `app/globals.css:167–411`, lower the ratchet, and confirm the theme still renders by toggling all three palettes.
+**Rules.**
 
-**Two rules for every slice.** (1) Delete the override rule in the *same* PR that removes its last consumer — deleting ahead of the migration breaks a surface nobody is looking at. (2) Never add a new literal to compensate; if a colour has no token, add the token to all three palettes first, which is the point of the exercise.
-
-The prefix-matching bug stays until the text rules are deleted, so **do not** "fix" `[class*=" text-white/1"]` by adding more prefixes. Removal is the fix. The file itself records what prefix matching already cost once: `[class*="bg-white/"]` matched `hover:bg-white/[0.06]`, so every control wore its hover background permanently.
-
-### P1-T9 — Decide what Ink is (F-11)
-
-| | |
-|---|---|
-| **Change** | Either document Ink as layout-locked, or decouple it into a selectable appearance. |
-| **Files** | `lib/settings.ts` (`applyDocumentTheme`), `README.md`, `components/SettingsPanel.tsx` |
-| **Acceptance** | README no longer implies three independent themes; if decoupled, `appearance` and `homeLayout` are independent and the Focus layout no longer forces `ink`. |
-| **Verify** | `bunx tsx tests/focus-home.test.ts`; manual toggle matrix |
-
-Recommendation: **document it** (Option A). It is a true statement about the design, it costs one paragraph, and decoupling opens a fourth palette combination that nobody has designed. Take Option B only on an explicit product decision — this is D2 in [§13](#13-open-decisions).
-
-**Phase gate:** contrast script enforcing and green; override block deleted (verified by `grep -c "!important" app/globals.css` falling from 49 to the handful in primitives); ratchet at or near zero; `bun run test` green.
+- A missing key never throws at boot. The app starts, and the surface that needs the key says what is missing. "Nothing is required to boot" is a product posture, not an oversight.
+- `NEXT_PUBLIC_*` is compiled into the browser. No key, token or service-role value may take that prefix.
+- Vercel environments are separate: set the same names under **Preview** and **Production**. Preview uses a Supabase branch or a second project, never production data.
 
 ---
 
-## 7. Phase 2 — Money, identity and determinism
+## 7. Data model and migration map
 
-**Outcome:** the agent's budget cannot be reset by replay, secrets can be rotated one class at a time, and message order is decided by the server.
-**Findings:** F-05, F-07, F-08, F-10. **Contract:** every change here is additive to the schema; nothing drops a column.
+Migrations live in `supabase/migrations/` and are applied with `supabase db push`. Every migration must apply twice cleanly (`bun run check:migrations`).
 
-### P2-T1 — Server-authoritative agent steps (F-05)
+| File | Phase | Tables / functions |
+|---|---|---|
+| `001_profiles.sql` | 1 | `profiles`, trigger `on auth.users insert` |
+| `002_chats.sql` | 1 | `folders`, `chats`, `messages` (+ `seq`), indexes |
+| `003_github.sql` | 2 | `github_connections` |
+| `004_agent.sql` | 4 | `agent_turns` |
+| `005_changesets.sql` | 5 | `changesets`, `changeset_files` |
+| `006_dew.sql` | 7 | `hour_sessions`, `dew_transactions`, `invites`, `start_hour_session()`, `refund_hour()` |
+| `007_rls.sql` | 1–7, extended per phase | all policies + `revoke all from anon, authenticated` where it moves money or identity |
+| `008_rate_limit.sql` | 9 | `rate_limits`, `rate_limit_hit(bucket, window_start, max)` |
 
-| | |
-|---|---|
-| **Change** | Mirror the signed turn's counters into a row updated conditionally, so a replayed token cannot rewind the budget. |
-| **Files** | new migration `supabase/migrations/2026…_agent_turn_steps.sql`; `lib/agent/turns.ts` (`readTurn`, `advanceTurn`); `app/api/agent/step/route.ts` |
-| **Acceptance** | Sending an older valid token after `advanceTurn` returns `409` and does not decrement `steps`; a fresh turn starts at zero; the signed blob remains the transport. |
-| **Verify** | new `tests/agent-turn-steps.test.ts` plus `bun run check:migrations` |
+**Shape notes.**
 
-Shape: `agent_turns(turn_id text pk, owner uuid, steps int, tokens int, exp timestamptz, updated_at)`. `advanceTurn` becomes an RPC that updates `where turn_id = $1 and owner = auth.uid() and steps = $2` — a compare-and-set, so the second of two racing steps loses instead of both winning.
-
-**Do not** replace the HMAC token. It carries `exp`, the model binding and the prompt hash that the step route needs before it can query anything. The row is authority over *counters only*.
-
-The honest alternative is to close this as accepted risk: the exposure is bounded by a prepaid hour, so a replayed turn buys more reads, not more hours. If that is the decision, say so in `docs/AGENT_TOOLS_AND_RESUME.md` and skip the task — but do not leave the comment at `lib/agent/turns.ts:8` as the only place the trade-off is written down.
-
-### P2-T2 — Per-purpose keys with a key id (F-07)
-
-| | |
-|---|---|
-| **Change** | Split the seal so GitHub tokens and user provider keys no longer share one key, and add a key id to the envelope for rotation. |
-| **Files** | `lib/github/crypto.ts:32`, `:46`, `:52`, `:57–64`, `:77–80`; `.env.example`; `lib/providerKeys.ts` call sites |
-| **Acceptance** | Existing `v1.<iv>.<tag>.<ct>` payloads still decrypt; new payloads are `v2.<keyid>.<iv>.<tag>.<ct>`; rotating the provider key does not break GitHub tokens and vice versa; the last-four display is unchanged. |
-| **Verify** | new `tests/crypto-rotation.test.ts` covering seal→open across a key change and a legacy `v1` fixture |
-
-The format is **`v2`**, not the audit's `v1.<keyid>…`: `v1` is already deployed as a four-part payload, so reusing it would make stored ciphertexts ambiguous. Openers dispatch on the prefix: `v1` = four parts, legacy key; `v2` = five parts, key id selects from a ring.
-
-Lazy re-seal on read is what makes this shippable without a migration script: a token read under `v1` is rewritten as `v2` the next time it is used. Accept that tokens nobody uses stay on the old key — that is the residual risk, not a bug.
-
-New env var: `PROVIDER_KEY_KEY`, falling back to `GITHUB_TOKEN_KEY` when unset so existing deployments boot. `AGENT_TURN_SECRET`'s borrow at `:46` is a *signing* key, not a seal — leave the fallback, it is a separate concern and changing it invalidates live turns.
-
-### P2-T3 — A limiter that survives a cold start (F-08)
-
-| | |
-|---|---|
-| **Change** | Give the rate limiter a Postgres fallback so serverless instances stop counting in isolation. |
-| **Files** | `lib/serverControl.ts:340–347`, `lib/rateLimit.ts`; new RPC in a migration; `lib/rateLimitPolicy.ts` untouched (the policy is correct); `lib/setupChecks.ts:72` already reports presence, so no setup-screen work |
-| **Acceptance** | Two instances observe one shared counter; with `UPSTASH_*` set, Upstash is used; without it, the RPC is used; a burst across instances returns `429` at the documented threshold. |
-| **Verify** | `bunx tsx tests/rate-limit.test.ts` extended with a fallback case; PGlite replay |
-
-Shape: `rate_limit_hit(bucket text, window_start timestamptz, max int) returns boolean` — one atomic upsert, no read-then-write. The bucket key must include the caller id where the policy does, not only the IP.
-
-Do **not** make a missing limiter a boot failure. The product's stated posture is "nothing is required to boot"; a hard failure contradicts it and turns a degraded protection into an outage. Add the fallback and keep the `.env.example` sentence truthful.
-
-### P2-T4 — Server-assigned message order (F-10)
-
-| | |
-|---|---|
-| **Change** | Add a per-chat sequence to `chat_messages`, assign it server-side, and order reads by it. |
-| **Files** | new migration; `app/api/chat/route.ts` insert path; read path in `lib/cloudHistory.ts`; `lib/db.ts:404` stays for local display |
-| **Acceptance** | Two devices inserting in the same millisecond yield a total order that both then read identically; existing rows backfill deterministically by `created_at, id`; local optimistic ordering is unchanged before sync. |
-| **Verify** | `tests/chat-sync.test.ts` extended with a same-millisecond two-device case; `bun run check:migrations` |
-
-Backfill in the migration, not in application code — a chat with 400 messages must not renumber on every read. Order reads by `(seq, created_at)` so a NULL from an in-flight insert never sorts above a real row.
-
-Keep `nextMessageTime()`. It is the optimistic local order and it is correct for its job; it simply stops being the authority after sync.
-
-### P2-T5 — Regression pass
-
-| | |
-|---|---|
-| **Change** | None. Prove the four changes compose. |
-| **Acceptance** | Full suite green, migrations apply twice, build with no secrets succeeds, and the money paths still charge exactly 3 Dew per hour in `tests/dew.test.ts` and `tests/refund.test.ts`. |
-| **Verify** | the P0-T1 command block |
-
-**Phase gate:** replay rejected (or documented as accepted); rotation test green; limiter shared; ordering stable under tie.
+- `messages.seq` is a per-chat `bigint` assigned by the insert path; reads order by `(seq, created_at)`. `created_at` is display metadata, not order.
+- `github_connections.token_sealed` is AES-256-GCM under `GITHUB_TOKEN_KEY`, format `v1.<iv>.<tag>.<ciphertext>`. Only the last four characters of the token are ever returned to the browser.
+- `changesets` stores `base_sha`, `branch`, `title`, `summary`, `status`, `content_hash`, `signature`, `pr_url`, `pr_number`, `commit_sha`.
+- `hour_sessions(owner uuid primary key, model text, repo text, started_at, expires_at)` — no surrogate key, deliberately.
+- `dew_transactions` is an append-only ledger: `(id, owner, delta, kind, reason, ref, created_at)`. Balance is derived, with a cached column updated in the same transaction.
 
 ---
 
-## 8. Phase 3 — Edge and abuse surface
+## 8. Phase map
 
-**Outcome:** the public edge is bounded, the dead memory path is gone, and the CSP stops needing `unsafe-inline`.
-**Findings:** F-06, F-09, F-13, F-14, F-15.
+```
+P0 foundation
+   ├── P1 auth/shell ── P2 github ── P3 chat ── P4 agent ── P5 review ── P6 commit/PR
+   │                                                                        │
+   └──────────────── P7 billing ────────────────────────────────────────────┤
+                                                                            ├── P9 launch
+   P8 setup/about (starts P0, completed after P7) ──────────────────────────┘
+                                                                            └── P10 execution (gated)
+```
 
-### P3-T1 — Resolve the `/chat` gate question (F-06)
+| Phase | Name | Tasks | Depends on | Exit gate |
+|---|---|---|---|---|
+| **P0** | Foundation and truth | 6 | — | Builds with zero env vars; `/setup` lists every gap; migrations apply twice |
+| **P1** | Auth, shell, history | 7 | P0 | Two accounts isolated; signed-out `/chat` redirects; trash round-trips |
+| **P2** | GitHub and repo workspace | 6 | P1 | Token never reaches the browser; no write path outside the commit module |
+| **P3** | Chat core | 6 | P2 | Stream and stop work; order stable across devices; every citation resolves |
+| **P4** | Repo agent | 5 | P3 | Replayed turn rejected; cap message truthful; no tool writes |
+| **P5** | Changesets and review | 5 | P4 | Signature breaks on content change, survives a status change |
+| **P6** | Approval, branch, PR | 5 | P5 | Commit-refusal test green; PR only from approval; default branch untouched |
+| **P7** | Dew billing | 8 | P3 | Concurrent start impossible; exactly 3 Dew/hour; ledger sums to balance |
+| **P8** | Setup and about | 4 | P0, P7 | `/setup` accurate at zero config and at full config |
+| **P9** | Hardening and launch | 6 | P6, P7, P8 | RLS audit green; contrast gate green; smoke tests pass |
+| **P10** | Execution (gated) | 4+ | P9, §21 D6 | Review card can truthfully say "tests passed" |
 
-| | |
-|---|---|
-| **Change** | Either add an edge redirect, or record why it cannot exist yet. |
-| **Files** | `app/chat/page.tsx`, `app/chat/layout.tsx`, possibly new `middleware.ts` |
-| **Acceptance** | A signed-out visitor to `/chat` either redirects before paint, or the audit finding is closed as "not implementable without cookie sessions" with that reason written down. |
-| **Verify** | manual: clear storage, request `/chat`, observe |
-
-**This one is not the simple fix it looks like.** The session lives in the browser (bearer token, `AuthScreen` gate), not in a cookie. Middleware cannot read it, so a `middleware.ts` that redirects on "no session cookie" would redirect **every** signed-in user too. Making F-06 real means moving the session to an httpOnly cookie — a genuine auth change that touches every handler's `verifyCaller`, not a matcher.
-
-Recommendation: **defer and document.** The data is already protected by RLS and per-route bearer checks; the exposure is a shell paint and a search-engine-noindexed page. Spending a session-migration on it is worse than spending that session on P2. This is D4.
-
-### P3-T2 — Cap public share reads (F-09)
-
-| | |
-|---|---|
-| **Change** | Put the public snapshot read behind a bounded route instead of letting the page read the table directly. |
-| **Files** | `app/api/share/[id]/route.ts` (currently `DELETE` only), `app/share/[id]/page.tsx`, `lib/share.ts` |
-| **Acceptance** | `GET` returns a snapshot with `cache-control: no-store`; the token is matched exactly, never prefix-scanned; more than N reads per IP per minute returns `429` with `Retry-After`; revoking makes the next read `404`. |
-| **Verify** | `tests/share.test.ts` extended; manual revoke-then-read |
-
-The table read under RLS stays as the storage mechanism — the route is the throttle and the shape, not a second source of truth. 30-day expiry and revocation already work; do not touch them.
-
-### P3-T3 — Delete the memory residue (F-13)
-
-| | |
-|---|---|
-| **Change** | Remove the sync functions and drop the table, or restore the feature. Pick one. |
-| **Files** | `lib/cloudHistory.ts:800`, `:821`, `:840`; `lib/types.ts:218` (`Memory`); new migration `drop table public.memories`; `docs/OVERHAUL_SPEC.md` §3 |
-| **Acceptance** | No `Memory` type, no sync call, no table; `bun run typecheck` clean. The local Dexie store was **already** dropped in v5, so no schema bump is needed — confirm that still holds instead of assuming it. |
-| **Verify** | `grep -rn "memor" lib app components tests` returns only the changelog entry; migrations apply twice |
-
-Recommendation: **delete** (Option A). The feature was removed deliberately; the residue is dead code that still writes rows. But it is a data-destroying migration, so it needs an explicit owner decision — D5.
-
-If restored instead, the work is larger than the deletion: the panel, the suggestions, the Dexie store, the RLS policy and the spec section all need to come back, and none of them are in this plan.
-
-### P3-T4 — CSP without `unsafe-inline` (F-14)
-
-| | |
-|---|---|
-| **Change** | Issue a per-request nonce and drop `'unsafe-inline'` from `script-src`; move the artifact preview off `srcdoc`. |
-| **Files** | `next.config.mjs:82`; the middleware from P3-T1 if it exists, otherwise a route-level header |
-| **Acceptance** | `script-src 'self' 'nonce-…' 'strict-dynamic'`; the app hydrates; the artifact preview renders from a sandboxed frame that is not same-origin; no console CSP violations on `/chat`, `/`, `/about`. |
-| **Verify** | build, load each route, read the console; a test asserting `next.config.mjs` contains no `'unsafe-inline'` in `script-src` |
-
-Depends on P3-T1: a nonce needs something to mint it per request, and that is middleware. If P3-T1 is deferred, this task is deferred with it — the two are one decision, not two.
-
-`style-src 'unsafe-inline'` stays. Next injects inline style attributes and removing it breaks layout; the audit only flagged the script directive, and that is the one with an exploit path.
-
-### P3-T5 — Notice when the whitelist rejects a label (F-15)
-
-| | |
-|---|---|
-| **Change** | Count rejections instead of silently rewriting to "Openmi". |
-| **Files** | `lib/models.ts:146–150` |
-| **Acceptance** | A rejected label still renders "Openmi"; a counter records the input; the counter is inert when no DSN is configured. |
-| **Verify** | `tests/navigation.test.ts` or a new case asserting fallback + counter call |
-
-Small and worth doing precisely because it is small: the failure mode it guards against is a future model shipping and every user seeing "Openmi" with no signal that anything went wrong.
-
-**Phase gate:** share reads bounded; memory path gone; CSP nonce live or explicitly deferred with P3-T1.
+**Why this order.** P0 first because every later phase needs the migration harness and an honest setup page. P2 before P3 because a chat about a repository with no repository is a chat about nothing. P5 before P6 because the approval gate is only meaningful if the artefact is signed before it can be committed. P7 lands after chat exists so the charge has something to gate, and before P8 so the setup page can report billing state truthfully.
 
 ---
 
-## 9. Phase 4 — Runtime confidence
+## 9. Phase 0 — Foundation and truth
 
-**Outcome:** the paths that only exist at runtime are covered by something that runs them.
-**Finding:** F-12.
+**Outcome:** a deployable skeleton where configuration gaps are visible instead of fatal.
+**Contract:** no product behaviour yet.
 
-### P4-T1 — Browser harness on the paths static tests cannot reach
+| Task | Work | Acceptance |
+|---|---|---|
+| **P0-T1** | Scaffold Next.js 15 App Router + TS strict + Tailwind v4 + Bun. One page, no logic. | `bun run build` succeeds on a bare clone |
+| **P0-T2** | `lib/env.ts` (server, non-throwing) and `lib/envPublic.ts`; `.env.example` naming every key in §6; degraded-mode contract documented | Importing env with nothing set returns typed `missing[]`, never throws |
+| **P0-T3** | Supabase clients: browser, server-cookie (`@supabase/ssr`), and `lib/supabase/admin.ts` (service role, server-only) | Only `admin.ts` imports the service-role key; a grep test asserts it |
+| **P0-T4** | `supabase/migrations/` harness + `scripts/check-migrations.mjs` applying every migration twice to a throwaway Postgres | `bun run check:migrations` exits 0; a deliberately broken migration exits 1 |
+| **P0-T5** | `/setup` v1: env presence table (present/missing, never values) and migration status | With zero env vars the page renders and names every gap |
+| **P0-T6** | CI: typecheck, test, check:migrations, build-with-no-secrets; commit author `Openmi` per `agent-push-requirements.md` | Workflow green on a PR; build step has no secrets in scope |
 
-| | |
-|---|---|
-| **Change** | Add Playwright and a small, deliberately unambitious suite. |
-| **Files** | `package.json` (dev dep), `playwright.config.ts`, `tests/e2e/*.spec.ts`, `.github/workflows/ci.yml` (new `e2e` job) |
-| **Acceptance** | Four specs pass: signed-out gate, send→stream→stop, approve flow up to the commit refusal, theme contrast on the three palettes. |
-| **Verify** | `bunx playwright test` locally against `bun run dev` |
-
-**Scope discipline.** Four specs, not forty. The existing 32 suites already pin source contracts well; a browser layer's only job is the gap — streaming, the composer, and the approval gate. Anything that a regex test can assert belongs in a regex test, because it is a hundred times cheaper to run.
-
-The highest-value single spec is **commit refusal**: sign in, open a change set, attempt a commit to a non-`agent/*` branch, assert `403 "Openmi only commits to agent/ branches."`. That is the product's central safety claim and today nothing executes it.
-
-**Honest limitation to record in the spec file:** the authenticated specs need a test account and a seeded repository. If CI has no such secret, run only the unauthenticated specs and mark the rest `test.skip` with a comment naming what is missing — do not fake a session, and do not report a skipped spec as coverage.
-
-### P4-T2 — Wire it, or don't
-
-| | |
-|---|---|
-| **Change** | Add the CI job if credentials exist; otherwise document the manual run. |
-| **Acceptance** | Either `e2e` runs on PRs, or `README` documents `bunx playwright test` as a pre-release manual step. |
-| **Verify** | CI run, or the README section |
-
-**Phase gate:** the four specs exist and pass wherever they can run; the limitation is stated in the repository, not only in a chat.
+**Phase gate:** `bun run build` with an empty `.env`; `/setup` accurate; migrations apply twice; no service-role reference outside `admin.ts`.
 
 ---
 
-## 10. Phase 5 — Structural debt
+## 10. Phase 1 — Auth, shell, history
 
-**Outcome:** the files that make every change expensive get smaller, without a behaviour change.
-**Findings:** none — this is risk reduction, not a defect. **Contract:** zero functional diff; the 32 suites are the safety net and must stay untouched.
+**Outcome:** a signed-in user with their own history, folders and trash. No repository, no chat yet.
 
-Ordered after P1 because the theme migration touches the same components; running them concurrently guarantees conflicts in `AdminPanel` and `RepoPanel`.
+| Task | Work | Acceptance |
+|---|---|---|
+| **P1-T1** | `001_profiles.sql`: `profiles(id → auth.users, handle, timezone, created_at)` + insert trigger | Signup creates exactly one profile row |
+| **P1-T2** | Email + password signup/signin via Supabase Auth, `/auth/callback`, sign-out; cookie session through `@supabase/ssr` | Signed-out `/chat` → `/login?next=/chat`; signed-in stays |
+| **P1-T3** | `middleware.ts`: cookie-presence gate for `/chat`, `/settings`, `/activity` — presence only, no authorization decision | Clearing cookies redirects; RLS still refuses data on a forged cookie |
+| **P1-T4** | App shell: sidebar, header, user menu, Dew chip placeholder, responsive breakpoints, focus and reduced-motion support | Renders at 360px and 1440px; keyboard reaches every control |
+| **P1-T5** | `002_chats.sql`: `folders`, `chats` (with `folder_id`, `deleted_at`); RLS on both; sidebar CRUD | Forked request with another user's id returns zero rows, not another user's row |
+| **P1-T6** | Trash: soft delete, restore, purge-forever, empty-trash; chats and folders | Delete → restore → purge round-trips; purge removes dependent messages by cascade |
+| **P1-T7** | Chat history list with recency grouping, titles from the first user message, empty state | New account shows an empty state with one clear next action |
 
-| Task | Target | Now | Split |
-|---|---|---|---|
-| **P5-T1** | `app/chat/page.tsx` | 2,321 | hooks by concern: session/pricing, repo workspace, streaming, search, appearance |
-| **P5-T2** | `tests/repo-agent.test.ts` | 2,121 | split by concern: signature, hash/expiry, branch policy, double submit |
-| **P5-T3** | `components/AdminPanel.tsx` | 1,375 | per view: console, codes, receipts |
-| **P5-T4** | `components/RepoPanel.tsx` | 1,353 | connection, picker, tree/file viewer |
-| **P5-T5** | `lib/cloudHistory.ts` + `lib/cloudAdmin.ts` | 925 + 1,074 | per domain, matching the table groups |
-
-**Rules.** Move code, do not rewrite it. One extraction per PR, ≤300 lines moved, no new props and no renamed exports. If an extraction needs a behaviour change to work, the boundary is wrong — stop and pick a different seam.
-
-`app/chat/page.tsx` is the one worth doing first and the one most likely to go wrong: it holds ~25 `useState` and ~20 effects. Extract the *effects and their state together* into `useHourSession`, `useRepoWorkspace`, `useThreadStream`, `useSearch`, `useAppearance` — extracting state without its effect leaves the coupling behind and produces a hook that is harder to follow than the original page.
-
-**Phase gate:** no file above 900 lines except `globals.css`; suite count unchanged; no test edits.
+**Phase gate:** two accounts see only their own rows (anon key, no service role); auth redirect works with a cookie and fails closed without one.
 
 ---
 
-## 11. Phase 6 — Execution (gated)
+## 11. Phase 2 — GitHub and repo workspace
 
-**Outcome:** the review card can truthfully say "tests passed" — and says nothing when it cannot.
-**Status:** **not ready to build.** Four decisions are missing and inventing answers here would produce a sandbox that costs money in ways nobody priced.
+**Outcome:** a connected account, a picked repository, and a read-only workspace pinned to one commit.
 
-This is the product's stated third phase (`docs/ROADMAP.md`) and the audit's Phase 5. It is last for a reason: it is the only phase that changes what the product *claims*, and the honesty contract in §3.8 is the thing most likely to be broken by it.
+| Task | Work | Acceptance |
+|---|---|---|
+| **P2-T1** | `003_github.sql` + connect route: seal a PAT with AES-256-GCM under `GITHUB_TOKEN_KEY`, store `login`, `scopes`, `sealed`; disconnect; `/api/github/status` returns login + last four only | Response JSON never contains the token; `crypto` test covers seal→open and a tampered tag |
+| **P2-T2** | `lib/github/read.ts`: GET-only client for user, repos, tree, contents, search; no write verbs imported anywhere | Test greps every `lib/github/*` file for non-GET fetch calls and fails on a match |
+| **P2-T3** | Repo picker: every repo the token can read, private badge, sort and filter, recent list | A repo the token cannot read is absent, not erroring |
+| **P2-T4** | Workspace pane: branch picker → recursive tree → file viewer with line numbers; pin `baseSha` on selection | Selecting a file shows its blob at the pinned sha; switching branch resets the pin |
+| **P2-T5** | Search: instant path filter over the cached tree; code search via GitHub search with caps (20 hits, 10 candidates) | A query returns path + line per hit; a hit opens the viewer at that line |
+| **P2-T6** *(optional)* | GitHub OAuth App flow writing the same sealed row | OAuth and PAT connections are indistinguishable downstream |
+
+**Phase gate:** token never reaches the browser in any route or RSC payload; no write verb outside `lib/github/write.ts` (added in P6).
+
+---
+
+## 12. Phase 3 — Chat core
+
+**Outcome:** a streaming conversation that knows which repository is attached and cites it precisely.
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P3-T1** | `lib/models.ts`: capability ids (`auto`, `code`, `flash`), display names, capability matrix (images, documents); vendor ids and keys stay server-side in `lib/providers.ts` | Browser bundle contains no provider id or key; a test asserts the model file has no vendor names |
+| **P3-T2** | `/api/chat` SSE route on Node runtime: adapters for each provider, fallback chain for `auto`, abort propagation, `no-store` | Tokens arrive incrementally (<250ms to first byte on a live key); abort stops upstream spend |
+| **P3-T3** | Message persistence with server-assigned `seq`; optimistic local ordering before sync; reconcile on refresh | Two clients inserting in the same millisecond read back the same order |
+| **P3-T4** | Citation rendering: `path:line` in an answer becomes a link that opens the workspace viewer at that line | Every rendered citation resolves to a real path at the pinned sha, or renders as plain text |
+| **P3-T5** | Stop generation, retry, and honest error surfaces (provider down, key missing, rate limited) | No error path renders a fabricated assistant answer |
+| **P3-T6** | Context assembly: attached repo tree summary + pinned file + explicit selection, budgeted with a visible "context used" meter | Exceeding the budget trims with a stated reason and never silently drops the pinned file |
+
+**Phase gate:** stream, stop and error paths behave; two-device ordering stable; citations resolve.
+
+---
+
+## 13. Phase 4 — Repo agent
+
+**Outcome:** the model can read the repository through tools, and its budget cannot be rewound.
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P4-T1** | HMAC turn envelope (`turn_id`, `exp`, `model`, `prompt_hash`) + `agent_turns` row updated by compare-and-set (`where turn_id=$1 and owner=auth.uid() and steps=$2`) | Replaying an older valid token returns `409` and does not decrement `steps` |
+| **P4-T2** | Tools: `list_files` (≤200 paths), `read_file` (≤200KB), `search_code` (≤10 candidates, ≤20 hits) — all GET, all server-side | Each tool refuses over-cap input with a typed error; no tool accepts a URL |
+| **P4-T3** | Streamed step events: announcement before the call, completion after, prose interleaved | The transcript shows `read lib/db.ts ✓` before the text that depends on it |
+| **P4-T4** | Budget: `MAX_STEPS = 24`, `MAX_TURN_TOKENS = 120_000`, `TURN_TTL_MS = 30 min`; cap message states which limit was hit; signed continuation token when the function nears `maxDuration` | Hitting the cap produces a truthful message; a continued turn resumes without re-billing |
+| **P4-T5** | System contract: cite paths and line numbers, never claim a build or test ran, say when a read failed | A test asserts the prompt contains the no-fabrication clause and the UI has no "tests passed" string |
+
+**Phase gate:** replay rejected; caps truthful; tool surface read-only.
+
+---
+
+## 14. Phase 5 — Changesets and review
+
+**Outcome:** proposed edits arrive as a signed, reviewable diff. Nothing is written to GitHub.
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P5-T1** | `propose_edits` tool → `changesets` + `changeset_files`: whole-file write or exact string replacement; ≤6 edits per call, ≤120KB per edit | A replacement whose anchor is absent fails that file and says so |
+| **P5-T2** | Diff engine: unified diff per file, `MAX_DIFF_CHARS = 60_000`, `MAX_DIFF_LINES = 2_000`, explicit truncation notice | Truncated diff says it is truncated; no silent clipping |
+| **P5-T3** | Review UI: file list, per-file diff, accept/reject per file, base-sha staleness warning | Rejecting a file removes it from the commit set and the card says so |
+| **P5-T4** | Signature: HMAC over `changeset_id + base_sha + content_hash`, `status` excluded, `CHANGESET_TTL_MS = 6h` | Editing a byte of content invalidates; moving `open` → `approved` does not |
+| **P5-T5** | Review card states: draft, ready, approved, committed, failed, expired — each reachable from a real observation | No state is rendered optimistically |
+
+**Phase gate:** signature semantics proven both ways; no commit path exists yet; the card never claims verification.
+
+---
+
+## 15. Phase 6 — Approval, branch, pull request
+
+**Outcome:** one click creates a branch and opens a PR. The default branch is unreachable by construction.
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P6-T1** | Approve route: verify owner, signature, TTL and `status = 'open'` before anything else | A tampered or expired changeset returns `409` and commits nothing |
+| **P6-T2** | `lib/github/write.ts`: create ref `openmi/agent/<changeset-id>`, commit all accepted files in one Git tree commit, open a PR against the recorded base | Exactly one commit and one PR per approval; a retry with the same idempotency key returns the same PR |
+| **P6-T3** | Branch policy: prefix enforced, base compared to the repo default branch, refusal is `403 "Openmi only commits to agent/ branches."` | Test asserts refusal for the default branch and for a user-supplied branch name |
+| **P6-T4** | Persist `pr_url`, `pr_number`, `commit_sha`; review card links out; activity records the approval | Card links to the real PR; no PR is created before approval |
+| **P6-T5** | Failure handling: partial commit, permission denied, stale base — each surfaced with its own message and no retry storm | Each failure has a distinct message; none consumes a second Dew hour |
+
+**Phase gate:** commit-refusal test green; a PR exists only after an approval; default branch has no new commits in the test repo.
+
+---
+
+## 16. Phase 7 — Dew billing
+
+**Outcome:** an hour of chat costs a flat amount, paid before the model call, with a ledger and a history page.
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P7-T1** | `lib/dew.ts`: `DEW_PER_HOUR = 3`, `HOUR_SESSION_MS = 3_600_000`, `DAILY_FREE_DEW = 10`, `PAID_DAILY_FREE_DEW = 15`, `TRIAL_DEW = 5`, precision 3, dust floor 0.05, low balance 10 | A docs test asserts every documented number equals its exported constant |
+| **P7-T2** | `006_dew.sql`: `hour_sessions(owner pk)`, `start_hour_session(model, repo)` `security definer`, advisory lock, no price parameter | Two concurrent calls yield one session and one charge; the function signature has no amount argument |
+| **P7-T3** | Charge gate on `/api/chat` and agent routes: no active hour → `402` before any provider call; spend free bucket, then paid credit | A refused request makes no upstream call (asserted with a stubbed fetch) |
+| **P7-T4** | `dew_transactions` ledger; daily refill at local midnight in the account's timezone; a `dailyDay` ahead of today does not refill | Clock-backwards fixture does not refill; ledger sums to the cached balance |
+| **P7-T5** | `/activity`: ledger entries, hour sessions, per-chat usage, empty state | Totals match the ledger exactly |
+| **P7-T6** | Invites: personal code, attribution at signup, reward both sides, ledger `kind='invite'`, per-account cap | Self-invite and re-use are refused; rewards appear once |
+| **P7-T7** | Refunds: provider failure, abort before first token, operator correction — three explicit paths, each writing a ledger row | Each path tested; no refund exceeds the original charge |
+| **P7-T8** | Low-balance state, top-up packs, redeem code (operator-issued), purchase history | Balance below 10 turns the chip amber; a used code cannot be reused |
+
+**Phase gate:** concurrent start impossible by primary key; exactly 3 Dew per hour; ledger and cached balance agree after every test.
+
+---
+
+## 17. Phase 8 — Setup and about truth surface
+
+**Outcome:** one page that tells a new deployer exactly what is missing, and one page that says exactly what the product does.
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P8-T1** | `/setup`: every variable from §6 with present/missing, which feature each unlocks, and the exact fix | Accurate at zero config and at full config; never prints a value |
+| **P8-T2** | Migration status: applied versions, pending files, checksum drift against `supabase/migrations` | A hand-edited applied migration shows as drift, not as "up to date" |
+| **P8-T3** | Live probes: Supabase reachable, GitHub token decrypts, each AI provider responds, RLS smoke test (anon select returns empty) | Each probe reports its own failure, not a generic "error" |
+| **P8-T4** | `/about`: what the product does and does not do, the branch policy, the hourly price, the no-execution statement | No claim exists that the code does not perform |
+
+**Phase gate:** `/setup` is the single answer to "why is this not working"; `/about` survives a sceptical read.
+
+---
+
+## 18. Phase 9 — Hardening and launch
+
+| Task | Work | Acceptance |
+|---|---|---|
+| **P9-T1** | RLS audit: two accounts, anon key, direct REST calls against every table | No cross-account read or write succeeds; anon sees nothing |
+| **P9-T2** | Accessibility: semantic tokens only, every text pair ≥4.5:1, accent fills ≥4.5:1, focus visible, reduced motion honoured; contrast gate in CI | Script exits 1 when a token regresses; audit of all three themes is clean |
+| **P9-T3** | Rate limiting: `rate_limit_hit(bucket, window_start, max)` atomic upsert; Upstash used when configured; absent limiter degrades, never blocks boot | Burst across two instances shares one counter |
+| **P9-T4** | Playwright smoke: sign-in, pick repo, stream a chat, approve-to-refusal on the default branch | Four specs pass locally; unauthenticated specs run in CI |
+| **P9-T5** | Vercel specifics: per-route `maxDuration`, `dynamic = "force-dynamic"`, `no-store`, `X-Accel-Buffering: no`, region choice, no cron dependency | Streaming verified on the deployed preview, not just locally |
+| **P9-T6** | `README.md` + runbook §23, screenshots, known limitations, manual test steps | A fresh reader can deploy without asking a question |
+
+**Phase gate:** RLS audit green; contrast green; smoke tests green; streaming verified on Vercel.
+
+---
+
+## 19. Phase 10 — Execution (gated, not v1)
+
+**Status: not buildable.** Four decisions are missing, and inventing them would produce a sandbox that costs money nobody priced.
 
 | Task | Work | Blocked on |
 |---|---|---|
-| **P6-T1** | Design doc: what runs, where, for how long, at what cost, with which secrets absent | D6.1–D6.4 |
-| **P6-T2** | Provider selection and a cost model in Dew/hour terms | D6.2 |
-| **P6-T3** | Wire results into the review card, including the failure text | P6-T1 |
-| **P6-T4** | Contract tests: a "tests passed" claim is impossible without a real run, and a failed run cannot render as success | P6-T3 |
+| **P10-T1** | Design doc: what runs, where, for how long, at what cost, with which secrets absent | D6.1–D6.4 |
+| **P10-T2** | Provider selection and a cost model in Dew/hour | D6.2 |
+| **P10-T3** | Wire results into the review card, including failure text | P10-T1 |
+| **P10-T4** | Contract tests: "tests passed" is impossible without a real run; a failed run cannot render as success | P10-T3 |
 
-The one rule that cannot be relaxed: **every state the card can show must be reachable from a real observation.** If the sandbox times out, the card says timed out. If it cannot start, the card says it could not start. There is no optimistic default, because the entire product proposition is that the review is honest about what it verified.
-
----
-
-## 12. Coverage matrix
-
-| Finding | Sev | Task | Phase |
-|---|---|---|---|
-| F-01 accent ink 2.14 / 2.59 | P1 | P1-T1 | 1 |
-| F-02 `--text-low` 3.61 / 3.40 / 4.47 | P1 | P1-T2 | 1 |
-| F-03 `!important` override block | P1 | P1-T4 → T8 | 1 |
-| F-04 README/spec drift | P1 | P0-T2 | 0 |
-| F-05 client-held step budget | P2 | P2-T1 | 2 |
-| F-06 no `/chat` middleware | P2 | P3-T1 (likely defer) | 3 |
-| F-07 one key, two secret classes | P2 | P2-T2 | 2 |
-| F-08 per-instance limiter | P2 | P2-T3 | 2 |
-| F-09 uncapped share reads | P2 | P3-T2 | 3 |
-| F-10 client-clock ordering | P2 | P2-T4 | 2 |
-| F-11 Ink is not selectable | P2 | P1-T9 | 1 |
-| F-12 no browser layer | P2 | P4-T1, T2 | 4 |
-| F-13 memory residue | P3 | P3-T3 | 3 |
-| F-14 CSP `unsafe-inline` | P3 | P3-T4 | 3 |
-| F-15 silent label fallback | P3 | P3-T5 | 3 |
-
-All 15 are assigned. Nothing in the register is left as "future work".
+The rule that cannot be relaxed: **every card state must be reachable from a real observation.** Timeout says timed out. Cannot start says cannot start. There is no optimistic default.
 
 ---
 
-## 13. Open decisions
+## 20. Requirement coverage
 
-These need an owner answer before the named task starts. Each is a real fork, not a formality.
+| Requirement | Phase | Tasks |
+|---|---|---|
+| Account sign-in | 1 | P1-T1, P1-T2 |
+| Connect GitHub | 2 | P2-T1 (OAuth: P2-T6) |
+| Pick a repository | 2 | P2-T3 |
+| Browse files | 2 | P2-T4 |
+| Read code | 2, 3 | P2-T4, P3-T4 |
+| Search the repo | 2, 4 | P2-T5, P4-T2 |
+| Answer with real paths and line references | 3, 4 | P3-T4, P4-T5 |
+| Suggest edits as a reviewable diff | 5 | P5-T1, P5-T2, P5-T3 |
+| Nothing pushed until approve + commit | 5, 6 | P5-T4, P6-T1 |
+| Approve → branch + pull request | 6 | P6-T2, P6-T3, P6-T4 |
+| Never touch the default branch | 6 | P6-T3 |
+| Chat history | 1, 3 | P1-T7, P3-T3 |
+| Repo workspace | 2 | P2-T4, P2-T5 |
+| Sidebar with folders and trash | 1 | P1-T5, P1-T6 |
+| Dew credits | 7 | P7-T1 → P7-T3 |
+| Daily free usage | 7 | P7-T4 |
+| Activity history | 7 | P7-T5 |
+| Invite rewards | 7 | P7-T6 |
+| Setup/about page showing missing keys or migrations | 0, 8 | P0-T5, P8-T1 → P8-T4 |
+| Vercel + Supabase deployment | 0, 9, §23 | P0-T3, P9-T5, runbook |
+
+---
+
+## 21. Open decisions
 
 | ID | Decision | Blocks | Recommendation |
 |---|---|---|---|
-| **D1** | Delete the override block entirely, or keep a residual block for surfaces that cannot be tokenised? | P1-T9 | Delete. Anything that cannot be tokenised should not be styled. |
-| **D2** | Is Ink a theme or a layout? | P1-T9 | Document as layout-locked. |
-| **D3** | Postgres limiter vs requiring Upstash in production | P2-T3 | Postgres. No new vendor, and the app must boot unconfigured. |
-| **D4** | Move sessions to cookies for a real `/chat` gate? | P3-T1, P3-T4 | Defer. Cost is a session migration across every handler; benefit is a shell paint. |
-| **D5** | Delete the memory table, or restore the feature? | P3-T3 | Delete. It is a destructive migration, so it needs an explicit yes. |
-| **D6.1** | What may the sandbox execute? | P6-T1 | Must be enumerated, not "the project's tests". |
-| **D6.2** | How is sandbox time priced in Dew? | P6-T2 | Per minute, prepaid, refused before start — never metered after the fact. |
-| **D6.3** | Which secrets are absent from the sandbox? | P6-T1 | All of them. No provider keys, no service role, no GitHub token. |
-| **D6.4** | What happens when the sandbox cannot start? | P6-T3 | The card says so, and the commit gate stays closed on a claim. |
+| **D1** | Sign-in method: email + password, magic link, GitHub OAuth, or all three? | P1-T2 | Email + password plus magic link; GitHub OAuth stays a connect flow, not a login |
+| **D2** | Does a chat belong to one repository permanently, or can the attachment change mid-thread? | P3-T1, P5-T1 | One repository per chat; a new repo starts a new chat, so a diff always has one base |
+| **D3** | A shared rate limiter without Upstash: Postgres RPC or per-instance? | P9-T3 | Postgres RPC. No new vendor, and the app must boot unconfigured |
+| **D4** | Is Dew spendable on an agent turn separately from chat, or does one hour cover both? | P7-T3, P4-T4 | One hour covers both; the caps bound cost, not price |
+| **D5** | Top-up: manual receipt upload, redeem codes, or a payment provider? | P7-T8 | Redeem codes in v1; a provider is its own project with tax and webhook work |
+| **D6.1** | What may the sandbox execute? | P10-T1 | Enumerated commands, never "the project's tests" |
+| **D6.2** | How is sandbox time priced in Dew? | P10-T2 | Per minute, prepaid, refused before start |
+| **D6.3** | Which secrets are absent from the sandbox? | P10-T1 | All of them |
+| **D6.4** | What happens when the sandbox cannot start? | P10-T3 | The card says so, and the gate stays closed on a claim |
 
 ---
 
-## 14. Per-PR gates
+## 22. Per-PR gates
 
-Every phase PR runs the same five commands, and all five must be green before review:
+Every PR runs the same commands, and all must be green before review:
 
 ```bash
 bun install --frozen-lockfile
@@ -525,25 +433,68 @@ bun run check:migrations
 NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 ```
 
-Plus, once Phase 1 lands:
+Once Phase 9 lands, plus:
 
 ```bash
 node scripts/check-contrast.mjs
-bunx tsx tests/theme-literals.test.ts
+bun run test:rls
 ```
 
 **Reviewer checklist.**
 
-- [ ] No invariant in [§3](#3-invariants--do-not-fix-these) was touched.
+- [ ] No invariant in §5 was touched.
 - [ ] Any new limit is a named constant with a test that reads it, not a literal in a handler.
-- [ ] Any new table has RLS enabled, a policy keyed on `auth.uid()`, and `revoke all from anon, authenticated` where it moves money or identity.
-- [ ] Any new migration applies twice cleanly (the CI job enforces it, but read the diff).
-- [ ] No new literal colour outside the ratchet.
+- [ ] Any new table has RLS enabled in the same migration, with a policy keyed on `auth.uid()`.
+- [ ] Any migration applies twice cleanly.
+- [ ] No literal palette colour in a component; no new `!important` override.
+- [ ] No secret in a `NEXT_PUBLIC_*` variable, a log line, or a client bundle.
 - [ ] No claim of verification the product does not perform — in code, comments, docs or UI copy.
-- [ ] The PR names the finding it closes, and the audit is updated with the sha.
-
-**Rollback.** Phases 0, 1, 3 and 5 are revertible by a single `git revert` because nothing in them is a migration. Phases 2 and 3 add migrations; those are additive and re-runnable, so a revert leaves the objects in place and unused — acceptable, and the reason none of them drops a column the running app still selects.
+- [ ] The PR names the task id it closes.
+- [ ] Pushes are authored as **`Openmi`** — see [`agent-push-requirements.md`](agent-push-requirements.md).
 
 ---
 
-*Plan derived from `OPENMI_ARCHITECTURE_AUDIT.md` at `test` @ `08a049d`. Line anchors verified against that tree; re-grep before editing. Contrast candidates are computed with the WCAG relative-luminance formula over the shipped tokens and must be asserted by the script, not trusted from this table.*
+## 23. Deploy runbook
+
+**First deploy**
+
+1. Create the Supabase project. Copy the project URL, anon key and service-role key.
+2. Generate a 32-byte base64 `GITHUB_TOKEN_KEY` (`openssl rand -base64 32`).
+3. In Supabase → Authentication → URL configuration, add `https://<domain>/auth/callback` and `http://localhost:3000/auth/callback`.
+4. Import the repo into Vercel; set every key from §6 under **Preview** and **Production** separately.
+5. Apply migrations: `supabase link --project-ref <ref> && supabase db push`. Vercel does not run these; order is migrate, then deploy.
+6. Deploy. Open `/setup` and confirm every row is green.
+7. Connect GitHub with a fine-grained PAT scoped to the repositories you intend to use: **contents: read/write, pull requests: write, metadata: read**.
+8. Pick a repo, send one message, approve one trivial change, confirm the PR target is `openmi/agent/...`.
+
+**Ongoing**
+
+- Migrations are applied before the deploy that depends on them; never after.
+- Rotating `GITHUB_TOKEN_KEY` invalidates existing sealed tokens; users reconnect. Plan it as a maintenance window.
+- Preview deployments use a Supabase branch or a second project. Never point Preview at production data.
+
+**Known limits to state in the README**
+
+- Turns are bounded by `maxDuration`; a long turn returns a continuation rather than a background job.
+- Top-ups are operator-issued codes in v1.
+- No execution of any kind: the product reads and proposes, it does not run.
+
+---
+
+## 24. Rollback
+
+| Phase | Revertible by `git revert`? | Notes |
+|---|---|---|
+| 0 | yes | No migrations beyond 001, which is additive |
+| 1 | yes | `001`, `002` additive; dropping tables needs a manual migration |
+| 2 | yes | `003` additive |
+| 3–4 | yes | `004` additive; sealed tokens remain usable |
+| 5–6 | yes | `005` additive; an open PR is a GitHub artefact, not a database row |
+| 7 | partially | `006` adds money tables; revert leaves them unused, which is acceptable because nothing drops a column the app still selects |
+| 8–9 | yes | No schema change |
+
+A revert never deletes a PR that was already opened. That is a human decision on GitHub, not a deploy step.
+
+---
+
+*Plan written for a greenfield Vercel + Supabase build. Every task names its proving check; a task that cannot name one belongs in §21 instead.*
