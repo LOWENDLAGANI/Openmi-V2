@@ -9,6 +9,8 @@ export type Chat = {
   title: string;
   folder_id: string | null;
   repo_full_name: string | null;
+  repo_branch: string | null;
+  repo_base_sha: string | null;
   model: string;
   created_at: string;
   updated_at: string;

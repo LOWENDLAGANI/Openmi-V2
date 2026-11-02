@@ -179,3 +179,20 @@ test("the service-only marker table is not readable by a signed-in account", asy
     /permission denied/
   );
 });
+
+test("a GitHub connection is invisible to another account", async () => {
+  await actAs("authenticated", USER_A);
+  await db.query(
+    "insert into public.github_connections (owner, login, token_sealed, token_last_four, scopes) values ($1, $2, $3, $4, $5)",
+    [USER_A, "octocat", "v1.aaaaaaaa.bbbbbbbb.cccccccc", "1234", "{repo,read:user}"]
+  );
+
+  const own = await db.query("select login from public.github_connections");
+  expect(own.rows.length).toBe(1);
+
+  await actAs("authenticated", USER_B);
+  const other = await db.query(
+    "select login, token_sealed from public.github_connections"
+  );
+  expect(other.rows).toEqual([]);
+});
