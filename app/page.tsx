@@ -24,12 +24,20 @@ export default function HomePage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-6 py-10">
       <header className="flex items-center justify-between">
         <Brand />
-        <Link
-          href="/setup"
-          className="rounded-lg border border-line bg-card px-3 py-1.5 text-[13px] font-medium text-body transition-colors hover:bg-hover"
-        >
-          Setup status
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="text-[13px] font-medium text-body transition-colors hover:text-hi"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/setup"
+            className="rounded-lg border border-line bg-card px-3 py-1.5 text-[13px] font-medium text-body transition-colors hover:bg-hover"
+          >
+            Setup status
+          </Link>
+        </div>
       </header>
 
       <section className="mt-20 max-w-2xl">
@@ -55,10 +63,10 @@ export default function HomePage() {
             Check configuration
           </Link>
           <Link
-            href="/about"
+            href="/login"
             className="rounded-lg border border-line bg-card px-4 py-2 text-[13px] font-medium text-body transition-colors hover:bg-hover"
           >
-            What it does not do
+            Sign in to start
           </Link>
         </div>
       </section>
@@ -86,7 +94,8 @@ export default function HomePage() {
         <p>
           Every phase is written down in{" "}
           <span className="font-mono text-mid">OPENMI_BUILD_PHASES.md</span>.
-          Sign-in, repositories and chat arrive in phases 1–3.
+          Sign-in, folders and the trash are live; repositories arrive in phase 2
+          and chat in phase 3.
         </p>
       </footer>
     </main>

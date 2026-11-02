@@ -36,7 +36,12 @@ const SHIM = `
   );
   create or replace function auth.uid() returns uuid
     language sql stable
-    as $$ select null::uuid $$;
+    as $$
+      select nullif(
+        current_setting('request.jwt.claims', true)::jsonb ->> 'sub',
+        ''
+      )::uuid
+    $$;
 
   do $$
   begin
@@ -48,6 +53,15 @@ const SHIM = `
     end if;
   end
   $$;
+
+  -- Supabase grants these by default; a bare Postgres does not, and without
+  -- them every policy is inert because the role cannot reach the table. This
+  -- runs after the roles exist, or the grant itself is the error.
+  grant usage on schema public to anon, authenticated;
+  grant usage, select on all sequences in schema public to anon, authenticated;
+  grant execute on all functions in schema public to anon, authenticated;
+  alter default privileges in schema public
+    grant all on tables to anon, authenticated;
 
   create schema if not exists supabase_migrations;
   create table if not exists supabase_migrations.schema_migrations (
