@@ -1,14 +1,16 @@
 # Openmi
 
-A chat client welded to a GitHub repository. It reads code, proposes edits as a
-reviewable diff, and opens a pull request only after you approve one. It does
-not run your tests, and it says so.
+A chat client welded to a GitHub repository. It reads code at a pinned commit,
+answers with `path:line` citations, and proposes edits as a diff you can review.
+Nothing is written to GitHub until you approve it, and an approval opens a pull
+request on a new branch — never on the default branch. It does not run your
+tests, and it says so.
 
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0 and 1
-are done.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–4 are
+built; review, changesets and billing are next.
 
 ---
 
@@ -26,12 +28,12 @@ migrations have been applied.
 
 ## Sign in
 
-Sign-in uses Supabase Auth with email and password. The session lives in an
-httpOnly cookie (`@supabase/ssr`), which is what lets `middleware.ts` redirect a
+Email and password through Supabase Auth. The session lives in an httpOnly
+cookie (`@supabase/ssr`), which is what lets `middleware.ts` redirect a
 signed-out visitor before paint. RLS remains the authority: a forged cookie
-renders a shell with no data and is sent back to sign-in.
+renders a shell with no data.
 
-For email confirmation links, add these redirect URLs in Supabase →
+Email confirmation links need these redirect URLs in Supabase →
 Authentication → URL configuration:
 
 ```
@@ -39,23 +41,30 @@ http://localhost:3000/auth/callback
 https://<your-domain>/auth/callback
 ```
 
-Create accounts with **Authentication → Users → Add user** if you want to skip
-email delivery while developing.
+## Connect GitHub
+
+Paste a fine-grained token with **Contents: read** and **Metadata: read**. It is
+sent once, verified against GitHub, sealed with AES-256-GCM under
+`GITHUB_TOKEN_KEY`, and only its last four characters are ever shown again.
+`/api/github/status` reads a query that does not select the sealed column at all.
+
+Rotating `GITHUB_TOKEN_KEY` makes existing sealed tokens unopenable. That is the
+intended behaviour, not a bug: every account reconnects.
 
 ## Database
-
-Migrations live in `supabase/migrations/` and are applied in filename order:
 
 ```bash
 supabase link --project-ref <ref>
 supabase db push
 ```
 
-Vercel does not run migrations. The order is always **migrate, then deploy**.
+Migrations are applied in filename order and must apply twice cleanly:
 
-`bun run check:migrations` applies every migration to an in-memory Postgres and
-then applies them again, requiring the second pass to be a no-op — which is what
-makes that order safe to repeat.
+```bash
+bun run check:migrations   # PGlite, every migration, second pass is a no-op
+```
+
+Vercel does not run migrations. The order is always **migrate, then deploy**.
 
 ## Checks
 
@@ -66,30 +75,52 @@ bun run check:migrations
 NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 ```
 
-`bun run test` includes `tests/rls.test.ts`, which runs the real migrations and
-then queries as two different accounts and as `anon`, asserting that no row
-crosses an account boundary.
+`bun run test` runs the real migrations against Postgres and queries as two
+different accounts and as `anon`. It also covers the seal/unseal path and its
+tamper cases, the GET-only GitHub client, the context budget, the turn envelope,
+and the tool surface.
 
 ## What is built
 
 | Phase | Status | Surface |
 |---|---|---|
 | 0 | done | Env contract, Supabase clients, migration harness, `/setup`, CI |
-| 1 | done | Sign-in/out, cookie session, middleware gate, sidebar, folders, trash, chat history |
-| 2 | next | GitHub connect, repo picker, tree and file viewer, repository search |
-| 3 | — | Streaming chat, model modes, citations |
-| 4 | — | Repository agent tools with a server-held step budget |
-| 5 | — | Changesets, unified diff, review UI |
+| 1 | done | Sign-in/out, cookie session, middleware gate, sidebar, folders, trash, history |
+| 2 | done | GitHub connect with sealed tokens, repo picker, pinned tree + file viewer, code search |
+| 3 | done | Streaming chat, capability modes, per-chat sequence, context budget, citation links |
+| 4 | done | Read-only agent tools, step budget with compare-and-set, signed continuation, truthful caps |
+| 5 | next | Changesets, unified diff, review UI |
 | 6 | — | Approval → branch → pull request, default-branch refusal |
 | 7 | — | Dew: hourly sessions, ledger, daily free bucket, activity, invites |
+| 8–9 | — | Setup/about truth surface, hardening, launch |
+
+## The agent, and its limits
+
+A turn may call three tools, all of them reads: `list_files` (≤200 paths),
+`read_file` (≤200KB, text only), and `search_code` (≤10 candidates). No tool
+accepts a URL; every request is built from the token plus a path in the
+repository the chat is pinned to.
+
+The turn stops at one of three caps, and the transcript says which:
+
+| Cap | Value |
+|---|---|
+| Steps | 24 |
+| Budget | 120,000 tokens (estimated from characters) |
+| Wall clock | 40s inside a 60s function, then a signed continuation |
+
+Replaying an older continuation is refused in Postgres, not in the route: the
+step counter advances by compare-and-set, so a stale token matches no row.
 
 ## Known limits
 
-- Chat, repository access and billing are not implemented yet; the UI says so
-  rather than pretending.
-- Nothing in this app executes code. There is no sandbox and no test runner.
-- A rebuild of a repository is a GitHub API call, not a mirror; nothing is
-  stored locally except chats, folders and (later) review artefacts.
+- Nothing in this app executes code. There is no sandbox and no test runner, and
+  no surface claims otherwise.
+- No diff or approval yet: the agent reads and cites, it does not propose edits.
+- GitHub code search runs against the default branch while line numbers are
+  resolved at the pinned commit; the UI says both.
+- Repository access is API calls, not a clone. There is no mirror to go stale,
+  and no offline mode.
 
 ## Rules for contributors
 
@@ -99,3 +130,5 @@ crosses an account boundary.
   (`bg-canvas`, `text-low`, `border-line`). There is no override block and there
   will not be one.
 - A new table gets RLS enabled in the migration that creates it.
+- A new limit is a named constant with a test that reads it.
+- Do not claim verification the product does not perform.

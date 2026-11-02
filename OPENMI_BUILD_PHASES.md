@@ -1,7 +1,7 @@
 # Openmi — Build Phases
 
 **Target:** a greenfield Openmi web app on **Vercel** (hosting) and **Supabase** (Postgres, Auth, RLS).
-**Status:** nothing is built yet. This file is the build order: eleven phases, one merge window each, one task per pull request.
+**Status:** phases 0–4 are built, checked and pushed to `main`. Phases 5–10 are open. This file is the build order: eleven phases, one merge window each, one task per pull request.
 **Repository state:** wiped at the start of this plan. See §1 for what was removed and what was kept.
 
 ---
@@ -149,12 +149,13 @@ Migrations live in `supabase/migrations/` and are applied with `supabase db push
 |---|---|---|
 | `001_profiles.sql` | 1 | `profiles`, trigger `on auth.users insert` |
 | `002_chats.sql` | 1 | `folders`, `chats`, `messages` (+ `seq`), indexes |
-| `003_github.sql` | 2 | `github_connections` |
-| `004_agent.sql` | 4 | `agent_turns` |
-| `005_changesets.sql` | 5 | `changesets`, `changeset_files` |
-| `006_dew.sql` | 7 | `hour_sessions`, `dew_transactions`, `invites`, `start_hour_session()`, `refund_hour()` |
-| `007_rls.sql` | 1–7, extended per phase | all policies + `revoke all from anon, authenticated` where it moves money or identity |
-| `008_rate_limit.sql` | 9 | `rate_limits`, `rate_limit_hit(bucket, window_start, max)` |
+| `003_github.sql` | 2 | `github_connections`, the chat commit pin |
+| `004_chat.sql` | 3 | `append_message()` — per-chat sequence, first-message title |
+| `005_agent.sql` | 4 | `agent_turns`, `consume_agent_step()` |
+| `006_changesets.sql` | 5 | `changesets`, `changeset_files` |
+| `007_dew.sql` | 7 | `hour_sessions`, `dew_transactions`, `invites`, `start_hour_session()`, `refund_hour()` |
+| `008_rls.sql` | 1–7, extended per phase | all policies + `revoke all from anon, authenticated` where it moves money or identity |
+| `009_rate_limit.sql` | 9 | `rate_limits`, `rate_limit_hit(bucket, window_start, max)` |
 
 **Shape notes.**
 

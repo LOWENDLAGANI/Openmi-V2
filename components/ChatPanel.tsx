@@ -17,6 +17,8 @@ type UiMessage = {
   model: string | null;
 };
 
+type StepLine = { detail: string; state: "start" | "done" | "error" };
+
 type ContextMeter = {
   usedChars: number;
   budgetChars: number;
@@ -55,37 +57,57 @@ export function ChatPanel({
   const [model, setModel] = useState<ModelId>(initialModel);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState("");
+  const [steps, setSteps] = useState<StepLine[]>([]);
+  const [notices, setNotices] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meter, setMeter] = useState<ContextMeter | null>(null);
   const [lastSent, setLastSent] = useState("");
+
+  const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const continuedRef = useRef(false);
 
-  async function send(content: string) {
-    if (content.trim().length === 0 || streaming) return;
+  async function send(content: string, turnToken?: string) {
+    const continuation = typeof turnToken === "string";
 
+    if (busyRef.current) return;
+    if (!continuation && content.trim().length === 0) return;
+
+    busyRef.current = true;
+    setStreaming(true);
     setError(null);
     setPending("");
-    setStreaming(true);
-    setLastSent(content);
-    setDraft("");
+    setSteps([]);
+    setNotices([]);
 
-    const optimisticId = `local-${Date.now()}`;
-    setMessages((current) => [
-      ...current,
-      { id: optimisticId, role: "user", content, seq: null, model },
-    ]);
+    let pausedToken: string | null = null;
+    let assembled = "";
+    let optimisticId: string | null = null;
+
+    if (!continuation) {
+      setLastSent(content);
+      setDraft("");
+      optimisticId = `local-${Date.now()}`;
+      const localId = optimisticId;
+      setMessages((current) => [
+        ...current,
+        { id: localId, role: "user", content, seq: null, model },
+      ]);
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
-
-    let assembled = "";
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chatId, content, model, path: pinnedPath }),
+        body: JSON.stringify(
+          continuation
+            ? { chatId, turn: turnToken }
+            : { chatId, content, model, path: pinnedPath }
+        ),
         signal: controller.signal,
       });
 
@@ -94,7 +116,10 @@ export function ChatPanel({
           | { error?: string }
           | null;
         setError(payload?.error ?? `The request failed (${response.status}).`);
-        setMessages((current) => current.filter((message) => message.id !== optimisticId));
+        if (optimisticId) {
+          const failedId = optimisticId;
+          setMessages((current) => current.filter((message) => message.id !== failedId));
+        }
         return;
       }
 
@@ -119,6 +144,7 @@ export function ChatPanel({
         if (event === "user") {
           const id = typeof payload.id === "string" ? payload.id : optimisticId;
           const seq = typeof payload.seq === "number" ? payload.seq : null;
+          if (!id) return;
           setMessages((current) =>
             current.map((message) =>
               message.id === optimisticId ? { ...message, id, seq } : message
@@ -136,9 +162,35 @@ export function ChatPanel({
           return;
         }
 
+        if (event === "step") {
+          const detail = typeof payload.detail === "string" ? payload.detail : "step";
+          const state =
+            payload.state === "done" || payload.state === "error" ? payload.state : "start";
+
+          setSteps((current) => {
+            const withoutPending = current.filter(
+              (step) => !(step.detail === detail && step.state === "start")
+            );
+            if (state === "start") return [...current, { detail, state }];
+            return [...withoutPending, { detail, state }];
+          });
+          return;
+        }
+
+        if (event === "notice") {
+          const message = typeof payload.message === "string" ? payload.message : "";
+          if (message) setNotices((current) => [...current, message]);
+          return;
+        }
+
         if (event === "delta") {
           assembled += typeof payload.text === "string" ? payload.text : "";
           setPending(assembled);
+          return;
+        }
+
+        if (event === "paused") {
+          pausedToken = typeof payload.turn === "string" ? payload.turn : null;
           return;
         }
 
@@ -179,13 +231,19 @@ export function ChatPanel({
       if (!aborted) {
         setError(caught instanceof Error ? caught.message : "The connection dropped.");
       }
-      // A stopped turn may still have been saved server-side; refreshing reads
-      // the truth rather than what this tab believes.
       router.refresh();
     } finally {
-      setPending("");
+      busyRef.current = false;
       setStreaming(false);
       abortRef.current = null;
+      setPending("");
+    }
+
+    // A paused turn is continued once, with the signed token the server issued.
+    // If that continuation also pauses, the reader is told instead of looping.
+    if (pausedToken && !continuedRef.current) {
+      continuedRef.current = true;
+      await send("", pausedToken);
     }
   }
 
@@ -203,8 +261,7 @@ export function ChatPanel({
         <p className="text-[11px] text-low">
           {repo ? (
             <>
-              Reading{" "}
-              <span className="font-mono text-mid">{repo.fullName}</span> at{" "}
+              Reading <span className="font-mono text-mid">{repo.fullName}</span> at{" "}
               <span className="font-mono text-mid">{repo.sha.slice(0, 7)}</span>
             </>
           ) : (
@@ -252,7 +309,7 @@ export function ChatPanel({
             <p className="text-[13px] font-medium text-hi">Nothing asked yet</p>
             <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-mid">
               {repo
-                ? "Ask about a file, a function or where something is defined. Answers cite path:line, and the citation opens the file at that commit."
+                ? "Ask about a file, a function or where something is defined. The agent reads the repository, and answers cite path:line."
                 : "Attach a repository first, or ask a general question. Without a repository there is nothing to cite."}
             </p>
           </div>
@@ -280,22 +337,46 @@ export function ChatPanel({
               </article>
             ))}
 
-            {pending.length > 0 && (
+            {(steps.length > 0 || pending.length > 0) && (
               <article className="max-w-full px-1 py-1">
                 <p className="pb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
-                  Openmi · streaming
+                  Openmi · working
                 </p>
-                <MessageBody
-                  content={pending}
-                  repo={repo}
-                  validPaths={validPaths}
-                  chatId={chatId}
-                />
+
+                {steps.length > 0 && (
+                  <ul className="mb-2 space-y-0.5 rounded-lg border border-line bg-card px-3 py-2 font-mono text-[10.5px] text-low">
+                    {steps.map((step, index) => (
+                      <li key={`${step.detail}-${index}`}>
+                        <span aria-hidden="true">
+                          {step.state === "done" ? "✓" : step.state === "error" ? "✕" : "…"}
+                        </span>{" "}
+                        {step.detail}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {pending.length > 0 && (
+                  <MessageBody
+                    content={pending}
+                    repo={repo}
+                    validPaths={validPaths}
+                    chatId={chatId}
+                  />
+                )}
               </article>
             )}
           </div>
         )}
       </div>
+
+      {notices.length > 0 && (
+        <ul className="mb-2 space-y-0.5 rounded-lg border border-line bg-raised px-3 py-2 text-[10.5px] leading-relaxed text-mid">
+          {notices.map((notice, index) => (
+            <li key={`${notice}-${index}`}>{notice}</li>
+          ))}
+        </ul>
+      )}
 
       {error && (
         <div
