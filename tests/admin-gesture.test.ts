@@ -22,7 +22,7 @@ test("a drag resolves to its dominant axis", () => {
   expect(directionOf(20, 90)).toBe("down");
 });
 
-test("up, down, left, right unlocks after the fourth step", () => {
+test("up, down, left, right, up, down, left, right, up, right unlocks after the tenth step", () => {
   let state = GESTURE_IDLE;
   const unlocks: boolean[] = [];
 
@@ -32,7 +32,7 @@ test("up, down, left, right unlocks after the fourth step", () => {
     unlocks.push(result.unlocked);
   });
 
-  expect(unlocks).toEqual([false, false, false, true]);
+  expect(unlocks).toEqual([false, false, false, false, false, false, false, false, false, true]);
   expect(state).toEqual(GESTURE_IDLE);
 });
 

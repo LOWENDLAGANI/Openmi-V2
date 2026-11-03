@@ -17,6 +17,12 @@ export const ADMIN_SEQUENCE: readonly Direction[] = [
   "down",
   "left",
   "right",
+  "up",
+  "down",
+  "left",
+  "right",
+  "up",
+  "right",
 ];
 
 export const SWIPE_MIN_PX = 44;
