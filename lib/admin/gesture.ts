@@ -1,84 +1,60 @@
 /**
  * The hidden admin sequence.
  *
- * Each tap on the logo moves one step forward when it lands within the tap
- * window from the previous tap, so a ten-tap burst unlocks the panel. If there
- * is a gap longer than the window, or the same spot is hit twice in a row,
- * progress resets.
+ * Ten taps on the mark, each within the tap window of the one before it. That
+ * is the whole rule: a burst of ten taps opens the verification card, and a
+ * gap longer than the window starts the count again.
+ *
+ * An earlier version required a fixed ten-step tour of the mark's quadrants,
+ * with the same cell rejected twice in a row. On the real page that sequence
+ * was not reachable by tapping the logo: the second column sits under the
+ * wordmark, the centre of the mark always reads as the first cell, and one
+ * repeated spot silently reset the count — so ten clicks on the logo never
+ * unlocked anything. Position no longer matters; the burst does.
  *
  * This module is deliberately pure: no DOM, no React, no clock of its own. The
  * component passes the timestamp, which is what makes the recognizer testable
  * without a browser.
+ *
+ * The gesture grants nothing. `/admin` resolves the operator role on the server
+ * from the verified email or the database role, and answers 404 to anyone else.
  */
 
-export type AdminFingerprint = [number, number];
-
-export const ADMIN_SEQUENCE: readonly AdminFingerprint[] = [
-  [1, 1],
-  [2, 1],
-  [1, 2],
-  [2, 2],
-  [1, 1],
-  [2, 1],
-  [1, 2],
-  [2, 2],
-  [1, 1],
-  [2, 2],
-];
-
+export const TAPS_TO_UNLOCK = 10;
 export const TAP_WINDOW_MS = 1000;
 
 export type GestureState = {
-  /** How many taps of the sequence are complete. */
-  progress: number;
-  /** When the last accepted tap happened, in epoch milliseconds. */
+  /** Consecutive taps of the current burst. */
+  taps: number;
+  /** When the last counted tap happened, in epoch milliseconds. */
   lastAt: number;
-  /** Where the last accepted tap landed, used to reject the same spot twice. */
-  lastFinger: AdminFingerprint | null;
 };
 
-export const GESTURE_IDLE: GestureState = { progress: 0, lastAt: 0, lastFinger: null };
+export const GESTURE_IDLE: GestureState = { taps: 0, lastAt: 0 };
 
 /**
- * Feeds one tap into the recognizer. A tap is accepted when it arrives within
- * `windowMs` of the previous one and lands on a different spot than the last
- * accepted tap.
+ * Feeds one tap into the recognizer. A tap extends the burst when it arrives
+ * within `windowMs` of the previous one, and starts a new burst otherwise.
  */
 export function advanceGesture(
   state: GestureState,
-  finger: AdminFingerprint,
   now: number,
-  sequence: readonly AdminFingerprint[] = ADMIN_SEQUENCE,
   windowMs: number = TAP_WINDOW_MS
-): { state: GestureState; unlocked: boolean } {
-  const expired =
-    state.lastAt === 0 ||
-    state.lastFinger === null ||
-    now - state.lastAt > windowMs;
+): { state: GestureState; unlocked: boolean; remaining: number } {
+  const continued =
+    state.lastAt !== 0 && now >= state.lastAt && now - state.lastAt <= windowMs;
 
-  const repeated =
-    state.lastFinger !== null &&
-    finger[0] === state.lastFinger[0] &&
-    finger[1] === state.lastFinger[1];
+  const taps = continued ? state.taps + 1 : 1;
 
-  const progress = expired || repeated ? 0 : state.progress;
-
-  const next =
-    finger[0] === sequence[progress][0] &&
-    finger[1] === sequence[progress][1]
-      ? progress + 1
-      : 0;
-
-  if (next >= sequence.length) {
-    return { state: { ...GESTURE_IDLE }, unlocked: true };
+  if (taps >= TAPS_TO_UNLOCK) {
+    // Unlock once, then forget everything: the card is a one-shot reveal and
+    // the next burst has to be earned again.
+    return { state: { ...GESTURE_IDLE }, unlocked: true, remaining: 0 };
   }
 
   return {
-    state: {
-      progress: next,
-      lastAt: now,
-      lastFinger: finger,
-    },
+    state: { taps, lastAt: now },
     unlocked: false,
+    remaining: TAPS_TO_UNLOCK - taps,
   };
 }

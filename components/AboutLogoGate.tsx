@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
-  ADMIN_SEQUENCE,
   advanceGesture,
   GESTURE_IDLE,
   type GestureState,
@@ -15,10 +14,10 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 /**
  * The one place the hidden admin gesture lives: its own logo, on /about.
  *
- * Tap the mark 10 times in a row (staying within the tap window and not
- * repeating the same spot) to reveal the verification card. Tap position is
- * read from the logo itself, so it works on mouse and on touch without
- * guessing a coordinate that could drift.
+ * Tap the mark 10 times in a row, each tap within a second of the last, to
+ * reveal the verification card. Position is deliberately ignored: the mark is
+ * small, the wordmark sits inside the same box, and a gesture that demanded a
+ * particular corner was one a reader could not perform by tapping the logo.
  *
  * The gesture grants nothing — `/admin` resolves the operator role on the
  * server from the verified email or the database role, and answers 404 to
@@ -35,34 +34,8 @@ export function AboutLogoGate() {
   const [error, setError] = useState<string | null>(null);
 
   const gesture = useRef<GestureState>(GESTURE_IDLE);
-  const logoBounds = useRef<DOMRect | null>(null);
-
-  /** Returns the tap as a normalized 1x2 or 2x2 grid cell of the logo. */
-  function tapFingerprint(rect: DOMRect, clientX: number, clientY: number): [number, number] {
-    const left = rect.left + rect.width * 0.25;
-    const right = rect.left + rect.width * 0.75;
-    const top = rect.top + rect.height * 0.25;
-    const bottom = rect.top + rect.height * 0.75;
-
-    const col = clientX < right ? 1 : 2;
-    const row = clientY < bottom ? 1 : 2;
-    return [col, row] as const;
-  }
 
   useEffect(() => setMounted(true), []);
-
-  // Re-read the logo bounding box whenever it shows up, including when the
-  // logo spans an Admin-only section that /admin already resolved.
-  useEffect(() => {
-    const logo = document.querySelector<HTMLElement>('[data-admin-logo]');
-    if (!logo) return;
-
-    const sync = () => { logoBounds.current = logo.getBoundingClientRect(); };
-    sync();
-    const observer = new ResizeObserver(sync);
-    observer.observe(logo);
-    return () => { observer.disconnect(); };
-  }, []);
 
   // The card only needs one fact: is this session already an operator? The
   // answer comes from the server, never from local state.
@@ -89,11 +62,7 @@ export function AboutLogoGate() {
       return;
     }
 
-    const rect = logoBounds.current;
-    if (!rect) return;
-
-    const finger = tapFingerprint(rect, event.clientX, event.clientY);
-    const result = advanceGesture(gesture.current, finger, Date.now());
+    const result = advanceGesture(gesture.current, Date.now());
     gesture.current = result.state;
 
     if (result.unlocked) setUnlocked(true);
@@ -141,7 +110,6 @@ export function AboutLogoGate() {
       aria-label="Openmi"
       draggable={false}
       onPointerDown={onTap}
-      onPointerCancel={onTap}
       className="inline-flex touch-none select-none items-center gap-3"
       style={{ touchAction: "pan-y" }}
     >

@@ -1,101 +1,88 @@
 import { expect, test } from "bun:test";
 
 import {
-  ADMIN_SEQUENCE,
   GESTURE_IDLE,
+  TAPS_TO_UNLOCK,
+  TAP_WINDOW_MS,
   advanceGesture,
   type GestureState,
 } from "../lib/admin/gesture";
 
-test("10 taps in sequence unlock after the tenth", () => {
+/**
+ * The gesture has to be reachable by a person clicking the logo, not just by a
+ * test walking a table. Every case below taps the same spot on purpose: that is
+ * what a reader does, and it is what the previous quadrant sequence refused.
+ */
+
+test("ten taps in a burst unlock on the tenth, whatever spot they hit", () => {
   let state: GestureState = GESTURE_IDLE;
   const unlocks: boolean[] = [];
 
-  ADMIN_SEQUENCE.forEach((finger, index) => {
-    const result = advanceGesture(state, finger, 1_000 + index * 200);
+  for (let index = 0; index < TAPS_TO_UNLOCK; index += 1) {
+    const result = advanceGesture(state, 1_000 + index * 200);
     state = result.state;
     unlocks.push(result.unlocked);
-  });
+  }
 
+  expect(TAPS_TO_UNLOCK).toBe(10);
   expect(unlocks).toEqual(
-    Array(ADMIN_SEQUENCE.length - 1).fill(false).concat([true]),
+    Array(TAPS_TO_UNLOCK - 1).fill(false).concat([true]),
   );
+  // A reveal is one-shot: the recogniser goes back to idle.
   expect(state).toEqual(GESTURE_IDLE);
 });
 
-test("a fresh tap uses the sequence regardless of the last accepted spot", () => {
-  let state = advanceGesture(GESTURE_IDLE, ADMIN_SEQUENCE[0], 1000);
-  // A later tap far outside the window is treated as fresh, not rejected by
-  // the last accepted spot.
-  const r = advanceGesture(state.state, ADMIN_SEQUENCE[1], 2_000);
-  expect(r.state.progress).toBe(2);
-  expect(r.unlocked).toBe(false);
-});
-
-test("a gap longer than the window forgets progress", () => {
-  let state = advanceGesture(GESTURE_IDLE, ADMIN_SEQUENCE[0], 1_000);
-  expect(state.state.progress).toBe(1);
-  expect(state.unlocked).toBe(false);
-
-  state = advanceGesture(state.state, ADMIN_SEQUENCE[1], 1_000 + 2_000);
-  expect(state.state.progress).toBe(0);
-  expect(state.unlocked).toBe(false);
-});
-
-test("the same finger twice in a row does not count", () => {
-  let r = advanceGesture(GESTURE_IDLE, ADMIN_SEQUENCE[0], 1000);
-  expect(r.state.progress).toBe(1);
-
-  // Repeating the first spot counts as a wasted tap, not as step two.
-  r = advanceGesture(r.state, ADMIN_SEQUENCE[0], 1050);
-  expect(r.state.progress).toBe(1);
-  expect(r.unlocked).toBe(false);
-});
-
-test("an early tap on the wrong spot resets the sequence", () => {
-  let r = advanceGesture(GESTURE_IDLE, ADMIN_SEQUENCE[0], 1000);
-  r = advanceGesture(r.state, ADMIN_SEQUENCE[1], 1300);
-
-  expect(r.state.progress).toBe(2);
-  expect(r.unlocked).toBe(false);
-
-  r = advanceGesture(r.state, [99, 99] as [number, number], 1500);
-  expect(r.state.progress).toBe(0);
-  expect(r.unlocked).toBe(false);
-});
-
-test("a wrong tap that matches the first spot restarts at one", () => {
+test("nine taps do not unlock and report one tap remaining", () => {
   let state: GestureState = GESTURE_IDLE;
-  const three: [number, number] = [7, 7];
+  let result = { unlocked: false, remaining: 0 } as ReturnType<typeof advanceGesture>;
 
-  let r = advanceGesture(state, ADMIN_SEQUENCE[2], 1000);
-  state = r.state;
-  expect(state.progress).toBe(0);
-
-  r = advanceGesture(state, ADMIN_SEQUENCE[0], 1200);
-  state = r.state;
-  expect(state.progress).toBe(1);
-  expect(r.unlocked).toBe(false);
-
-  r = advanceGesture(state, three, 1300);
-  state = r.state;
-  expect(state.progress).toBe(0);
-  expect(r.unlocked).toBe(false);
-
-  r = advanceGesture(state, ADMIN_SEQUENCE[0], 1400);
-  state = r.state;
-  expect(state.progress).toBe(1);
-  expect(r.unlocked).toBe(false);
-});
-
-test("the sequence is defined as ten steps, not four", () => {
-  const firstNine = ADMIN_SEQUENCE.slice(0, -1);
-  let state: GestureState = GESTURE_IDLE;
-  for (const finger of firstNine) {
-    const r = advanceGesture(state, finger, 1000);
-    state = r.state;
-    expect(r.unlocked).toBe(false);
+  for (let index = 0; index < TAPS_TO_UNLOCK - 1; index += 1) {
+    result = advanceGesture(state, 1_000 + index * 100);
+    state = result.state;
   }
-  expect(state.progress).toBe(ADMIN_SEQUENCE.length - 1);
-  expect(ADMIN_SEQUENCE.length).toBe(10);
+
+  expect(result.unlocked).toBe(false);
+  expect(result.remaining).toBe(1);
+  expect(state.taps).toBe(TAPS_TO_UNLOCK - 1);
+});
+
+test("a gap longer than the window starts the count again", () => {
+  let state: GestureState = GESTURE_IDLE;
+  for (let index = 0; index < 5; index += 1) {
+    state = advanceGesture(state, 1_000 + index * 100).state;
+  }
+  expect(state.taps).toBe(5);
+
+  const afterGap = advanceGesture(state, 1_000 + 4 * 100 + TAP_WINDOW_MS + 1);
+  expect(afterGap.unlocked).toBe(false);
+  expect(afterGap.state.taps).toBe(1);
+  expect(afterGap.remaining).toBe(9);
+});
+
+test("a tap exactly on the window edge still counts", () => {
+  const first = advanceGesture(GESTURE_IDLE, 1_000);
+  const edge = advanceGesture(first.state, 1_000 + TAP_WINDOW_MS);
+
+  expect(edge.state.taps).toBe(2);
+  expect(edge.unlocked).toBe(false);
+});
+
+test("a slow burst of five and five never reaches ten", () => {
+  let state: GestureState = GESTURE_IDLE;
+  for (let index = 0; index < 5; index += 1) {
+    state = advanceGesture(state, 1_000 + index * 100).state;
+  }
+  for (let index = 0; index < 5; index += 1) {
+    state = advanceGesture(state, 3_000 + index * 100).state;
+  }
+
+  expect(state.taps).toBe(5);
+});
+
+test("a clock that jumps backwards cannot extend a burst", () => {
+  const first = advanceGesture(GESTURE_IDLE, 5_000);
+  const backwards = advanceGesture(first.state, 4_000);
+
+  expect(backwards.state.taps).toBe(1);
+  expect(backwards.unlocked).toBe(false);
 });
