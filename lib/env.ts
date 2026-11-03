@@ -146,6 +146,13 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Adsterra banner key; optional, reserved for inline rectangles",
   },
   {
+    key: "CUSTOM_MODELS",
+    scope: "server",
+    required: false,
+    unlocks: "Model choices beyond the built-in catalogue",
+    hint: 'JSON array: [{"id":"my-model","name":"My Model","provider":"openrouter","upstream":"vendor/model-id"}]',
+  },
+  {
     key: "UPSTASH_REDIS_REST_URL",
     scope: "server",
     required: false,

@@ -71,6 +71,18 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
 
   const chain = providersFor(options.model);
   let steps = options.steps;
+
+  // A named model resolves to one provider; without its key there is nothing
+  // to call, and saying so beats an empty answer that blames the model.
+  if (chain.length === 0) {
+    return {
+      text: "",
+      steps,
+      tokens: 0,
+      stopped: "error",
+      notice: "This model's provider key is not configured.",
+    };
+  }
   let tokens = 0;
   let text = "";
 

@@ -430,8 +430,13 @@ export function ChatPanel({
             className="field w-auto py-1 text-[11.5px]"
           >
             {models.map((option) => (
-              <option key={option.id} value={option.id}>
+              <option
+                key={option.id}
+                value={option.id}
+                disabled={option.available === false}
+              >
                 {option.name}
+                {option.available === false ? " — key missing" : ""}
               </option>
             ))}
           </select>

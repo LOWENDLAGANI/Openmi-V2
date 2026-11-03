@@ -28,8 +28,8 @@ import { loadChangesets } from "@/lib/changesets/store";
 import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
-import { DEFAULT_MODEL, MODELS, isModelId } from "@/lib/models";
-import { providersConfigured } from "@/lib/providers";
+import { DEFAULT_MODEL, hasModel } from "@/lib/models";
+import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
 import { emptyTrash, purgeChat, restoreChat } from "./actions";
@@ -383,6 +383,8 @@ async function RepoSurface({
 }
 
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
+  const models = modelCatalogue();
+
   const [messages, changesets, runningTurn] = await Promise.all([
     listMessages(session.supabase, chat.id),
     loadChangesets(session.supabase, chat.id),
@@ -454,8 +456,8 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
         <ChatPanel
           chatId={chat.id}
           repo={repo}
-          models={MODELS}
-          initialModel={isModelId(chat.model) ? chat.model : DEFAULT_MODEL}
+          models={models}
+          initialModel={hasModel(models, chat.model) ? chat.model : DEFAULT_MODEL}
           initialMessages={messages}
           validPaths={validPaths}
           pinnedPath={null}
@@ -468,12 +470,14 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
 }
 
 function DraftChat() {
+  const models = modelCatalogue();
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatPanel
         chatId={null}
         repo={null}
-        models={MODELS}
+        models={models}
         initialModel={DEFAULT_MODEL}
         initialMessages={[]}
         validPaths={[]}

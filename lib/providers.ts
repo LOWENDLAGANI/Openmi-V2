@@ -1,6 +1,12 @@
 import "server-only";
 
-import type { ModelId } from "@/lib/models";
+import {
+  MODELS,
+  type ModelCapability,
+  type ModelId,
+} from "@/lib/models";
+import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
+import { routeForModel } from "@/lib/models/routes";
 
 /**
  * The vendor layer. Server only.
@@ -76,12 +82,66 @@ export function providerKey(
   return (env[provider.keyName] ?? "").trim();
 }
 
-/** The providers this deployment can actually call, in preference order. */
+export function providerById(id: ProviderId): Provider | undefined {
+  return providerCatalogue().find((provider) => provider.id === id);
+}
+
+/**
+ * The providers this deployment can actually call for a model, in order.
+ *
+ * `auto` keeps the preference chain. A named model resolves to exactly one
+ * route with its own upstream id, and an empty list means "unknown model or no
+ * key", which the caller reports plainly instead of guessing.
+ */
 export function providersFor(
   model: ModelId,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  custom: readonly CustomModel[] = parseCustomModels(env.CUSTOM_MODELS).models
 ): Provider[] {
-  return CHAINS[model].filter((provider) => providerKey(provider, env).length > 0);
+  if (model === "auto") {
+    return CHAINS.auto.filter(
+      (provider) => providerKey(provider, env).length > 0
+    );
+  }
+
+  const route = routeForModel(model, custom);
+  if (!route) return [];
+
+  const provider = providerById(route.provider);
+  if (!provider || providerKey(provider, env).length === 0) return [];
+
+  // One provider, with the upstream id this model names.
+  return [{ ...provider, model: route.upstream }];
+}
+
+/**
+ * What the picker shows: built-ins plus CUSTOM_MODELS, each marked with whether
+ * a key exists for it. Availability is a server fact; the name is public.
+ */
+export function modelCatalogue(
+  env: Record<string, string | undefined> = process.env
+): ModelCapability[] {
+  const custom = parseCustomModels(env.CUSTOM_MODELS).models;
+
+  const catalogue: ModelCapability[] = MODELS.map((model) => ({
+    ...model,
+    available: providersFor(model.id, env, custom).length > 0,
+  }));
+
+  for (const model of custom) {
+    if (MODELS.some((builtin) => builtin.id === model.id)) continue;
+
+    catalogue.push({
+      id: model.id,
+      name: model.name,
+      blurb: model.blurb,
+      images: false,
+      documents: false,
+      available: providersFor(model.id, env, custom).length > 0,
+    });
+  }
+
+  return catalogue;
 }
 
 export function providersConfigured(

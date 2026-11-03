@@ -22,9 +22,10 @@ import { serverEnv } from "@/lib/env";
 import { getFile, getTree, isRepoFullName, MAX_PATH_INDEX } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
-import { DEFAULT_MODEL, isModelId, type ModelId } from "@/lib/models";
+import { DEFAULT_MODEL, hasModel, type ModelId } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/prompt";
 import {
+  modelCatalogue,
   providerKey,
   providersConfigured,
   providersFor,
@@ -136,7 +137,11 @@ export async function POST(request: Request) {
     }
   }
 
-  const model: ModelId = isModelId(body.model) ? body.model : DEFAULT_MODEL;
+  // An id the catalogue does not know — an old tab, a renamed custom entry —
+  // falls back to auto instead of failing the turn.
+  const model: ModelId = hasModel(modelCatalogue(), body.model)
+    ? (body.model as string)
+    : DEFAULT_MODEL;
 
   // RLS decides whether this chat exists for this account; the select is the
   // request, not a second authority.
@@ -698,7 +703,20 @@ export async function POST(request: Request) {
         let produced = "";
         let failure: Error | null = null;
 
-        for (const provider of providersFor(model)) {
+        const chain = providersFor(model);
+
+        // A named model has exactly one provider. If its key is absent the loop
+        // below would run zero times and the old path would report an empty
+        // answer, which blames the model for a configuration gap.
+        if (chain.length === 0) {
+          failure = new Error(
+            model === "auto"
+              ? "No AI provider key is configured for this deployment."
+              : "This model's provider key is not configured."
+          );
+        }
+
+        for (const provider of chain) {
           try {
             for await (const delta of streamCompletion({
               provider,

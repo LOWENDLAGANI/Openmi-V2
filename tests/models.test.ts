@@ -1,38 +1,62 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { DEFAULT_MODEL, MODELS, isModelId } from "../lib/models";
+import {
+  DEFAULT_MODEL,
+  MODELS,
+  hasModel,
+  isModelId,
+  modelName,
+} from "../lib/models";
 
-const MODELS_SOURCE = readFileSync(new URL("../lib/models.ts", import.meta.url), "utf8");
+const MODELS_SOURCE = readFileSync(
+  new URL("../lib/models.ts", import.meta.url),
+  "utf8"
+);
 
-const VENDORS = [
-  "openrouter",
-  "groq",
-  "deepseek",
-  "openai",
-  "anthropic",
-  "claude",
-  "gemini",
-  "llama",
-  "mistral",
-  "qwen",
-  "gpt-",
-];
+// The prose may name the concepts it is excluding; only executable code is
+// scanned.
+const MODELS_CODE = MODELS_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("the browser model catalogue names no vendor", () => {
-  // The capability id is the contract. A vendor name here would end up in the
-  // client bundle the moment a component imported this file.
-  for (const vendor of VENDORS) {
-    expect(MODELS_SOURCE.toLowerCase()).not.toContain(vendor);
-  }
+test("the picker offers model names, with Auto first and as the default", () => {
+  const names = MODELS.map((model) => model.name);
+
+  expect(MODELS[0]?.id).toBe("auto");
+  expect(DEFAULT_MODEL).toBe("auto");
+  expect(names).toContain("GPT OSS 120B");
+  expect(names).toContain("GLM 4.6");
+  expect(names).toContain("DeepSeek V3");
+  expect(modelName("glm-4.6")).toBe("GLM 4.6");
+  expect(modelName("unknown-model")).toBe("unknown-model");
 });
 
-test("three capability modes are offered and auto is the default", () => {
-  expect(MODELS.map((model) => model.id)).toEqual(["auto", "code", "flash"]);
-  expect(DEFAULT_MODEL).toBe("auto");
-  expect(isModelId("auto")).toBe(true);
-  expect(isModelId("gpt-5")).toBe(false);
+test("ids are lowercase slugs and lookups are exact", () => {
+  for (const model of MODELS) {
+    expect(isModelId(model.id)).toBe(true);
+  }
+
+  expect(isModelId("qwen3-coder")).toBe(true);
+  expect(isModelId("Auto")).toBe(false);
+  expect(isModelId("../etc/passwd")).toBe(false);
+  expect(isModelId("with space")).toBe(false);
   expect(isModelId(undefined)).toBe(false);
+  expect(isModelId(42)).toBe(false);
+
+  expect(hasModel(MODELS, "deepseek-chat")).toBe(true);
+  expect(hasModel(MODELS, "deepseek-chat-v9")).toBe(false);
+});
+
+test("the browser catalogue carries no endpoint, upstream id or key", () => {
+  for (const token of [
+    "http",
+    "API_KEY",
+    "upstream",
+    "endpoint",
+    "process.env",
+    "routeForModel",
+  ]) {
+    expect(MODELS_CODE).not.toContain(token);
+  }
 });
 
 test("no component claims a build or a test ran", () => {

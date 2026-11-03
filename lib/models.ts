@@ -1,45 +1,83 @@
 /**
- * What the browser is allowed to know about models.
+ * The model catalogue the browser is allowed to see.
  *
- * Capability ids, display names and what each mode is for. No vendor name, no
- * model id and no endpoint appears here: those live in lib/providers.ts, which
- * is server-only and never reaches a client bundle.
+ * Display names are public on purpose: the picker shows a model name ("GPT OSS
+ * 120B", "GLM 4.6"), not a capability alias. What stays server-only is the
+ * vendor, the upstream id, the endpoint and the key — those live in
+ * lib/models/routes.ts and lib/providers.ts, which no client component imports.
  *
- * tests/models.test.ts reads this file and fails on any vendor name, which is a
- * cheaper guarantee than a reviewer remembering not to add one.
+ * A model that is not in this list can be added with a CUSTOM_MODELS entry at
+ * deploy time; see lib/models/custom.ts. That is a configuration change, not a
+ * code change, and it still never reaches the browser's routing logic.
  */
 
-export type ModelId = "auto" | "code" | "flash";
+export type ModelId = string;
 
 export type ModelCapability = {
   id: ModelId;
+  /** What the picker shows: the model's name. */
   name: string;
   blurb: string;
-  /** Whether a provider in this deployment can accept image input. */
   images: boolean;
-  /** Whether a provider in this deployment can accept document input. */
   documents: boolean;
+  /** Filled in on the server: is a key for this model's provider configured? */
+  available?: boolean;
 };
 
 export const MODELS: ModelCapability[] = [
   {
     id: "auto",
     name: "Auto",
-    blurb: "Reads the repository and picks a provider per request, with a fallback.",
+    blurb: "Picks a model per request, with a fallback if one provider fails.",
     images: false,
     documents: false,
   },
   {
-    id: "code",
-    name: "Code",
-    blurb: "Slower and more literal; better at following a call chain.",
+    id: "gpt-oss-120b",
+    name: "GPT OSS 120B",
+    blurb: "Open-weight model with quick tool use, good for repository browsing.",
     images: false,
     documents: false,
   },
   {
-    id: "flash",
-    name: "Flash",
-    blurb: "Fastest and cheapest, for small questions about one file.",
+    id: "glm-4.6",
+    name: "GLM 4.6",
+    blurb: "Strong at coding and long-context edits.",
+    images: false,
+    documents: false,
+  },
+  {
+    id: "qwen3-coder",
+    name: "Qwen3 Coder",
+    blurb: "Tuned for repository work and frequent tool calls.",
+    images: false,
+    documents: false,
+  },
+  {
+    id: "kimi-k2",
+    name: "Kimi K2",
+    blurb: "Large context, comfortable with long files.",
+    images: false,
+    documents: false,
+  },
+  {
+    id: "deepseek-chat",
+    name: "DeepSeek V3",
+    blurb: "Balanced speed and price for everyday questions.",
+    images: false,
+    documents: false,
+  },
+  {
+    id: "deepseek-reasoner",
+    name: "DeepSeek Reasoner",
+    blurb: "Thinks longer before answering, slower and more literal.",
+    images: false,
+    documents: false,
+  },
+  {
+    id: "llama-3.3-70b",
+    name: "Llama 3.3 70B",
+    blurb: "Open-weight general model, fast enough for small edits.",
     images: false,
     documents: false,
   },
@@ -47,10 +85,26 @@ export const MODELS: ModelCapability[] = [
 
 export const DEFAULT_MODEL: ModelId = "auto";
 
+const SLUG = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
 export function isModelId(value: unknown): value is ModelId {
-  return value === "auto" || value === "code" || value === "flash";
+  return typeof value === "string" && SLUG.test(value);
 }
 
-export function modelName(id: ModelId): string {
-  return MODELS.find((model) => model.id === id)?.name ?? id;
+/** Exact membership in a catalogue, including custom entries. */
+export function hasModel(
+  catalogue: readonly ModelCapability[],
+  value: unknown
+): value is ModelId {
+  return (
+    typeof value === "string" &&
+    catalogue.some((model) => model.id === value)
+  );
+}
+
+export function modelName(
+  id: ModelId,
+  catalogue: readonly ModelCapability[] = MODELS
+): string {
+  return catalogue.find((model) => model.id === id)?.name ?? id;
 }
