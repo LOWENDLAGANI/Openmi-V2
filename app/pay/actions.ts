@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { planById } from "@/lib/billing/plans";
+import { redeemDewCode } from "@/lib/dew/store";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -103,4 +104,72 @@ export async function submitReceipt(formData: FormData) {
   revalidatePath("/pay");
   revalidatePath("/admin");
   redirect("/pay?submitted=1");
+}
+
+async function account() {
+  const session = await getSession();
+
+  if (session.state === "unconfigured") redirect("/setup");
+  if (session.state !== "signed-in") redirect("/login?next=%2Fpay");
+
+  return session;
+}
+
+function done(message: string): never {
+  redirect(`/pay?dew=${encodeURIComponent(message)}`);
+}
+
+/**
+ * A top-up without a receipt: an operator-issued code, redeemed once.
+ *
+ * This is the receipt-free direction. Money still has to arrive on the hosted
+ * payment page and be seen by an operator; a code is what the operator hands
+ * back for it, and `redeem_dew_code` is the only thing that can turn one into
+ * Dew.
+ */
+export async function redeemTopUpCode(formData: FormData) {
+  const { supabase } = await account();
+  const code = field(formData, "code");
+
+  if (code.length === 0) fail("Enter a code first.");
+  if (code.length > 64) fail("That code is too long.");
+
+  const result = await redeemDewCode(supabase, code);
+  if (!result.ok) fail(result.error);
+
+  revalidatePath("/pay");
+  revalidatePath("/activity");
+  done(`Redeemed ${result.amount} Dew. New balance: ${result.balance}.`);
+}
+
+/**
+ * A deduction without a receipt: the account gives Dew back.
+ *
+ * It is one-directional on purpose. `deduct_own_dew` can only subtract from the
+ * signed-in balance and refuses to go below zero, so this form can never mint
+ * Dew — a self-service top-up with no code and no receipt would be free credit.
+ */
+export async function deductOwnDew(formData: FormData) {
+  const { supabase } = await account();
+
+  const raw = Number(field(formData, "amount"));
+  if (!Number.isFinite(raw) || raw <= 0) fail("Enter the Dew to deduct.");
+
+  const amount = Math.min(Math.round(raw), 100000);
+  const reason = field(formData, "reason").slice(0, 120);
+
+  const { data, error } = await supabase.rpc("deduct_own_dew", {
+    p_amount: amount,
+    p_reason: reason.length > 0 ? reason : null,
+  });
+
+  if (error) fail(error.message.replace(/^dew:\s*/, ""));
+
+  const balance = Number(Array.isArray(data) ? data[0] : data);
+
+  revalidatePath("/pay");
+  revalidatePath("/activity");
+  done(
+    `Deducted ${amount} Dew. New balance: ${Number.isFinite(balance) ? balance : "updated"}.`
+  );
 }

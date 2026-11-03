@@ -75,11 +75,47 @@ export class ProviderError extends Error {
   }
 }
 
+/** How many numbered variants one provider may hold. */
+export const MAX_PROVIDER_KEYS = 3;
+
+/**
+ * Every usable key for one provider, in the order they should be tried.
+ *
+ * The primary name comes first, then a comma or space separated pool
+ * (`GROQ_API_KEYS`), then numbered variants (`GROQ_API_KEY_2`, `_3`). Duplicates
+ * are dropped, so a pool that repeats the primary does not make the same key
+ * fail twice.
+ */
+export function providerKeys(
+  provider: Provider,
+  env: Record<string, string | undefined> = process.env
+): string[] {
+  const keys: string[] = [];
+
+  const push = (value: string | undefined) => {
+    const key = (value ?? "").trim();
+    if (key.length > 0 && !keys.includes(key)) keys.push(key);
+  };
+
+  push(env[provider.keyName]);
+
+  for (const part of (env[`${provider.keyName}S`] ?? "").split(/[,\s]+/)) {
+    push(part);
+  }
+
+  for (let index = 2; index <= MAX_PROVIDER_KEYS; index += 1) {
+    push(env[`${provider.keyName}_${index}`]);
+  }
+
+  return keys;
+}
+
+/** The first key, for single-value callers: probes and availability. */
 export function providerKey(
   provider: Provider,
   env: Record<string, string | undefined> = process.env
 ): string {
-  return (env[provider.keyName] ?? "").trim();
+  return providerKeys(provider, env)[0] ?? "";
 }
 
 export function providerById(id: ProviderId): Provider | undefined {
@@ -100,7 +136,7 @@ export function providersFor(
 ): Provider[] {
   if (model === "auto") {
     return CHAINS.auto.filter(
-      (provider) => providerKey(provider, env).length > 0
+      (provider) => providerKeys(provider, env).length > 0
     );
   }
 
@@ -108,7 +144,7 @@ export function providersFor(
   if (!route) return [];
 
   const provider = providerById(route.provider);
-  if (!provider || providerKey(provider, env).length === 0) return [];
+  if (!provider || providerKeys(provider, env).length === 0) return [];
 
   // One provider, with the upstream id this model names.
   return [{ ...provider, model: route.upstream }];
@@ -163,7 +199,61 @@ export function providerCatalogue(): Provider[] {
  * Stop ends the upstream request rather than only hiding the output. That is
  * the difference between stopping and pretending to stop.
  */
+/**
+ * Streams text deltas from one provider, rotating its keys before the first
+ * token.
+ *
+ * Keys for the same provider and model are tried in order. Once a delta has
+ * reached the reader a second key is no longer attempted, because a retry would
+ * replay the answer from the top; the caller sees one continuous answer or one
+ * failure. A key that was rejected or rate limited simply hands over to the
+ * next one, and nothing about the rotation reaches the browser.
+ */
 export async function* streamCompletion({
+  provider,
+  apiKeys,
+  messages,
+  signal,
+}: {
+  provider: Provider;
+  apiKeys: string[];
+  messages: ChatMessage[];
+  signal: AbortSignal;
+}): AsyncGenerator<string> {
+  const keys = apiKeys.map((key) => key.trim()).filter((key) => key.length > 0);
+
+  if (keys.length === 0) {
+    throw new ProviderError("No API key is configured for this provider.");
+  }
+
+  let lastError: unknown = null;
+
+  for (const apiKey of keys) {
+    let produced = false;
+
+    try {
+      for await (const delta of streamCompletionOnce({
+        provider,
+        apiKey,
+        messages,
+        signal,
+      })) {
+        produced = true;
+        yield delta;
+      }
+      return;
+    } catch (caught) {
+      lastError = caught;
+      if (produced || signal.aborted) throw caught;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new ProviderError("Every key for this provider failed.");
+}
+
+async function* streamCompletionOnce({
   provider,
   apiKey,
   messages,
@@ -275,7 +365,59 @@ export type ChatEvent =
  * why this yields events rather than strings: the caller needs to know which
  * kind of thing it just received, and a tool call is not prose.
  */
+/**
+ * The tool-calling stream, with the same key rotation rule as the text one.
+ * A tool frame counts as output: once one has been read, restarting on another
+ * key would re-send the whole turn.
+ */
 export async function* streamChat({
+  provider,
+  apiKeys,
+  messages,
+  tools,
+  signal,
+}: {
+  provider: Provider;
+  apiKeys: string[];
+  messages: WireMessage[];
+  tools: AgentToolDefinition[];
+  signal: AbortSignal;
+}): AsyncGenerator<ChatEvent> {
+  const keys = apiKeys.map((key) => key.trim()).filter((key) => key.length > 0);
+
+  if (keys.length === 0) {
+    throw new ProviderError("No API key is configured for this provider.");
+  }
+
+  let lastError: unknown = null;
+
+  for (const apiKey of keys) {
+    let produced = false;
+
+    try {
+      for await (const event of streamChatOnce({
+        provider,
+        apiKey,
+        messages,
+        tools,
+        signal,
+      })) {
+        produced = true;
+        yield event;
+      }
+      return;
+    } catch (caught) {
+      lastError = caught;
+      if (produced || signal.aborted) throw caught;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new ProviderError("Every key for this provider failed.");
+}
+
+async function* streamChatOnce({
   provider,
   apiKey,
   messages,

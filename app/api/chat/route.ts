@@ -34,7 +34,7 @@ import { DEFAULT_MODEL, hasModel, type ModelId } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/prompt";
 import {
   modelCatalogue,
-  providerKey,
+  providerKeys,
   providersConfigured,
   providersFor,
   streamCompletion,
@@ -782,7 +782,7 @@ export async function POST(request: Request) {
           try {
             for await (const delta of streamCompletion({
               provider,
-              apiKey: providerKey(provider),
+              apiKeys: providerKeys(provider),
               messages: plainMessages,
               signal: abort.signal,
             })) {

@@ -1,14 +1,16 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
+import { CountryHint } from "@/components/CountryHint";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
-  countryFromHeaders,
+  COUNTRY_COOKIE,
+  countryFromRequest,
   currencyForCountry,
   formatMoney,
   isConverted,
@@ -18,7 +20,7 @@ import { paymentLink, PLANS, planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
 import { getSession } from "@/lib/session";
-import { submitReceipt } from "./actions";
+import { deductOwnDew, redeemTopUpCode, submitReceipt } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +57,7 @@ function utc(value: string | null): string {
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; submitted?: string }>;
+  searchParams: Promise<{ error?: string; submitted?: string; dew?: string }>;
 }) {
   const params = await searchParams;
   const session = await getSession();
@@ -110,10 +112,16 @@ export default async function PayPage({
     })
   );
 
-  // The country comes from the host's geo header; unknown countries see ringgit.
-  // The rate is fetched and cached server-side, falling back to the indicative
-  // table when the rate service is unreachable.
-  const base = currencyForCountry(countryFromHeaders(await headers()));
+  // Country detection, in order: the host's geo header, the browser region the
+  // hint cookie remembered, then the request's own language tag. The client hint
+  // is written only when all three are absent, so a real IP lookup always wins.
+  const requestHeaders = await headers();
+  const cookieStore = await cookies();
+  const country = countryFromRequest(
+    requestHeaders,
+    cookieStore.get(COUNTRY_COOKIE)?.value
+  );
+  const base = currencyForCountry(country);
   const currency = withLiveRate(base, await getMyrRates());
   const live = currency !== base;
   const localPrices = isConverted(currency);
@@ -121,6 +129,8 @@ export default async function PayPage({
 
   return (
     <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
+      <CountryHint needed={country === null} />
+
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/chat" aria-label="Back to chats">
@@ -159,6 +169,15 @@ export default async function PayPage({
         >
           Receipt received. It is pending until an operator reviews it; the
           status below updates in place.
+        </p>
+      )}
+
+      {params.dew && (
+        <p
+          role="status"
+          className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
+        >
+          {params.dew}
         </p>
       )}
 
@@ -250,6 +269,104 @@ export default async function PayPage({
           The hosted page is the only place money changes hands. This app never
           asks for card details.
         </p>
+      </section>
+
+      <section aria-labelledby="dew-actions-heading" className="panel mt-6 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2
+            id="dew-actions-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
+            Top up or deduct Dew
+          </h2>
+          <p className="text-[10.5px] text-low">no receipt required</p>
+        </div>
+
+        <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-mid">
+          A code adds Dew the moment it is redeemed. Deducting takes Dew off your
+          own balance — a correction, or credit you want to give back. Neither
+          asks for a receipt, and both write the same ledger row a plan purchase
+          does.
+        </p>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <form
+            action={redeemTopUpCode}
+            className="rounded-2xl border border-line bg-raised p-4"
+          >
+            <p className="eyebrow">top up</p>
+
+            <label htmlFor="topup-code" className="mt-2 block text-[12px] font-medium text-hi">
+              Code
+            </label>
+            <input
+              id="topup-code"
+              name="code"
+              required
+              maxLength={64}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="TOPUP-…"
+              className="field mt-1.5 py-2 font-mono text-[12px]"
+            />
+
+            <SubmitButton
+              className="btn btn-primary mt-3 w-full py-2 text-[12px]"
+              pendingText="Redeeming…"
+            >
+              Redeem code
+            </SubmitButton>
+
+            <p className="mt-2 text-[10.5px] leading-relaxed text-low">
+              Codes are issued by the operator and can be used once.
+            </p>
+          </form>
+
+          <form
+            action={deductOwnDew}
+            className="rounded-2xl border border-line bg-raised p-4"
+          >
+            <p className="eyebrow">deduct</p>
+
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="block text-[12px] font-medium text-hi">Dew</span>
+                <input
+                  name="amount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  max={Math.floor(profile?.balance ?? 0)}
+                  required
+                  placeholder="1"
+                  className="field mt-1.5 py-2 font-mono text-[12px]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="block text-[12px] font-medium text-hi">Reason</span>
+                <input
+                  name="reason"
+                  maxLength={120}
+                  placeholder="correction"
+                  className="field mt-1.5 py-2 text-[12px]"
+                />
+              </label>
+            </div>
+
+            <SubmitButton
+              className="btn mt-3 w-full py-2 text-[12px]"
+              pendingText="Deducting…"
+              disabled={(profile?.balance ?? 0) <= 0}
+            >
+              Deduct Dew
+            </SubmitButton>
+
+            <p className="mt-2 text-[10.5px] leading-relaxed text-low">
+              Only ever takes Dew off your balance; it cannot mint any.
+            </p>
+          </form>
+        </div>
       </section>
 
       <section aria-labelledby="receipt-heading" className="panel mt-6 p-5">

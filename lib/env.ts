@@ -90,6 +90,27 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "At least one provider key is required",
   },
   {
+    key: "OPENROUTER_API_KEYS",
+    scope: "server",
+    required: false,
+    unlocks: "Extra OpenRouter keys, tried before the first token",
+    hint: "Comma or space separated; the primary key is always tried first",
+  },
+  {
+    key: "GROQ_API_KEYS",
+    scope: "server",
+    required: false,
+    unlocks: "Extra Groq keys, tried before the first token",
+    hint: "Comma or space separated; the primary key is always tried first",
+  },
+  {
+    key: "DEEPSEEK_API_KEYS",
+    scope: "server",
+    required: false,
+    unlocks: "Extra DeepSeek keys, tried before the first token",
+    hint: "Comma or space separated; the primary key is always tried first",
+  },
+  {
     key: "GITHUB_OAUTH_CLIENT_ID",
     scope: "server",
     required: false,

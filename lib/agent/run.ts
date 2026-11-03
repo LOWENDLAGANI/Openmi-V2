@@ -2,7 +2,7 @@ import "server-only";
 
 import type { ModelId } from "@/lib/models";
 import {
-  providerKey,
+  providerKeys,
   providersFor,
   streamChat,
   type WireMessage,
@@ -130,7 +130,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
       try {
         for await (const event of streamChat({
           provider,
-          apiKey: providerKey(provider),
+          apiKeys: providerKeys(provider),
           messages,
           tools: TOOL_SPECS,
           signal: options.signal,

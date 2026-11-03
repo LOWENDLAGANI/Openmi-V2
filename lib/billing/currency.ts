@@ -61,8 +61,28 @@ export const CURRENCY_CODES = Object.keys(CURRENCY) as CurrencyCode[];
 /** The payment page always charges in ringgit, so that is the fallback. */
 export const DEFAULT_CURRENCY: Currency = CURRENCY.MYR;
 
-/** Vercel and most proxies put the two-letter country here. */
-export const COUNTRY_HEADER = "x-vercel-ip-country";
+/**
+ * Where a host puts the two-letter country. Vercel first, then Cloudflare and
+ * the generic proxies, so the same deployment detects a visitor on more than one
+ * platform. `COUNTRY_HEADER` is kept as the primary name for callers that only
+ * want one.
+ */
+export const COUNTRY_HEADERS = [
+  "x-vercel-ip-country",
+  "cf-ipcountry",
+  "x-country-code",
+  "x-geo-country",
+  "x-appengine-country",
+] as const;
+
+export const COUNTRY_HEADER = COUNTRY_HEADERS[0];
+
+/**
+ * The visitor's own browser region, written by `CountryHint` only when the
+ * server could not detect a country from the request. It is a fallback, not an
+ * override: a geo header always wins.
+ */
+export const COUNTRY_COOKIE = "openmi-country";
 
 const COUNTRY_CURRENCY: Record<string, CurrencyCode> = {
   MY: "MYR",
@@ -118,11 +138,58 @@ export function currencyForCountry(country: string | null | undefined): Currency
   return code ? CURRENCY[code] : DEFAULT_CURRENCY;
 }
 
-/** Reads the country from request headers without trusting anything else. */
+/**
+ * Reads the country from the first header that carries a plausible code.
+ * `XX` and `T1` are placeholder values (unknown, Tor) and are skipped rather
+ * than mapped to a currency.
+ */
 export function countryFromHeaders(headers: {
   get(name: string): string | null;
 }): string | null {
-  return headers.get(COUNTRY_HEADER);
+  for (const name of COUNTRY_HEADERS) {
+    const code = (headers.get(name) ?? "").trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(code) && code !== "XX" && code !== "T1") return code;
+  }
+
+  return null;
+}
+
+/**
+ * The region out of the first `Accept-Language` tag: `en-GB,en;q=0.9` becomes
+ * `GB`. A language without a region (plain `en`) says nothing about money and is
+ * skipped.
+ */
+export function countryFromLanguage(header: string | null): string | null {
+  if (!header) return null;
+
+  for (const entry of header.split(",")) {
+    const tag = entry.trim().split(";")[0]?.trim() ?? "";
+    const parts = tag.split("-");
+    if (parts.length < 2) continue;
+
+    const region = parts[parts.length - 1] ?? "";
+    if (/^[A-Za-z]{2}$/.test(region)) return region.toUpperCase();
+  }
+
+  return null;
+}
+
+/**
+ * The country for a request: the host's geo header, then the browser region the
+ * hint cookie remembered, then the request's own language tag. A deployment with
+ * none of the three shows ringgit rather than guessing.
+ */
+export function countryFromRequest(
+  headers: { get(name: string): string | null },
+  cookieCountry?: string | null
+): string | null {
+  const geo = countryFromHeaders(headers);
+  if (geo) return geo;
+
+  const saved = (cookieCountry ?? "").trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(saved)) return saved;
+
+  return countryFromLanguage(headers.get("accept-language"));
 }
 
 function round(value: number): number {

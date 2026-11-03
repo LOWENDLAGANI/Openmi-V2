@@ -242,6 +242,16 @@ Postgres function is the backend. If neither answers, the request is allowed and
 the result says `degraded` — a limiter that fails closed turns a database blip
 into an outage.
 
+## Provider fallback keys
+
+A provider may hold more than one key. `providerKeys()` reads the primary
+variable, then `<PROVIDER>_API_KEYS` (comma or space separated), then the `_2`
+and `_3` variants. When a key is rejected or rate limited **before the first
+token**, the same provider and the same model are retried with the next key; once
+text has reached the reader nothing is retried, because a second attempt would
+replay the answer from the top. The setup probes still check the first key, and
+the rotation never leaves the server.
+
 ## Accessibility
 
 Semantic tokens only, and three appearances: paper (the default), carbon and ink.
