@@ -159,7 +159,7 @@ hour is reused, so more turns inside it are free. The charge is made by
 | Constant | Value |
 |---|---|
 | Hour price | 3 |
-| Daily free allowance | 10 |
+| Daily free allowance | 6 |
 | Paid daily allowance | 15 |
 | Trial credit | 5 |
 | Low-balance warning | 10 |
@@ -167,7 +167,7 @@ hour is reused, so more turns inside it are free. The charge is made by
 | Dust floor | 0.05 |
 
 On the first day the daily allowance is added to the trial credit; after that it
-tops the balance up to 10 Dew (15 once a top-up has been redeemed) at local
+tops the balance up to 6 Dew (15 once a top-up has been redeemed) at local
 midnight in the account's timezone. It never refills on a day that is ahead of
 the local date, so a clock that steps backwards mints nothing. The trial credit
 is a ledger row at signup, not an unrecorded default.

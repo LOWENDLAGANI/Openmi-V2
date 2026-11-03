@@ -11,7 +11,7 @@
 
 export const DEW_PER_HOUR = 3;
 export const HOUR_SESSION_MS = 3_600_000;
-export const DAILY_FREE_DEW = 10;
+export const DAILY_FREE_DEW = 6;
 export const PAID_DAILY_FREE_DEW = 15;
 export const TRIAL_DEW = 5;
 export const DEW_PRECISION = 3;

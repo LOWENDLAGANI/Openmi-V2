@@ -32,7 +32,7 @@ function documented(label: string): string | null {
 test("the documented Dew numbers are the exported constants", () => {
   expect(DEW_PER_HOUR).toBe(3);
   expect(HOUR_SESSION_MS).toBe(3_600_000);
-  expect(DAILY_FREE_DEW).toBe(10);
+  expect(DAILY_FREE_DEW).toBe(6);
   expect(PAID_DAILY_FREE_DEW).toBe(15);
   expect(TRIAL_DEW).toBe(5);
   expect(DEW_PRECISION).toBe(3);
@@ -40,6 +40,18 @@ test("the documented Dew numbers are the exported constants", () => {
   expect(LOW_BALANCE_DEW).toBe(10);
   expect(INVITE_REWARD_DEW).toBe(5);
   expect(MAX_INVITES_PER_ACCOUNT).toBe(10);
+});
+
+test("the deployed refill allowance matches the constants", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/014_six_dew_daily.sql", import.meta.url),
+    "utf8"
+  );
+
+  expect(migration).toContain(
+    `case when v_paid then ${PAID_DAILY_FREE_DEW} else ${DAILY_FREE_DEW} end`
+  );
+  expect(migration).toContain("(now() at time zone coalesce(v_tz, 'UTC'))::date");
 });
 
 test("the README table agrees with every constant", () => {

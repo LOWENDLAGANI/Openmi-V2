@@ -152,15 +152,16 @@ test("the daily allowance refills once, at the local day", async () => {
   const first = await db.query<{ balance: string }>(
     "select public.refill_daily_dew() as balance"
   );
-  expect(Number(first.rows[0].balance)).toBe(15);
+  // Five trial Dew plus the six Dew free allowance.
+  expect(Number(first.rows[0].balance)).toBe(11);
 
   const second = await db.query<{ balance: string }>(
     "select public.refill_daily_dew() as balance"
   );
-  expect(Number(second.rows[0].balance)).toBe(15);
+  expect(Number(second.rows[0].balance)).toBe(11);
 
   expect(await ledgerCount(A, "daily")).toBe(1);
-  expect(await ledgerSum(A)).toBe(15);
+  expect(await ledgerSum(A)).toBe(11);
 });
 
 test("an hour is charged once and reused inside the hour", async () => {
@@ -175,7 +176,7 @@ test("an hour is charged once and reused inside the hour", async () => {
 
   expect(started.rows[0].started).toBe(true);
   expect(Number(started.rows[0].price)).toBe(3);
-  expect(Number(started.rows[0].balance)).toBe(12);
+  expect(Number(started.rows[0].balance)).toBe(8);
 
   sessionA = String(started.rows[0].session_id);
 
@@ -187,7 +188,7 @@ test("an hour is charged once and reused inside the hour", async () => {
 
   expect(again.rows[0].started).toBe(false);
   expect(String(again.rows[0].session_id)).toBe(sessionA);
-  expect(Number(again.rows[0].balance)).toBe(12);
+  expect(Number(again.rows[0].balance)).toBe(8);
 
   await reset();
   const sessions = await db.query<{ count: number }>(
@@ -197,7 +198,7 @@ test("an hour is charged once and reused inside the hour", async () => {
   expect(Number(sessions.rows[0].count)).toBe(1);
 
   expect(await ledgerCount(A, "session")).toBe(1);
-  expect(await ledgerSum(A)).toBe(12);
+  expect(await ledgerSum(A)).toBe(8);
 });
 
 test("a provider failure is refunded once, never twice", async () => {
@@ -207,14 +208,14 @@ test("a provider failure is refunded once, never twice", async () => {
     "select public.refund_hour_session($1, 'provider failed') as balance",
     [sessionA]
   );
-  expect(Number(refund.rows[0].balance)).toBe(15);
+  expect(Number(refund.rows[0].balance)).toBe(11);
 
   await expect(
     db.query("select public.refund_hour_session($1, 'again')", [sessionA])
   ).rejects.toThrow(/already refunded/);
 
   expect(await ledgerCount(A, "refund")).toBe(1);
-  expect(await ledgerSum(A)).toBe(15);
+  expect(await ledgerSum(A)).toBe(11);
 });
 
 test("a balance below one hour refuses the session before anything runs", async () => {
@@ -236,7 +237,7 @@ test("a balance below one hour refuses the session before anything runs", async 
   expect(await ledgerCount(A, "session")).toBe(1);
 
   await reset();
-  await db.query("update public.profiles set dew_balance = 15 where id = $1", [A]);
+  await db.query("update public.profiles set dew_balance = 11 where id = $1", [A]);
 });
 
 test("a redeem code works once and marks the account as paid", async () => {
@@ -251,7 +252,7 @@ test("a redeem code works once and marks the account as paid", async () => {
   );
 
   expect(Number(redeemed.rows[0].amount)).toBe(20);
-  expect(Number(redeemed.rows[0].balance)).toBe(35);
+  expect(Number(redeemed.rows[0].balance)).toBe(31);
 
   await expect(db.query("select * from public.redeem_dew_code('TOPUP-20')")).rejects.toThrow(
     /already redeemed/
@@ -277,10 +278,10 @@ test("operator correction is service-role only and stays in the ledger", async (
     "select public.operator_adjust_dew($1, -5, 'correction') as balance",
     [A]
   );
-  expect(Number(adjusted.rows[0].balance)).toBe(30);
+  expect(Number(adjusted.rows[0].balance)).toBe(26);
 
   expect(await ledgerCount(A, "adjustment")).toBe(1);
-  expect(await ledgerSum(A)).toBe(30);
+  expect(await ledgerSum(A)).toBe(26);
 });
 
 test("both sides of an invite are rewarded once", async () => {
@@ -291,7 +292,7 @@ test("both sides of an invite are rewarded once", async () => {
     "select dew_balance from public.profiles where id = $1",
     [A]
   );
-  expect(Number(inviter.rows[0].dew_balance)).toBe(35);
+  expect(Number(inviter.rows[0].dew_balance)).toBe(31);
 
   const invitee = await db.query<{
     dew_balance: string;
