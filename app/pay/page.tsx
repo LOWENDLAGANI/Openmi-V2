@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { paymentLink, PLANS, planById } from "@/lib/billing/plans";
@@ -174,6 +175,8 @@ export default async function PayPage({
           paid daily allowance.
         </p>
       </section>
+
+      <AdBanner className="mt-6" />
 
       <section aria-labelledby="plans-heading" className="mt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

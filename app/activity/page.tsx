@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import {
   DEW_PER_HOUR,
@@ -174,6 +175,8 @@ export default async function ActivityPage({
           Back to chats
         </Link>
       </header>
+
+      <AdBanner className="mt-6" />
 
       {params.error && (
         <p

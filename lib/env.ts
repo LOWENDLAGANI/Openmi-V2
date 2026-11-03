@@ -125,6 +125,27 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to the Sociabuzz page in lib/billing/plans.ts",
   },
   {
+    key: "NEXT_PUBLIC_ADSTERRA_LEADERBOARD_KEY",
+    scope: "public",
+    required: false,
+    unlocks: "Leaderboard banner on wide screens",
+    hint: "Adsterra banner key; the slot renders a placeholder until it is set",
+  },
+  {
+    key: "NEXT_PUBLIC_ADSTERRA_MOBILE_KEY",
+    scope: "public",
+    required: false,
+    unlocks: "Compact banner on phones",
+    hint: "Adsterra banner key for the 320×50 slot",
+  },
+  {
+    key: "NEXT_PUBLIC_ADSTERRA_RECTANGLE_KEY",
+    scope: "public",
+    required: false,
+    unlocks: "The 300×250 slot, when a page uses it",
+    hint: "Adsterra banner key; optional, reserved for inline rectangles",
+  },
+  {
     key: "UPSTASH_REDIS_REST_URL",
     scope: "server",
     required: false,

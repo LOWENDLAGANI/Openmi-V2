@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 
 const CAPABILITIES = [
@@ -81,6 +82,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <AdBanner className="mx-auto w-full max-w-6xl px-5 pb-14 sm:px-8" />
 
       <section className="border-t border-line">
         <div className="mx-auto grid w-full max-w-6xl gap-px bg-line sm:grid-cols-3">

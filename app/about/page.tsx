@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AboutLogoGate } from "@/components/AboutLogoGate";
+import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
@@ -67,6 +68,8 @@ export default function AboutPage() {
         code, answers with real paths and line numbers, and proposes edits for
         you to review. Nothing reaches GitHub until you approve it.
       </p>
+
+      <AdBanner className="mt-10" />
 
       <section className="mt-12 border-t border-line pt-6">
         <div className="flex items-baseline justify-between gap-3">
