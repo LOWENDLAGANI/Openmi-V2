@@ -14,22 +14,15 @@ export function Spinner({
   className?: string;
 }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
+    <img
+      src="/openmi-mark.png"
+      alt=""
+      aria-hidden="true"
+      draggable={false}
       width={size}
       height={size}
-      aria-hidden="true"
-      focusable="false"
-      className={`spinner shrink-0 ${className}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 15 12 7l8 8" />
-      <path d="M4 20 12 12l8 8" opacity="0.4" />
-    </svg>
+      className={`spinner shrink-0 select-none object-contain ${className}`}
+    />
   );
 }
 

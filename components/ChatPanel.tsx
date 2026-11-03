@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { AiThinking } from "@/components/AiThinking";
+import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { MODEL_CATEGORIES, type ModelCapability, type ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
@@ -414,13 +415,11 @@ export function ChatPanel({
 
         <div className="flex items-center gap-2">
           {meter && (
-            <span
-              className="eyebrow"
-              title="Characters of repository context sent with the last turn."
-            >
-              {Math.round(meter.usedChars / 1000)}k/
-              {Math.round(meter.budgetChars / 1000)}k ctx
-            </span>
+            <ContextCircle
+              usedChars={meter.usedChars}
+              budgetChars={meter.budgetChars}
+              notes={meter.notes}
+            />
           )}
 
           <select
