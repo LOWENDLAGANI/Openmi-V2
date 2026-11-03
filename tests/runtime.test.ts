@@ -43,3 +43,11 @@ test("the rate limit is checked before the provider and carries Retry-After", ()
   expect(CHAT).toContain('"retry-after"');
   expect(limitAt).toBeLessThan(chargeAt);
 });
+
+test("the workspace route exports the shell page, not the draft composer", () => {
+  // Regression: DraftChat was accidentally the default export, so /chat
+  // rendered a bare composer with no header, sidebar or mobile drawer.
+  expect(WORKSPACE).toContain("export default async function ChatPage");
+  expect(WORKSPACE.match(/export default/g)?.length).toBe(1);
+  expect(WORKSPACE).not.toContain("export default function DraftChat");
+});

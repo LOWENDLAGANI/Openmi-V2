@@ -467,7 +467,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   );
 }
 
-export default function DraftChat() {
+function DraftChat() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatPanel
@@ -485,7 +485,7 @@ export default function DraftChat() {
   );
 }
 
-async function ChatPage({
+export default async function ChatPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
