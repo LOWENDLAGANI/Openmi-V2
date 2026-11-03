@@ -42,6 +42,38 @@ type ProfileRow = {
   has_paid: boolean;
 };
 
+type AccountRow = ProfileRow & {
+  handle: string | null;
+  created_at: string;
+};
+
+/** How many accounts the panel renders before "See more". */
+const ACCOUNT_PAGE = 20;
+
+/** A ceiling, so one click-crazy operator cannot ask for the whole table. */
+const ACCOUNT_PAGE_MAX = 200;
+
+/**
+ * An email search, reduced to something PostgREST cannot read as syntax. `%`
+ * and `_` are wildcards, and commas and parentheses separate filters.
+ */
+function cleanSearch(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .slice(0, 80)
+    .replace(/[%,()*_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** A paging link that keeps the search and returns to the member list. */
+function accountsHref(query: string, shown: number): string {
+  const search = new URLSearchParams();
+  if (query.length > 0) search.set("q", query);
+  search.set("users", String(shown));
+  return `/admin?${search.toString()}#members`;
+}
+
 function utc(value: string | null): string {
   if (!value) return "—";
   return value.slice(0, 16).replace("T", " ");
@@ -59,7 +91,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; done?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    done?: string;
+    q?: string;
+    users?: string;
+  }>;
 }) {
   const params = await searchParams;
   const access = await readAdminAccess();
@@ -131,6 +168,32 @@ export default async function AdminPage({
   const dewHeld = ((balancesResult.data ?? []) as Array<{
     dew_balance: number | string;
   }>).reduce((total, row) => total + Number(row.dew_balance), 0);
+
+  // Accounts are their own query so the panel does not get slower as the member
+  // list grows. Search and paging run in Postgres and only the slice on screen
+  // is fetched — the whole table is never sent to the page.
+  const accountSearch = cleanSearch(params.q);
+  const requestedAccounts = Number.parseInt(params.users ?? "", 10);
+  const accountShown = Number.isFinite(requestedAccounts)
+    ? Math.min(Math.max(requestedAccounts, ACCOUNT_PAGE), ACCOUNT_PAGE_MAX)
+    : ACCOUNT_PAGE;
+
+  let accountQuery = admin
+    .from("profiles")
+    .select("id, email, handle, dew_balance, has_paid, created_at", {
+      count: "exact",
+    });
+
+  if (accountSearch.length > 0) {
+    accountQuery = accountQuery.ilike("email", `%${accountSearch}%`);
+  }
+
+  const accountsResult = await accountQuery
+    .order("created_at", { ascending: false })
+    .range(0, accountShown - 1);
+
+  const accountRows = (accountsResult.data ?? []) as AccountRow[];
+  const accountTotal = accountsResult.count ?? accountRows.length;
 
   // Short-lived links: the bucket is private and the operator is the only
   // viewer here.
@@ -230,6 +293,109 @@ export default async function AdminPage({
             </p>
           </div>
         ))}
+      </section>
+
+      <section
+        id="members"
+        aria-labelledby="members-heading"
+        className="panel mt-5 p-5"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2
+            id="members-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
+            Registered accounts
+          </h2>
+          <p className="text-[10.5px] text-low">
+            {accountRows.length} of {accountTotal} · newest first
+          </p>
+        </div>
+
+        <form action="/admin" method="get" className="mt-3 flex flex-wrap gap-2">
+          <input
+            type="search"
+            name="q"
+            defaultValue={accountSearch}
+            maxLength={80}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Search by email"
+            aria-label="Search accounts by email"
+            className="field min-w-0 flex-1 py-1.5 text-[12px]"
+          />
+          <button type="submit" className="btn px-3.5 py-1.5 text-[12px]">
+            Search
+          </button>
+          {accountSearch.length > 0 && (
+            <Link
+              href="/admin#members"
+              className="btn btn-quiet px-3 py-1.5 text-[12px]"
+            >
+              Clear
+            </Link>
+          )}
+        </form>
+
+        {accountRows.length === 0 ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-mid">
+            {accountSearch.length > 0
+              ? `No account matches “${accountSearch}”.`
+              : "No accounts yet."}
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line">
+            {accountRows.map((member) => (
+              <li
+                key={member.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+              >
+                <div className="min-w-0">
+                  <p
+                    className="truncate text-[12px] text-body"
+                    title={member.email ?? member.handle ?? member.id}
+                  >
+                    {member.email ?? member.handle ?? member.id}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] text-low">
+                    joined {utc(member.created_at)}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="font-mono text-[10.5px] text-low">
+                    {formatDew(Number(member.dew_balance))} dew
+                  </span>
+                  <StatusPill tone={member.has_paid ? "ok" : "optional"}>
+                    {member.has_paid ? "paid" : "free"}
+                  </StatusPill>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {accountRows.length < accountTotal && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+            <p className="max-w-md text-[10.5px] leading-relaxed text-low">
+              Showing {accountRows.length} of {accountTotal}. The rest load on
+              request, so a large account list never slows this page.
+            </p>
+
+            {accountShown < ACCOUNT_PAGE_MAX ? (
+              <Link
+                href={accountsHref(accountSearch, accountShown + ACCOUNT_PAGE)}
+                className="btn px-3.5 py-1.5 text-[11.5px]"
+              >
+                See more
+              </Link>
+            ) : (
+              <p className="text-[10.5px] text-low">
+                Refine the search to see more.
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       {requestsResult.error && (
