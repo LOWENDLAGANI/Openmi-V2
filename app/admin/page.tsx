@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Brand } from "@/components/Brand";
 import { StatusPill } from "@/components/StatusPill";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
@@ -71,7 +72,7 @@ export default async function AdminPage({
 
   if (!admin) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
+      <main className="animate-enter mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
         <p className="eyebrow">admin</p>
         <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
           Service role required
@@ -149,7 +150,7 @@ export default async function AdminPage({
   );
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
+    <main className="animate-enter mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/chat" aria-label="Back to chats">
@@ -165,6 +166,7 @@ export default async function AdminPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <ThemeSwitcher className="hidden sm:inline-flex" />
           <StatusPill tone={access.via === "allowlist" ? "pending" : "ok"}>
             {access.via === "allowlist" ? "allowlist" : "admin role"}
           </StatusPill>

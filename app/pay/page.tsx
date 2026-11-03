@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   countryFromHeaders,
   currencyForCountry,
@@ -121,7 +122,7 @@ export default async function PayPage({
   const link = paymentLink();
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
+    <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/chat" aria-label="Back to chats">
@@ -136,9 +137,12 @@ export default async function PayPage({
           </div>
         </div>
 
-        <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
-          Back to chats
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <ThemeSwitcher />
+          <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
+            Back to chats
+          </Link>
+        </div>
       </header>
 
       {params.error && (

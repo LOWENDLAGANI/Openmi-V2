@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Brand } from "@/components/Brand";
 import { StatusPill } from "@/components/StatusPill";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { AI_PROVIDER_KEYS, readEnvReport } from "@/lib/env";
 import type { MigrationEntryState } from "@/lib/migrations";
 import { readMigrationReport } from "@/lib/setup/migrations";
@@ -67,12 +68,13 @@ export default async function SetupPage() {
         : "unreachable";
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
+    <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
       <header className="flex items-center justify-between">
         <Link href="/" aria-label="Openmi home">
           <Brand compact />
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-1.5">
+          <ThemeSwitcher />
           <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12px]">
             About
           </Link>

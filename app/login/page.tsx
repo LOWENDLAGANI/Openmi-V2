@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/components/AuthForm";
 import { Brand } from "@/components/Brand";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +32,17 @@ export default async function LoginPage({
   if (session.state === "signed-in") redirect(next);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-5 py-6 sm:px-8">
+    <main className="animate-enter mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-5 py-6 sm:px-8">
       <header className="flex items-center justify-between">
         <Link href="/" aria-label="Openmi home">
           <Brand />
         </Link>
-        <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12px]">
-          About
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeSwitcher />
+          <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12px]">
+            About
+          </Link>
+        </div>
       </header>
 
       <div className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[minmax(0,1fr)_380px]">

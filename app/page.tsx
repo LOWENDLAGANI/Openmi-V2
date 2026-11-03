@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 const CAPABILITIES = [
   {
@@ -22,10 +23,11 @@ const CAPABILITIES = [
 
 export default function HomePage() {
   return (
-    <main className="min-h-dvh">
+    <main className="min-h-dvh animate-enter">
       <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-8">
         <Brand />
         <nav className="flex flex-wrap items-center justify-end gap-1.5">
+          <ThemeSwitcher />
           <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12.5px]">
             About
           </Link>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AboutLogoGate } from "@/components/AboutLogoGate";
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
   DAILY_FREE_DEW,
@@ -37,12 +38,13 @@ const DOES_NOT = [
 
 export default function AboutPage() {
   return (
-    <main className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
+    <main className="animate-enter mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
       <header className="flex items-center justify-between">
         <Link href="/" aria-label="Openmi home">
           <Brand />
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-1.5">
+          <ThemeSwitcher />
           <Link href="/setup" className="btn btn-quiet px-3 py-1.5 text-[12px]">
             Setup
           </Link>
