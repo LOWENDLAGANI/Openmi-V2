@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AiThinking } from "@/components/AiThinking";
 import { MessageBody } from "@/components/MessageBody";
 import type { ModelCapability, ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
@@ -534,14 +535,11 @@ export function ChatPanel({
                 )}
 
                 {pending.length === 0 ? (
-                  <div className="computing flex w-fit items-center gap-2.5 rounded-full bg-accent-soft px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-text">
-                    <span className="flex gap-1 text-[13px] leading-none" aria-hidden="true">
-                      <span>•</span>
-                      <span>•</span>
-                      <span>•</span>
-                    </span>
-                    computing…
-                  </div>
+                  <AiThinking
+                    steps={steps}
+                    streaming={streaming}
+                    backgroundRunning={backgroundRunning}
+                  />
                 ) : (
                   <MessageBody
                     content={pending}

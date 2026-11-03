@@ -371,3 +371,48 @@
     padding-inline: 1.1rem;
   }
 }
+
+/* ── Loading ─────────────────────────────────────────────────────────────────
+   The spinner is the brand mark rotating, not a generic ring. The skeleton
+   shimmer is a light sweep over the chip colour, so it reads as "waiting" on
+   paper without a second palette. Both stop under the reduced-motion rule. */
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.spinner {
+  animation: spin-slow 1.15s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--chip);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 253, 247, 0.55),
+    transparent
+  );
+  animation: shimmer 1.6s ease-in-out infinite;
+}
