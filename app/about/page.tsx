@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AboutLogoGate } from "@/components/AboutLogoGate";
 import { Brand } from "@/components/Brand";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
@@ -38,7 +39,7 @@ export default function AboutPage() {
     <main className="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
       <header className="flex items-center justify-between">
         <Link href="/" aria-label="Openmi home">
-          <Brand compact />
+          <Brand />
         </Link>
         <nav className="flex items-center gap-1.5">
           <Link href="/setup" className="btn btn-quiet px-3 py-1.5 text-[12px]">
@@ -50,7 +51,14 @@ export default function AboutPage() {
         </nav>
       </header>
 
-      <p className="eyebrow mt-14">the contract</p>
+      <section
+        aria-label="Openmi"
+        className="mt-10 flex flex-col items-center gap-3 border-y border-line py-10"
+      >
+        <AboutLogoGate />
+      </section>
+
+      <p className="eyebrow mt-10">the contract</p>
       <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
         What Openmi does, and what it does not.
       </h1>

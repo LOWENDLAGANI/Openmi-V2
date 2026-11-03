@@ -36,6 +36,14 @@ const BRAND = readFileSync(
   new URL("../components/Brand.tsx", import.meta.url),
   "utf8"
 );
+const ABOUT_GATE = readFileSync(
+  new URL("../components/AboutLogoGate.tsx", import.meta.url),
+  "utf8"
+);
+const ABOUT_PAGE = readFileSync(
+  new URL("../app/about/page.tsx", import.meta.url),
+  "utf8"
+);
 
 test("middleware gates the admin and billing routes behind a session", () => {
   expect(MIDDLEWARE).toContain('"/admin/:path*"');
@@ -74,11 +82,18 @@ test("the status route is uncacheable and tells the truth about the session", ()
   expect(STATUS_ROUTE).toContain("readAdminAccess()");
 });
 
-test("the logo carries the gesture and reveals verification, not access", () => {
-  expect(BRAND).toContain("advanceGesture");
-  expect(BRAND).toContain("signInWithOAuth");
-  expect(BRAND).toContain("createPortal");
-  expect(BRAND).toContain("/api/admin/status");
+test("the shared logo stays plain so links and navigation cannot break", () => {
+  expect(BRAND).not.toContain('"use client"');
+  expect(BRAND).not.toContain("onPointerDown");
+  expect(BRAND).not.toContain("createPortal");
+});
+
+test("the gesture lives on the about page and reveals verification, not access", () => {
+  expect(ABOUT_GATE).toContain("advanceGesture");
+  expect(ABOUT_GATE).toContain("signInWithOAuth");
+  expect(ABOUT_GATE).toContain("createPortal");
+  expect(ABOUT_GATE).toContain("/api/admin/status");
+  expect(ABOUT_PAGE).toContain("<AboutLogoGate");
 });
 
 test("the migration makes the role table unreadable and re-checks the role", () => {
