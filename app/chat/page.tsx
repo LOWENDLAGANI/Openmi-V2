@@ -419,6 +419,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .select("turn_id")
       .eq("chat_id", chat.id)
       .eq("status", "running")
+      .eq("cancel_requested", false)
       .gt("expires_at", new Date().toISOString())
       .limit(1)
       .maybeSingle(),

@@ -34,9 +34,10 @@ export async function GET(request: Request) {
 
   const { data } = await session.supabase
     .from("agent_turns")
-    .select("turn_id, status, expires_at")
+    .select("turn_id, status, expires_at, cancel_requested")
     .eq("chat_id", chatId)
     .eq("status", "running")
+    .eq("cancel_requested", false)
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(1)

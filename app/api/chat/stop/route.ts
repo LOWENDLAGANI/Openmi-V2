@@ -35,9 +35,19 @@ export async function POST(request: Request) {
 
   // RLS scopes the update to this owner; the explicit owner filter makes the
   // intent readable and turns a policy regression into a no-op.
+  // The flag is what the runner polls, and the status is what the workspace
+  // polls. Both are written here because the runner may already be gone: a
+  // closed tab ends the invocation, and the row would otherwise keep saying
+  // "running" for its full 30-minute TTL — which is why a stopped chat still
+  // showed "still working on the server" after a commit or a reload. If the
+  // runner is alive it writes its partial answer over the same row.
   const { error } = await session.supabase
     .from("agent_turns")
-    .update({ cancel_requested: true })
+    .update({
+      cancel_requested: true,
+      status: "done",
+      finished_at: new Date().toISOString(),
+    })
     .eq("chat_id", chatId)
     .eq("owner", session.user.id)
     .eq("status", "running");

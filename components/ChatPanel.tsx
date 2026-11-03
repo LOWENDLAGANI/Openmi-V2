@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { AdBanner } from "@/components/AdBanner";
+import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
@@ -66,6 +66,7 @@ export function ChatPanel({
   const [steps, setSteps] = useState<StepLine[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meter, setMeter] = useState<ContextMeter | null>(null);
   const [lastSent, setLastSent] = useState("");
@@ -80,6 +81,7 @@ export function ChatPanel({
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const continuedRef = useRef(false);
+  const stopTimerRef = useRef<number | null>(null);
 
   /** A badge per model family, and the name shown on the card. */
   function modelLabel(id: string | null): string {
@@ -147,6 +149,13 @@ export function ChatPanel({
     element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
   }, [draft]);
 
+  // A pending stop timer must not outlive the component.
+  useEffect(() => {
+    return () => {
+      if (stopTimerRef.current) window.clearTimeout(stopTimerRef.current);
+    };
+  }, []);
+
   const suggestions = repo
     ? [
         {
@@ -192,6 +201,11 @@ export function ChatPanel({
 
     busyRef.current = true;
     setStreaming(true);
+    setStopping(false);
+    if (stopTimerRef.current) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
     setError(null);
     setPending("");
     setSteps([]);
@@ -199,6 +213,7 @@ export function ChatPanel({
 
     let pausedToken: string | null = null;
     let assembled = "";
+    let sawDone = false;
     let optimisticId: string | null = null;
 
     if (!continuation) {
@@ -339,11 +354,24 @@ export function ChatPanel({
         if (event === "done") {
           const id = typeof payload.id === "string" ? payload.id : `assistant-${Date.now()}`;
           const seq = typeof payload.seq === "number" ? payload.seq : null;
+          // The server appends the same note when it stores a stopped answer, so
+          // the card on screen and the row in the transcript say the same thing.
+          const content =
+            payload.stopped === "aborted"
+              ? `${assembled}\n\n_(stopped before this answer finished)_`
+              : assembled;
+
           setMessages((current) => [
             ...current,
-            { id, role: "assistant", content: assembled, seq, model },
+            { id, role: "assistant", content, seq, model },
           ]);
           setPending("");
+          sawDone = true;
+          setSteps([]);
+          if (stopTimerRef.current) {
+            window.clearTimeout(stopTimerRef.current);
+            stopTimerRef.current = null;
+          }
 
           // The chat did not exist until this turn, so its URL is adopted once
           // the answer is safe to re-read. Doing it mid-stream would replace
@@ -362,6 +390,8 @@ export function ChatPanel({
         if (event === "error") {
           setError(typeof payload.message === "string" ? payload.message : "The turn failed.");
           setPending("");
+          sawDone = true;
+          setSteps([]);
         }
       };
 
@@ -388,7 +418,33 @@ export function ChatPanel({
     } finally {
       busyRef.current = false;
       setStreaming(false);
+      setStopping(false);
       abortRef.current = null;
+
+      if (stopTimerRef.current) {
+        window.clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
+
+      // A stopped turn is not a lost answer. If the stream ended without the
+      // server's final "done", the part already on screen becomes a message
+      // instead of vanishing with the composer state.
+      if (!sawDone && assembled.trim().length > 0) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: `local-stopped-${Date.now()}`,
+            role: "assistant",
+            content: `${assembled}\n\n_(stopped before this answer finished)_`,
+            seq: null,
+            model,
+          },
+        ]);
+      }
+
+      // Steps are live progress, not transcript. Leaving them set is what kept
+      // the "thinking" pill on screen after a turn had already ended.
+      setSteps([]);
       setPending("");
     }
 
@@ -401,19 +457,40 @@ export function ChatPanel({
   }
 
   function stop() {
-    // Tell the server first: aborting this fetch only ends the stream, and the
-    // turn is deliberately not tied to it. The flag is what stops the work.
+    if (!streaming || stopping) return;
+
+    setStopping(true);
+    setBackgroundRunning(false);
+
+    // Ask the server to stop first, and keep the stream open.
+    //
+    // Aborting this fetch only ends this view; the turn is deliberately not tied
+    // to it. Aborting immediately is what used to discard the part of the
+    // answer already on screen: the runner writes its final "done" after it
+    // sees the stop flag, and that event never reached a closed stream. The
+    // runner polls once every two seconds, so the wait is short.
     if (activeChatId) {
       void fetch("/api/chat/stop", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ chatId: activeChatId }),
-      }).catch(() => {
-        // The abort below still ends this view.
-      });
+      })
+        .then((response) => {
+          if (!response.ok) abortRef.current?.abort();
+        })
+        .catch(() => {
+          // No server to stop, so end this view rather than hang on it.
+          abortRef.current?.abort();
+        });
+    } else {
+      abortRef.current?.abort();
     }
 
-    abortRef.current?.abort();
+    // Backstop: if no final event arrives, close the stream and keep the text.
+    stopTimerRef.current = window.setTimeout(() => {
+      stopTimerRef.current = null;
+      abortRef.current?.abort();
+    }, 8_000);
   }
 
   function retry() {
@@ -438,49 +515,6 @@ export function ChatPanel({
 
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="model-pill">
-            <select
-              value={model}
-              onChange={(event) => setModel(event.target.value as ModelId)}
-              aria-label="Model"
-              className="cursor-pointer appearance-none bg-transparent pr-0.5 text-[11.5px] text-mid focus:outline-none"
-            >
-            {MODEL_CATEGORIES.map((category) => {
-              const options = models.filter(
-                (option) => option.category === category.id
-              );
-              if (options.length === 0) return null;
-
-              return (
-                <optgroup key={category.id} label={category.label}>
-                  {options.map((option) => (
-                    <option
-                      key={option.id}
-                      value={option.id}
-                      disabled={option.available === false}
-                    >
-                      {option.name}
-                      {option.available === false ? " — key missing" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-            </select>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="size-3 shrink-0 text-low"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </span>
-        </div>
       </div>
 
       <div
@@ -635,10 +669,12 @@ export function ChatPanel({
 
       <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2 md:-mx-7 md:px-7">
         <div className="mx-auto w-full max-w-3xl">
-          <AdBanner className="mb-2.5" />
+          <div className="mb-1.5 flex justify-center">
+            <AdSlot slot="mobile" className="w-full max-w-[320px] opacity-80" />
+          </div>
 
-          <div className="mb-1.5 flex items-end gap-2">
-            <div className="min-w-0 flex-1">
+          {messages.length === 0 && pending.length === 0 && (
+            <div className="mb-1.5 min-w-0">
               <QuickActions
                 onSelect={(prompt) => {
                   setDraft(prompt);
@@ -647,15 +683,7 @@ export function ChatPanel({
                 disabled={streaming}
               />
             </div>
-
-            {meter && (
-              <ContextCircle
-                usedChars={meter.usedChars}
-                budgetChars={meter.budgetChars}
-                notes={meter.notes}
-              />
-            )}
-          </div>
+          )}
 
           <form
             onSubmit={(event) => {
@@ -663,7 +691,7 @@ export function ChatPanel({
               void send(draft);
             }}
           >
-            <div className="rounded-[26px] border border-line-strong bg-card p-2 shadow-[0_18px_40px_-32px_rgba(0,0,0,0.9)] transition-colors focus-within:border-accent/45">
+            <div className="rounded-[24px] border border-line-strong bg-card px-2 pb-2 pt-2 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.7)] transition-colors focus-within:border-accent/45">
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -678,25 +706,78 @@ export function ChatPanel({
                 placeholder={
                   providerReady
                     ? "Message Openmi…"
-                    : "No provider key is configured — the setup page lists what is missing."
+                    : "No provider key is configured — ask the operator."
                 }
-                className="composer-input max-h-[168px] min-h-[52px] px-3 pt-1.5 text-[14px] leading-[1.6] focus:outline-none"
+                className="composer-input max-h-[168px] min-h-[44px] px-2 pt-0.5 text-[14px] leading-[1.6] focus:outline-none"
               />
 
-              <div className="flex items-center justify-between gap-2 px-1 pt-1">
-                <span className="eyebrow hidden pl-2 sm:inline">
-                  {streaming ? "streaming" : "enter to send"}
-                </span>
+              <div className="flex items-center justify-between gap-2 pl-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="model-pill">
+                    <select
+                      value={model}
+                      onChange={(event) => setModel(event.target.value as ModelId)}
+                      aria-label="Model"
+                      className="max-w-[9.5rem] cursor-pointer appearance-none truncate bg-transparent pr-0.5 text-[11px] text-mid focus:outline-none"
+                    >
+                      {MODEL_CATEGORIES.map((category) => {
+                        const options = models.filter(
+                          (option) => option.category === category.id
+                        );
+                        if (options.length === 0) return null;
 
-                <div className="ml-auto flex items-center gap-2">
+                        return (
+                          <optgroup key={category.id} label={category.label}>
+                            {options.map((option) => (
+                              <option
+                                key={option.id}
+                                value={option.id}
+                                disabled={option.available === false}
+                              >
+                                {option.name}
+                                {option.available === false ? " — key missing" : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
+                    </select>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="size-3 shrink-0 text-low"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </span>
+
+                  {meter && (
+                    <ContextCircle
+                      usedChars={meter.usedChars}
+                      budgetChars={meter.budgetChars}
+                      notes={meter.notes}
+                    />
+                  )}
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1.5">
                   {streaming && (
                     <button
                       type="button"
                       onClick={stop}
-                      aria-label="Stop the turn"
-                      className="lift grid size-10 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover"
+                      disabled={stopping}
+                      aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
+                      title={stopping ? "Stopping…" : "Stop"}
+                      className="lift grid size-9 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
                     >
-                      <span aria-hidden="true" className="size-3 rounded-[3px] bg-current" />
+                      <span
+                        aria-hidden="true"
+                        className={`size-3 rounded-[3px] bg-current ${stopping ? "animate-blink" : ""}`}
+                      />
                     </button>
                   )}
 
@@ -704,7 +785,7 @@ export function ChatPanel({
                     type="submit"
                     disabled={streaming || draft.trim().length === 0}
                     aria-label="Send message"
-                    className="lift grid size-10 place-items-center rounded-full bg-accent text-on-accent disabled:opacity-40"
+                    className="lift grid size-9 place-items-center rounded-full bg-accent text-on-accent disabled:opacity-40"
                   >
                     <svg
                       aria-hidden="true"
@@ -724,7 +805,7 @@ export function ChatPanel({
             </div>
           </form>
 
-          <p className="mt-1.5 text-center font-mono text-[10px] tracking-[0.06em] text-low">
+          <p className="mt-1 text-center font-mono text-[9.5px] tracking-[0.05em] text-low">
             Content generated by Openmi AI. Might not be accurate.
           </p>
         </div>
