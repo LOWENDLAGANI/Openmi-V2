@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
+  ADMIN_SEQUENCE,
   advanceGesture,
-  directionOf,
   GESTURE_IDLE,
   type GestureState,
 } from "@/lib/admin/gesture";
@@ -15,12 +15,16 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 /**
  * The one place the hidden admin gesture lives: its own logo, on /about.
  *
- * Swipe up, down, left, right on the mark (mouse drag or finger) to reveal the
- * verification card. The gesture grants nothing — `/admin` resolves the
- * operator role on the server from the verified email or the database role, and
- * answers 404 to anyone else.
+ * Tap the mark 10 times in a row (staying within the tap window and not
+ * repeating the same spot) to reveal the verification card. Tap position is
+ * read from the logo itself, so it works on mouse and on touch without
+ * guessing a coordinate that could drift.
  *
- * It is not inside a link, so a drag never navigates and the card can use a
+ * The gesture grants nothing — `/admin` resolves the operator role on the
+ * server from the verified email or the database role, and answers 404 to
+ * anyone else.
+ *
+ * It is not inside a link, so a tap never navigates and the card can use a
  * portal without competing with an anchor's default action.
  */
 export function AboutLogoGate() {
@@ -31,9 +35,34 @@ export function AboutLogoGate() {
   const [error, setError] = useState<string | null>(null);
 
   const gesture = useRef<GestureState>(GESTURE_IDLE);
-  const anchor = useRef<{ x: number; y: number } | null>(null);
+  const logoBounds = useRef<DOMRect | null>(null);
+
+  /** Returns the tap as a normalized 1x2 or 2x2 grid cell of the logo. */
+  function tapFingerprint(rect: DOMRect, clientX: number, clientY: number): [number, number] {
+    const left = rect.left + rect.width * 0.25;
+    const right = rect.left + rect.width * 0.75;
+    const top = rect.top + rect.height * 0.25;
+    const bottom = rect.top + rect.height * 0.75;
+
+    const col = clientX < right ? 1 : 2;
+    const row = clientY < bottom ? 1 : 2;
+    return [col, row] as const;
+  }
 
   useEffect(() => setMounted(true), []);
+
+  // Re-read the logo bounding box whenever it shows up, including when the
+  // logo spans an Admin-only section that /admin already resolved.
+  useEffect(() => {
+    const logo = document.querySelector<HTMLElement>('[data-admin-logo]');
+    if (!logo) return;
+
+    const sync = () => { logoBounds.current = logo.getBoundingClientRect(); };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(logo);
+    return () => { observer.disconnect(); };
+  }, []);
 
   // The card only needs one fact: is this session already an operator? The
   // answer comes from the server, never from local state.
@@ -50,37 +79,27 @@ export function AboutLogoGate() {
         if (!cancelled) setAdmin(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [unlocked]);
 
-  function onPointerDown(event: React.PointerEvent<HTMLSpanElement>) {
-    anchor.current = { x: event.clientX, y: event.clientY };
-  }
+  function onTap(event: React.PointerEvent<HTMLSpanElement>) {
+    // Only count a real touch/click, not the hover pointer that browsers
+    // fire over the span.
+    if (event.pointerType !== "touch" && event.pointerType !== "pen" && event.button !== 0) {
+      return;
+    }
 
-  function onPointerMove(event: React.PointerEvent<HTMLSpanElement>) {
-    const start = anchor.current;
-    if (!start) return;
+    const rect = logoBounds.current;
+    if (!rect) return;
 
-    const direction = directionOf(
-      event.clientX - start.x,
-      event.clientY - start.y
-    );
-
-    if (!direction) return;
-
-    const result = advanceGesture(gesture.current, direction, Date.now());
+    const finger = tapFingerprint(rect, event.clientX, event.clientY);
+    const result = advanceGesture(gesture.current, finger, Date.now());
     gesture.current = result.state;
 
-    // Continue from here, so one long drag can supply several steps.
-    anchor.current = { x: event.clientX, y: event.clientY };
-
     if (result.unlocked) setUnlocked(true);
-  }
 
-  function onPointerUp() {
-    anchor.current = null;
+    // Keep the pointer from turning into a text cursor / drag.
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   async function verify() {
@@ -98,7 +117,7 @@ export function AboutLogoGate() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-          "/admin"
+          "/admin",
         )}`,
         queryParams: { prompt: "select_account" },
       },
@@ -109,7 +128,7 @@ export function AboutLogoGate() {
       setError(
         oauthError.message.toLowerCase().includes("provider")
           ? "Google sign-in is not enabled in Supabase Auth yet."
-          : oauthError.message
+          : oauthError.message,
       );
     }
     // On success the browser leaves for Google; staying busy is correct.
@@ -117,15 +136,14 @@ export function AboutLogoGate() {
 
   return (
     <span
+      data-admin-logo
       role="img"
       aria-label="Openmi"
       draggable={false}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerDown={onTap}
+      onPointerCancel={onTap}
       className="inline-flex touch-none select-none items-center gap-3"
-      style={{ touchAction: "none" }}
+      style={{ touchAction: "pan-y" }}
     >
       <svg
         aria-hidden="true"
@@ -222,7 +240,7 @@ export function AboutLogoGate() {
               </p>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </span>
   );

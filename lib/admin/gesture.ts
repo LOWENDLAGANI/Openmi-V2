@@ -1,93 +1,84 @@
 /**
  * The hidden admin sequence.
  *
- * A swipe is a pointer movement past `SWIPE_MIN_PX` on its dominant axis. Each
- * step must arrive within `SWIPE_WINDOW_MS` of the previous one, so a sequence
- * left half-finished in the morning does not unlock the panel in the afternoon.
+ * Each tap on the logo moves one step forward when it lands within the tap
+ * window from the previous tap, so a ten-tap burst unlocks the panel. If there
+ * is a gap longer than the window, or the same spot is hit twice in a row,
+ * progress resets.
  *
  * This module is deliberately pure: no DOM, no React, no clock of its own. The
  * component passes the timestamp, which is what makes the recognizer testable
  * without a browser.
  */
 
-export type Direction = "up" | "down" | "left" | "right";
+export type AdminFingerprint = [number, number];
 
-export const ADMIN_SEQUENCE: readonly Direction[] = [
-  "up",
-  "down",
-  "left",
-  "right",
-  "up",
-  "down",
-  "left",
-  "right",
-  "up",
-  "right",
+export const ADMIN_SEQUENCE: readonly AdminFingerprint[] = [
+  [1, 1],
+  [2, 1],
+  [1, 2],
+  [2, 2],
+  [1, 1],
+  [2, 1],
+  [1, 2],
+  [2, 2],
+  [1, 1],
+  [2, 2],
 ];
 
-export const SWIPE_MIN_PX = 44;
-export const SWIPE_WINDOW_MS = 900;
+export const TAP_WINDOW_MS = 1000;
 
 export type GestureState = {
-  /** How many steps of the sequence are complete. */
+  /** How many taps of the sequence are complete. */
   progress: number;
-  /** When the last accepted swipe happened, in epoch milliseconds. */
+  /** When the last accepted tap happened, in epoch milliseconds. */
   lastAt: number;
+  /** Where the last accepted tap landed, used to reject the same spot twice. */
+  lastFinger: AdminFingerprint | null;
 };
 
-export const GESTURE_IDLE: GestureState = { progress: 0, lastAt: 0 };
+export const GESTURE_IDLE: GestureState = { progress: 0, lastAt: 0, lastFinger: null };
 
 /**
- * The direction of a drag, or null when it is too small to be a swipe. A drag
- * counts along its dominant axis only, so a diagonal does not satisfy two
- * steps.
- */
-export function directionOf(
-  dx: number,
-  dy: number,
-  min: number = SWIPE_MIN_PX
-): Direction | null {
-  const horizontal = Math.abs(dx);
-  const vertical = Math.abs(dy);
-
-  if (horizontal < min && vertical < min) return null;
-
-  if (horizontal >= vertical) {
-    if (horizontal < min) return null;
-    return dx < 0 ? "left" : "right";
-  }
-
-  if (vertical < min) return null;
-  return dy < 0 ? "up" : "down";
-}
-
-/**
- * Feeds one swipe into the recognizer.
- *
- * A swipe that is not the next step restarts the sequence, unless it is the
- * first step — that way a wrong turn followed by the opening swipe does not
- * throw away the attempt.
+ * Feeds one tap into the recognizer. A tap is accepted when it arrives within
+ * `windowMs` of the previous one and lands on a different spot than the last
+ * accepted tap.
  */
 export function advanceGesture(
   state: GestureState,
-  direction: Direction,
+  finger: AdminFingerprint,
   now: number,
-  sequence: readonly Direction[] = ADMIN_SEQUENCE,
-  windowMs: number = SWIPE_WINDOW_MS
+  sequence: readonly AdminFingerprint[] = ADMIN_SEQUENCE,
+  windowMs: number = TAP_WINDOW_MS
 ): { state: GestureState; unlocked: boolean } {
-  const fresh = state.lastAt === 0 || now - state.lastAt > windowMs;
-  const progress = fresh ? 0 : state.progress;
+  const expired =
+    state.lastAt === 0 ||
+    state.lastFinger === null ||
+    now - state.lastAt > windowMs;
 
-  let next = 0;
-  if (direction === sequence[progress]) {
-    next = progress + 1;
-  } else if (direction === sequence[0]) {
-    next = 1;
-  }
+  const repeated =
+    state.lastFinger !== null &&
+    finger[0] === state.lastFinger[0] &&
+    finger[1] === state.lastFinger[1];
+
+  const progress = expired || repeated ? 0 : state.progress;
+
+  const next =
+    finger[0] === sequence[progress][0] &&
+    finger[1] === sequence[progress][1]
+      ? progress + 1
+      : 0;
 
   if (next >= sequence.length) {
     return { state: { ...GESTURE_IDLE }, unlocked: true };
   }
 
-  return { state: { progress: next, lastAt: now }, unlocked: false };
+  return {
+    state: {
+      progress: next,
+      lastAt: now,
+      lastFinger: finger,
+    },
+    unlocked: false,
+  };
 }
