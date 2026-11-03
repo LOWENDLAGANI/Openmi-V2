@@ -78,13 +78,15 @@ export function AppShell({
           </div>
 
           {actions && (
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {actions}
+            </div>
           )}
         </header>
 
         {banner}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-5 pt-4 md:px-7 md:pb-7">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 md:px-7 md:pb-7">
           {children}
         </div>
       </main>

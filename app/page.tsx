@@ -24,7 +24,7 @@ export default function HomePage() {
     <main className="min-h-dvh">
       <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-8">
         <Brand />
-        <nav className="flex items-center gap-1.5">
+        <nav className="flex flex-wrap items-center justify-end gap-1.5">
           <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12.5px]">
             About
           </Link>

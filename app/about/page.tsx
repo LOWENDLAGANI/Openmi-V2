@@ -41,7 +41,7 @@ export default function AboutPage() {
         <Link href="/" aria-label="Openmi home">
           <Brand />
         </Link>
-        <nav className="flex items-center gap-1.5">
+        <nav className="flex flex-wrap items-center justify-end gap-1.5">
           <Link href="/setup" className="btn btn-quiet px-3 py-1.5 text-[12px]">
             Setup
           </Link>

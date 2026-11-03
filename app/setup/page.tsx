@@ -72,7 +72,7 @@ export default async function SetupPage() {
         <Link href="/" aria-label="Openmi home">
           <Brand compact />
         </Link>
-        <nav className="flex items-center gap-1.5">
+        <nav className="flex flex-wrap items-center justify-end gap-1.5">
           <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12px]">
             About
           </Link>

@@ -609,7 +609,7 @@ export function ChatPanel({
                 ? "Message Openmi…"
                 : "No provider key is configured — the setup page lists what is missing."
             }
-            className="max-h-[168px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-1.5 text-[14px] leading-[1.6] text-body placeholder:text-low focus:outline-none"
+            className="composer-input max-h-[168px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-1.5 text-[14px] leading-[1.6] text-body placeholder:text-low focus:outline-none"
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-1">

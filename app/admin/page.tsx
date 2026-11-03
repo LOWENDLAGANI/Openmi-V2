@@ -151,7 +151,7 @@ export default async function AdminPage({
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link href="/chat" aria-label="Back to chats">
             <Brand compact />
           </Link>
@@ -164,7 +164,7 @@ export default async function AdminPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusPill tone={access.via === "allowlist" ? "pending" : "ok"}>
             {access.via === "allowlist" ? "allowlist" : "admin role"}
           </StatusPill>
@@ -278,7 +278,7 @@ export default async function AdminPage({
                     <StatusPill tone="pending">pending</StatusPill>
                   </div>
 
-                  <p className="mt-1 font-mono text-[10.5px] text-low">
+                  <p className="mt-1 break-words font-mono text-[10.5px] text-low">
                     {plan?.name ?? row.plan} · RM{" "}
                     {Number(row.amount).toFixed(2)} · ref {row.reference} ·{" "}
                     {utc(row.created_at)}
@@ -337,14 +337,14 @@ export default async function AdminPage({
                       <button
                         name="decision"
                         value="approved"
-                        className="btn btn-primary px-3 py-1.5 text-[11.5px]"
+                        className="btn btn-primary flex-1 px-3 py-1.5 text-[11.5px] sm:flex-none"
                       >
                         Approve
                       </button>
                       <button
                         name="decision"
                         value="rejected"
-                        className="btn px-3 py-1.5 text-[11.5px]"
+                        className="btn flex-1 px-3 py-1.5 text-[11.5px] sm:flex-none"
                       >
                         Reject
                       </button>

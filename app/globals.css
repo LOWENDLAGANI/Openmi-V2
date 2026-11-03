@@ -349,3 +349,25 @@
     background-color: var(--text-low);
   }
 }
+
+/* ── Phones ──────────────────────────────────────────────────────────────────
+   Two rules that matter on a handset. A control smaller than 16px makes iOS
+   Safari zoom the whole page when it takes focus, and a 34px button is smaller
+   than a fingertip. Both are scoped to narrow screens so the desktop rhythm is
+   untouched. Unlayered on purpose: these must win over the size utilities. */
+@media (max-width: 640px) {
+  .field,
+  .composer-input,
+  input[type="file"] {
+    font-size: 16px;
+  }
+
+  .field,
+  .btn {
+    min-height: 2.5rem;
+  }
+
+  .btn {
+    padding-inline: 1.1rem;
+  }
+}

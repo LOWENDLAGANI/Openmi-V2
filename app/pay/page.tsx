@@ -107,7 +107,7 @@ export default async function PayPage({
   return (
     <main className="mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link href="/chat" aria-label="Back to chats">
             <Brand compact />
           </Link>
@@ -156,7 +156,7 @@ export default async function PayPage({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {pending > 0 && (
               <StatusPill tone="pending">
                 {pending} receipt{pending === 1 ? "" : "s"} pending
@@ -300,7 +300,7 @@ export default async function PayPage({
               type="file"
               required
               accept="image/png,image/jpeg,image/webp,application/pdf"
-              className="field cursor-pointer py-1.5 text-[11.5px] file:mr-3 file:rounded-full file:border-0 file:bg-chip file:px-3 file:py-1 file:font-mono file:text-[10px] file:uppercase file:tracking-[0.12em] file:text-mid"
+              className="field w-full max-w-full cursor-pointer py-1.5 text-[11.5px] file:mr-3 file:max-w-[45%] file:truncate file:rounded-full file:border-0 file:bg-chip file:px-3 file:py-1 file:font-mono file:text-[10px] file:uppercase file:tracking-[0.12em] file:text-mid"
             />
             <span className="mt-1 block px-1 text-[10px] text-low">
               PNG, JPEG, WebP or PDF, up to 5 MB.
@@ -351,7 +351,7 @@ export default async function PayPage({
                     <StatusPill tone={state.tone}>{state.label}</StatusPill>
                   </div>
 
-                  <p className="mt-1 font-mono text-[10.5px] text-low">
+                  <p className="mt-1 break-all font-mono text-[10.5px] text-low">
                     ref {row.reference}
                   </p>
 
@@ -377,7 +377,7 @@ export default async function PayPage({
                       view receipt ↗
                     </a>
                   ) : (
-                    <p className="mt-1 text-[10.5px] text-low">
+                    <p className="mt-1 break-all text-[10.5px] text-low">
                       {row.receipt_name ?? "receipt"}
                     </p>
                   )}
