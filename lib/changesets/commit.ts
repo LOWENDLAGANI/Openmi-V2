@@ -8,10 +8,12 @@ import {
 } from "@/lib/changesets";
 import { getRepo } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
+import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
   GithubWriteError,
   agentBranchName,
   assertAgentBranch,
+  assertSafeBranch,
   commitProposal,
   type ProposedFile,
 } from "@/lib/github/write";
@@ -35,10 +37,12 @@ type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
 export type ApprovalResult =
   | {
       ok: true;
-      prUrl: string;
-      prNumber: number;
+      /** Null when the approval was a direct commit instead of a pull request. */
+      prUrl: string | null;
+      prNumber: number | null;
       commitSha: string;
       branch: string;
+      target: "pull-request" | "branch";
       alreadyCommitted: boolean;
     }
   | { ok: false; error: string };
@@ -60,16 +64,31 @@ type ChangesetRow = {
 };
 
 function existingResult(row: ChangesetRow): ApprovalResult | null {
-  if (
-    row.pr_url &&
-    typeof row.pr_number === "number" &&
-    row.commit_sha &&
-    row.branch_name
-  ) {
+  if (!row.commit_sha || !row.branch_name) return null;
+
+  // A committed row is done. Without a PR url it is only done when the branch
+  // is not an agent branch; an agent branch with no PR is a half-finished
+  // pull request that a retry should still complete.
+  const direct = !row.branch_name.startsWith(AGENT_BRANCH_PREFIX);
+
+  if (row.pr_url && typeof row.pr_number === "number") {
     return {
       ok: true,
+      target: "pull-request",
       prUrl: row.pr_url,
       prNumber: row.pr_number,
+      commitSha: row.commit_sha,
+      branch: row.branch_name,
+      alreadyCommitted: true,
+    };
+  }
+
+  if (row.status === "committed" && direct) {
+    return {
+      ok: true,
+      target: "branch",
+      prUrl: null,
+      prNumber: null,
       commitSha: row.commit_sha,
       branch: row.branch_name,
       alreadyCommitted: true,
@@ -81,13 +100,33 @@ function existingResult(row: ChangesetRow): ApprovalResult | null {
 
 export async function approveChangesetAndOpenPullRequest(
   supabase: Client,
-  input: { changesetId: string; owner: string; sealKey: string | null }
+  input: {
+    changesetId: string;
+    owner: string;
+    sealKey: string | null;
+    /** When set, commit straight to this branch instead of opening a PR. */
+    target?: { branch: string };
+  }
 ): Promise<ApprovalResult> {
   if (!input.sealKey) {
     return {
       ok: false,
       error: "GITHUB_TOKEN_KEY is not configured, so a changeset cannot be verified.",
     };
+  }
+
+  if (input.target) {
+    try {
+      assertSafeBranch(input.target.branch.trim());
+    } catch (caught) {
+      return {
+        ok: false,
+        error:
+          caught instanceof Error
+            ? caught.message
+            : "That branch name is not valid.",
+      };
+    }
   }
 
   const { data, error } = await supabase
@@ -212,10 +251,14 @@ export async function approveChangesetAndOpenPullRequest(
     };
   }
 
-  const branch = agentBranchName(row.id);
+  const branch = input.target ? input.target.branch.trim() : agentBranchName(row.id);
 
   try {
-    assertAgentBranch(branch, defaultBranch);
+    if (input.target) {
+      assertSafeBranch(branch);
+    } else {
+      assertAgentBranch(branch, defaultBranch);
+    }
   } catch (caught) {
     return {
       ok: false,
@@ -287,6 +330,7 @@ export async function approveChangesetAndOpenPullRequest(
       files,
       changesetId: row.id,
       existingCommitSha: row.commit_sha ?? undefined,
+      targetBranch: input.target?.branch.trim(),
       onProgress: async (progress) => {
         // Persisted before the next request so a partial write is resumable.
         await supabase
@@ -322,6 +366,7 @@ export async function approveChangesetAndOpenPullRequest(
 
     return {
       ok: true,
+      target: input.target ? "branch" : "pull-request",
       prUrl: outcome.prUrl,
       prNumber: outcome.prNumber,
       commitSha: outcome.commitSha,

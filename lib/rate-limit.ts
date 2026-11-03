@@ -18,6 +18,14 @@ export const RATE_LIMIT_WINDOW_MS = 60_000;
 export const RATE_LIMITS = {
   chat: { max: 20, windowMs: RATE_LIMIT_WINDOW_MS },
   approval: { max: 10, windowMs: RATE_LIMIT_WINDOW_MS },
+  // A code is a bearer value, so guessing is the attack this stops.
+  redeem: { max: 6, windowMs: RATE_LIMIT_WINDOW_MS },
+  // Deductions are cheap but append to the ledger; this is a spam ceiling.
+  wallet: { max: 12, windowMs: RATE_LIMIT_WINDOW_MS },
+  // Connecting GitHub mints an OAuth state and calls the provider.
+  oauth: { max: 10, windowMs: RATE_LIMIT_WINDOW_MS },
+  // Search arrives as the reader types, so the ceiling is generous but finite.
+  search: { max: 90, windowMs: RATE_LIMIT_WINDOW_MS },
 } as const;
 
 export type RateLimitKind = keyof typeof RATE_LIMITS;

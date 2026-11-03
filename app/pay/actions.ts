@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 
 import { planById } from "@/lib/billing/plans";
 import { redeemDewCode } from "@/lib/dew/store";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -128,13 +129,20 @@ function done(message: string): never {
  * Dew.
  */
 export async function redeemTopUpCode(formData: FormData) {
-  const { supabase } = await account();
+  const session = await account();
+
+  // A code is a bearer value, so attempts are counted before one is looked up.
+  const limited = await checkRateLimit(supabaseAdmin(), "redeem", session.user.id);
+  if (!limited.allowed) {
+    fail(`Too many code attempts. Try again in ${limited.retryAfterSeconds} seconds.`);
+  }
+
   const code = field(formData, "code");
 
   if (code.length === 0) fail("Enter a code first.");
   if (code.length > 64) fail("That code is too long.");
 
-  const result = await redeemDewCode(supabase, code);
+  const result = await redeemDewCode(session.supabase, code);
   if (!result.ok) fail(result.error);
 
   revalidatePath("/pay");
@@ -150,7 +158,12 @@ export async function redeemTopUpCode(formData: FormData) {
  * Dew — a self-service top-up with no code and no receipt would be free credit.
  */
 export async function deductOwnDew(formData: FormData) {
-  const { supabase } = await account();
+  const session = await account();
+
+  const limited = await checkRateLimit(supabaseAdmin(), "wallet", session.user.id);
+  if (!limited.allowed) {
+    fail(`Too many deductions. Try again in ${limited.retryAfterSeconds} seconds.`);
+  }
 
   const raw = Number(field(formData, "amount"));
   if (!Number.isFinite(raw) || raw <= 0) fail("Enter the Dew to deduct.");
@@ -158,7 +171,7 @@ export async function deductOwnDew(formData: FormData) {
   const amount = Math.min(Math.round(raw), 100000);
   const reason = field(formData, "reason").slice(0, 120);
 
-  const { data, error } = await supabase.rpc("deduct_own_dew", {
+  const { data, error } = await session.supabase.rpc("deduct_own_dew", {
     p_amount: amount,
     p_reason: reason.length > 0 ? reason : null,
   });

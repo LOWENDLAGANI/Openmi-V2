@@ -7,7 +7,9 @@ import {
   oauthConfigured,
   oauthRedirectUri,
 } from "@/lib/oauth/github";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,19 @@ export async function GET(request: Request) {
   if (session.state !== "signed-in") {
     return NextResponse.redirect(
       new URL("/login?next=%2Fchat", url.origin)
+    );
+  }
+
+  // Each connect mints a state and sends a request to GitHub.
+  const limited = await checkRateLimit(supabaseAdmin(), "oauth", session.user.id);
+  if (!limited.allowed) {
+    return NextResponse.redirect(
+      new URL(
+        `/chat?error=${encodeURIComponent(
+          `Too many GitHub connect attempts. Try again in ${limited.retryAfterSeconds} seconds.`
+        )}`,
+        url.origin
+      )
     );
   }
 

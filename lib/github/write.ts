@@ -1,6 +1,7 @@
 import {
   AGENT_BRANCH_PATTERN,
   agentBranchName,
+  isSafeBranchName,
 } from "@/lib/branch";
 import { GITHUB_API, GITHUB_TIMEOUT_MS, isRepoFullName } from "./read";
 
@@ -9,17 +10,19 @@ export { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
 /**
  * The only module in the app that writes to GitHub.
  *
- * The safety property is structural, not a prompt instruction: the branch a
- * commit may touch is derived here from the changeset id, and every write goes
- * through `assertAgentBranch` first. There is no parameter that accepts a
- * caller-supplied branch name, so "commit to main" is not a request this
- * module can express. tests/github-read.test.ts keeps read-only modules GET-
- * only and tests/github-write.test.ts pins the refusal and the request shape.
+ * The safety property is structural, not a prompt instruction. A pull request
+ * always goes to a branch derived from the changeset id, and every write on
+ * that path goes through `assertAgentBranch` first. A direct commit, which the
+ * reader asks for explicitly, names its branch instead: the name must pass
+ * git's own rules, the branch head must still be the pinned base, and the ref
+ * is updated without force. A branch that has moved is refused, never
+ * overwritten. tests/github-read.test.ts keeps read-only modules GET-only and
+ * tests/github-write.test.ts pins both refusals and the request shapes.
  *
- * One approval means one branch, one commit and one pull request. The
- * changeset id is the idempotency key: the branch name contains it, the commit
- * is content-addressed by GitHub, and an existing pull request is reused rather
- * than duplicated on retry.
+ * One approval means one commit and either one agent branch with a pull request
+ * or one direct branch update. The changeset id is the idempotency key: the
+ * agent branch name contains it, the commit is content-addressed by GitHub, and
+ * an existing pull request is reused rather than duplicated on retry.
  *
  * The PR body states that nothing was executed. That is the product's central
  * honesty claim and it travels with the diff, not just the UI.
@@ -60,8 +63,9 @@ export type CommitOutcome = {
   branch: string;
   baseBranch: string;
   commitSha: string;
-  prUrl: string;
-  prNumber: number;
+  /** Null for a direct commit: no pull request was opened. */
+  prUrl: string | null;
+  prNumber: number | null;
 };
 
 /**
@@ -76,6 +80,44 @@ export function assertAgentBranch(branch: string, defaultBranch: string): void {
       "Openmi only commits to agent/ branches.",
       403
     );
+  }
+}
+
+/** A direct commit names its branch, so the name is checked before any write. */
+export function assertSafeBranch(branch: string): void {
+  if (!isSafeBranchName(branch)) {
+    throw new GithubWriteError(
+      "refused",
+      `"${branch}" is not a valid branch name to commit to.`,
+      403
+    );
+  }
+}
+
+/** A branch path keeps its slashes; every other character is encoded. */
+function encodedBranch(branch: string): string {
+  return branch.split("/").map(encodeURIComponent).join("/");
+}
+
+/** The head of a branch, or null when GitHub says it does not exist. */
+async function readBranchHead(
+  token: string,
+  repoPath: string,
+  branch: string
+): Promise<string | null> {
+  try {
+    const ref = await request<{ object: { sha: string } }>(
+      token,
+      "GET",
+      `${repoPath}/git/ref/heads/${encodedBranch(branch)}`
+    );
+
+    return ref.object.sha;
+  } catch (caught) {
+    if (caught instanceof GithubWriteError && caught.failure === "not-found") {
+      return null;
+    }
+    throw caught;
   }
 }
 
@@ -199,6 +241,7 @@ export async function commitProposal({
   files,
   changesetId,
   existingCommitSha,
+  targetBranch,
   onProgress,
 }: {
   token: string;
@@ -209,6 +252,8 @@ export async function commitProposal({
   files: ProposedFile[];
   changesetId: string;
   existingCommitSha?: string;
+  /** When set, commit straight to this branch instead of opening a PR. */
+  targetBranch?: string;
   onProgress?: (progress: { branch: string; commitSha?: string }) => Promise<void> | void;
 }): Promise<CommitOutcome> {
   if (!isRepoFullName(repo)) {
@@ -240,17 +285,45 @@ export async function commitProposal({
     }
   }
 
-  // Policy before the first request: no branch outside the agent prefix can be
-  // created by this function, and the base is the default branch, not a string
-  // a user supplied.
-  const branch = agentBranchName(changesetId);
-  assertAgentBranch(branch, defaultBranch);
-  assertBaseBranch(baseBranch, defaultBranch);
+  // Policy before the first request. A pull request can only use the branch
+  // derived from this changeset, based on the repository default. A direct
+  // commit may name any valid branch, and its base is checked against the live
+  // head below rather than assumed.
+  const direct = targetBranch !== undefined;
+  const branch = direct ? targetBranch.trim() : agentBranchName(changesetId);
+
+  if (direct) {
+    assertSafeBranch(branch);
+  } else {
+    assertAgentBranch(branch, defaultBranch);
+    assertBaseBranch(baseBranch, defaultBranch);
+  }
 
   const [owner, name] = repo.split("/");
   const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
   await onProgress?.({ branch });
+
+  // Direct commits read the branch before writing anything. A branch that is
+  // not at the pinned base is refused rather than overwritten, and a missing
+  // branch is created once the commit exists.
+  let branchHead: string | null = null;
+
+  if (direct) {
+    branchHead = await readBranchHead(token, repoPath, branch);
+
+    if (
+      branchHead !== null &&
+      branchHead !== baseSha &&
+      branchHead !== existingCommitSha
+    ) {
+      throw new GithubWriteError(
+        "conflict",
+        `The branch ${branch} has moved to ${branchHead.slice(0, 7)}; this diff was computed at ${baseSha.slice(0, 7)}. Nothing was committed.`,
+        409
+      );
+    }
+  }
 
   let commitSha = existingCommitSha ?? "";
 
@@ -281,6 +354,31 @@ export async function commitProposal({
   }
 
   await onProgress?.({ branch, commitSha });
+
+  if (direct) {
+    if (branchHead !== commitSha) {
+      if (branchHead === null) {
+        await request(token, "POST", `${repoPath}/git/refs`, {
+          ref: `refs/heads/${branch}`,
+          sha: commitSha,
+        });
+      } else {
+        // Not forced: GitHub itself refuses a non-fast-forward move.
+        await request(token, "PATCH", `${repoPath}/git/refs/heads/${encodedBranch(branch)}`, {
+          sha: commitSha,
+          force: false,
+        });
+      }
+    }
+
+    return {
+      branch,
+      baseBranch: branch,
+      commitSha,
+      prUrl: null,
+      prNumber: null,
+    };
+  }
 
   // Create the agent ref, or verify a ref that an earlier attempt created.
   // A 422 here is expected on retry, so the ref is read back and compared.

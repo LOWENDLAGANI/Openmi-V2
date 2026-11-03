@@ -11,9 +11,18 @@ test("a failed turn with no answer is refunded", () => {
   expect(refundReasonFor({ textLength: 0, stopped: "tokens" })).toContain("empty answer");
 });
 
-test("an answer, a pause or saved steps keep the hour charged", () => {
-  expect(refundReasonFor({ textLength: 12, stopped: "error" })).toBeNull();
+test("a failure is refunded even when part of an answer had arrived", () => {
+  expect(refundReasonFor({ textLength: 120, stopped: "error" })).toContain(
+    "failed before finishing"
+  );
+  expect(refundReasonFor({ textLength: 120, stopped: "conflict" })).toContain(
+    "could not finish"
+  );
+});
+
+test("a finished answer, a stop after tokens, a pause or saved steps keep the hour charged", () => {
   expect(refundReasonFor({ textLength: 12, stopped: "done" })).toBeNull();
+  expect(refundReasonFor({ textLength: 12, stopped: "aborted" })).toBeNull();
   expect(refundReasonFor({ textLength: 0, stopped: "paused" })).toBeNull();
   expect(refundReasonFor({ textLength: 0, stopped: "steps" })).toBeNull();
 });

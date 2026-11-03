@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 
 import {
+  RATE_LIMITS,
   RATE_LIMIT_WINDOW_MS,
   checkRateLimit,
   rateBucket,
@@ -80,6 +81,13 @@ test("a bucket names the kind and the account, and nothing else", () => {
   expect(rateBucket("chat", " user-1 ")).toBe("openmi:chat:user-1");
   expect(rateBucket("approval", "user-1")).not.toBe(rateBucket("chat", "user-1"));
   expect(rateBucket("chat", "   ")).toBe("");
+});
+
+test("wallet, code and OAuth attempts are counted apart", () => {
+  expect(rateBucket("redeem", "u-1")).not.toBe(rateBucket("wallet", "u-1"));
+  expect(rateBucket("oauth", "u-1")).not.toBe(rateBucket("search", "u-1"));
+  expect(RATE_LIMITS.redeem.max).toBeLessThan(RATE_LIMITS.chat.max);
+  expect(RATE_LIMITS.wallet.max).toBeGreaterThan(0);
 });
 
 test("an absent limiter allows the request and says it is degraded", async () => {

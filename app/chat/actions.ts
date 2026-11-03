@@ -225,8 +225,14 @@ export async function approveProposal(formData: FormData) {
   const { supabase, user } = await acting();
   const changesetId = field(formData, "changesetId");
   const chatId = field(formData, "chatId");
+  const target = field(formData, "target") === "branch" ? "branch" : "pull-request";
+  const branch = field(formData, "branch");
 
   if (!changesetId) fail("That changeset no longer exists.");
+
+  if (target === "branch" && branch.length === 0) {
+    fail("Name the branch to commit to.");
+  }
 
   // Approvals are writes to GitHub, so they are limited even when the chat
   // counter is free. The refusal happens before the changeset is read.
@@ -239,6 +245,7 @@ export async function approveProposal(formData: FormData) {
     changesetId,
     owner: user.id,
     sealKey: serverEnv().githubTokenKey,
+    target: target === "branch" ? { branch } : undefined,
   });
 
   revalidatePath("/chat");

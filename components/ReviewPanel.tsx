@@ -1,5 +1,6 @@
 import { acceptChange, approveProposal, rejectChange } from "@/app/chat/actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
   changesetDisplayStatus,
   type ChangesetStatus,
@@ -73,6 +74,9 @@ export function ReviewPanel({
         const deletions = accepted.reduce((total, file) => total + file.deletions, 0);
         const stale = chatSha !== null && chatSha !== changeset.base_sha;
         const reviewable = status === "ready";
+        const directCommit =
+          changeset.branch_name !== null &&
+          !changeset.branch_name.startsWith(AGENT_BRANCH_PREFIX);
 
         return (
           <details
@@ -162,25 +166,62 @@ export function ReviewPanel({
               {status === "ready" && (
                 <form
                   action={approveProposal}
-                  className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3"
+                  className="space-y-3 border-t border-line pt-3"
                 >
                   <input type="hidden" name="changesetId" value={changeset.id} />
                   <input type="hidden" name="chatId" value={chatId} />
 
-                  <p className="max-w-md text-[11px] leading-relaxed text-low">
-                    {accepted.length === 0
-                      ? "No files are accepted, so there is nothing to approve."
-                      : `${accepted.length} file(s) accepted. Approving opens one branch and one pull request; the default branch is not written to.`}
-                  </p>
+                  <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <legend className="eyebrow mb-1 w-full">Destination</legend>
 
-                  {accepted.length > 0 && (
-                    <SubmitButton
-                      className="btn btn-primary px-4 py-1.5 text-[11.5px]"
-                      pendingText="Opening the PR…"
-                    >
-                      Approve and open PR
-                    </SubmitButton>
-                  )}
+                    <label className="flex items-center gap-1.5 text-[11px] text-body">
+                      <input
+                        type="radio"
+                        name="target"
+                        value="pr"
+                        defaultChecked
+                        className="size-3 accent-current"
+                      />
+                      Open a pull request
+                    </label>
+
+                    <label className="flex items-center gap-1.5 text-[11px] text-body">
+                      <input
+                        type="radio"
+                        name="target"
+                        value="branch"
+                        className="size-3 accent-current"
+                      />
+                      Commit to
+                    </label>
+
+                    <input
+                      name="branch"
+                      defaultValue="main"
+                      maxLength={100}
+                      spellCheck={false}
+                      aria-label="Branch to commit to"
+                      placeholder="main"
+                      className="field w-32 py-1 text-[11px]"
+                    />
+                  </fieldset>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="max-w-md text-[11px] leading-relaxed text-low">
+                      {accepted.length === 0
+                        ? "No files are accepted, so there is nothing to approve."
+                        : `${accepted.length} file(s) accepted. A pull request goes on its own branch; a direct commit writes the branch you named, and only while it is still at the base shown above.`}
+                    </p>
+
+                    {accepted.length > 0 && (
+                      <SubmitButton
+                        className="btn btn-primary px-4 py-1.5 text-[11.5px]"
+                        pendingText="Writing…"
+                      >
+                        Approve changes
+                      </SubmitButton>
+                    )}
+                  </div>
                 </form>
               )}
 
@@ -211,8 +252,9 @@ export function ReviewPanel({
                   ) : (
                     <>
                       <p className="text-[11px] leading-relaxed text-mid">
-                        Approved, but GitHub has not confirmed a pull request
-                        yet.
+                        {directCommit
+                          ? "Approved, but GitHub has not confirmed the commit yet."
+                          : "Approved, but GitHub has not confirmed a pull request yet."}
                       </p>
 
                       {changeset.failure && (
@@ -230,6 +272,18 @@ export function ReviewPanel({
                       >
                         <input type="hidden" name="changesetId" value={changeset.id} />
                         <input type="hidden" name="chatId" value={chatId} />
+                        <input
+                          type="hidden"
+                          name="target"
+                          value={directCommit ? "branch" : "pr"}
+                        />
+                        {directCommit && changeset.branch_name && (
+                          <input
+                            type="hidden"
+                            name="branch"
+                            value={changeset.branch_name}
+                          />
+                        )}
 
                         <p className="max-w-md text-[11px] leading-relaxed text-low">
                           Retry reuses{" "}
@@ -237,7 +291,7 @@ export function ReviewPanel({
                             ? `the branch ${changeset.branch_name}`
                             : "the same branch"}{" "}
                           and any commit already created; it never opens a second
-                          pull request.
+                          pull request or a second commit.
                         </p>
 
                         <SubmitButton
@@ -282,18 +336,20 @@ export function ReviewPanel({
                   ) : null}
                   .{" "}
                   {changeset.pr_url && typeof changeset.pr_number === "number" ? (
-                    <a
-                      href={changeset.pr_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-accent-text underline-offset-2 hover:underline"
-                    >
-                      Pull request #{changeset.pr_number}
-                    </a>
+                    <>
+                      <a
+                        href={changeset.pr_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-text underline-offset-2 hover:underline"
+                      >
+                        Pull request #{changeset.pr_number}
+                      </a>{" "}
+                      The default branch was not modified.
+                    </>
                   ) : (
-                    "No pull request is recorded."
-                  )}{" "}
-                  The default branch was not modified.
+                    "No pull request was opened; this was a direct commit to the branch above."
+                  )}
                 </p>
               )}
             </div>

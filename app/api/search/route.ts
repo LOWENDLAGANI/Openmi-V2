@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import {
   MAX_QUERY_CHARS,
@@ -8,6 +9,7 @@ import {
   escapeLike,
   snippetAround,
 } from "@/lib/search";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,22 @@ export async function GET(request: Request) {
 
   if (session.state !== "signed-in") {
     return json({ error: "Sign in to search." }, 401);
+  }
+
+  const limited = await checkRateLimit(supabaseAdmin(), "search", session.user.id);
+  if (!limited.allowed) {
+    return NextResponse.json(
+      {
+        error: `Too many searches. Try again in ${limited.retryAfterSeconds} seconds.`,
+      },
+      {
+        status: 429,
+        headers: {
+          "cache-control": "no-store",
+          "retry-after": String(limited.retryAfterSeconds),
+        },
+      }
+    );
   }
 
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim();

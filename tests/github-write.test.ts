@@ -223,6 +223,89 @@ test("a permission failure names the scopes the token needs", async () => {
   await expect(commitProposal(BASE)).rejects.toThrow(/Contents: read and write/);
 });
 
+test("a direct commit moves the named branch and opens no pull request", async () => {
+  const calls = stubFetch((method, path) => {
+    if (method === "GET" && path.endsWith("/git/ref/heads/main")) {
+      return { status: 404, body: { message: "Not Found" } };
+    }
+    return happyPath(method, path);
+  });
+
+  const outcome = await commitProposal({ ...BASE, targetBranch: "main" });
+
+  expect(outcome).toEqual({
+    branch: "main",
+    baseBranch: "main",
+    commitSha: "commit-1",
+    prUrl: null,
+    prNumber: null,
+  });
+
+  const ref = calls.find((call) => call.method === "POST" && call.path.endsWith("/git/refs"));
+  expect(ref?.body?.ref).toBe("refs/heads/main");
+  expect(ref?.body?.sha).toBe("commit-1");
+  expect(calls.some((call) => call.path.endsWith("/pulls"))).toBe(false);
+});
+
+test("an existing branch at the pinned base is fast-forwarded, never forced", async () => {
+  const calls = stubFetch((method, path) => {
+    if (method === "GET" && path.endsWith("/git/ref/heads/release")) {
+      return { body: { object: { sha: "base-1" } } };
+    }
+    if (method === "PATCH" && path.endsWith("/git/refs/heads/release")) {
+      return { body: { object: { sha: "commit-1" } } };
+    }
+    return happyPath(method, path);
+  });
+
+  await commitProposal({ ...BASE, targetBranch: "release" });
+
+  const patch = calls.find((call) => call.method === "PATCH");
+  expect(patch?.path).toBe("/repos/octocat/hello/git/refs/heads/release");
+  expect(patch?.body).toEqual({ sha: "commit-1", force: false });
+  expect(calls.some((call) => call.method === "POST" && call.path.endsWith("/git/refs"))).toBe(
+    false
+  );
+});
+
+test("a branch that has moved is refused before a commit is written", async () => {
+  const calls = stubFetch((method, path) => {
+    if (method === "GET" && path.endsWith("/git/ref/heads/main")) {
+      return { body: { object: { sha: "newer-commit" } } };
+    }
+    return happyPath(method, path);
+  });
+
+  await expect(commitProposal({ ...BASE, targetBranch: "main" })).rejects.toThrow(
+    /has moved/
+  );
+
+  expect(
+    calls.some((call) => call.method === "POST" && call.path.endsWith("/git/commits"))
+  ).toBe(false);
+});
+
+test("a branch name git would refuse is refused before any request", async () => {
+  const calls = stubFetch(happyPath);
+
+  for (const branch of [
+    "",
+    "refs/heads/main",
+    "bad..name",
+    "-oops",
+    "trailing/",
+    "has space",
+    "x.lock",
+    "feature/~x",
+  ]) {
+    await expect(commitProposal({ ...BASE, targetBranch: branch })).rejects.toThrow(
+      /not a valid branch/
+    );
+  }
+
+  expect(calls).toHaveLength(0);
+});
+
 test("only the approval path imports the GitHub write client", () => {
   const files = (readdirSync(ROOT, { recursive: true }) as string[])
     .map((file) => file.replaceAll("\\", "/"))
