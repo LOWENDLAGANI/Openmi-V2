@@ -1,9 +1,16 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
+import {
+  countryFromHeaders,
+  currencyForCountry,
+  formatMoney,
+  isConverted,
+} from "@/lib/billing/currency";
 import { paymentLink, PLANS, planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
@@ -103,6 +110,9 @@ export default async function PayPage({
     })
   );
 
+  // The country comes from the host's geo header; unknown countries see ringgit.
+  const currency = currencyForCountry(countryFromHeaders(await headers()));
+  const localPrices = isConverted(currency);
   const link = paymentLink();
 
   return (
@@ -204,7 +214,14 @@ export default async function PayPage({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[13px] font-semibold text-hi">{plan.name}</p>
-                <p className="font-mono text-[11px] text-low">RM {plan.price}</p>
+                <p
+                  className="font-mono text-[11px] text-low"
+                  title={`Charged as RM ${plan.price} on the payment page`}
+                >
+                  {localPrices
+                    ? `≈ ${formatMoney(plan.price, currency)}`
+                    : `RM ${plan.price}`}
+                </p>
               </div>
               <p className="mt-2 font-mono text-[20px] leading-none text-accent-text">
                 {plan.dew}
@@ -220,6 +237,9 @@ export default async function PayPage({
         </div>
 
         <p className="mt-2 text-[10.5px] leading-relaxed text-low">
+          {localPrices
+            ? `Prices above are an estimate in ${currency.name} at an indicative rate. The hosted page charges ringgit, and the ringgit amount on your receipt is the one that counts. `
+            : ""}
           The hosted page is the only place money changes hands. This app never
           asks for card details.
         </p>
