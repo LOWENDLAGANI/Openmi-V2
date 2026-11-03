@@ -82,6 +82,14 @@ export async function attachRepo(formData: FormData) {
   const github = await readToken(supabase, user.id);
   if (!github) fail("Connect GitHub before picking a repository.");
 
+  // A draft chat stores nothing, and the workspace resolves the default branch
+  // itself. Resolving the pin here as well meant two extra GitHub round trips
+  // on the click that already felt slow, for a sha nobody read.
+  if (!chatId) {
+    revalidatePath("/chat");
+    redirect(`/chat?repo=${encodeURIComponent(fullName)}`);
+  }
+
   let branch = "";
   let sha = "";
   try {

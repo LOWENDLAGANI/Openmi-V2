@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { OpenmiMark } from "@/components/OpenmiMark";
+import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import type { Chat, Folder } from "@/lib/types";
 import {
@@ -69,14 +70,19 @@ function ChatRow({
                 </option>
               ))}
             </select>
-            <button className="btn px-2 py-1 text-[11px]">Move</button>
+            <SubmitButton className="btn px-2 py-1 text-[11px]" pendingText="Moving…">
+              Move
+            </SubmitButton>
           </form>
 
           <form action={trashChat} className="mt-1.5 border-t border-line pt-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
-            <button className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-mid hover:bg-hover hover:text-hi">
+            <SubmitButton
+              className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-mid hover:bg-hover hover:text-hi"
+              pendingText="Moving to trash…"
+            >
               Move to trash
-            </button>
+            </SubmitButton>
           </form>
         </div>
       </details>
@@ -200,14 +206,19 @@ export function Sidebar({
                       aria-label={`Rename ${folder.name}`}
                       className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
                     />
-                    <button className="btn px-2 py-1 text-[11px]">Save</button>
+                    <SubmitButton className="btn px-2 py-1 text-[11px]" pendingText="Saving…">
+                      Save
+                    </SubmitButton>
                   </form>
 
                   <form action={deleteFolder} className="px-2 pt-1.5 pb-1">
                     <input type="hidden" name="folderId" value={folder.id} />
-                    <button className="text-[11px] text-danger hover:underline">
+                    <SubmitButton
+                      className="text-[11px] text-danger hover:underline"
+                      pendingText="Deleting…"
+                    >
                       Delete folder (chats kept)
-                    </button>
+                    </SubmitButton>
                   </form>
                 </details>
               </div>
@@ -224,7 +235,9 @@ export function Sidebar({
             aria-label="New folder name"
             className="field min-w-0 flex-1 px-3 py-1.5 text-[11px]"
           />
-          <button className="btn px-3 py-1.5 text-[11px]">Add</button>
+          <SubmitButton className="btn px-3 py-1.5 text-[11px]" pendingText="Adding…">
+            Add
+          </SubmitButton>
         </form>
       </nav>
 
@@ -264,7 +277,12 @@ export function Sidebar({
             {email}
           </p>
           <form action="/auth/signout" method="post">
-            <button className="text-[11px] text-mid hover:text-hi">Sign out</button>
+            <SubmitButton
+              className="text-[11px] text-mid hover:text-hi"
+              pendingText="Signing out…"
+            >
+              Sign out
+            </SubmitButton>
           </form>
         </div>
       </div>

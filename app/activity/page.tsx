@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
+import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   DEW_PER_HOUR,
@@ -257,7 +258,9 @@ export default async function ActivityPage({
               aria-label="Dew code"
               className="field min-w-0 flex-1 bg-canvas py-1.5 font-mono text-[12px]"
             />
-            <button className="btn px-3 py-1.5 text-[12px]">Redeem</button>
+            <SubmitButton className="btn px-3 py-1.5 text-[12px]" pendingText="Redeeming…">
+              Redeem
+            </SubmitButton>
           </form>
 
           <p className="eyebrow mt-4">top-up packs</p>
@@ -421,7 +424,9 @@ export default async function ActivityPage({
               </option>
             ))}
           </select>
-          <button className="btn px-3 py-1.5 text-[12px]">Save timezone</button>
+          <SubmitButton className="btn px-3 py-1.5 text-[12px]" pendingText="Saving…">
+            Save timezone
+          </SubmitButton>
         </form>
       </section>
 

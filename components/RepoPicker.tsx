@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { attachRepo } from "@/app/github/actions";
+import { SubmitButton } from "@/components/SubmitButton";
 import type { RepoSummary } from "@/lib/github/types";
 
 const MAX_RENDERED = 100;
@@ -82,7 +83,9 @@ export function RepoPicker({
               <form action={attachRepo}>
                 <input type="hidden" name="repo" value={repo.fullName} />
                 {chatId && <input type="hidden" name="chat" value={chatId} />}
-                <button className="btn px-4 py-1.5 text-[12px]">Open</button>
+                <SubmitButton className="btn px-4 py-1.5 text-[12px]" pendingText="Opening…">
+                  Open
+                </SubmitButton>
               </form>
             </li>
           ))}

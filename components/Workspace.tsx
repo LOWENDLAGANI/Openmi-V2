@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { PathFilter } from "@/components/PathFilter";
+import { SubmitButton } from "@/components/SubmitButton";
 import { MAX_PATH_INDEX, MAX_VIEW_LINES } from "@/lib/github/read";
 import type {
   CodeSearch,
@@ -172,7 +173,9 @@ export function Workspace(props: WorkspaceProps) {
                 </option>
               ))}
             </select>
-            <button className="btn px-3 py-1.5 text-[12px]">Switch</button>
+            <SubmitButton className="btn px-3 py-1.5 text-[12px]" pendingText="Switching…">
+              Switch
+            </SubmitButton>
           </form>
 
           <PathFilter
@@ -265,7 +268,9 @@ export function Workspace(props: WorkspaceProps) {
               aria-label="Search code"
               className="field px-3 py-1.5 text-[12px]"
             />
-            <button className="btn w-full py-1.5 text-[12px]">Search code</button>
+            <SubmitButton className="btn w-full py-1.5 text-[12px]" pendingText="Searching GitHub…">
+              Search code
+            </SubmitButton>
           </form>
 
           {searchError && (

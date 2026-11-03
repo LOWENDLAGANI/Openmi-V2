@@ -5,6 +5,7 @@ import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { SubmitButton } from "@/components/SubmitButton";
 import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
 import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
@@ -120,9 +121,12 @@ function ConnectPanel() {
           placeholder="github_pat_… or ghp_…"
           className="field py-2.5 font-mono text-[12px]"
         />
-        <button className="btn btn-primary w-full py-2.5 text-[13px]">
+        <SubmitButton
+          className="btn btn-primary w-full py-2.5 text-[13px]"
+          pendingText="Connecting to GitHub…"
+        >
           Seal and connect
-        </button>
+        </SubmitButton>
       </form>
 
       <ul className="mt-6 space-y-2">
@@ -183,7 +187,9 @@ function TrashList({ chats }: { chats: Chat[] }) {
             <div className="flex items-center gap-2">
               <form action={restoreChat}>
                 <input type="hidden" name="chatId" value={chat.id} />
-                <button className="btn px-3 py-1 text-[11px]">Restore</button>
+                <SubmitButton className="btn px-3 py-1 text-[11px]" pendingText="Restoring…">
+                  Restore
+                </SubmitButton>
               </form>
 
               <form action={purgeChat}>

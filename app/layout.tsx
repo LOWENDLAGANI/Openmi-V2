@@ -1,4 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+
+import { NavProgress } from "@/components/NavProgress";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,6 +46,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body className="app-surface min-h-dvh bg-canvas text-body antialiased">
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         {children}
       </body>
     </html>

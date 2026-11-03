@@ -729,6 +729,38 @@ html.light .mark-on-light {
   transform: scale(0.985);
 }
 
+/* ── Navigation feedback ─────────────────────────────────────────────────────
+   A dynamic route can take a second to answer; the bar says the click landed
+   instead of leaving the old page looking inert. Decorative only, and it stops
+   under the reduced-motion rule. */
+
+@keyframes nav-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 90;
+  height: 2px;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.nav-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background-image: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: nav-sweep 900ms ease-in-out infinite;
+}
+
 /* ── Scrollbars and phones ─────────────────────────────────────────────────── */
 
 @layer base {

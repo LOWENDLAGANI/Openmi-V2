@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
+import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   countryFromHeaders,
@@ -339,9 +340,12 @@ export default async function PayPage({
             </span>
           </label>
 
-          <button className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2">
+          <SubmitButton
+            className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2"
+            pendingText="Uploading the receipt…"
+          >
             Submit receipt
-          </button>
+          </SubmitButton>
         </form>
       </section>
 

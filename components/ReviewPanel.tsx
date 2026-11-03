@@ -1,4 +1,5 @@
 import { acceptChange, approveProposal, rejectChange } from "@/app/chat/actions";
+import { SubmitButton } from "@/components/SubmitButton";
 import {
   changesetDisplayStatus,
   type ChangesetStatus,
@@ -134,9 +135,12 @@ export function ReviewPanel({
                             <input type="hidden" name="changesetId" value={changeset.id} />
                             <input type="hidden" name="chatId" value={chatId} />
                             <input type="hidden" name="fileId" value={file.id} />
-                            <button className="btn px-3 py-0.5 text-[10.5px]">
+                            <SubmitButton
+                              className="btn px-3 py-0.5 text-[10.5px]"
+                              pendingText="Saving…"
+                            >
                               {file.accepted ? "Reject" : "Accept"}
-                            </button>
+                            </SubmitButton>
                           </form>
                         )}
                       </div>
@@ -170,9 +174,12 @@ export function ReviewPanel({
                   </p>
 
                   {accepted.length > 0 && (
-                    <button className="btn btn-primary px-4 py-1.5 text-[11.5px]">
+                    <SubmitButton
+                      className="btn btn-primary px-4 py-1.5 text-[11.5px]"
+                      pendingText="Opening the PR…"
+                    >
                       Approve and open PR
-                    </button>
+                    </SubmitButton>
                   )}
                 </form>
               )}
@@ -233,9 +240,12 @@ export function ReviewPanel({
                           pull request.
                         </p>
 
-                        <button className="btn px-4 py-1.5 text-[11.5px]">
+                        <SubmitButton
+                          className="btn px-4 py-1.5 text-[11.5px]"
+                          pendingText="Retrying…"
+                        >
                           Retry approval
-                        </button>
+                        </SubmitButton>
                       </form>
                     </>
                   )}

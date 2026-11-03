@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Brand } from "@/components/Brand";
 import { StatusPill } from "@/components/StatusPill";
+import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
@@ -336,20 +337,22 @@ export default async function AdminPage({
                       className="field py-1.5 text-[12px]"
                     />
                     <div className="flex gap-1.5">
-                      <button
+                      <SubmitButton
                         name="decision"
                         value="approved"
                         className="btn btn-primary flex-1 px-3 py-1.5 text-[11.5px] sm:flex-none"
+                        pendingText="Approving…"
                       >
                         Approve
-                      </button>
-                      <button
+                      </SubmitButton>
+                      <SubmitButton
                         name="decision"
                         value="rejected"
                         className="btn flex-1 px-3 py-1.5 text-[11.5px] sm:flex-none"
+                        pendingText="Rejecting…"
                       >
                         Reject
-                      </button>
+                      </SubmitButton>
                     </div>
                   </form>
                 </li>
@@ -400,9 +403,12 @@ export default async function AdminPage({
                 className="field py-1.5 text-[12px]"
               />
             </Field>
-            <button className="btn btn-primary w-full py-2 text-[12px]">
+            <SubmitButton
+              className="btn btn-primary w-full py-2 text-[12px]"
+              pendingText="Adding Dew…"
+            >
               Add Dew
-            </button>
+            </SubmitButton>
           </form>
         </section>
 
@@ -429,7 +435,9 @@ export default async function AdminPage({
               aria-label="Email to grant admin"
               className="field min-w-0 flex-1 py-1.5 text-[12px]"
             />
-            <button className="btn px-3 py-1.5 text-[11.5px]">Grant</button>
+            <SubmitButton className="btn px-3 py-1.5 text-[11.5px]" pendingText="Granting…">
+              Grant
+            </SubmitButton>
           </form>
 
           {adminRows.length === 0 ? (
@@ -458,9 +466,12 @@ export default async function AdminPage({
                       name="email"
                       value={profiles.get(row.user_id)?.email ?? ""}
                     />
-                    <button className="text-[10.5px] text-danger hover:underline">
+                    <SubmitButton
+                      className="text-[10.5px] text-danger hover:underline"
+                      pendingText="Revoking…"
+                    >
                       Revoke
-                    </button>
+                    </SubmitButton>
                   </form>
                 </li>
               ))}
