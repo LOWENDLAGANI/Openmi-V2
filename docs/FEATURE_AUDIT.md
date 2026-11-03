@@ -113,7 +113,7 @@ items are missing because that whole layer is different, not because a button wa
 
 | # | Feature | Status | Where / why |
 |---|---|---|---|
-| 48 | Appearance: Dark / Light (spec) | 🟡 | Three themes (night, paper, ink) with a switcher in every header — but no settings panel and no account sync. |
+| 48 | Appearance: Dark / Light (spec) | 🟡 | Three themes (paper default, carbon, ink) with a switcher in every header — but no settings panel and no account sync. |
 | 49 | Home layout: Classic / Focus · ink | ❌ | No layout mode; "ink" exists only as a theme. |
 | 50 | Web search: Auto / On / Off with key status | ❌ | No web search at all. |
 
@@ -298,7 +298,7 @@ one in this repository. Each one changes how a "missing" feature should be built
 4. **Brand.** Spec: the SVG sparkle is primary and the PNG is a fallback. Repo (per your
    instruction): the uploaded PNG is primary, sparkle is the fallback, with an inverted copy
    for dark surfaces.
-5. **Themes.** Spec: dark/light + an "ink" Focus *layout*. Repo: night/paper/ink as three
+5. **Themes.** Spec: dark/light + an "ink" Focus *layout*. Repo: paper/carbon/ink as three
    colour themes, with the Focus layout not built. Some spec'd ink details (its own mark,
    focus composer, focus marks) belong to that layout.
 

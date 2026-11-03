@@ -126,8 +126,8 @@ export function Sidebar({
           <span className="flex items-center gap-2.5">
             <OpenmiMark size={36} />
             <span className="flex flex-col leading-none">
-              <span className="text-[23px] font-semibold tracking-[-0.015em] text-hi">
-                Openmi
+              <span className="text-[24px] font-semibold tracking-[-0.045em] text-hi">
+                openmi
               </span>
               <span className="mt-1 text-[10px] tracking-[0.02em] text-low">
                 by Minetallest

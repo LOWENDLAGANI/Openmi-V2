@@ -11,9 +11,10 @@
 //
 //   node scripts/check-contrast.mjs
 //
-// There are three appearances — the night canvas (`:root`), paper, and ink — so
-// there are three blocks to check. The script still reads the stylesheet rather
-// than hardcoding values, so a changed token is checked rather than assumed.
+// There are three appearances — paper (`:root`, the default), carbon, and ink —
+// so there are three blocks to check. The script still reads the stylesheet
+// rather than hardcoding values, so a changed token is checked rather than
+// assumed.
 //
 // It also refuses a stylesheet that lost its visible focus ring or its
 // reduced-motion block, because both are part of the same accessibility gate.
@@ -29,8 +30,8 @@ const css = readFileSync(cssPath, "utf8");
 const MIN_RATIO = 4.5;
 
 const THEMES = [
-  { name: "night", selector: ":root" },
-  { name: "paper", selector: "html.light" },
+  { name: "paper", selector: ":root" },
+  { name: "carbon", selector: "html.dark" },
   { name: "ink", selector: "html.ink" },
 ];
 

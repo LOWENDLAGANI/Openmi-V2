@@ -2,126 +2,131 @@
 
 /* ── Three themes, one token layer ───────────────────────────────────────────
    Every colour is a CSS custom property, and a theme is a block that swaps
-   them. `:root` is the night canvas and the default; the `light` block is the
-   paper theme; the `ink` block is the indigo focus theme. Components only use the
-   semantic tokens (`bg-card`, `text-mid`, `border-line`), so a theme change is
-   a class on <html> with no component touching it.
+   them. `:root` is the warm paper canvas and the default; `html.dark` is the
+   carbon theme; `html.ink` is the blue-black focus theme. Components only use
+   the semantic tokens (`bg-card`, `text-mid`, `border-line`), so a theme change
+   is a class on <html> with no component touching it.
+
+   The palette is one ink, one paper and one ember: a warm off-white canvas,
+   near-black type and a single coral accent. Nothing else is allowed to be a
+   colour — the accent carries every interactive surface, and the neutral ramp
+   carries everything else.
 
    Contrast is a gate, not a claim: every text token clears 4.5:1 on every
    surface it is drawn on in all three themes, and `node scripts/check-contrast.mjs`
-   is what makes that true. The spec's muted slate/green greys were lifted
-   slightly where they fell under the line — the hue is kept, the lightness is
-   earned. */
+   is what makes that true. Where the reference coral was too light to carry
+   text, the token that draws text (`accent-text`) is a deeper ember than the
+   token that draws fills (`accent`). */
 
 :root {
+  color-scheme: light;
+
+  --bg: #f4f1e9;
+  --bg-raised: #faf7f0;
+  --card: #fffdf8;
+  --chip: #efeade;
+  --hover: #eae4d6;
+  --elevated: #e5ddcc;
+  --dock: #faf7f0;
+
+  --line: rgba(20, 18, 13, 0.13);
+  --line-strong: rgba(20, 18, 13, 0.24);
+
+  --text-hi: #14120d;
+  --text: #2c2820;
+  --text-mid: #4c463c;
+  --text-low: #655f52;
+
+  --accent: #f0501f;
+  --accent-text: #b8350f;
+  --accent-soft: rgba(240, 80, 31, 0.13);
+  --on-accent: #14120d;
+
+  --bubble-user: #f0501f;
+  --bubble-user-text: #14120d;
+
+  --danger: #b3261e;
+  --warn: #7d5408;
+  --azure: #1f5fa8;
+  --code: #a8431f;
+
+  --surface:
+    radial-gradient(92% 44% at 50% 0%, rgba(240, 80, 31, 0.07), transparent 72%),
+    linear-gradient(180deg, #f7f4ec 0%, #f2eee3 100%);
+}
+
+html.dark {
   color-scheme: dark;
 
-  --bg: #0b1310;
-  --bg-raised: #111a16;
-  --card: #111a16;
-  --chip: #111a16;
-  --hover: #17221c;
-  --elevated: #1a2520;
-  --dock: #0e1613;
+  --bg: #121110;
+  --bg-raised: #171614;
+  --card: #1a1916;
+  --chip: #211f1b;
+  --hover: #26231e;
+  --elevated: #2b2721;
+  --dock: #171614;
 
-  --line: rgba(233, 245, 236, 0.08);
-  --line-strong: rgba(233, 245, 236, 0.14);
+  --line: rgba(246, 242, 233, 0.1);
+  --line-strong: rgba(246, 242, 233, 0.18);
 
-  --text-hi: #eef5f0;
-  --text: #cddfd4;
-  --text-mid: #a3b8aa;
-  --text-low: #93a89a;
+  --text-hi: #f7f3ea;
+  --text: #ded8cb;
+  --text-mid: #b6af9f;
+  --text-low: #9c9486;
 
-  --accent: #6ec294;
-  --accent-text: #6ec294;
-  --accent-soft: rgba(110, 194, 148, 0.15);
-  --on-accent: #0b1310;
+  --accent: #ff6a3d;
+  --accent-text: #ff9b76;
+  --accent-soft: rgba(255, 106, 61, 0.16);
+  --on-accent: #14120d;
 
-  --bubble-user: #2f6b48;
-  --bubble-user-text: #eef5f0;
+  --bubble-user: #ff6a3d;
+  --bubble-user-text: #14120d;
 
   --danger: #fca5a5;
   --warn: #fcd34d;
-  --azure: #5b9bd5;
-  --code: #e08e6b;
+  --azure: #8fb8e6;
+  --code: #f0a184;
 
   --surface:
-    radial-gradient(80% 48% at 50% 100%, rgba(110, 194, 148, 0.1), transparent 70%),
-    linear-gradient(180deg, #070c0a 0%, #0a120e 45%, #0a1a12 100%);
-}
-
-html.light {
-  color-scheme: light;
-
-  --bg: #f8f9fa;
-  --bg-raised: #ffffff;
-  --card: #ffffff;
-  --chip: #f3f4f6;
-  --hover: #f3f4f6;
-  --elevated: #eef0f3;
-  --dock: #ffffff;
-
-  --line: #e5e7eb;
-  --line-strong: #d1d5db;
-
-  --text-hi: #111827;
-  --text: #1f2937;
-  --text-mid: #4b5563;
-  --text-low: #5f6672;
-
-  --accent: #0066ff;
-  --accent-text: #0052cc;
-  --accent-soft: rgba(0, 102, 255, 0.1);
-  --on-accent: #ffffff;
-
-  --bubble-user: #0066ff;
-  --bubble-user-text: #ffffff;
-
-  --danger: #b3261e;
-  --warn: #7c5410;
-  --azure: #1f6fb2;
-  --code: #b1522f;
-
-  --surface:
-    radial-gradient(70% 42% at 50% 0%, rgba(0, 102, 255, 0.05), transparent 70%),
-    linear-gradient(180deg, #f8f9fa 0%, #f1f3f5 100%);
+    radial-gradient(80% 48% at 50% 100%, rgba(255, 106, 61, 0.1), transparent 70%),
+    linear-gradient(180deg, #0d0c0b 0%, #121110 55%, #17130f 100%);
 }
 
 html.ink {
   color-scheme: dark;
 
-  --bg: #1b1826;
-  --bg-raised: #211e2f;
-  --card: #211e2f;
-  --chip: #211e2f;
-  --hover: #2a2739;
-  --elevated: #2a2739;
-  --dock: #201d2e;
+  --bg: #0d1319;
+  --bg-raised: #111922;
+  --card: #141d27;
+  --chip: #1a242f;
+  --hover: #1f2a36;
+  --elevated: #24303d;
+  --dock: #111922;
 
-  --line: rgba(233, 245, 236, 0.08);
-  --line-strong: rgba(233, 245, 236, 0.14);
+  --line: rgba(226, 235, 243, 0.11);
+  --line-strong: rgba(226, 235, 243, 0.2);
 
-  --text-hi: #f2f0fa;
-  --text: #d6d3e6;
-  --text-mid: #b3aecd;
-  --text-low: #a39dbe;
+  --text-hi: #eef4f8;
+  --text: #d2dde6;
+  --text-mid: #a9b8c5;
+  --text-low: #93a4b3;
 
-  --accent: #a09ad8;
-  --accent-text: #b9b3ec;
-  --accent-soft: rgba(160, 154, 216, 0.16);
-  --on-accent: #1b1826;
+  --accent: #ff6a3d;
+  --accent-text: #ffa282;
+  --accent-soft: rgba(255, 106, 61, 0.16);
+  --on-accent: #0d1319;
 
-  --bubble-user: #4a4670;
-  --bubble-user-text: #f2f0fa;
+  --bubble-user: #ff6a3d;
+  --bubble-user-text: #0d1319;
 
   --danger: #fca5a5;
   --warn: #fcd34d;
-  --azure: #8fb3dd;
-  --code: #e6a184;
+  --azure: #8fc2ef;
+  --code: #f2ab90;
 
   --surface:
-    radial-gradient(80% 48% at 50% 100%, rgba(160, 154, 216, 0.12), transparent 70%),
-    linear-gradient(180deg, #141220 0%, #1b1826 55%, #221d33 100%);
+    radial-gradient(80% 46% at 50% 0%, rgba(255, 106, 61, 0.1), transparent 70%),
+    linear-gradient(180deg, #0a0f14 0%, #0d1319 55%, #121a22 100%);
 }
 
 /* Semantic names become real Tailwind utilities: bg-canvas, text-low, etc. */
@@ -155,10 +160,14 @@ html.ink {
   --color-azure: var(--azure);
   --color-code: var(--code);
 
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
-    "Liberation Mono", monospace;
+  /* The face is loaded by next/font in the root layout and handed over as a
+     variable, so the fallback stack is only ever seen before the swap. */
+  --font-sans: var(--font-openmi-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-display: var(--font-openmi-sans), ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-openmi-mono), ui-monospace, "SF Mono", SFMono-Regular,
+    Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -175,8 +184,8 @@ html.ink {
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 15.5px;
-    line-height: 1.75;
-    letter-spacing: -0.011em;
+    line-height: 1.72;
+    letter-spacing: -0.012em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -185,13 +194,14 @@ html.ink {
   h2,
   h3,
   h4 {
-    letter-spacing: -0.015em;
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
     color: var(--text-hi);
   }
 
   ::selection {
-    background-color: var(--accent-soft);
-    color: var(--text-hi);
+    background-color: var(--accent);
+    color: var(--on-accent);
   }
 
   :focus-visible {
@@ -219,9 +229,18 @@ html.ink {
     font-family: var(--font-mono);
     font-size: 10px;
     line-height: 1.5;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.17em;
     text-transform: uppercase;
     color: var(--text-low);
+  }
+
+  /* The small coral square that marks a label, borrowed from a printed caption. */
+  .marker {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    flex: none;
+    background-color: var(--accent);
   }
 
   .panel {
@@ -267,10 +286,10 @@ html.ink {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     border-radius: 999px;
     border: 1px solid var(--line-strong);
-    background-color: var(--card);
+    background-color: transparent;
     padding: 0.45rem 1rem;
     font-size: 0.8125rem;
     font-weight: 500;
@@ -278,11 +297,14 @@ html.ink {
     transition:
       background-color 0.15s ease,
       border-color 0.15s ease,
+      color 0.15s ease,
       opacity 0.15s ease;
   }
 
   .btn:hover {
-    background-color: var(--hover);
+    border-color: var(--text);
+    background-color: transparent;
+    color: var(--text-hi);
   }
 
   .btn:disabled {
@@ -294,11 +316,14 @@ html.ink {
     background-color: var(--accent);
     color: var(--on-accent);
     font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   .btn-primary:hover {
+    border-color: transparent;
     background-color: var(--accent);
-    filter: brightness(1.07);
+    color: var(--on-accent);
+    filter: brightness(1.06);
   }
 
   .btn-quiet {
@@ -308,7 +333,8 @@ html.ink {
   }
 
   .btn-quiet:hover {
-    background-color: var(--hover);
+    border-color: transparent;
+    background-color: transparent;
     color: var(--text-hi);
   }
 
@@ -327,17 +353,17 @@ html.ink {
   }
 
   .glass {
-    background-color: color-mix(in srgb, var(--bg-raised) 80%, transparent);
+    background-color: color-mix(in srgb, var(--bg-raised) 82%, transparent);
     backdrop-filter: blur(12px);
   }
 
   .frosted {
-    background-color: rgba(0, 0, 0, 0.4);
+    background-color: rgba(20, 18, 13, 0.42);
     backdrop-filter: blur(12px);
   }
 
   .gradient-text {
-    background-image: linear-gradient(92deg, var(--text-hi), var(--accent));
+    background-image: linear-gradient(92deg, var(--text-hi) 20%, var(--accent) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -347,10 +373,10 @@ html.ink {
 
   .msg-ai-card {
     border: 1px solid var(--line);
-    border-radius: 20px;
+    border-radius: 18px;
     background-color: var(--card);
     padding: 0.875rem;
-    box-shadow: 0 18px 34px -30px rgba(0, 0, 0, 0.85);
+    box-shadow: 0 16px 30px -30px rgba(20, 18, 13, 0.55);
   }
 
   .prose-chat h1 {
@@ -411,7 +437,7 @@ html.ink {
     position: sticky;
     bottom: 0;
     border-top: 1px solid var(--line);
-    background-color: color-mix(in srgb, var(--dock) 88%, transparent);
+    background-color: color-mix(in srgb, var(--dock) 90%, transparent);
     backdrop-filter: blur(14px);
   }
 
@@ -432,7 +458,7 @@ html.ink {
     gap: 0.4rem;
     border-radius: 999px;
     border: 1px solid var(--line-strong);
-    background-color: color-mix(in srgb, var(--card) 70%, transparent);
+    background-color: transparent;
     padding: 0.35rem 0.75rem;
     font-size: 12px;
     color: var(--text-mid);
@@ -440,7 +466,7 @@ html.ink {
   }
 
   .quick-chip:hover {
-    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    border-color: var(--accent);
     color: var(--text-hi);
   }
 
@@ -515,23 +541,26 @@ html.ink {
 
 /* ── Brand mark ─────────────────────────────────────────────────────────────
    The uploaded logo is a single-colour mark. It ships twice: the dark ink copy
-   for paper surfaces and the near-white copy for the night and ink canvases, so
-   it is never drawn black on black. Swapping is CSS only. */
+   for the paper surfaces and the near-white copy for the dark canvases, so it
+   is never drawn black on black. Paper is the default, so the ink copy is what
+   the first paint shows; swapping is CSS only. */
 
 .mark-on-dark {
-  display: block;
+  display: none;
 }
 
 .mark-on-light {
-  display: none;
-}
-
-html.light .mark-on-dark {
-  display: none;
-}
-
-html.light .mark-on-light {
   display: block;
+}
+
+html.dark .mark-on-dark,
+html.ink .mark-on-dark {
+  display: block;
+}
+
+html.dark .mark-on-light,
+html.ink .mark-on-light {
+  display: none;
 }
 
 /* ── Motion ─────────────────────────────────────────────────────────────────

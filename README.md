@@ -236,7 +236,8 @@ into an outage.
 
 ## Accessibility
 
-Semantic tokens only, and three appearances. `node scripts/check-contrast.mjs`
+Semantic tokens only, and three appearances: paper (the default), carbon and ink.
+`node scripts/check-contrast.mjs`
 resolves every text token against every surface in all three themes and exits 1
 below 4.5:1; `bun run test` runs the same script. Accent fills use `--on-accent`,
 and accent *text* uses `--accent-text`, because one colour cannot clear 4.5:1

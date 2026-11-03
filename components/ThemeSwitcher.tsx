@@ -5,24 +5,25 @@ import { useEffect, useState } from "react";
 /**
  * The three themes, as a class on <html>.
  *
- * The value is read once on mount — never during render — so the server and the
- * first client render agree. `localStorage` is the only store; the bootstrap
- * script in the root layout applies it before paint.
+ * Paper is the default and has no class of its own; Carbon and Ink are `dark`
+ * and `ink`. The value is read once on mount — never during render — so the
+ * server and the first client render agree. `localStorage` is the only store;
+ * the bootstrap script in the root layout applies it before paint.
  */
 const THEMES = [
-  { id: "dark", label: "Night", swatch: "#6ec294" },
-  { id: "light", label: "Paper", swatch: "#0066ff" },
-  { id: "ink", label: "Ink", swatch: "#a09ad8" },
+  { id: "paper", label: "Paper", swatch: "#f0501f", className: "" },
+  { id: "dark", label: "Carbon", swatch: "#171614", className: "dark" },
+  { id: "ink", label: "Ink", swatch: "#111922", className: "ink" },
 ] as const;
 
 type ThemeId = (typeof THEMES)[number]["id"];
 
 function isTheme(value: string | null): value is ThemeId {
-  return value === "dark" || value === "light" || value === "ink";
+  return value === "paper" || value === "dark" || value === "ink";
 }
 
 export function ThemeSwitcher({ className = "" }: { className?: string }) {
-  const [theme, setTheme] = useState<ThemeId>("dark");
+  const [theme, setTheme] = useState<ThemeId>("paper");
 
   useEffect(() => {
     const saved = window.localStorage.getItem("openmi-theme");
@@ -38,8 +39,9 @@ export function ThemeSwitcher({ className = "" }: { className?: string }) {
     }
 
     const root = document.documentElement;
-    root.classList.remove("dark", "light", "ink");
-    root.classList.add(next);
+    root.classList.remove("light", "dark", "ink");
+    const option = THEMES.find((entry) => entry.id === next);
+    if (option && option.className) root.classList.add(option.className);
   }
 
   return (

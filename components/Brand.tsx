@@ -12,9 +12,9 @@ import { OpenmiMark } from "@/components/OpenmiMark";
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2.5">
-      <OpenmiMark size={20} />
-      <span className="text-[17px] font-semibold leading-none tracking-[-0.02em] text-hi">
-        Openmi
+      <OpenmiMark size={21} />
+      <span className="text-[18px] font-semibold leading-none tracking-[-0.04em] text-hi">
+        openmi
       </span>
       {!compact && (
         <span className="eyebrow ml-0.5 hidden sm:inline">repo agent</span>

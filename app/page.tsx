@@ -24,7 +24,7 @@ const CAPABILITIES = [
 export default function HomePage() {
   return (
     <main className="min-h-dvh animate-enter">
-      <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-8">
+      <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
         <Brand />
         <nav className="flex flex-wrap items-center justify-end gap-1.5">
           <ThemeSwitcher />
@@ -36,22 +36,31 @@ export default function HomePage() {
           </Link>
           <Link href="/login" className="btn btn-primary px-4 py-1.5 text-[12.5px]">
             Sign in
+            <span aria-hidden="true" className="text-[13px] leading-none">
+              →
+            </span>
           </Link>
         </nav>
       </header>
 
       <div className="border-y border-line bg-raised">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-5 gap-y-1 px-5 py-2.5 sm:px-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2.5 sm:px-8">
           <span className="eyebrow flex items-center gap-2 text-accent-text">
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
-            openmi
+            <span aria-hidden="true" className="marker" />
+            repo agent
           </span>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-mid">
-            reads the repository · proposes a diff · opens one pull request
+
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.18em] text-mid">
+            <span>read the repository</span>
+            <span aria-hidden="true" className="marker" />
+            <span>stage the diff</span>
+            <span aria-hidden="true" className="marker" />
+            <span>approve</span>
           </p>
+
           <Link
             href="/about"
-            className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em] text-accent-text hover:underline"
+            className="ml-auto font-mono text-[10px] uppercase tracking-[0.18em] text-accent-text hover:underline"
           >
             read more ›
           </Link>
@@ -59,29 +68,53 @@ export default function HomePage() {
       </div>
 
       <section className="mx-auto w-full max-w-6xl px-5 pb-16 pt-12 sm:px-8 sm:pb-24 sm:pt-20">
-        <p className="eyebrow">phase 0 · foundation</p>
+        <p className="eyebrow flex items-center gap-2 text-accent-text">
+          <span aria-hidden="true" className="marker" />
+          phase 0 · foundation
+        </p>
 
-        <h1 className="mt-6 text-[clamp(2.3rem,7.4vw,4.7rem)] font-semibold leading-[1.03] tracking-[-0.04em]">
-          <span className="block text-hi">Every file read.</span>
-          <span className="block text-low">Every diff reviewed.</span>
-          <span className="block text-low">Every push approved.</span>
+        <h1 className="mt-7 max-w-[19ch] text-[clamp(2.4rem,7.6vw,4.9rem)] font-semibold leading-[0.97] tracking-[-0.05em] text-hi">
+          Every file read.
+          <span className="mt-1 block text-mid">Every diff reviewed.</span>
+          <span className="block text-mid">Every push approved.</span>
         </h1>
 
-        <div className="mt-10 grid gap-8 sm:mt-14 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-          <p className="max-w-md text-[15px] leading-relaxed text-mid">
+        <div className="mt-11 grid gap-8 border-t border-line pt-8 sm:mt-16 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <p className="max-w-md text-[15.5px] leading-[1.7] text-mid">
             Chat with your repository. Review the diff. Approve the pull request
-            <span aria-hidden="true" className="mx-1 inline-block size-2.5 translate-y-[-1px] bg-accent" />
+            <span
+              aria-hidden="true"
+              className="mx-1.5 inline-block size-2 translate-y-[-2px] bg-accent"
+            />
             or don&apos;t.
           </p>
 
           <div className="flex flex-wrap gap-2">
             <Link href="/login" className="btn btn-primary px-5 py-2.5 text-[13px]">
               Sign in to start
+              <span aria-hidden="true" className="text-[13px] leading-none">
+                →
+              </span>
             </Link>
             <Link href="/setup" className="btn px-5 py-2.5 text-[13px]">
               Check configuration
             </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-line">
+        <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
+          <p className="max-w-2xl font-mono text-[11.5px] uppercase leading-[2] tracking-[0.15em] text-mid">
+            Building the repo agent that shows you the diff before it writes one.
+          </p>
+          <Link
+            href="/about"
+            className="mt-6 inline-flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-accent-text hover:underline"
+          >
+            read more
+            <span aria-hidden="true">›</span>
+          </Link>
         </div>
       </section>
 
@@ -91,10 +124,11 @@ export default function HomePage() {
         <div className="mx-auto grid w-full max-w-6xl gap-px bg-line sm:grid-cols-3">
           {CAPABILITIES.map((item, index) => (
             <article key={item.title} className="bg-canvas px-5 py-9 sm:px-8 sm:py-11">
-              <p className="eyebrow text-accent-text">
+              <p className="eyebrow flex items-center gap-2 text-accent-text">
+                <span aria-hidden="true" className="marker" />
                 0{index + 1} · {item.tag}
               </p>
-              <h2 className="mt-3 text-[17px] font-semibold leading-snug tracking-[-0.02em] text-hi">
+              <h2 className="mt-4 text-[18px] font-semibold leading-snug tracking-[-0.03em] text-hi">
                 {item.title}
               </h2>
               <p className="mt-2.5 text-[13px] leading-relaxed text-mid">{item.body}</p>
@@ -103,11 +137,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-8 sm:px-8">
-        <p className="eyebrow">
-          every phase is written down in OPENMI_BUILD_PHASES.md
-        </p>
-        <p className="eyebrow">no build · no test · no merge</p>
+      <footer className="border-t border-line">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-8 sm:px-8">
+          <p className="eyebrow">
+            every phase is written down in OPENMI_BUILD_PHASES.md
+          </p>
+          <p className="eyebrow">no build · no test · no merge</p>
+        </div>
       </footer>
     </main>
   );
