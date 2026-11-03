@@ -1,8 +1,80 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
-import { MODELS } from "../lib/models";
+import { MODELS, MODEL_CATEGORIES } from "../lib/models";
 import { MAX_CUSTOM_MODELS, parseCustomModels } from "../lib/models/custom";
 import { BUILTIN_ROUTES, routeForModel } from "../lib/models/routes";
+
+test("every built-in model has a category the picker can group", () => {
+  const ids = MODEL_CATEGORIES.map((category) => category.id);
+
+  for (const model of MODELS) {
+    expect(ids).toContain(model.category);
+  }
+
+  // No group is defined but empty, so the picker never shows a bare heading.
+  for (const category of MODEL_CATEGORIES) {
+    expect(MODELS.some((model) => model.category === category.id)).toBe(true);
+  }
+
+  expect(MODEL_CATEGORIES.map((category) => category.label)).toEqual([
+    "General",
+    "Coding",
+    "Reasoning",
+  ]);
+});
+
+test("a custom model picks its own category and defaults to general", () => {
+  const parsed = parseCustomModels(
+    JSON.stringify([
+      {
+        id: "coder-x",
+        name: "Coder X",
+        category: "coding",
+        provider: "openrouter",
+        upstream: "vendor/coder-x",
+      },
+      {
+        id: "plain-x",
+        name: "Plain X",
+        provider: "groq",
+        upstream: "vendor/plain-x",
+      },
+    ])
+  );
+
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.models[0]?.category).toBe("coding");
+  expect(parsed.models[1]?.category).toBe("general");
+});
+
+test("an unknown custom category is rejected, not guessed", () => {
+  const parsed = parseCustomModels(
+    JSON.stringify([
+      {
+        id: "odd",
+        name: "Odd",
+        category: "fastest",
+        provider: "groq",
+        upstream: "a/b",
+      },
+    ])
+  );
+
+  expect(parsed.models).toEqual([]);
+  expect(parsed.errors[0]).toContain("category");
+});
+
+test("the picker renders one optgroup per category", () => {
+  const panel = readFileSync(
+    new URL("../components/ChatPanel.tsx", import.meta.url),
+    "utf8"
+  );
+
+  expect(panel).toContain("MODEL_CATEGORIES.map");
+  expect(panel).toContain("<optgroup");
+  expect(panel).toContain("label={category.label}");
+});
 
 test("every built-in model except auto has a provider route", () => {
   for (const model of MODELS) {

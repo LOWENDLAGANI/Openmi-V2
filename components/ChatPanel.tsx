@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { AiThinking } from "@/components/AiThinking";
 import { MessageBody } from "@/components/MessageBody";
-import type { ModelCapability, ModelId } from "@/lib/models";
+import { MODEL_CATEGORIES, type ModelCapability, type ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
@@ -429,16 +429,27 @@ export function ChatPanel({
             aria-label="Model"
             className="field w-auto py-1 text-[11.5px]"
           >
-            {models.map((option) => (
-              <option
-                key={option.id}
-                value={option.id}
-                disabled={option.available === false}
-              >
-                {option.name}
-                {option.available === false ? " — key missing" : ""}
-              </option>
-            ))}
+            {MODEL_CATEGORIES.map((category) => {
+              const options = models.filter(
+                (option) => option.category === category.id
+              );
+              if (options.length === 0) return null;
+
+              return (
+                <optgroup key={category.id} label={category.label}>
+                  {options.map((option) => (
+                    <option
+                      key={option.id}
+                      value={option.id}
+                      disabled={option.available === false}
+                    >
+                      {option.name}
+                      {option.available === false ? " — key missing" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </div>
       </div>

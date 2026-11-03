@@ -5,13 +5,21 @@
  * catalogue does not cover and says which provider serves it:
  *
  *   [{"id":"my-model","name":"My Model","provider":"openrouter",
- *     "upstream":"vendor/model-id"}]
+ *     "upstream":"vendor/model-id","category":"coding"}]
+ *
+ * `category` is optional and defaults to "general".
  *
  * The parser never throws and never trusts the file: a bad entry is reported by
  * index and skipped, so one typo cannot take the whole picker down. Provider,
  * upstream id and key stay on the server — only `id` and `name` are handed to
  * the browser.
  */
+
+import {
+  MODEL_CATEGORIES,
+  isModelCategory,
+  type ModelCategory,
+} from "../models";
 
 export const CUSTOM_MODEL_PROVIDERS = [
   "openrouter",
@@ -24,6 +32,7 @@ export type CustomProvider = (typeof CUSTOM_MODEL_PROVIDERS)[number];
 export type CustomModel = {
   id: string;
   name: string;
+  category: ModelCategory;
   provider: CustomProvider;
   upstream: string;
   blurb: string;
@@ -109,6 +118,16 @@ export function parseCustomModels(raw: string | undefined): {
       return;
     }
 
+    const category = entry.category === undefined ? "general" : entry.category;
+    if (!isModelCategory(category)) {
+      errors.push(
+        `${at}: category must be one of ${MODEL_CATEGORIES.map(
+          (option) => option.id
+        ).join(", ")}.`
+      );
+      return;
+    }
+
     if (!isProvider(entry.provider)) {
       errors.push(
         `${at}: provider must be one of ${CUSTOM_MODEL_PROVIDERS.join(", ")}.`
@@ -129,7 +148,7 @@ export function parseCustomModels(raw: string | undefined): {
         : "Custom model added by this deployment.";
 
     seen.add(id);
-    models.push({ id, name, provider: entry.provider, upstream, blurb });
+    models.push({ id, name, category, provider: entry.provider, upstream, blurb });
   });
 
   return { models, errors };

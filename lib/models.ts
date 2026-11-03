@@ -13,10 +13,28 @@
 
 export type ModelId = string;
 
+export type ModelCategory = "general" | "coding" | "reasoning";
+
+/** The order the picker groups models in, with the heading each group shows. */
+export const MODEL_CATEGORIES: { id: ModelCategory; label: string }[] = [
+  { id: "general", label: "General" },
+  { id: "coding", label: "Coding" },
+  { id: "reasoning", label: "Reasoning" },
+];
+
+export function isModelCategory(value: unknown): value is ModelCategory {
+  return (
+    typeof value === "string" &&
+    MODEL_CATEGORIES.some((category) => category.id === value)
+  );
+}
+
 export type ModelCapability = {
   id: ModelId;
   /** What the picker shows: the model's name. */
   name: string;
+  /** Which group the picker lists it under. */
+  category: ModelCategory;
   blurb: string;
   images: boolean;
   documents: boolean;
@@ -28,6 +46,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "auto",
     name: "Auto",
+    category: "general",
     blurb: "Picks a model per request, with a fallback if one provider fails.",
     images: false,
     documents: false,
@@ -35,6 +54,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "gpt-oss-120b",
     name: "GPT OSS 120B",
+    category: "general",
     blurb: "Open-weight model with quick tool use, good for repository browsing.",
     images: false,
     documents: false,
@@ -42,6 +62,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "glm-4.6",
     name: "GLM 4.6",
+    category: "coding",
     blurb: "Strong at coding and long-context edits.",
     images: false,
     documents: false,
@@ -49,6 +70,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "qwen3-coder",
     name: "Qwen3 Coder",
+    category: "coding",
     blurb: "Tuned for repository work and frequent tool calls.",
     images: false,
     documents: false,
@@ -56,6 +78,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "kimi-k2",
     name: "Kimi K2",
+    category: "coding",
     blurb: "Large context, comfortable with long files.",
     images: false,
     documents: false,
@@ -63,6 +86,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "deepseek-chat",
     name: "DeepSeek V3",
+    category: "general",
     blurb: "Balanced speed and price for everyday questions.",
     images: false,
     documents: false,
@@ -70,6 +94,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "deepseek-reasoner",
     name: "DeepSeek Reasoner",
+    category: "reasoning",
     blurb: "Thinks longer before answering, slower and more literal.",
     images: false,
     documents: false,
@@ -77,6 +102,7 @@ export const MODELS: ModelCapability[] = [
   {
     id: "llama-3.3-70b",
     name: "Llama 3.3 70B",
+    category: "general",
     blurb: "Open-weight general model, fast enough for small edits.",
     images: false,
     documents: false,

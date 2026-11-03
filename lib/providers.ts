@@ -134,6 +134,7 @@ export function modelCatalogue(
     catalogue.push({
       id: model.id,
       name: model.name,
+      category: model.category,
       blurb: model.blurb,
       images: false,
       documents: false,

@@ -150,7 +150,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Model choices beyond the built-in catalogue",
-    hint: 'JSON array: [{"id":"my-model","name":"My Model","provider":"openrouter","upstream":"vendor/model-id"}]',
+    hint: 'JSON array: [{"id":"my-model","name":"My Model","provider":"openrouter","upstream":"vendor/model-id","category":"coding"}] (category optional)',
   },
   {
     key: "UPSTASH_REDIS_REST_URL",
