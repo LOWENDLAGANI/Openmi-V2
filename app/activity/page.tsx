@@ -79,11 +79,9 @@ export default async function ActivityPage({
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Dew balances and the ledger live in Postgres behind row-level
-          security. Without a project configured there is nothing to show.
+          security. Without a project configured there is nothing to show. Ask
+          the operator to finish the deployment configuration.
         </p>
-        <Link href="/setup" className="btn btn-primary mt-6 w-fit px-4 py-2">
-          Open setup
-        </Link>
       </main>
     );
   }

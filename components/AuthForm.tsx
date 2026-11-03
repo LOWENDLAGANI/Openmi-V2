@@ -91,12 +91,10 @@ export function AuthForm({
           Supabase is not configured
         </p>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
-          Sign-in needs a project URL and an anon key. The setup page lists
-          exactly what is missing and where each value comes from.
+          Sign-in needs a project URL and an anon key. Ask the operator to finish
+          the deployment configuration; the admin panel lists exactly what is
+          missing and where each value comes from.
         </p>
-        <a href="/setup" className="btn mt-4">
-          Open setup
-        </a>
       </div>
     );
   }

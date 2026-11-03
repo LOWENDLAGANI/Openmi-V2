@@ -231,5 +231,7 @@ export function serverEnv() {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? null,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
     githubTokenKey: process.env.GITHUB_TOKEN_KEY ?? null,
+    githubOauthClientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? null,
+    githubOauthClientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? null,
   };
 }

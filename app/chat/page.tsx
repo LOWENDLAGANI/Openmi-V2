@@ -29,6 +29,7 @@ import { loadChangesets } from "@/lib/changesets/store";
 import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
+import { oauthConfigured } from "@/lib/oauth/github";
 import { DEFAULT_MODEL, hasModel } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { getSession } from "@/lib/session";
@@ -84,7 +85,7 @@ function Panel({
   );
 }
 
-function ConnectPanel() {
+function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
   return (
     <div className="mx-auto w-full max-w-xl py-8">
       <p className="eyebrow">step one</p>
@@ -106,6 +107,23 @@ function ConnectPanel() {
         then paste it once. It is sealed with AES-256-GCM before it is stored, and
         only its last four characters are ever shown again.
       </p>
+
+      {oauthEnabled && (
+        <div className="mt-5">
+          <a
+            href="/auth/github"
+            className="btn btn-primary w-full py-2.5 text-[13px]"
+          >
+            Continue with GitHub
+            <span aria-hidden="true" className="text-[13px] leading-none">
+              →
+            </span>
+          </a>
+          <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-low">
+            or paste a personal access token below
+          </p>
+        </div>
+      )}
 
       <form action={connectGithub} className="panel mt-6 space-y-3 p-4">
         <label htmlFor="github-token" className="eyebrow block px-1">
@@ -302,7 +320,7 @@ async function RepoSurface({
     );
   }
 
-  if (!github) return <ConnectPanel />;
+  if (!github) return <ConnectPanel oauthEnabled={oauthConfigured()} />;
 
   if (!params.repo) {
     let repos: RepoSummary[] = [];
@@ -521,10 +539,8 @@ export default async function ChatPage({
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Chats, folders and the trash live in Postgres behind row-level
           security. Without a project configured there is nowhere to put them.
+          Ask the operator to finish the deployment configuration.
         </p>
-        <Link href="/setup" className="btn btn-primary mt-6 w-fit px-4 py-2">
-          Open setup
-        </Link>
       </main>
     );
   }
@@ -619,7 +635,7 @@ export default async function ChatPage({
   if (trashView) {
     body = <TrashList chats={trashedChats} />;
   } else if (!connection) {
-    body = <ConnectPanel />;
+    body = <ConnectPanel oauthEnabled={oauthConfigured()} />;
   } else if (draft) {
     body = <DraftChat repo={draftRepo} />;
   } else if (activeChat && !workspaceView) {

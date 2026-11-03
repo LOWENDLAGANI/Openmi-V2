@@ -70,11 +70,8 @@ export default async function PayPage({
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Receipts are stored privately and requests live in Postgres behind
           row-level security. Without a project there is nothing to attach them
-          to.
+          to. Ask the operator to finish the deployment configuration.
         </p>
-        <Link href="/setup" className="btn btn-primary mt-6 w-fit px-4 py-2">
-          Open setup
-        </Link>
       </main>
     );
   }

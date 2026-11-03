@@ -1,7 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { getSession } from "@/lib/session";
+
+// The landing page reads the session to send a signed-in reader to /chat, so it
+// must be evaluated per request even on a deployment with no Supabase keys.
+export const dynamic = "force-dynamic";
 
 const CAPABILITIES = [
   {
@@ -21,7 +28,12 @@ const CAPABILITIES = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  // A signed-in reader does not need the pitch; the workspace is where they
+  // were going, and the landing page is the front door for everyone else.
+  const session = await getSession();
+  if (session.state === "signed-in") redirect("/chat");
+
   return (
     <main className="min-h-dvh animate-enter">
       <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
@@ -30,9 +42,6 @@ export default function HomePage() {
           <ThemeSwitcher />
           <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12.5px]">
             About
-          </Link>
-          <Link href="/setup" className="btn px-3.5 py-1.5 text-[12.5px]">
-            Setup status
           </Link>
           <Link href="/login" className="btn btn-primary px-4 py-1.5 text-[12.5px]">
             Sign in
@@ -96,8 +105,8 @@ export default function HomePage() {
                 →
               </span>
             </Link>
-            <Link href="/setup" className="btn px-5 py-2.5 text-[13px]">
-              Check configuration
+            <Link href="/about" className="btn px-5 py-2.5 text-[13px]">
+              See what shipped
             </Link>
           </div>
         </div>

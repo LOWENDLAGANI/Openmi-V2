@@ -135,9 +135,6 @@ export function Sidebar({
             </span>
           </span>
         </Link>
-        <Link href="/setup" className="eyebrow hover:text-hi">
-          setup
-        </Link>
       </div>
 
       <div className="space-y-2 px-3">

@@ -27,7 +27,8 @@ bun run dev                  # http://localhost:3000
 
 Nothing is required to boot. With an empty `.env.local` the app starts and
 [`/setup`](http://localhost:3000/setup) names every missing key and whether the
-migrations have been applied.
+migrations have been applied. Once Supabase is configured that report lives in
+the admin panel under **Configuration & probes**; it is not a public page.
 
 ## Sign in
 
@@ -52,6 +53,12 @@ GitHub, sealed with AES-256-GCM under `GITHUB_TOKEN_KEY`, and only its last
 four characters are ever shown again. Read-only tokens still browse and chat;
 they are refused at approval with a message naming the missing scopes.
 `/api/github/status` reads a query that does not select the sealed column at all.
+
+With `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` set, the
+workspace offers **Continue with GitHub** instead of the paste box: the same
+sealed token is stored, it is just obtained by an authorisation redirect. Register
+`<NEXT_PUBLIC_SITE_URL>/auth/github/callback` as the OAuth App's callback URL,
+and keep the token form in mind as the fallback when those two keys are unset.
 
 Rotating `GITHUB_TOKEN_KEY` makes existing sealed tokens unopenable. That is the
 intended behaviour, not a bug: every account reconnects.
@@ -186,7 +193,8 @@ amounts equals the cached balance, and a test asserts it for every account.
 
 ## Setup and about
 
-`/setup` reports every environment variable from the contract as present or
+The setup report — reached from the admin panel, and served at `/setup` only to
+operators — lists every environment variable from the contract as present or
 missing, never its value, with the fix beside it. It reads the Supabase
 migration ledger through a service-role function and compares each applied row
 against this checkout: applied files are green, missing files are pending, and a
@@ -255,7 +263,8 @@ both as a light fill and as dark text on paper. Focus rings come from a single
    **Production** separately.
 5. Apply migrations with `supabase link --project-ref <ref> && supabase db push`.
    Vercel does not run them; the order is always migrate, then deploy.
-6. Deploy, then open `/setup` and make every row green.
+6. Deploy, sign in, open `/admin` → **Configuration & probes**, and make every
+   row green.
 7. Connect GitHub with a fine-grained token: contents read/write, pull requests
    read/write, metadata read.
 8. Pick a repo, send a message, approve one trivial change and confirm the pull
@@ -272,7 +281,8 @@ These need a real project and token, so they are steps rather than specs:
 5. Ask for an edit, reject one file, accept another, then approve.
 6. Confirm one branch exists, one PR is open, and its base is the default branch.
 7. Try to approve with a read-only token; the refusal names the missing scopes.
-8. Open `/setup` and confirm the probes report per-service state, not "error".
+8. Open `/admin` → **Configuration & probes** and confirm the probes report
+   per-service state, not "error".
 
 ## Phase 10 is gated
 

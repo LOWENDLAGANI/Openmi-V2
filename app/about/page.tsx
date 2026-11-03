@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { AboutLogoGate } from "@/components/AboutLogoGate";
-import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
@@ -45,9 +44,6 @@ export default function AboutPage() {
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-1.5">
           <ThemeSwitcher />
-          <Link href="/setup" className="btn btn-quiet px-3 py-1.5 text-[12px]">
-            Setup
-          </Link>
           <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
             Open workspace
           </Link>
@@ -70,8 +66,6 @@ export default function AboutPage() {
         code, answers with real paths and line numbers, and proposes edits for
         you to review. Nothing reaches GitHub until you approve it.
       </p>
-
-      <AdBanner className="mt-10" />
 
       <section className="mt-12 border-t border-line pt-6">
         <div className="flex items-baseline justify-between gap-3">
@@ -163,15 +157,13 @@ export default function AboutPage() {
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           The review card states what the model proposed and what you approved.
           It never claims a build, test, check or deployment ran. There is no
-          execution environment in this build, and the setup page tells you
-          exactly which configuration is missing instead of failing silently.
+          execution environment in this build, and the admin panel tells the
+          operator exactly which configuration is missing instead of failing
+          silently.
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Full environment and migration status live on{" "}
-          <Link href="/setup" className="text-accent-text underline-offset-2 hover:underline">
-            the setup page
-          </Link>
-          .
+          Full environment and migration status live in the admin panel, behind
+          the operator role. It is not part of the public site.
         </p>
       </section>
 

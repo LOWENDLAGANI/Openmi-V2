@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AdBanner } from "@/components/AdBanner";
 import { AiThinking } from "@/components/AiThinking";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
@@ -634,6 +635,8 @@ export function ChatPanel({
 
       <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2 md:-mx-7 md:px-7">
         <div className="mx-auto w-full max-w-3xl">
+          <AdBanner className="mb-2.5" />
+
           <div className="mb-1.5 flex items-end gap-2">
             <div className="min-w-0 flex-1">
               <QuickActions

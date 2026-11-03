@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Brand } from "@/components/Brand";
+import { SetupReport } from "@/components/SetupReport";
 import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -83,9 +84,6 @@ export default async function AdminPage({
           on the server. The role check already passed; this key is the missing
           piece.
         </p>
-        <Link href="/setup" className="btn btn-primary mt-6 w-fit px-4 py-2">
-          Open setup
-        </Link>
       </main>
     );
   }
@@ -523,6 +521,18 @@ export default async function AdminPage({
           </ul>
         )}
       </section>
+
+      <details className="panel mt-8 p-5">
+        <summary className="cursor-pointer text-[15px] font-semibold tracking-[-0.02em] text-hi">
+          Configuration &amp; probes
+        </summary>
+        <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-mid">
+          The deployment report: which keys are present, whether the schema
+          matches this checkout, and which live services answer. It used to be a
+          public page; only operators see it now.
+        </p>
+        <SetupReport />
+      </details>
 
       <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
         Every action here re-checks the operator role on the server, and the SQL

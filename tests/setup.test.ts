@@ -13,6 +13,15 @@ const SETUP = readFileSync(
   new URL("../app/setup/page.tsx", import.meta.url),
   "utf8"
 );
+const SETUP_REPORT = readFileSync(
+  new URL("../components/SetupReport.tsx", import.meta.url),
+  "utf8"
+);
+const HOME = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const SIDEBAR = readFileSync(
+  new URL("../components/Sidebar.tsx", import.meta.url),
+  "utf8"
+);
 const ABOUT = readFileSync(
   new URL("../app/about/page.tsx", import.meta.url),
   "utf8"
@@ -102,12 +111,20 @@ test("provider statuses become specific messages", () => {
   expect(classifyProviderStatus(500).detail).toContain("500");
 });
 
-test("the setup page reads presence, the ledger and live probes", () => {
-  expect(SETUP).toContain("readEnvReport");
-  expect(SETUP).toContain("readMigrationReport");
-  expect(SETUP).toContain("runSetupProbes");
-  expect(SETUP).not.toContain("process.env");
+test("the setup report reads presence, the ledger and live probes", () => {
+  expect(SETUP_REPORT).toContain("readEnvReport");
+  expect(SETUP_REPORT).toContain("readMigrationReport");
+  expect(SETUP_REPORT).toContain("runSetupProbes");
+  expect(SETUP_REPORT).not.toContain("process.env");
   expect(SETUP).toContain("Values are never read back");
+  expect(SETUP).toContain("SetupReport");
+});
+
+test("the setup report is an operator surface, not a public page", () => {
+  expect(SETUP).toContain("readAdminAccess");
+  expect(SETUP).toContain("notFound()");
+  expect(HOME).not.toContain("/setup");
+  expect(SIDEBAR).not.toContain("/setup");
 });
 
 test("the ledger function is service-role only", () => {
