@@ -17,6 +17,7 @@ import {
   findDraftChangeset,
 } from "@/lib/changesets/store";
 import { assembleContext } from "@/lib/context";
+import { refundReasonFor } from "@/lib/dew/refund";
 import { refundDewSession, startDewSession } from "@/lib/dew/store";
 import { serverEnv } from "@/lib/env";
 import { getFile, getTree, isRepoFullName, MAX_PATH_INDEX } from "@/lib/github/read";
@@ -477,7 +478,11 @@ export async function POST(request: Request) {
           reason
         );
 
-        if (!ok) {
+        if (ok) {
+          send("notice", {
+            message: `Refunded automatically: ${reason.toLowerCase()}.`,
+          });
+        } else {
           send("notice", {
             message:
               "This hour could not be refunded automatically; the ledger still shows the charge.",
@@ -597,16 +602,14 @@ export async function POST(request: Request) {
           startedAt,
         });
 
-        if (
-          result.text.length === 0 &&
-          (result.stopped === "error" || result.stopped === "aborted")
-        ) {
-          await refundTurn(
-            result.stopped === "aborted"
-              ? "Stopped before the first token"
-              : "Provider failed before the first token"
-          );
-        }
+        // Any failure that produced no answer is refunded, including an
+        // empty completion and a turn that could not advance.
+        const refundReason = refundReasonFor({
+          textLength: result.text.length,
+          stopped: result.stopped,
+        });
+
+        if (refundReason) await refundTurn(refundReason);
 
         if (result.notice) send("notice", { message: result.notice });
 
@@ -735,13 +738,14 @@ export async function POST(request: Request) {
           }
         }
 
-        if (produced.length === 0 && (failure !== null || abort.signal.aborted)) {
-          await refundTurn(
-            abort.signal.aborted
-              ? "Stopped before the first token"
-              : "Provider failed before the first token"
-          );
-        }
+        // An empty completion is a failed turn, so this is not limited to
+        // thrown provider errors.
+        const refundReason = refundReasonFor({
+          textLength: produced.length,
+          stopped: abort.signal.aborted ? "aborted" : failure ? "error" : "done",
+        });
+
+        if (refundReason) await refundTurn(refundReason);
 
         if (produced.length > 0) {
           const text = abort.signal.aborted
