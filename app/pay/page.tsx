@@ -11,6 +11,7 @@ import {
   formatMoney,
   isConverted,
 } from "@/lib/billing/currency";
+import { getMyrRates, withLiveRate } from "@/lib/billing/rates";
 import { paymentLink, PLANS, planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
@@ -111,7 +112,11 @@ export default async function PayPage({
   );
 
   // The country comes from the host's geo header; unknown countries see ringgit.
-  const currency = currencyForCountry(countryFromHeaders(await headers()));
+  // The rate is fetched and cached server-side, falling back to the indicative
+  // table when the rate service is unreachable.
+  const base = currencyForCountry(countryFromHeaders(await headers()));
+  const currency = withLiveRate(base, await getMyrRates());
+  const live = currency !== base;
   const localPrices = isConverted(currency);
   const link = paymentLink();
 
@@ -238,7 +243,7 @@ export default async function PayPage({
 
         <p className="mt-2 text-[10.5px] leading-relaxed text-low">
           {localPrices
-            ? `Prices above are an estimate in ${currency.name} at an indicative rate. The hosted page charges ringgit, and the ringgit amount on your receipt is the one that counts. `
+            ? `Prices above are an estimate in ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges ringgit, and the ringgit amount on your receipt is the one that counts. `
             : ""}
           The hosted page is the only place money changes hands. This app never
           asks for card details.

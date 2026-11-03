@@ -2,16 +2,20 @@
 //
 // Money is charged by the hosted payment page in Malaysian ringgit, so every
 // amount here is an *estimate* converted from RM for the visitor's country.
-// The rates are indicative and changed by hand: this module never charges,
-// settles or stores an amount, and nothing downstream treats the converted
-// figure as money owed.
+// Each currency carries a hand-written indicative rate that `withLiveRate`
+// (lib/billing/rates.ts) replaces with a cached live rate when one is
+// available: this module never charges, settles or stores an amount, and
+// nothing downstream treats the converted figure as money owed.
 
 export type Currency = {
   /** ISO 4217 code, e.g. "USD". */
   code: string;
   /** BCP 47 locale used only to group digits and place the symbol. */
   locale: string;
-  /** Indicative units of this currency per 1 MYR. */
+  /**
+   * Units of this currency per 1 MYR: the live rate when the server has one,
+   * otherwise the hand-written fallback below.
+   */
   perMyr: number;
   /** English name, used in the "estimated" note. */
   name: string;
@@ -50,6 +54,9 @@ const CURRENCY = {
 } as const satisfies Record<string, Currency>;
 
 export type CurrencyCode = keyof typeof CURRENCY;
+
+/** Every code the page can display, in catalogue order. */
+export const CURRENCY_CODES = Object.keys(CURRENCY) as CurrencyCode[];
 
 /** The payment page always charges in ringgit, so that is the fallback. */
 export const DEFAULT_CURRENCY: Currency = CURRENCY.MYR;
