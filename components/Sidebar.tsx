@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { Brand } from "@/components/Brand";
+import { OpenmiMark } from "@/components/OpenmiMark";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import type { Chat, Folder } from "@/lib/types";
 import {
   createFolder,
@@ -21,8 +22,8 @@ function ChatRow({
 }) {
   return (
     <div
-      className={`group relative flex items-center rounded-full pr-1 ${
-        active ? "bg-accent-soft" : "hover:bg-hover"
+      className={`group relative flex items-center rounded-xl pr-1 ${
+        active ? "bg-elevated" : "hover:bg-hover"
       }`}
     >
       <span
@@ -52,7 +53,7 @@ function ChatRow({
         >
           ⋯
         </summary>
-        <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-2xl border border-line bg-card p-2 shadow-[0_18px_40px_rgba(22,18,12,0.16)]">
+        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-2xl border border-line bg-card p-2 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
           <form action={moveChatToFolder} className="flex gap-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <select
@@ -105,24 +106,38 @@ export function Sidebar({
   return (
     <aside className="flex h-full min-h-0 flex-col bg-raised md:border-r md:border-line">
       <div className="flex items-center justify-between gap-2 px-5 pb-4 pt-5">
-        <Link href="/" aria-label="Openmi home">
-          <Brand compact />
+        <Link href="/" aria-label="Openmi home" className="lift">
+          <span className="flex items-center gap-2.5">
+            <OpenmiMark size={36} />
+            <span className="flex flex-col leading-none">
+              <span className="text-[23px] font-semibold tracking-[-0.015em] text-hi">
+                Openmi
+              </span>
+              <span className="mt-1 text-[10px] tracking-[0.02em] text-low">
+                by Minetallest
+              </span>
+            </span>
+          </span>
         </Link>
         <Link href="/setup" className="eyebrow hover:text-hi">
           setup
         </Link>
       </div>
 
-      <div className="px-3">
+      <div className="space-y-2 px-3">
         <Link
           href="/chat?new=1"
-          className="btn btn-primary w-full py-2.5 text-[13px]"
+          className="lift flex w-full items-center justify-center gap-2 rounded-2xl bg-elevated py-2.5 text-[13px] font-medium text-hi hover:bg-hover"
         >
           <span aria-hidden="true" className="text-[15px] leading-none">
             +
           </span>
           New chat
         </Link>
+
+        <p className="rounded-full border border-line px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-low">
+          one repo · one chat
+        </p>
       </div>
 
       <nav aria-label="Chats" className="mt-6 min-h-0 flex-1 overflow-y-auto px-2 pb-4">
@@ -214,6 +229,8 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-line px-2 py-3">
+        <ThemeSwitcher className="mb-2 w-full justify-between" />
+
         <Link
           href="/pay"
           className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"

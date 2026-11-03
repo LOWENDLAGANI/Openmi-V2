@@ -1,16 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 /**
  * The context budget as one ring.
  *
- * The number that matters before a turn is how much of the repository context
- * the last request actually carried, and a ring shows "nearly full" faster than
- * a fraction does. The ring is decoration over the exact figure: the popover
- * repeats the characters used against the characters allowed, and lists the
- * server's own notes about what was trimmed. No trim is ever invented here —
- * the notes come from the same object the request was assembled from.
+ * A 26px donut in the composer header: the arc turns from sage to amber at 70%
+ * and to red at 95%, so "nearly full" reads before a number does. The popover
+ * repeats the exact figures and lists the server's own notes about what was
+ * trimmed — no trim is invented here, the strings come from the same object the
+ * request was assembled from.
+ *
+ * When the budget is spent the popover offers a new chat, because a full
+ * context is the one case where the next turn cannot carry what it should.
  */
 export function ContextCircle({
   usedChars,
@@ -26,14 +29,15 @@ export function ContextCircle({
 
   const ratio = budgetChars > 0 ? Math.min(Math.max(usedChars / budgetChars, 0), 1) : 0;
   const percent = Math.round(ratio * 100);
+  const full = percent >= 100;
 
-  const size = 30;
-  const stroke = 3.5;
+  const size = 26;
+  const stroke = 3;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // A click anywhere else, or Escape, closes the panel. It is a detail view,
-  // not a modal, so it never traps focus.
+  const tone = full || percent >= 95 ? "#ef6b6b" : percent >= 70 ? "#f5b544" : "#7fd1a1";
+
   useEffect(() => {
     if (!open) return;
 
@@ -54,14 +58,14 @@ export function ContextCircle({
   }, [open]);
 
   return (
-    <div ref={wrapper} className="relative">
+    <div ref={wrapper} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-label={`Repository context: ${percent}% of the ${budgetChars.toLocaleString()} character budget used`}
+        aria-label={`Context: ${percent}% of ${budgetChars.toLocaleString()} characters used`}
         title={`${usedChars.toLocaleString()} of ${budgetChars.toLocaleString()} characters of repository context`}
-        className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-card hover:border-line-strong"
+        className="lift grid size-9 place-items-center rounded-full border border-line bg-card hover:border-line-strong"
       >
         <span className="relative grid place-items-center">
           <svg
@@ -77,7 +81,8 @@ export function ContextCircle({
               cy={size / 2}
               r={radius}
               fill="none"
-              stroke="var(--line-strong)"
+              stroke="var(--text-low)"
+              strokeOpacity="0.18"
               strokeWidth={stroke}
             />
             <circle
@@ -85,7 +90,7 @@ export function ContextCircle({
               cy={size / 2}
               r={radius}
               fill="none"
-              stroke="var(--accent)"
+              stroke={tone}
               strokeWidth={stroke}
               strokeLinecap="round"
               strokeDasharray={circumference}
@@ -93,7 +98,7 @@ export function ContextCircle({
               style={{ transition: "stroke-dashoffset 320ms ease-out" }}
             />
           </svg>
-          <span className="absolute font-mono text-[9px] leading-none text-mid">
+          <span className="absolute font-mono text-[8.5px] leading-none text-mid">
             {percent}
           </span>
         </span>
@@ -102,11 +107,11 @@ export function ContextCircle({
       {open && (
         <div
           role="group"
-          aria-label="Context budget"
-          className="fade-in absolute right-0 top-full z-40 mt-2 w-64 rounded-2xl border border-line-strong bg-card p-3.5 shadow-[0_18px_44px_rgba(22,18,12,0.18)]"
+          aria-label="Context breakdown"
+          className="animate-pop absolute bottom-full right-0 z-40 mb-2 w-64 rounded-2xl border border-line-strong bg-card p-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.32)]"
         >
           <div className="flex items-baseline justify-between gap-2">
-            <p className="eyebrow">context budget</p>
+            <p className="eyebrow">context</p>
             <p className="font-mono text-[10px] text-low">{percent}% used</p>
           </div>
 
@@ -117,8 +122,8 @@ export function ContextCircle({
 
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-chip">
             <div
-              className="h-full rounded-full bg-accent"
-              style={{ width: `${Math.max(percent, 1)}%` }}
+              className="h-full rounded-full transition-[width] duration-300"
+              style={{ width: `${Math.max(percent, 1)}%`, backgroundColor: tone }}
             />
           </div>
 
@@ -147,6 +152,16 @@ export function ContextCircle({
             The file you have open is never trimmed. If it fills the budget, it
             is kept and the notes say why nothing else was added.
           </p>
+
+          {full && (
+            <Link
+              href="/chat?new=1"
+              onClick={() => setOpen(false)}
+              className="btn btn-primary mt-2.5 w-full py-1.5 text-[11.5px]"
+            >
+              Start a new chat
+            </Link>
+          )}
         </div>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { OpenmiMark } from "@/components/OpenmiMark";
+
 /**
  * The brand mark. Deliberately plain.
  *
@@ -9,21 +11,13 @@
  */
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-2">
-      <img
-        src="/openmi-mark.png"
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        width={494}
-        height={466}
-        className="size-5 shrink-0 select-none object-contain"
-      />
-      <span className="text-[17px] font-semibold leading-none tracking-[-0.03em] text-hi">
-        openmi
+    <span className="inline-flex items-center gap-2.5">
+      <OpenmiMark size={20} />
+      <span className="text-[17px] font-semibold leading-none tracking-[-0.02em] text-hi">
+        Openmi
       </span>
       {!compact && (
-        <span className="eyebrow ml-1 hidden sm:inline">review before push</span>
+        <span className="eyebrow ml-0.5 hidden sm:inline">repo agent</span>
       )}
     </span>
   );

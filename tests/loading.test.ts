@@ -19,7 +19,7 @@ const CSS = read("/app/globals.css");
 test("the spinner is the brand mark, driven by one CSS animation", () => {
   expect(LOADING).toContain("export function Spinner");
   expect(LOADING).toContain("className={`spinner");
-  expect(LOADING).toContain('src="/openmi-mark.png"');
+  expect(LOADING).toContain("<OpenmiMark");
 
   expect(CSS).toContain("@keyframes spin-slow");
   expect(CSS).toContain(".spinner {");

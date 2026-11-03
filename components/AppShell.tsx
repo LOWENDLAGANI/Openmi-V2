@@ -36,7 +36,7 @@ export function AppShell({
   }, [open]);
 
   return (
-    <div className="flex h-dvh min-h-dvh flex-col overflow-hidden md:grid md:grid-cols-[286px_minmax(0,1fr)]">
+    <div className="flex h-dvh min-h-dvh flex-col overflow-hidden md:grid md:grid-cols-[292px_minmax(0,1fr)]">
       <div className="hidden min-h-0 md:block">{sidebar}</div>
 
       {open && (
@@ -45,16 +45,16 @@ export function AppShell({
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="fade-in absolute inset-0 bg-[#16120c]/35 backdrop-blur-[2px]"
+            className="fade-in absolute inset-0 bg-black/45 backdrop-blur-[2px]"
           />
-          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-raised shadow-[0_24px_60px_rgba(22,18,12,0.28)]">
+          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-raised shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
             {sidebar}
           </div>
         </div>
       )}
 
       <main className="flex h-dvh min-w-0 flex-col md:h-full md:min-h-0">
-        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 py-3 backdrop-blur-md md:px-7">
+        <header className="glass sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3 md:px-7">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"

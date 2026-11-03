@@ -80,7 +80,7 @@ function Prose({
   }, [text, repo, validPaths]);
 
   return (
-    <p className="whitespace-pre-wrap text-[14px] leading-[1.72] text-body">
+    <p className="prose-chat whitespace-pre-wrap text-[14px] leading-[1.72] text-body">
       {segments.map((segment, index) => {
         if (segment.kind === "text") return <span key={index}>{segment.text}</span>;
 
@@ -131,7 +131,7 @@ export function MessageBody({
   const blocks = useMemo(() => splitBlocks(content), [content]);
 
   if (blocks.length === 0) {
-    return <p className="text-[14px] leading-[1.72] text-body">{content}</p>;
+    return <p className="prose-chat text-[14px] leading-[1.72] text-body">{content}</p>;
   }
 
   return (

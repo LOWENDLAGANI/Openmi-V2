@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { AiThinking } from "@/components/AiThinking";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
+import { QuickActions } from "@/components/QuickActions";
 import { MODEL_CATEGORIES, type ModelCapability, type ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
@@ -78,6 +79,19 @@ export function ChatPanel({
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const continuedRef = useRef(false);
+
+  /** A badge per model family, and the name shown on the card. */
+  function modelLabel(id: string | null): string {
+    if (!id) return "openmi";
+    return models.find((entry) => entry.id === id)?.name ?? id;
+  }
+
+  function badgeFor(id: string | null): string {
+    const category = models.find((entry) => entry.id === id)?.category;
+    if (category === "coding") return "model-badge-code";
+    if (category === "reasoning") return "model-badge-azure";
+    return "model-badge-auto";
+  }
 
   // While a turn is running without this tab driving it, ask the server whether
   // it is still going and re-read the transcript when it stops. This is the
@@ -414,20 +428,13 @@ export function ChatPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          {meter && (
-            <ContextCircle
-              usedChars={meter.usedChars}
-              budgetChars={meter.budgetChars}
-              notes={meter.notes}
-            />
-          )}
-
-          <select
-            value={model}
-            onChange={(event) => setModel(event.target.value as ModelId)}
-            aria-label="Model"
-            className="field w-auto py-1 text-[11.5px]"
-          >
+          <span className="model-pill">
+            <select
+              value={model}
+              onChange={(event) => setModel(event.target.value as ModelId)}
+              aria-label="Model"
+              className="cursor-pointer appearance-none bg-transparent pr-0.5 text-[11.5px] text-mid focus:outline-none"
+            >
             {MODEL_CATEGORIES.map((category) => {
               const options = models.filter(
                 (option) => option.category === category.id
@@ -449,7 +456,19 @@ export function ChatPanel({
                 </optgroup>
               );
             })}
-          </select>
+            </select>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-3 shrink-0 text-low"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
         </div>
       </div>
 
@@ -501,34 +520,39 @@ export function ChatPanel({
                   key={message.id}
                   className="rise-in flex flex-col items-end gap-1"
                 >
-                  <div className="max-w-[88%] whitespace-pre-wrap rounded-[26px] rounded-br-lg bg-bubble px-4 py-2.5 text-[14px] leading-[1.6] text-bubble-text">
+                  <div className="msg-user-bubble max-w-[88%] whitespace-pre-wrap">
                     {message.content}
                   </div>
                   <button
                     type="button"
                     onClick={() => setDraft(message.content)}
-                    className="eyebrow mr-2 hover:text-hi"
+                    className="thread-tool mr-1"
                   >
                     edit
                   </button>
                 </article>
               ) : (
                 <article key={message.id} className="rise-in group max-w-[94%]">
-                  <div className="flex justify-end pb-0.5">
+                  <div className="flex items-center justify-between gap-2 pb-1">
+                    <span className={`model-badge ${badgeFor(message.model)}`}>
+                      {modelLabel(message.model)}
+                    </span>
                     <button
                       type="button"
                       onClick={() => void copy(message.id, message.content)}
-                      className="eyebrow opacity-0 hover:text-hi focus-visible:opacity-100 group-hover:opacity-100"
+                      className="thread-tool opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                     >
                       {copiedId === message.id ? "copied" : "copy"}
                     </button>
                   </div>
-                  <MessageBody
-                    content={message.content}
-                    repo={repo}
-                    validPaths={validPaths}
-                    chatId={activeChatId ?? ""}
-                  />
+                  <div className="msg-ai-card">
+                    <MessageBody
+                      content={message.content}
+                      repo={repo}
+                      validPaths={validPaths}
+                      chatId={activeChatId ?? ""}
+                    />
+                  </div>
                 </article>
               )
             )}
@@ -598,57 +622,100 @@ export function ChatPanel({
         </div>
       )}
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void send(draft);
-        }}
-        className="pt-2"
-      >
-        <div className="rounded-[28px] border border-line-strong/70 bg-card p-2 shadow-[0_18px_40px_-32px_rgba(22,18,12,0.6)] focus-within:border-accent/45">
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void send(draft);
-              }
-            }}
-            rows={1}
-            placeholder={
-              providerReady
-                ? "Message Openmi…"
-                : "No provider key is configured — the setup page lists what is missing."
-            }
-            className="composer-input max-h-[168px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-1.5 text-[14px] leading-[1.6] text-body placeholder:text-low focus:outline-none"
-          />
-
-          <div className="flex items-center justify-between gap-2 px-1 pt-1">
-            <div className="ml-auto flex items-center gap-2">
-              {streaming && (
-                <button
-                  type="button"
-                  onClick={stop}
-                  className="btn btn-quiet px-3 py-1.5 text-[12px]"
-                >
-                  Stop
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={streaming || draft.trim().length === 0}
-                className="btn btn-primary px-4 py-2 text-[12.5px]"
-              >
-                Send
-                <span aria-hidden="true">↗</span>
-              </button>
+      <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2 md:-mx-7 md:px-7">
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="mb-1.5 flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <QuickActions
+                onSelect={(prompt) => {
+                  setDraft(prompt);
+                  textareaRef.current?.focus();
+                }}
+                disabled={streaming}
+              />
             </div>
-          </div>
-        </div>
 
-      </form>
+            {meter && (
+              <ContextCircle
+                usedChars={meter.usedChars}
+                budgetChars={meter.budgetChars}
+                notes={meter.notes}
+              />
+            )}
+          </div>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send(draft);
+            }}
+          >
+            <div className="rounded-[26px] border border-line-strong bg-card p-2 shadow-[0_18px_40px_-32px_rgba(0,0,0,0.9)] transition-colors focus-within:border-accent/45">
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void send(draft);
+                  }
+                }}
+                rows={1}
+                placeholder={
+                  providerReady
+                    ? "Message Openmi…"
+                    : "No provider key is configured — the setup page lists what is missing."
+                }
+                className="composer-input max-h-[168px] min-h-[52px] px-3 pt-1.5 text-[14px] leading-[1.6] focus:outline-none"
+              />
+
+              <div className="flex items-center justify-between gap-2 px-1 pt-1">
+                <span className="eyebrow hidden pl-2 sm:inline">
+                  {streaming ? "streaming" : "enter to send"}
+                </span>
+
+                <div className="ml-auto flex items-center gap-2">
+                  {streaming && (
+                    <button
+                      type="button"
+                      onClick={stop}
+                      aria-label="Stop the turn"
+                      className="lift grid size-10 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover"
+                    >
+                      <span aria-hidden="true" className="size-3 rounded-[3px] bg-current" />
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={streaming || draft.trim().length === 0}
+                    aria-label="Send message"
+                    className="lift grid size-10 place-items-center rounded-full bg-accent text-on-accent disabled:opacity-40"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="size-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 19V5M6 11l6-6 6 6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <p className="mt-1.5 text-center font-mono text-[10px] tracking-[0.06em] text-low">
+            Content generated by Openmi AI. Might not be accurate.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

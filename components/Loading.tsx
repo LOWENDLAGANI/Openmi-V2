@@ -1,3 +1,5 @@
+import { OpenmiMark } from "@/components/OpenmiMark";
+
 /**
  * The loading vocabulary: one spinner, one pill, used everywhere.
  *
@@ -14,15 +16,13 @@ export function Spinner({
   className?: string;
 }) {
   return (
-    <img
-      src="/openmi-mark.png"
-      alt=""
+    <span
       aria-hidden="true"
-      draggable={false}
-      width={size}
-      height={size}
-      className={`spinner shrink-0 select-none object-contain ${className}`}
-    />
+      className={`spinner inline-grid shrink-0 place-items-center ${className}`}
+      style={{ width: size, height: size }}
+    >
+      <OpenmiMark size={size} />
+    </span>
   );
 }
 

@@ -11,9 +11,9 @@
 //
 //   node scripts/check-contrast.mjs
 //
-// There is one appearance — warm paper — so there is one block to check. The
-// script still reads the stylesheet rather than hardcoding values, so a changed
-// token is checked rather than assumed.
+// There are three appearances — the night canvas (`:root`), paper, and ink — so
+// there are three blocks to check. The script still reads the stylesheet rather
+// than hardcoding values, so a changed token is checked rather than assumed.
 //
 // It also refuses a stylesheet that lost its visible focus ring or its
 // reduced-motion block, because both are part of the same accessibility gate.
@@ -28,7 +28,11 @@ const css = readFileSync(cssPath, "utf8");
 
 const MIN_RATIO = 4.5;
 
-const THEMES = [{ name: "paper", selector: ":root" }];
+const THEMES = [
+  { name: "night", selector: ":root" },
+  { name: "paper", selector: "html.light" },
+  { name: "ink", selector: "html.ink" },
+];
 
 /** Text tokens, and the surfaces each is rendered on. */
 const TEXT_PAIRS = [

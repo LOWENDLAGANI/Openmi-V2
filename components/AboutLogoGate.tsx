@@ -9,6 +9,7 @@ import {
   GESTURE_IDLE,
   type GestureState,
 } from "@/lib/admin/gesture";
+import { OpenmiMark } from "@/components/OpenmiMark";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 /**
@@ -113,17 +114,9 @@ export function AboutLogoGate() {
       className="inline-flex touch-none select-none items-center gap-3"
       style={{ touchAction: "pan-y" }}
     >
-      <img
-        src="/openmi-mark.png"
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        width={494}
-        height={466}
-        className="size-11 shrink-0 select-none object-contain"
-      />
-      <span className="text-[30px] font-semibold leading-none tracking-[-0.04em] text-hi">
-        openmi
+      <OpenmiMark size={44} />
+      <span className="text-[30px] font-semibold leading-none tracking-[-0.03em] text-hi">
+        Openmi
       </span>
 
       {mounted &&
@@ -132,7 +125,7 @@ export function AboutLogoGate() {
           <div
             role="dialog"
             aria-label="Admin verification"
-            className="fade-in fixed bottom-4 right-4 z-[70] w-[calc(100%-2rem)] max-w-xs rounded-3xl border border-line-strong bg-card p-4 shadow-[0_24px_60px_rgba(22,18,12,0.28)]"
+            className="animate-pop fixed bottom-4 right-4 z-[70] w-[calc(100%-2rem)] max-w-xs rounded-3xl border border-line-strong bg-card p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

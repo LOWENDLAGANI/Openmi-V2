@@ -121,7 +121,7 @@ export function AuthForm({
             }}
             className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
               mode === value
-                ? "bg-card text-hi shadow-[0_1px_2px_rgba(22,18,12,0.08)]"
+                ? "bg-card text-hi shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
                 : "text-mid hover:text-hi"
             }`}
           >
