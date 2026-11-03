@@ -13,6 +13,120 @@ import {
   trashChat,
 } from "@/app/chat/actions";
 
+/**
+ * The sidebar is a list, not a control panel.
+ *
+ * Search at the top, one row per destination, then the chats under a hairline.
+ * Everything that used to compete for attention — the marketing chip, the
+ * theme control, the plans links — either moved into a row that names a place
+ * or into the account bar at the bottom, where the three small controls live as
+ * icons. Rows are tall enough to hit on a phone, and the type is the same
+ * grotesk the rest of the product uses.
+ */
+
+const GLYPHS = {
+  cloud: (
+    <path d="M7.4 18h9.8a3.9 3.9 0 0 0 .5-7.77 5.7 5.7 0 0 0-10.86-1.4A3.6 3.6 0 0 0 7.4 18Z" />
+  ),
+  folder: (
+    <path d="M3.8 7.6a2 2 0 0 1 2-2h3.1l1.8 2.1h7.5a2 2 0 0 1 2 2v6.7a2 2 0 0 1-2 2H5.8a2 2 0 0 1-2-2Z" />
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M12 7.6V12l3 1.8" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M6.5 4.5h11v15l-2.2-1.4-1.6 1.4-1.7-1.4L10.3 19l-1.6-1.4-2.2 1.4Z" />
+      <path d="M9.6 9.2h4.8M9.6 12.5h4.8" />
+    </>
+  ),
+  compose: (
+    <>
+      <path d="M4.4 19.6h4.1L19 9.1a2.1 2.1 0 0 0-3-3L5.5 16.6Z" />
+      <path d="m14.9 7.3 1.8 1.8" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M5 7.5h14M9.5 7.5V5.9a1.4 1.4 0 0 1 1.4-1.4h2.2a1.4 1.4 0 0 1 1.4 1.4v1.6" />
+      <path d="M7 7.5l.8 11a1.6 1.6 0 0 0 1.6 1.5h5.2a1.6 1.6 0 0 0 1.6-1.5l.8-11" />
+      <path d="M10.5 11v5M13.5 11v5" />
+    </>
+  ),
+  signout: (
+    <>
+      <path d="M14.5 5.5H18a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 18 18.5h-3.5" />
+      <path d="M10 8.5 6.5 12l3.5 3.5M6.5 12H15" />
+    </>
+  ),
+  plus: <path d="M12 5.5v13M5.5 12h13" />,
+} as const;
+
+type GlyphName = keyof typeof GLYPHS;
+
+function Glyph({
+  name,
+  className = "size-5",
+}: {
+  name: GlyphName;
+  className?: string;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      className={`shrink-0 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {GLYPHS[name]}
+    </svg>
+  );
+}
+
+function NavRow({
+  href,
+  label,
+  icon,
+  active = false,
+  badge,
+}: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  badge?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] transition-colors ${
+        active
+          ? "bg-elevated font-medium text-hi"
+          : "text-body hover:bg-hover hover:text-hi"
+      }`}
+    >
+      <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge && (
+        <span className="shrink-0 rounded-full bg-accent-soft px-2 py-[3px] font-mono text-[9px] uppercase tracking-[0.1em] text-accent-text">
+          {badge}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function ChatRow({
   chat,
   active,
@@ -24,38 +138,43 @@ function ChatRow({
 }) {
   return (
     <div
-      className={`group relative flex items-center rounded-xl pr-1 ${
+      className={`group relative flex items-center rounded-2xl transition-colors ${
         active ? "bg-elevated" : "hover:bg-hover"
       }`}
     >
-      <span
-        aria-hidden="true"
-        className={`ml-3 size-1.5 shrink-0 rounded-full ${
-          active ? "bg-accent" : "bg-line-strong"
-        }`}
-      />
-
       <Link
         href={`/chat?chat=${chat.id}`}
         aria-current={active ? "page" : undefined}
         title={chat.title}
-        className={`min-w-0 flex-1 truncate px-2.5 py-2 text-[12.5px] ${
-          active
-            ? "font-semibold text-hi"
-            : "text-mid group-hover:text-hi"
-        }`}
+        className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1"
       >
-        {chat.title}
+        <span
+          aria-hidden="true"
+          className={`grid size-8 shrink-0 place-items-center rounded-full ${
+            active ? "bg-accent text-on-accent" : "bg-accent-soft text-accent-text"
+          }`}
+        >
+          <Glyph name="cloud" className="size-4" />
+        </span>
+        <span
+          className={`min-w-0 flex-1 truncate text-[13px] ${
+            active
+              ? "font-medium text-hi"
+              : "text-body group-hover:text-hi"
+          }`}
+        >
+          {chat.title}
+        </span>
       </Link>
 
-      <details className="relative shrink-0">
+      <details className="relative shrink-0 pr-1.5">
         <summary
           className="grid size-7 cursor-pointer list-none place-items-center rounded-full text-[14px] leading-none text-low opacity-0 transition-opacity hover:bg-canvas hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
           aria-label={`Options for ${chat.title}`}
         >
           ⋯
         </summary>
-        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-2xl border border-line bg-card p-2 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-2xl border border-line bg-card p-2 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
           <form action={moveChatToFolder} className="flex gap-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <select
@@ -119,47 +238,60 @@ export function Sidebar({
   const inFolder = (folderId: string) =>
     chats.filter((chat) => chat.folder_id === folderId);
 
+  const initial = email.trim().charAt(0).toUpperCase() || "?";
+
   return (
     <aside className="flex h-full min-h-0 flex-col bg-raised md:border-r md:border-line">
-      <div className="flex items-center justify-between gap-2 px-5 pb-4 pt-5">
-        <Link href="/" aria-label="Openmi home" className="lift">
-          <span className="flex items-center gap-2.5">
-            <OpenmiMark size={36} />
-            <span className="flex flex-col leading-none">
-              <span className="text-[24px] font-semibold tracking-[-0.045em] text-hi">
-                openmi
-              </span>
-              <span className="mt-1 text-[10px] tracking-[0.02em] text-low">
-                by Minetallest
-              </span>
-            </span>
-          </span>
-        </Link>
-      </div>
-
-      <div className="space-y-2 px-3">
+      <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-3">
+        <div className="min-w-0 flex-1">
+          <SearchLauncher />
+        </div>
         <Link
           href={newChatHref}
-          className="lift flex w-full items-center justify-center gap-2 rounded-2xl bg-elevated py-2.5 text-[13px] font-medium text-hi hover:bg-hover"
+          aria-label="New chat"
+          title="New chat"
+          className="grid size-10 shrink-0 place-items-center rounded-full text-hi transition-colors hover:bg-hover"
         >
-          <span aria-hidden="true" className="text-[15px] leading-none">
-            +
-          </span>
-          New chat
+          <Glyph name="compose" className="size-[19px]" />
         </Link>
-
-        <SearchLauncher />
-
-        <p className="rounded-full border border-line px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-low">
-          one repo · one chat
-        </p>
       </div>
 
-      <nav aria-label="Chats" className="mt-6 min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-        <p className="eyebrow px-3 pb-2">Chats</p>
+      <nav aria-label="Workspace" className="space-y-0.5 px-2 pb-1 pt-1">
+        <NavRow
+          href="/chat"
+          label="openmi"
+          active={!trashView && !activeChatId}
+          icon={
+            <span className="grid size-8 place-items-center rounded-full bg-accent text-on-accent">
+              <OpenmiMark size={16} />
+            </span>
+          }
+        />
+        <NavRow
+          href="/chat?view=repos"
+          label="Repositories"
+          badge={repo ? undefined : "New"}
+          icon={<Glyph name="folder" className="size-[19px]" />}
+        />
+        <NavRow
+          href="/activity"
+          label="Activity"
+          icon={<Glyph name="clock" className="size-[19px]" />}
+        />
+        <NavRow
+          href="/pay"
+          label="Plans &amp; receipts"
+          icon={<Glyph name="receipt" className="size-[19px]" />}
+        />
+      </nav>
+
+      <div className="mx-4 my-2 h-px bg-line" />
+
+      <nav aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        <p className="eyebrow px-3 pb-1.5">Chats</p>
 
         {ungrouped.length === 0 ? (
-          <p className="px-3 pb-2 text-[11.5px] leading-relaxed text-low">
+          <p className="px-3 pb-1.5 text-[11.5px] leading-relaxed text-low">
             Nothing here yet.
           </p>
         ) : (
@@ -177,16 +309,25 @@ export function Sidebar({
 
         {folders.map((folder) => {
           const items = inFolder(folder.id);
+
           return (
-            <details key={folder.id} open className="mt-5">
-              <summary className="eyebrow flex cursor-pointer list-none items-center gap-2 rounded-full px-3 py-1.5 hover:text-hi">
-                <span className="min-w-0 truncate">{folder.name}</span>
-                <span className="ml-auto font-mono text-[10px] text-low">
+            <details key={folder.id} open className="mt-1">
+              <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 hover:bg-hover">
+                <span
+                  aria-hidden="true"
+                  className="grid size-8 shrink-0 place-items-center text-low"
+                >
+                  <Glyph name="folder" className="size-[17px]" />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-body">
+                  {folder.name}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] text-low">
                   {items.length}
                 </span>
               </summary>
 
-              <div className="mt-0.5 space-y-0.5 border-l border-line pl-1.5">
+              <div className="space-y-0.5 pl-2">
                 {items.length === 0 ? (
                   <p className="px-3 py-1 text-[11px] text-low">Empty folder.</p>
                 ) : (
@@ -200,8 +341,8 @@ export function Sidebar({
                   ))
                 )}
 
-                <details className="mt-1">
-                  <summary className="eyebrow cursor-pointer list-none px-3 py-1 hover:text-hi">
+                <details className="mt-0.5">
+                  <summary className="cursor-pointer list-none px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-low hover:text-hi">
                     settings
                   </summary>
 
@@ -220,7 +361,7 @@ export function Sidebar({
                     </SubmitButton>
                   </form>
 
-                  <form action={deleteFolder} className="px-2 pt-1.5 pb-1">
+                  <form action={deleteFolder} className="px-2 pb-1 pt-1.5">
                     <input type="hidden" name="folderId" value={folder.id} />
                     <SubmitButton
                       className="text-[11px] text-danger hover:underline"
@@ -235,62 +376,76 @@ export function Sidebar({
           );
         })}
 
-        <form action={createFolder} className="mt-6 flex gap-1.5 px-1">
-          <input
-            name="name"
-            required
-            maxLength={60}
-            placeholder="New folder"
-            aria-label="New folder name"
-            className="field min-w-0 flex-1 px-3 py-1.5 text-[11px]"
-          />
-          <SubmitButton className="btn px-3 py-1.5 text-[11px]" pendingText="Adding…">
-            Add
-          </SubmitButton>
-        </form>
+        <details className="mt-1">
+          <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 text-[12.5px] text-mid hover:bg-hover hover:text-hi">
+            <span
+              aria-hidden="true"
+              className="grid size-8 shrink-0 place-items-center text-low"
+            >
+              <Glyph name="plus" className="size-[17px]" />
+            </span>
+            New folder
+          </summary>
+
+          <form action={createFolder} className="mt-1 flex gap-1.5 px-2 pb-2">
+            <input
+              name="name"
+              required
+              maxLength={60}
+              placeholder="Folder name"
+              aria-label="New folder name"
+              className="field min-w-0 flex-1 px-3 py-1.5 text-[11px]"
+            />
+            <SubmitButton className="btn px-3 py-1.5 text-[11px]" pendingText="Adding…">
+              Add
+            </SubmitButton>
+          </form>
+        </details>
       </nav>
 
-      <div className="border-t border-line px-2 py-3">
-        <ThemeSwitcher className="mb-2 w-full justify-between" />
-
-        <Link
-          href="/pay"
-          className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
-        >
-          Plans &amp; receipts
-          <span aria-hidden="true" className="text-low">
-            ↗
+      <div className="border-t border-line px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft font-mono text-[11px] uppercase text-accent-text"
+          >
+            {initial}
           </span>
-        </Link>
 
-        <Link
-          href="/activity"
-          className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
-        >
-          Dew &amp; activity
-          <span aria-hidden="true" className="text-low">
-            ↗
-          </span>
-        </Link>
-
-        <Link
-          href={trashView ? "/chat" : "/chat?trash=1"}
-          className="flex items-center justify-between rounded-full px-3 py-2 text-[12px] text-mid hover:bg-hover hover:text-hi"
-        >
-          {trashView ? "Back to chats" : "Trash"}
-          <span className="font-mono text-[10px] text-low">{trashedCount}</span>
-        </Link>
-
-        <div className="mt-2 flex items-center justify-between gap-2 border-t border-line px-3 pt-3">
-          <p className="min-w-0 truncate text-[11px] text-low" title={email}>
+          <span
+            className="min-w-0 flex-1 truncate text-[12px] font-medium text-hi"
+            title={email}
+          >
             {email}
-          </p>
-          <form action="/auth/signout" method="post">
+          </span>
+
+          <Link
+            href={trashView ? "/chat" : "/chat?trash=1"}
+            aria-label={trashView ? "Back to chats" : `Trash, ${trashedCount} chat(s)`}
+            title={trashView ? "Back to chats" : "Trash"}
+            aria-current={trashView ? "page" : undefined}
+            className={`relative grid size-9 shrink-0 place-items-center rounded-full transition-colors hover:bg-hover hover:text-hi ${
+              trashView ? "bg-elevated text-hi" : "text-mid"
+            }`}
+          >
+            <Glyph name="trash" className="size-[18px]" />
+            {trashedCount > 0 && (
+              <span className="absolute right-0 top-0 grid min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[9px] leading-4 text-on-accent">
+                {trashedCount}
+              </span>
+            )}
+          </Link>
+
+          <ThemeSwitcher variant="icon" />
+
+          <form action="/auth/signout" method="post" className="shrink-0">
             <SubmitButton
-              className="text-[11px] text-mid hover:text-hi"
-              pendingText="Signing out…"
+              ariaLabel="Sign out"
+              title="Sign out"
+              pendingText=""
+              className="grid size-9 place-items-center rounded-full text-mid hover:bg-hover hover:text-hi"
             >
-              Sign out
+              <Glyph name="signout" className="size-[18px]" />
             </SubmitButton>
           </form>
         </div>

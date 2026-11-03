@@ -25,6 +25,7 @@ export function SubmitButton({
   value,
   disabled = false,
   title,
+  ariaLabel,
 }: {
   children: React.ReactNode;
   pendingText?: string;
@@ -33,6 +34,8 @@ export function SubmitButton({
   value?: string;
   disabled?: boolean;
   title?: string;
+  /** For an icon-only submit, where the visible label is a glyph. */
+  ariaLabel?: string;
 }) {
   const { pending } = useFormStatus();
 
@@ -42,6 +45,7 @@ export function SubmitButton({
       name={name}
       value={value}
       title={title}
+      aria-label={ariaLabel}
       disabled={pending || disabled}
       aria-busy={pending}
       className={`${className} disabled:cursor-not-allowed disabled:opacity-60`}

@@ -22,7 +22,14 @@ function isTheme(value: string | null): value is ThemeId {
   return value === "paper" || value === "dark" || value === "ink";
 }
 
-export function ThemeSwitcher({ className = "" }: { className?: string }) {
+export function ThemeSwitcher({
+  className = "",
+  variant = "segmented",
+}: {
+  className?: string;
+  /** `icon` is one button that cycles the themes, for the sidebar's account bar. */
+  variant?: "segmented" | "icon";
+}) {
   const [theme, setTheme] = useState<ThemeId>("paper");
 
   useEffect(() => {
@@ -42,6 +49,34 @@ export function ThemeSwitcher({ className = "" }: { className?: string }) {
     root.classList.remove("light", "dark", "ink");
     const option = THEMES.find((entry) => entry.id === next);
     if (option && option.className) root.classList.add(option.className);
+  }
+
+  if (variant === "icon") {
+    const index = THEMES.findIndex((entry) => entry.id === theme);
+    const current = THEMES[index] ?? THEMES[0];
+    const next = THEMES[(index + 1) % THEMES.length];
+
+    return (
+      <button
+        type="button"
+        onClick={() => apply(next.id)}
+        aria-label={`Theme: ${current.label}. Switch to ${next.label}`}
+        title={`Theme: ${current.label} · switch to ${next.label}`}
+        className={`grid size-9 shrink-0 place-items-center rounded-full text-mid transition-colors hover:bg-hover hover:text-hi ${className}`}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="size-[18px]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+        >
+          <circle cx="12" cy="12" r="8.2" />
+          <path d="M12 3.8a8.2 8.2 0 0 1 0 16.4Z" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+    );
   }
 
   return (
