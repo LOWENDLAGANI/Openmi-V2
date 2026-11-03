@@ -65,15 +65,18 @@ test("an unknown custom category is rejected, not guessed", () => {
   expect(parsed.errors[0]).toContain("category");
 });
 
-test("the picker renders one optgroup per category", () => {
-  const panel = readFileSync(
-    new URL("../components/ChatPanel.tsx", import.meta.url),
+test("the picker renders one group per category", () => {
+  // The picker is its own popover now, not a native <select>: the grouping lives
+  // where the list is rendered.
+  const menu = readFileSync(
+    new URL("../components/ModelMenu.tsx", import.meta.url),
     "utf8"
   );
 
-  expect(panel).toContain("MODEL_CATEGORIES.map");
-  expect(panel).toContain("<optgroup");
-  expect(panel).toContain("label={category.label}");
+  expect(menu).toContain("MODEL_CATEGORIES.map");
+  expect(menu).toContain('role="listbox"');
+  expect(menu).toContain('role="option"');
+  expect(menu).toContain("{group.label}");
 });
 
 test("every built-in model except auto has a provider route", () => {

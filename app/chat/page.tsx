@@ -608,6 +608,25 @@ export default async function ChatPage({
         }
       : null);
 
+  // A bare /chat starts a new chat and reuses the repository from the most
+  // recent conversation, so the first message has something to cite. The
+  // picker is a place you navigate to (?view=repos), not where /chat lands.
+  const latestRepo =
+    draftRepo ??
+    (() => {
+      const recent = liveChats.find(
+        (chat) => chat.repo_full_name && chat.repo_base_sha
+      );
+
+      if (!recent?.repo_full_name || !recent.repo_base_sha) return null;
+
+      return {
+        fullName: recent.repo_full_name,
+        branch: recent.repo_branch ?? "",
+        sha: recent.repo_base_sha,
+      };
+    })();
+
   const heading = trashView
     ? "Deleted chats"
     : draft
@@ -617,7 +636,7 @@ export default async function ChatPage({
         : activeChat
           ? activeChat.title
           : connection
-            ? "Pick a repository"
+            ? "New chat"
             : "Connect GitHub";
 
   const eyebrow = trashView
@@ -641,8 +660,12 @@ export default async function ChatPage({
     body = <DraftChat repo={draftRepo} />;
   } else if (activeChat && !workspaceView) {
     body = await ChatView({ session, chat: activeChat });
-  } else {
+  } else if (workspaceView) {
+    // The repository browser is a place you ask for: the sidebar's Repositories
+    // row and every citation link pass `view`.
     body = await RepoSurface({ session, params, chat: activeChat });
+  } else {
+    body = <DraftChat repo={latestRepo} />;
   }
 
   const lowBalance = isLowBalance(dewBalance);

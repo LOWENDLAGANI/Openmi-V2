@@ -7,8 +7,9 @@ import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
+import { ModelMenu } from "@/components/ModelMenu";
 import { QuickActions } from "@/components/QuickActions";
-import { MODEL_CATEGORIES, type ModelCapability, type ModelId } from "@/lib/models";
+import type { ModelCapability, ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
@@ -309,6 +310,20 @@ export function ChatPanel({
             budgetChars: Number(payload.budgetChars ?? 0),
             notes: Array.isArray(payload.notes) ? payload.notes.map(String) : [],
           });
+          return;
+        }
+
+        if (event === "dew") {
+          const label =
+            typeof payload.label === "string"
+              ? payload.label
+              : "An hour of chat was charged.";
+
+          // The charge is a fact, not a silent balance change. It is shown with
+          // the turn's other notices, and one refresh is what makes the Dew chip
+          // in the header show the balance this charge produced.
+          setNotices((current) => [...current, label]);
+          router.refresh();
           return;
         }
 
@@ -713,47 +728,11 @@ export function ChatPanel({
 
               <div className="flex items-center justify-between gap-2 pl-1">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="model-pill">
-                    <select
-                      value={model}
-                      onChange={(event) => setModel(event.target.value as ModelId)}
-                      aria-label="Model"
-                      className="max-w-[9.5rem] cursor-pointer appearance-none truncate bg-transparent pr-0.5 text-[11px] text-mid focus:outline-none"
-                    >
-                      {MODEL_CATEGORIES.map((category) => {
-                        const options = models.filter(
-                          (option) => option.category === category.id
-                        );
-                        if (options.length === 0) return null;
-
-                        return (
-                          <optgroup key={category.id} label={category.label}>
-                            {options.map((option) => (
-                              <option
-                                key={option.id}
-                                value={option.id}
-                                disabled={option.available === false}
-                              >
-                                {option.name}
-                                {option.available === false ? " — key missing" : ""}
-                              </option>
-                            ))}
-                          </optgroup>
-                        );
-                      })}
-                    </select>
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="size-3 shrink-0 text-low"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </span>
+                  <ModelMenu
+                    models={models}
+                    value={model}
+                    onChange={(id) => setModel(id as ModelId)}
+                  />
 
                   {meter && (
                     <ContextCircle

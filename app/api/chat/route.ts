@@ -17,6 +17,7 @@ import {
   findDraftChangeset,
 } from "@/lib/changesets/store";
 import { assembleContext } from "@/lib/context";
+import { formatDew } from "@/lib/dew";
 import { refundReasonFor } from "@/lib/dew/refund";
 import { refundDewSession, startDewSession } from "@/lib/dew/store";
 import { serverEnv } from "@/lib/env";
@@ -512,6 +513,18 @@ export async function POST(request: Request) {
           ...(repoFailed ? ["Repository reads failed for this turn."] : []),
         ],
       });
+
+      // A charge is a fact the reader should see, not a silent balance change.
+      // Sent only when an hour actually started: a turn inside a running hour
+      // costs nothing and says nothing.
+      if (dew.session.started) {
+        send("dew", {
+          charged: true,
+          price: dew.session.price,
+          balance: dew.session.balance,
+          label: `Started an hour of chat: ${formatDew(dew.session.price)} Dew charged. Balance ${formatDew(dew.session.balance)}.`,
+        });
+      }
 
       const persist = (text: string) =>
         appendMessage(
