@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 
+import { CommandPalette } from "@/components/CommandPalette";
 import { NavProgress } from "@/components/NavProgress";
 import "./globals.css";
 
@@ -49,6 +50,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
+        <CommandPalette />
         {children}
       </body>
     </html>

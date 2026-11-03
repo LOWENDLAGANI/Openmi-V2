@@ -222,7 +222,17 @@ export function ChatPanel({
         body: JSON.stringify(
           continuation
             ? { chatId: activeChatId, turn: turnToken }
-            : { chatId: activeChatId ?? undefined, content, model, path: pinnedPath }
+            : {
+                chatId: activeChatId ?? undefined,
+                content,
+                model,
+                path: pinnedPath,
+                // A draft carries the repository it was started from, so the
+                // row is created with the pin instead of losing it.
+                repo: repo?.fullName,
+                branch: repo?.branch,
+                sha: repo?.sha,
+              }
         ),
         signal: controller.signal,
       });

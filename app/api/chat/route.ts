@@ -20,7 +20,14 @@ import { assembleContext } from "@/lib/context";
 import { refundReasonFor } from "@/lib/dew/refund";
 import { refundDewSession, startDewSession } from "@/lib/dew/store";
 import { serverEnv } from "@/lib/env";
-import { getFile, getTree, isRepoFullName, MAX_PATH_INDEX } from "@/lib/github/read";
+import {
+  getFile,
+  getRepo,
+  getTree,
+  isRepoFullName,
+  MAX_PATH_INDEX,
+  resolveBranchSha,
+} from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
 import { DEFAULT_MODEL, hasModel, type ModelId } from "@/lib/models";
@@ -49,6 +56,10 @@ type ChatRequest = {
   model?: unknown;
   path?: unknown;
   turn?: unknown;
+  /** The repository a draft chat was started from, if any. */
+  repo?: unknown;
+  branch?: unknown;
+  sha?: unknown;
 };
 
 function json(
@@ -111,9 +122,57 @@ export async function POST(request: Request) {
 
     // Created on the first message, not when "New chat" is clicked. An empty
     // chat is not a conversation, and it should not appear in history.
+    //
+    // A draft started from a repository carries that repository into the row.
+    // Without this, picking a repo and pressing "New chat" produced a chat with
+    // no code attached, and the first answer had nothing to cite.
+    const requestedRepo =
+      typeof body.repo === "string" && isRepoFullName(body.repo.trim())
+        ? body.repo.trim()
+        : "";
+
+    let requestedBranch = typeof body.branch === "string" ? body.branch.trim() : "";
+    let requestedSha =
+      typeof body.sha === "string" && /^[0-9a-f]{40}$/i.test(body.sha.trim())
+        ? body.sha.trim()
+        : "";
+
+    // The pin is resolved on the server when the draft did not carry one, so
+    // the sha in the database is one GitHub reported, not one a form supplied.
+    if (requestedRepo && (!requestedBranch || !requestedSha)) {
+      try {
+        const github = await readToken(session.supabase, session.user.id);
+        if (github) {
+          if (!requestedBranch) {
+            requestedBranch = (await getRepo(github.token, requestedRepo)).defaultBranch;
+          }
+          if (!requestedSha) {
+            requestedSha = await resolveBranchSha(
+              github.token,
+              requestedRepo,
+              requestedBranch
+            );
+          }
+        }
+      } catch {
+        // A repository that cannot be read is not attached. The message still
+        // sends, and the workspace keeps saying there is no repository rather
+        // than pinning a commit nobody verified.
+      }
+    }
+
+    const pin =
+      requestedRepo && requestedBranch && requestedSha
+        ? {
+            repo_full_name: requestedRepo,
+            repo_branch: requestedBranch,
+            repo_base_sha: requestedSha,
+          }
+        : {};
+
     const { data: created, error: createError } = await session.supabase
       .from("chats")
-      .insert({ owner: session.user.id, title: "New chat" })
+      .insert({ owner: session.user.id, title: "New chat", ...pin })
       .select("id")
       .single();
 

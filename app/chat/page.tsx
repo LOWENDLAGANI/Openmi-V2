@@ -475,14 +475,18 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   );
 }
 
-function DraftChat() {
+function DraftChat({
+  repo,
+}: {
+  repo: { fullName: string; branch: string; sha: string } | null;
+}) {
   const models = modelCatalogue();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatPanel
         chatId={null}
-        repo={null}
+        repo={repo}
         models={models}
         initialModel={DEFAULT_MODEL}
         initialMessages={[]}
@@ -565,6 +569,28 @@ export default async function ChatPage({
 
   const draft = params.new === "1";
 
+  // The repository the reader is currently looking at: either the one in the
+  // URL, or the one pinned to the open chat. A new chat inherits it, which is
+  // what makes "pick a repo, then start chatting" work.
+  const draftRepo =
+    params.repo && isRepoFullName(params.repo)
+      ? {
+          fullName: params.repo,
+          branch: params.branch ?? "",
+          sha: params.sha && isCommitSha(params.sha) ? params.sha : "",
+        }
+      : null;
+
+  const currentRepo =
+    draftRepo ??
+    (activeChat?.repo_full_name && activeChat.repo_base_sha
+      ? {
+          fullName: activeChat.repo_full_name,
+          branch: activeChat.repo_branch ?? "",
+          sha: activeChat.repo_base_sha,
+        }
+      : null);
+
   const heading = trashView
     ? "Deleted chats"
     : draft
@@ -595,7 +621,7 @@ export default async function ChatPage({
   } else if (!connection) {
     body = <ConnectPanel />;
   } else if (draft) {
-    body = <DraftChat />;
+    body = <DraftChat repo={draftRepo} />;
   } else if (activeChat && !workspaceView) {
     body = await ChatView({ session, chat: activeChat });
   } else {
@@ -635,6 +661,7 @@ export default async function ChatPage({
           activeChatId={activeChat?.id}
           trashView={trashView}
           trashedCount={trashedChats.length}
+          repo={currentRepo}
         />
       }
       eyebrow={eyebrow}

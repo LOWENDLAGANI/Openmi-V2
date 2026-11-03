@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { OpenmiMark } from "@/components/OpenmiMark";
+import { SearchLauncher } from "@/components/SearchLauncher";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import type { Chat, Folder } from "@/lib/types";
@@ -97,6 +98,7 @@ export function Sidebar({
   activeChatId,
   trashView,
   trashedCount,
+  repo,
 }: {
   email: string;
   folders: Folder[];
@@ -104,7 +106,15 @@ export function Sidebar({
   activeChatId?: string;
   trashView: boolean;
   trashedCount: number;
+  repo?: { fullName: string; branch: string; sha: string } | null;
 }) {
+  // A new chat should start where the reader already is. Without the repo in
+  // this link, picking a repository and pressing "New chat" dropped the
+  // repository and the first answer had nothing to cite.
+  const newChatHref = repo
+    ? `/chat?new=1&repo=${encodeURIComponent(repo.fullName)}&branch=${encodeURIComponent(repo.branch)}&sha=${encodeURIComponent(repo.sha)}`
+    : "/chat?new=1";
+
   const ungrouped = chats.filter((chat) => !chat.folder_id);
   const inFolder = (folderId: string) =>
     chats.filter((chat) => chat.folder_id === folderId);
@@ -132,7 +142,7 @@ export function Sidebar({
 
       <div className="space-y-2 px-3">
         <Link
-          href="/chat?new=1"
+          href={newChatHref}
           className="lift flex w-full items-center justify-center gap-2 rounded-2xl bg-elevated py-2.5 text-[13px] font-medium text-hi hover:bg-hover"
         >
           <span aria-hidden="true" className="text-[15px] leading-none">
@@ -140,6 +150,8 @@ export function Sidebar({
           </span>
           New chat
         </Link>
+
+        <SearchLauncher />
 
         <p className="rounded-full border border-line px-3 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-low">
           one repo · one chat
