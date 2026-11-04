@@ -2,6 +2,8 @@ import "server-only";
 
 import { Daytona } from "@daytona/sdk";
 
+import { executionConfigured } from "@/lib/env";
+
 import {
   DEFAULT_SNAPSHOT,
   EXEC_ALLOWED_DOMAINS,
@@ -25,14 +27,12 @@ import { EXEC_MAX_MINUTES } from "./cost";
  * Off only when the operator says so, or when there is no key. A deployment
  * that adds `DAYTONA_API_KEY` gets execution; a deployment that wants it back
  * off sets `EXECUTION_ENABLED=off` without removing the key.
+ *
+ * The gate itself lives in `lib/env.ts`, which imports no SDK, so the chat
+ * prompt and the setup page can ask the same question without loading Daytona.
+ * Re-exported here because this module is the runner's public face.
  */
-export function executionConfigured(): boolean {
-  const key = process.env.DAYTONA_API_KEY?.trim() ?? "";
-  if (key.length === 0) return false;
-
-  const flag = (process.env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
-  return flag !== "off" && flag !== "false" && flag !== "0";
-}
+export { executionConfigured };
 
 export function executionSnapshot(): string {
   const configured = process.env.EXECUTION_SNAPSHOT?.trim() ?? "";

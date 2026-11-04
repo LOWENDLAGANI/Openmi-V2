@@ -20,7 +20,7 @@ import { assembleContext } from "@/lib/context";
 import { formatDew } from "@/lib/dew";
 import { refundReasonFor } from "@/lib/dew/refund";
 import { refundDewSession, startDewSession } from "@/lib/dew/store";
-import { serverEnv } from "@/lib/env";
+import { executionConfigured, serverEnv } from "@/lib/env";
 import {
   getFile,
   getRepo,
@@ -402,6 +402,10 @@ export async function POST(request: Request) {
     context: context.text,
     notes: context.notes,
     edits: Boolean(repoFullName && sha && sealKey),
+    // The model is told what this deployment can actually do, so "do you have
+    // a Linux environment" gets the true answer: a sandbox exists for a ready
+    // diff, but not as a shell for this chat.
+    sandbox: executionConfigured(),
   });
 
   const plainMessages: ChatMessage[] = [

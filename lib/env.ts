@@ -265,6 +265,23 @@ export function readEnvReport(
   };
 }
 
+/**
+ * Whether this deployment can start a sandbox.
+ *
+ * Presence plus kill switch, in one pure place: the runner, the setup probe and
+ * the chat prompt have to answer "is execution on" identically, and the chat
+ * prompt must not import the sandbox SDK to find out.
+ */
+export function executionConfigured(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const key = (env.DAYTONA_API_KEY ?? "").trim();
+  if (key.length === 0) return false;
+
+  const flag = (env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
+  return flag !== "off" && flag !== "false" && flag !== "0";
+}
+
 /** Typed access for server code. `null` means "not configured", never a throw. */
 export function serverEnv() {
   return {

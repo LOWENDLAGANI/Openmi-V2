@@ -3,13 +3,31 @@
  *
  * Two sentences here do real work. The citation rule keeps an answer
  * checkable, and the no-execution clause is the product's central honesty
- * claim: nothing in this app runs code, so nothing may say it did. Both are
+ * claim: the model observes nothing, so nothing may say it did. Both are
  * asserted in tests/context.test.ts, and the UI copy is checked for the same
  * claim rather than trusted.
+ *
+ * The sandbox clauses separate two facts that used to be one sentence: the
+ * assistant has no shell in a chat turn, and the deployment may still be able
+ * to build a diff on a real Linux sandbox. Denying the second when it is true
+ * made the answer wrong about the product, so the deployment's state is passed
+ * in and only the true sentence is sent.
  */
 
 export const NO_EXECUTION_CLAUSE =
-  "You cannot run code, tests, builds or the app. Never say that anything was run, tested, passed, failed or verified, because you cannot observe that.";
+  "You cannot run code, tests, builds or the app yourself, and you cannot see the output of anything that runs. Never say that anything was run, tested, passed, failed or verified by you.";
+
+/** A deployment with no sandbox key: nothing runs anywhere, and say so. */
+export const NO_SANDBOX_CLAUSE =
+  "This deployment has no sandbox configured, so no code runs here at all. If you are asked whether there is a Linux environment, say that there is none.";
+
+/** A deployment that can verify a diff: the sandbox is real, but not this turn. */
+export const SANDBOX_CLAUSE =
+  "This deployment can install and build a change in a real Linux sandbox (Daytona), but only after the user accepts files in a changeset and starts the verification run on the review card. The runner, not you, chooses the install and build commands, and only the recorded exit code is reported. You cannot start a run, choose its commands or read its output. If you are asked whether a Linux environment is available, say that: not a shell you can use, but a sandbox this deployment starts to verify a diff.";
+
+/** The same deployment, but this chat has no repository, so no diff exists. */
+export const SANDBOX_NO_REPO_CLAUSE =
+  "This deployment can install and build a change in a real Linux sandbox (Daytona), but only for a diff in a chat with a repository: the user accepts files in a changeset and starts the verification run on the review card. This chat has no repository attached, so there is nothing to build. You cannot start a run or read its output. If you are asked whether a Linux environment is available, answer with that distinction rather than saying the deployment has none.";
 
 export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
@@ -28,14 +46,27 @@ export function buildSystemPrompt({
   context,
   notes,
   edits = false,
+  sandbox = false,
 }: {
   repo: string | null;
   sha: string | null;
   context: string;
   notes: string[];
   edits?: boolean;
+  /** True when this deployment can start a verification sandbox. */
+  sandbox?: boolean;
 }): string {
   const lines = [SYSTEM_PROMPT];
+
+  // Said before the repository line, because "is there an environment" is a
+  // question about the deployment, not about this diff.
+  lines.push(
+    !sandbox
+      ? NO_SANDBOX_CLAUSE
+      : repo && sha
+        ? SANDBOX_CLAUSE
+        : SANDBOX_NO_REPO_CLAUSE
+  );
 
   lines.push(
     repo && sha
