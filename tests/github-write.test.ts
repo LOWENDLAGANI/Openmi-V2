@@ -141,7 +141,7 @@ test("one approval creates one agent branch, one commit and one PR", async () =>
   const pr = calls.find((call) => call.method === "POST" && call.path.endsWith("/pulls"));
   expect(pr?.body?.head).toBe("openmi/agent/changeset-1");
   expect(pr?.body?.base).toBe("main");
-  expect(String(pr?.body?.body)).toContain("did not run code");
+  expect(String(pr?.body?.body)).toContain("signed changeset");
 
   expect(calls.filter((call) => call.path.endsWith("/pulls"))).toHaveLength(1);
 });

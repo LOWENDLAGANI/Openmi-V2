@@ -1,5 +1,4 @@
 import { acceptChange, approveProposal, forgetAutoApproval, rejectChange } from "@/app/chat/actions";
-import { ExecutionPanel } from "@/components/ExecutionPanel";
 import { SubmitButton } from "@/components/SubmitButton";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
@@ -193,8 +192,6 @@ export function ReviewPanel({
                   </li>
                 ))}
               </ul>
-
-              <ExecutionPanel changesetId={changeset.id} status={status} />
 
               {status === "ready" && (
                 <form

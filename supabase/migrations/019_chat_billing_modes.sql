@@ -42,7 +42,7 @@ alter table public.dew_transactions
   add constraint dew_transactions_kind_check
   check (kind in (
     'trial', 'daily', 'session', 'request', 'refund', 'invite', 'topup',
-    'adjustment', 'execution', 'execution_refund'
+    'adjustment'
   ));
 
 /**

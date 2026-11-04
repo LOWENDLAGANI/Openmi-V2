@@ -425,7 +425,7 @@ export async function commitProposal({
         "**Files**",
         ...files.map((file) => `- \`${file.path}\``),
         "",
-        "Openmi did not run code, tests or builds for this change. Nothing in this pull request was verified by execution.",
+  
       ].join("\n"),
     }
   ).catch(async (caught) => {

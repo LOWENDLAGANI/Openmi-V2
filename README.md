@@ -11,9 +11,7 @@ tests, and it says so.
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
-**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–9 are
-built. Phase 10 (execution) is gated, not built — four decisions are missing and
-inventing them would ship a sandbox nobody priced.
+**Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–9 are built.
 
 ---
 
@@ -111,7 +109,6 @@ detection, probe classification, and the tool surface.
 | 7 | done | Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
 | 8 | done | Setup env, migration drift and live probes; `/about` truth surface |
 | 9 | done | RLS audit, contrast gate, shared rate limiter, Vercel route config |
-| 10 | built | Sandbox verification — install + build recorded from real exit codes |
 
 ## The agent, and its limits
 
@@ -206,7 +203,7 @@ test where the anon key must read zero profile rows, GitHub token decryption and
 acceptance, and a model-list request for each configured provider. Each probe
 reports its own failure with its own fix; none prints a key.
 
-`/about` states what the product does and does not do: no execution, no default
+`/about` states what the product does and does not do: no default
 branch writes, no merges, no card payments, and no claim of verification.
 
 ## Known limits
@@ -228,8 +225,8 @@ branch writes, no merges, no card payments, and no claim of verification.
   and no offline mode.
 - The rate limiter degrades to allowing a request when neither Upstash nor the
   Postgres function is reachable. The setup page shows which backend is live.
-- Execution is gated (phase 10). There is no sandbox, no test runner and no
-  preview server, and no card may imply one exists.
+- Nothing in this app executes code. There is no sandbox and no test runner, and
+  no surface claims otherwise.
 
 ## Rate limits
 
@@ -293,56 +290,6 @@ These need a real project and token, so they are steps rather than specs:
 7. Try to approve with a read-only token; the refusal names the missing scopes.
 8. Open `/admin` → **Configuration & probes** and confirm the probes report
    per-service state, not "error".
-
-## Sandbox verification
-
-A ready changeset can be installed and built on a real Linux workspace in a
-[Daytona](https://www.daytona.io) sandbox. The card starts the build on its own,
-and a failing build gets up to two model repair passes before it is reported;
-**Install and build** stays available as a manual re-run. The run seeds a copy
-of the repository at the pinned commit, writes the accepted files into it, runs
-the command the runner detected from the lockfile and `package.json`, and
-records the exit code, the duration and the output tail.
-
-- With no `DAYTONA_API_KEY`, the button is disabled and the card says execution
-  is not configured. Nothing else in the product depends on it.
-- Every sentence comes from a stored row. A run that stops reporting says so; a
-  timed-out run says it timed out; a build that exits non-zero says that.
-- Tests are not run. The card never claims a test, a check or a deployment ran.
-- The sandbox holds no tokens, no provider keys and no push credential. It
-  cannot write to GitHub. Approval is still the only write path, and it still
-  only opens an `openmi/agent/` branch.
-- Egress follows the organisation's Daytona network policy by default. A
-  restricted org refuses a per-sandbox `domainAllowList` outright, so the
-  explicit list is sent only when `EXEC_NETWORK_ALLOWLIST=on`, on a tier that
-  accepts it.
-- A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
-  per started minute. The unused reservation is refunded through the same
-  ledger, so `sum(amount)` still equals the balance.
-
-### Automatic verification and standing approval
-
-A turn that proposes a changeset keeps going on its own: the run seeds a
-workspace, applies the diff, builds, and lets the model repair what failed — up
-to two passes, each bounded by the run's wall-clock cap. A pull request opens
-**only if the build really exits 0**. If it still fails, the diff stays on the
-card and nothing is written to GitHub. There is no switch to turn this on: it is
-the default for every ready diff.
-
-The approval form has a second option: **Approve and don't ask again for this
-branch**. It writes the diff now, then remembers the account, the repository and
-the chat's pinned branch. A later ready diff on that branch is written without
-waiting for the approval step. The review card names the branch and offers
-**Turn off** in one click.
-
-That is the whole change: it moves who approves from you to the build result. It
-still writes one `openmi/agent/` branch, still never the default branch, and the
-card still reports what was observed rather than what was hoped.
-
-The four decisions this depends on — what may run (D6.1), what a minute costs
-(D6.2), which secrets are absent (D6.3), and what the card says when a sandbox
-cannot start (D6.4) — are answered in
-[docs/EXECUTION_ENVIRONMENT_PLAN.md](docs/EXECUTION_ENVIRONMENT_PLAN.md).
 
 ## Rules for contributors
 
