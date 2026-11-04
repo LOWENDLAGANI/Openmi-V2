@@ -208,6 +208,13 @@ export const ENV_SPEC: EnvSpec[] = [
     unlocks: "The sandbox image runs start from",
     hint: "Defaults to daytona-medium (2 vCPU, 4 GiB)",
   },
+  {
+    key: "EXEC_NETWORK_ALLOWLIST",
+    scope: "server",
+    required: false,
+    unlocks: "An explicit sandbox egress allowlist (Daytona Tier 3 only)",
+    hint: 'Leave unset on restricted organisations; "on" sends domainAllowList, which they reject',
+  },
 ];
 
 export type EnvStatus = EnvSpec & { present: boolean };

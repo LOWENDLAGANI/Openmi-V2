@@ -39,6 +39,20 @@ export function executionSnapshot(): string {
   return configured.length > 0 ? configured : DEFAULT_SNAPSHOT;
 }
 
+/**
+ * Whether the sandbox should carry an explicit egress list.
+ *
+ * Off by default, on purpose. A restricted Daytona organisation rejects the
+ * field outright — "network access is restricted and cannot be overridden at
+ * the sandbox level" — and the rejection fails every run before a sandbox
+ * exists. So the org's own network policy is the default authority, and the
+ * enumerated list in `commands.ts` is only sent to a tier that accepts it.
+ */
+function networkAllowlistEnabled(): boolean {
+  const flag = (process.env.EXEC_NETWORK_ALLOWLIST ?? "").trim().toLowerCase();
+  return flag === "on" || flag === "true" || flag === "1";
+}
+
 export type ExecResult = {
   command: string;
   exitCode: number;
@@ -118,9 +132,13 @@ export async function createSandbox(runId: string): Promise<SandboxHandle> {
         autoStopInterval: EXEC_MAX_MINUTES + 2,
         labels: { app: "openmi", run: runId },
         public: false,
-        // Deny-by-default. On a Tier 1/2 organisation Daytona's own policy
-        // wins, which is a documented limit rather than a silent difference.
-        domainAllowList: EXEC_ALLOWED_DOMAINS.join(","),
+        // Sent only when the operator says this organisation is on a tier that
+        // accepts it. A restricted org refuses the whole create call when the
+        // field is present, so sending it unconditionally turned every run into
+        // "The sandbox refused the request".
+        ...(networkAllowlistEnabled()
+          ? { domainAllowList: EXEC_ALLOWED_DOMAINS.join(",") }
+          : {}),
       },
       { timeout: 120 }
     );

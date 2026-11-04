@@ -310,6 +310,10 @@ files into it, runs the command the runner detected from the lockfile and
 - The sandbox holds no tokens, no provider keys and no push credential. It
   cannot write to GitHub. Approval is still the only write path, and it still
   only opens an `openmi/agent/` branch.
+- Egress follows the organisation's Daytona network policy by default. A
+  restricted org refuses a per-sandbox `domainAllowList` outright, so the
+  explicit list is sent only when `EXEC_NETWORK_ALLOWLIST=on`, on a tier that
+  accepts it.
 - A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.

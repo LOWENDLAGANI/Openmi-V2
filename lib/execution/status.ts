@@ -118,11 +118,18 @@ export function describeRun(run: ExecutionRunRow | null): RunDescription {
     };
   }
 
+  // A terminal run with nothing charged must not read like a pending reserve:
+  // the promise has already been settled, so "nothing charged yet" was a lie on
+  // a failed start. That sentence is kept for a run that is still live.
   const charge =
     run.reserved_dew > 0 && run.charged_dew > 0
       ? `${run.charged_dew} Dew charged of ${run.reserved_dew} reserved.`
       : run.reserved_dew > 0
-        ? `${run.reserved_dew} Dew reserved; nothing charged yet.`
+        ? run.status === "failed" ||
+          run.status === "timed_out" ||
+          run.status === "cancelled"
+          ? `${run.reserved_dew} Dew reserved; no sandbox time was charged, so the unused reserve settles back.`
+          : `${run.reserved_dew} Dew reserved; nothing charged yet.`
         : null;
 
   if (run.status === "queued" || run.status === "running") {

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import {
   EXEC_ALLOWED_DOMAINS,
@@ -103,6 +104,33 @@ test("the step list cannot drift from what detection produces", () => {
   }
 
   expect(EXEC_STEPS).toEqual(["install", "build", "typecheck"]);
+});
+
+test("the egress allowlist is opt-in, because restricted orgs reject it", () => {
+  const provider = readFileSync(
+    new URL("../lib/execution/provider.ts", import.meta.url),
+    "utf8"
+  );
+
+  // A restricted Daytona org refuses the whole create call when the field is
+  // present, so it must not be sent unconditionally.
+  expect(provider).toContain("networkAllowlistEnabled()");
+  expect(provider).toContain("domainAllowList: EXEC_ALLOWED_DOMAINS.join");
+  expect(provider).toContain("...(networkAllowlistEnabled()");
+});
+
+test("a terminal run with nothing charged does not read as still pending", () => {
+  const failed = describeRun(
+    row({ status: "failed", failure_code: "refused", charged_dew: 0 })
+  );
+
+  expect(failed.charge).toContain("no sandbox time was charged");
+  expect(failed.charge).not.toContain("nothing charged yet");
+
+  const running = describeRun(
+    row({ status: "running", stage: "provision", charged_dew: 0 })
+  );
+  expect(running.charge).toContain("nothing charged yet");
 });
 
 test("egress is an explicit list, never a wildcard", () => {
