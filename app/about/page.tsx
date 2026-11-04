@@ -27,12 +27,12 @@ const DOES = [
 ];
 
 const DOES_NOT = [
-  "It does not run code, tests, builds, a sandbox or a preview server.",
+  "It runs an install and a build in a sandbox when one is configured; it does not run your tests or start a preview server.",
   "It does not write to the default branch. The write client refuses it, and a test asserts the refusal.",
   "It does not merge pull requests, push to a protected branch or clean up branches.",
   "It does not generate a project from nothing, and there is no guest mode.",
   "It does not take card payments; top-ups are operator-issued redeem codes.",
-  "It does not verify a change. No card claims that a test ran, because none did.",
+  "It does not run tests. A card says what a build did, and only from an exit code it observed.",
 ];
 
 export default function AboutPage() {
@@ -156,10 +156,11 @@ export default function AboutPage() {
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           The review card states what the model proposed and what you approved.
-          It never claims a build, test, check or deployment ran. There is no
-          execution environment in this build, and the admin panel tells the
-          operator exactly which configuration is missing instead of failing
-          silently.
+          If a sandbox run recorded an exit code, the card says what that
+          command did and nothing more. It never claims a test ran, because no
+          test is run, and a deployment it did not observe is never mentioned.
+          The admin panel names the configuration that is missing instead of
+          failing silently.
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Full environment and migration status live in the admin panel, behind

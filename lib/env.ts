@@ -187,6 +187,27 @@ export const ENV_SPEC: EnvSpec[] = [
     unlocks: "Shared rate limiter",
     hint: "Upstash Redis REST token",
   },
+  {
+    key: "DAYTONA_API_KEY",
+    scope: "server",
+    required: false,
+    unlocks: "Sandbox verification (install + build on a real Linux workspace)",
+    hint: "Daytona dashboard → API keys; runs stay off until this is set",
+  },
+  {
+    key: "EXECUTION_ENABLED",
+    scope: "server",
+    required: false,
+    unlocks: "A kill switch for sandbox runs",
+    hint: 'Set to "off" to disable runs without removing the key',
+  },
+  {
+    key: "EXECUTION_SNAPSHOT",
+    scope: "server",
+    required: false,
+    unlocks: "The sandbox image runs start from",
+    hint: "Defaults to daytona-medium (2 vCPU, 4 GiB)",
+  },
 ];
 
 export type EnvStatus = EnvSpec & { present: boolean };
@@ -254,5 +275,10 @@ export function serverEnv() {
     githubTokenKey: process.env.GITHUB_TOKEN_KEY ?? null,
     githubOauthClientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? null,
     githubOauthClientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? null,
+    daytonaApiKey: process.env.DAYTONA_API_KEY ?? null,
+    daytonaApiUrl: process.env.DAYTONA_API_URL ?? null,
+    daytonaTarget: process.env.DAYTONA_TARGET ?? null,
+    executionEnabled: process.env.EXECUTION_ENABLED ?? null,
+    executionSnapshot: process.env.EXECUTION_SNAPSHOT ?? null,
   };
 }

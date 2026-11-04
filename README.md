@@ -111,7 +111,7 @@ detection, probe classification, and the tool surface.
 | 7 | done | Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
 | 8 | done | Setup env, migration drift and live probes; `/about` truth surface |
 | 9 | done | RLS audit, contrast gate, shared rate limiter, Vercel route config |
-| 10 | gated | Execution — not buildable; D6.1–D6.4 are open |
+| 10 | built | Sandbox verification — install + build recorded from real exit codes |
 
 ## The agent, and its limits
 
@@ -294,16 +294,30 @@ These need a real project and token, so they are steps rather than specs:
 8. Open `/admin` → **Configuration & probes** and confirm the probes report
    per-service state, not "error".
 
-## Phase 10 is gated
+## Sandbox verification
 
-Execution is **not buildable** without four decisions: what may run (D6.1), what
-sandbox time costs in Dew (D6.2), which secrets are absent from it (D6.3), and
-what the card says when it cannot start (D6.4). The rule that cannot be relaxed
-is that every card state must come from a real observation: timed out says timed
-out, cannot start says cannot start, and there is no optimistic default.
+A ready changeset can be installed and built on a real Linux workspace in a
+[Daytona](https://www.daytona.io) sandbox. The card offers **Install and build**;
+the run seeds a copy of the repository at the pinned commit, writes the accepted
+files into it, runs the command the runner detected from the lockfile and
+`package.json`, and records the exit code, the duration and the output tail.
 
-Nothing in this build runs code, and `tests/execution-gate.test.ts` fails if a
-surface starts claiming otherwise or a sandbox dependency appears.
+- With no `DAYTONA_API_KEY`, the button is disabled and the card says execution
+  is not configured. Nothing else in the product depends on it.
+- Every sentence comes from a stored row. A run that stops reporting says so; a
+  timed-out run says it timed out; a build that exits non-zero says that.
+- Tests are not run. The card never claims a test, a check or a deployment ran.
+- The sandbox holds no tokens, no provider keys and no push credential. It
+  cannot write to GitHub. Approval is still the only write path, and it still
+  only opens an `openmi/agent/` branch.
+- A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
+  per started minute. The unused reservation is refunded through the same
+  ledger, so `sum(amount)` still equals the balance.
+
+The four decisions this depends on — what may run (D6.1), what a minute costs
+(D6.2), which secrets are absent (D6.3), and what the card says when a sandbox
+cannot start (D6.4) — are answered in
+[docs/EXECUTION_ENVIRONMENT_PLAN.md](docs/EXECUTION_ENVIRONMENT_PLAN.md).
 
 ## Rules for contributors
 

@@ -366,7 +366,14 @@ P0 foundation
 
 ## 19. Phase 10 — Execution (gated, not v1)
 
-**Status: not buildable.** Four decisions are missing, and inventing them would produce a sandbox that costs money nobody priced.
+**Status: built, verification only.** The four decisions are answered in
+`docs/EXECUTION_ENVIRONMENT_PLAN.md`: enumerated commands, 0.05 Dew per started
+minute, no secrets in the sandbox, and a specific state for every way a run can
+fail. What ships is the verification half of this phase — seed, apply, install,
+build — because it is the half whose result can be observed and stated without
+inventing anything. The agent does not yet run commands of its own inside the
+workspace; its edits still arrive as a changeset, which is exactly what a run
+verifies.
 
 | Task | Work | Blocked on |
 |---|---|---|

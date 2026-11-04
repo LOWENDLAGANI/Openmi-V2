@@ -234,13 +234,54 @@ async function probeProviders(): Promise<Probe[]> {
   );
 }
 
+/**
+ * Sandbox configuration, not reachability.
+ *
+ * This deliberately does not create a sandbox to prove it can: a probe that
+ * spends money to answer "is billing configured" is a probe that runs on every
+ * setup page load. What it can prove is that a key exists and that the kill
+ * switch is not holding it off, which is exactly what decides whether the
+ * review card offers the button.
+ */
+async function probeExecution(): Promise<Probe> {
+  const base = { id: "execution", label: "Sandbox verification" } as const;
+
+  const key = process.env.DAYTONA_API_KEY?.trim() ?? "";
+  if (key.length === 0) {
+    return {
+      ...base,
+      state: "unconfigured",
+      detail: "DAYTONA_API_KEY is not set, so runs cannot start and the card says so.",
+      fix: "Create a key at app.daytona.io and add DAYTONA_API_KEY.",
+    };
+  }
+
+  const flag = (process.env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
+  if (flag === "off" || flag === "false" || flag === "0") {
+    return {
+      ...base,
+      state: "skipped",
+      detail: "EXECUTION_ENABLED is off, so runs are disabled even though a key is present.",
+      fix: "Unset EXECUTION_ENABLED or set it to on.",
+    };
+  }
+
+  return {
+    ...base,
+    state: "ok",
+    detail:
+      "A Daytona key is present. Runs start on demand; this probe does not create one.",
+  };
+}
+
 export async function runSetupProbes(session: Session): Promise<Probe[]> {
-  const [supabase, rls, github, providers] = await Promise.all([
+  const [supabase, rls, github, execution, providers] = await Promise.all([
     probeSupabase(),
     probeRls(),
     probeGithub(session),
+    probeExecution(),
     probeProviders(),
   ]);
 
-  return [supabase, rls, github, ...providers];
+  return [supabase, rls, github, execution, ...providers];
 }
