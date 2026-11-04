@@ -16,7 +16,13 @@ import {
   isConverted,
 } from "@/lib/billing/currency";
 import { getMyrRates, withLiveRate } from "@/lib/billing/rates";
-import { paymentLink, PLANS, planById } from "@/lib/billing/plans";
+import {
+  PAID_BENEFITS,
+  PLANS,
+  TOPUP_PAUSED,
+  paymentLink,
+  planById,
+} from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
 import { getSession } from "@/lib/session";
@@ -210,6 +216,34 @@ export default async function PayPage({
           upload it below. Approval adds the Dew and switches the account to the
           paid daily allowance.
         </p>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-raised px-4 py-3">
+          <div>
+            <p className="eyebrow">wallet credit</p>
+            <p className="mt-0.5 font-mono text-[16px] leading-none text-hi">
+              {formatDew(profile?.wallet ?? 0)}{" "}
+              <span className="text-[10px] uppercase tracking-[0.1em] text-low">
+                dew
+              </span>
+            </p>
+          </div>
+          <p className="max-w-xs text-[10.5px] leading-relaxed text-low">
+            Spent only after the daily balance cannot cover a charge, and only
+            when the two together can.
+          </p>
+        </div>
+
+        <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
+          {PAID_BENEFITS.map((benefit) => (
+            <li
+              key={benefit}
+              className="flex items-center gap-2 text-[11.5px] leading-relaxed text-mid"
+            >
+              <span aria-hidden="true" className="size-1 rounded-full bg-accent" />
+              {benefit}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <AdBanner className="mt-6" />
@@ -232,7 +266,20 @@ export default async function PayPage({
           </a>
         </div>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {TOPUP_PAUSED && (
+          <p
+            role="status"
+            className="mt-3 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] leading-relaxed text-warn"
+          >
+            <span className="mr-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
+              paused
+            </span>
+            Card and hosted-page top-ups are paused while payments are being
+            tested. Nothing is charged here; a code you already hold still works.
+          </p>
+        )}
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {PLANS.map((plan) => (
             <div
               key={plan.id}
@@ -254,6 +301,9 @@ export default async function PayPage({
                 <span className="ml-1 text-[10px] uppercase tracking-[0.12em] text-low">
                   dew
                 </span>
+              </p>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
+                {plan.days ? `${plan.days} days` : "one-off"}
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-mid">
                 {plan.blurb}
@@ -281,6 +331,11 @@ export default async function PayPage({
           </h2>
           <p className="text-[10.5px] text-low">no receipt required</p>
         </div>
+
+        <p className="mt-2 rounded-2xl border border-line bg-raised px-4 py-2.5 text-[10.5px] leading-relaxed text-low">
+          Codes still work while top-ups are paused: an operator issues them and
+          no checkout is involved.
+        </p>
 
         <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-mid">
           A code adds Dew the moment it is redeemed. Deducting takes Dew off your
@@ -457,9 +512,17 @@ export default async function PayPage({
           <SubmitButton
             className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2"
             pendingText="Uploading the receipt…"
+            disabled={TOPUP_PAUSED}
           >
-            Submit receipt
+            {TOPUP_PAUSED ? "Top-ups paused" : "Submit receipt"}
           </SubmitButton>
+
+          {TOPUP_PAUSED && (
+            <p className="text-[10.5px] leading-relaxed text-warn sm:col-span-2">
+              Receipt uploads are paused with the rest of the top-up path. A
+              redeemed code is the only way Dew arrives while this is on.
+            </p>
+          )}
         </form>
       </section>
 

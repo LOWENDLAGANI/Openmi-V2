@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
+import { ChargeDialog, type ChargeMode } from "@/components/ChargeDialog";
+import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
+import { DEW_PER_HOUR, DEW_PER_REQUEST } from "@/lib/dew";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
@@ -40,6 +43,8 @@ export function ChatPanel({
   pinnedPath,
   providerReady,
   initialRunning,
+  dew,
+  chargeMode,
 }: {
   chatId: string | null;
   repo: RepoRef;
@@ -50,6 +55,10 @@ export function ChatPanel({
   pinnedPath: string | null;
   providerReady: boolean;
   initialRunning: boolean;
+  /** The two balances a charge can draw on. */
+  dew: { balance: number; wallet: number };
+  /** How this chat's messages are paid for after the first choice. */
+  chargeMode: ChargeMode;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<UiMessage[]>(() =>
@@ -75,6 +84,21 @@ export function ChatPanel({
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
   const [atBottom, setAtBottom] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId);
+  // The first message of a new chat waits here until a price is chosen.
+  const [chargeFor, setChargeFor] = useState<string | null>(null);
+  // What the reader picked for this chat, so the messages after the first one
+  // keep the same mode before the server-rendered row catches up.
+  const [chosenMode, setChosenMode] = useState<ChargeMode>(chargeMode);
+  const [modeChosen, setModeChosen] = useState(chatId !== null);
+  const heroRef = useStagger<HTMLDivElement>(".motion-word, .motion-chip", {
+    stagger: 0.05,
+    delay: 0.05,
+  });
+  const [conflict, setConflict] = useState<{
+    content: string;
+    mode: ChargeMode;
+    chatId: string | null;
+  } | null>(null);
 
   const createdChatRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -128,17 +152,19 @@ export function ChatPanel({
   }, [backgroundRunning, streaming, activeChatId, router]);
 
   // Follow the transcript only while the reader is already at the end. A
-  // smooth scroll per token is a stutter, so streaming moves instantly and a
-  // finished message eases in.
+  // tween per token is a stutter, so streaming jumps and a finished message is
+  // the one arrival that eases. The reader can still scroll away: autoKill in
+  // `scrollToBottom` stops the tween rather than fighting them.
   useEffect(() => {
     if (!atBottom) return;
     const element = scrollRef.current;
     if (!element) return;
 
-    element.scrollTo({
-      top: element.scrollHeight,
-      behavior: pending.length > 0 ? "auto" : "smooth",
-    });
+    const tween = scrollToBottom(element, pending.length > 0);
+
+    return () => {
+      tween?.kill();
+    };
   }, [messages, pending, steps, backgroundRunning, atBottom]);
 
   // A composer that grows with the question instead of showing a scrollbar
@@ -194,7 +220,42 @@ export function ChatPanel({
     }
   }
 
-  async function send(content: string, turnToken?: string) {
+  /**
+   * A new chat asks how to pay before anything is sent; an existing chat already
+   * has an answer, stored on its row. Typing must never cost Dew silently.
+   */
+  function beginSend(content: string) {
+    if (busyRef.current) return;
+    if (content.trim().length === 0) return;
+
+    if (activeChatId === null) {
+      setChargeFor(content);
+      return;
+    }
+
+    void send(content, undefined, chosenMode);
+  }
+
+  async function endAndRetry(pendingChoose: { content: string; mode: ChargeMode }) {
+    try {
+      await fetch("/api/dew/end-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+    } catch {
+      // The retry is the test: a session that did not end answers 409 again.
+    }
+
+    setConflict(null);
+    await send(pendingChoose.content, undefined, pendingChoose.mode);
+  }
+
+  async function send(
+    content: string,
+    turnToken?: string,
+    mode: ChargeMode = chosenMode
+  ) {
     const continuation = typeof turnToken === "string";
 
     if (busyRef.current) return;
@@ -249,16 +310,29 @@ export function ChatPanel({
                 repo: repo?.fullName,
                 branch: repo?.branch,
                 sha: repo?.sha,
+                mode,
               }
         ),
         signal: controller.signal,
       });
 
-      if (!response.ok || !response.body) {
-        const payload = (await response.json().catch(() => null)) as
-          | { error?: string }
+      if (!response.ok || !response.body) {        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; code?: string; activeChatId?: string | null }
           | null;
+
         setError(payload?.error ?? `The request failed (${response.status}).`);
+
+        // A running hour is not a failure to retry blindly; the server names the
+        // chat that holds it, and the reader decides between continuing there
+        // and ending it.
+        if (payload?.code === "hour-active") {
+          setConflict({
+            content,
+            mode,
+            chatId: payload.activeChatId ?? null,
+          });
+        }
+
         if (optimisticId) {
           const failedId = optimisticId;
           setMessages((current) => current.filter((message) => message.id !== failedId));
@@ -544,9 +618,19 @@ export function ChatPanel({
         className="min-h-0 flex-1 overflow-y-auto py-2"
       >
         {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center py-10 text-center">
+          <div
+            ref={heroRef}
+            className="flex h-full flex-col items-center justify-center py-10 text-center"
+          >
             <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-              {repo ? "Ask about this repo." : "What are you building?"}
+              {(repo ? "Ask about this repo." : "What are you building?")
+                .split(" ")
+                .map((word, index) => (
+                  <span key={`${word}-${index}`} className="motion-word inline-block">
+                    {word}
+                    {index === 0 ? "\u00A0" : ""}
+                  </span>
+                ))}
             </h2>
             <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-low">
               {repo
@@ -559,9 +643,9 @@ export function ChatPanel({
                 <button
                   key={suggestion.label}
                   type="button"
-                  onClick={() => void send(suggestion.prompt)}
+                  onClick={() => beginSend(suggestion.prompt)}
                   disabled={streaming}
-                  className="group flex items-center gap-2 rounded-full border border-line-strong bg-card px-4 py-2 text-[12px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
+                  className="motion-chip group flex items-center gap-2 rounded-full border border-line-strong bg-card px-4 py-2 text-[12px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
                 >
                   <span
                     aria-hidden="true"
@@ -576,9 +660,9 @@ export function ChatPanel({
           <div className="space-y-7">
             {messages.map((message) =>
               message.role === "user" ? (
-                <article
+                <EnteringArticle
                   key={message.id}
-                  className="rise-in flex flex-col items-end gap-1"
+                  className="flex flex-col items-end gap-1"
                 >
                   <div className="msg-user-bubble max-w-[88%] whitespace-pre-wrap">
                     {message.content}
@@ -590,9 +674,9 @@ export function ChatPanel({
                   >
                     edit
                   </button>
-                </article>
+                </EnteringArticle>
               ) : (
-                <article key={message.id} className="rise-in group max-w-[94%]">
+                <EnteringArticle key={message.id} className="group max-w-[94%]">
                   <div className="flex items-center justify-between gap-2 pb-1">
                     <span className={`model-badge ${badgeFor(message.model)}`}>
                       {modelLabel(message.model)}
@@ -613,7 +697,7 @@ export function ChatPanel({
                       chatId={activeChatId ?? ""}
                     />
                   </div>
-                </article>
+                </EnteringArticle>
               )
             )}
 
@@ -663,6 +747,44 @@ export function ChatPanel({
         </ul>
       )}
 
+      {conflict && (
+        <div
+          role="alert"
+          className="mb-2 space-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] text-warn"
+        >
+          <p className="leading-relaxed">
+            An hour of chat is already running
+            {conflict.chatId ? " in another chat" : ""}. Continue there, or end
+            that session and start a new one here.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {conflict.chatId && (
+              <a
+                href={`/chat?chat=${conflict.chatId}`}
+                className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+              >
+                Open that chat
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => void endAndRetry(conflict)}
+              disabled={streaming}
+              className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90 disabled:opacity-50"
+            >
+              End session &amp; retry
+            </button>
+            <button
+              type="button"
+              onClick={() => setConflict(null)}
+              className="text-[11px] underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div
           role="alert"
@@ -703,7 +825,7 @@ export function ChatPanel({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void send(draft);
+              beginSend(draft);
             }}
           >
             <div className="rounded-[24px] border border-line-strong bg-card px-2 pb-2 pt-2 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.7)] transition-colors focus-within:border-accent/45">
@@ -714,7 +836,7 @@ export function ChatPanel({
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
-                    void send(draft);
+                    beginSend(draft);
                   }
                 }}
                 rows={1}
@@ -733,6 +855,31 @@ export function ChatPanel({
                     value={model}
                     onChange={(id) => setModel(id as ModelId)}
                   />
+
+                  {/* What the next message costs, so the price is never a
+                      surprise after the answer. */}
+                  <span
+                    title={
+                      modeChosen
+                        ? chosenMode === "hour"
+                          ? "Every message in this chat is covered for the hour."
+                          : "Each message in this chat is charged separately."
+                        : "You choose the price when the first message sends."
+                    }
+                    className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`size-1 rounded-full ${
+                        modeChosen ? "bg-accent" : "bg-line-strong"
+                      }`}
+                    />
+                    {modeChosen
+                      ? chosenMode === "hour"
+                        ? `hour · ${DEW_PER_HOUR} dew`
+                        : `msg · ${DEW_PER_REQUEST} dew`
+                      : "pay on send"}
+                  </span>
 
                   {meter && (
                     <ContextCircle
@@ -789,6 +936,40 @@ export function ChatPanel({
           </p>
         </div>
       </div>
+
+      <ChargeDialog
+        open={chargeFor !== null}
+        balance={dew.balance}
+        wallet={dew.wallet}
+        hourPrice={DEW_PER_HOUR}
+        requestPrice={DEW_PER_REQUEST}
+        pending={streaming}
+        onCancel={() => setChargeFor(null)}
+        onChoose={(mode) => {
+          const content = chargeFor;
+          setChargeFor(null);
+          setChosenMode(mode);
+          setModeChosen(true);
+          if (content) void send(content, undefined, mode);
+        }}
+      />
     </div>
+  );
+}
+
+/** One transcript entry, animated once when it joins the conversation. */
+function EnteringArticle({
+  className,
+  children,
+}: {
+  className: string;
+  children: ReactNode;
+}) {
+  const ref = useEnter<HTMLElement>();
+
+  return (
+    <article ref={ref} className={className}>
+      {children}
+    </article>
   );
 }

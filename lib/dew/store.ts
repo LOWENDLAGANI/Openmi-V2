@@ -1,6 +1,6 @@
 import "server-only";
 
-import { DEW_PER_HOUR, formatDew } from "@/lib/dew";
+import { DEW_PER_HOUR, DEW_PER_REQUEST, formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -17,20 +17,36 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
 
+export type ChargeMode = "hour" | "request";
+
 export type DewSession = {
   sessionId: string;
   started: boolean;
   expiresAt: string;
   balance: number;
+  /** Paid wallet credit left after the charge. */
+  wallet: number;
   price: number;
+  mode: ChargeMode;
+  /** True when the charge was split between the balance and the wallet. */
+  combined: boolean;
 };
 
 export type DewGate =
   | { ok: true; session: DewSession }
-  | { ok: false; error: string; balance: number | null };
+  | {
+      ok: false;
+      error: string;
+      balance: number | null;
+      code: "hour-active" | "no-dew";
+      /** The chat holding the running hour, when the database named one. */
+      activeChatId: string | null;
+    };
 
 export type DewProfile = {
   balance: number;
+  /** Paid credit, spent only after the daily balance cannot cover a charge. */
+  wallet: number;
   timezone: string;
   hasPaid: boolean;
   inviteCode: string | null;
@@ -54,52 +70,127 @@ export async function refillDailyDew(supabase: Client): Promise<number | null> {
   return Number(data);
 }
 
+/**
+ * The gate, in one place for both modes.
+ *
+ * `hour` starts (or reuses, in the same chat) a three-Dew hour. `request`
+ * charges two Dew for one message and is refused while an hour is running,
+ * because the hour already covers that message. Neither price is a parameter:
+ * the browser chooses a mode, never a number.
+ */
 export async function startDewSession(
   supabase: Client,
   model: string,
-  repo: string | null
+  repo: string | null,
+  options: { chatId: string | null; mode: ChargeMode }
 ): Promise<DewGate> {
-  const { data, error } = await supabase.rpc("start_hour_session", {
-    p_model: model,
-    p_repo: repo,
-  });
+  const { chatId, mode } = options;
+  const price = mode === "request" ? DEW_PER_REQUEST : DEW_PER_HOUR;
+
+  const { data, error } =
+    mode === "request"
+      ? await supabase.rpc("charge_chat_request", {
+          p_model: model,
+          p_chat_id: chatId,
+          p_repo: repo,
+        })
+      : await supabase.rpc("start_hour_session", {
+          p_model: model,
+          p_repo: repo,
+          p_chat_id: chatId,
+        });
 
   if (error) {
     const message = errorText(error);
+
+    // An active hour is a state, not a failure: the composer offers the chat
+    // that holds it and an explicit "end session" instead of a retry loop.
+    if (/hour active/i.test(message)) {
+      const found = message.match(/hour active in ([0-9a-f-]{36})/i);
+      const activeChatId = found ? found[1] : null;
+
+      return {
+        ok: false,
+        balance: null,
+        code: "hour-active",
+        activeChatId,
+        error: activeChatId
+          ? "An hour of chat is already running in another chat. Open that chat to continue, or end the session and start a new one here."
+          : "An hour of chat is already running. Continue in that chat, or end the session and start a new one here.",
+      };
+    }
 
     if (message.includes("insufficient balance")) {
       return {
         ok: false,
         balance: null,
-        error: `This hour costs ${formatDew(DEW_PER_HOUR)} Dew, and the balance is too low. Top up with a code or wait for the daily refill.`,
+        code: "no-dew",
+        activeChatId: null,
+        error:
+          mode === "request"
+            ? `This message costs ${formatDew(price)} Dew, and the balance and wallet cannot cover it. Redeem a code or wait for the daily refill.`
+            : `This hour costs ${formatDew(price)} Dew, and the balance and wallet cannot cover it. Redeem a code or wait for the daily refill.`,
       };
     }
 
     return {
       ok: false,
       balance: null,
+      code: "no-dew",
+      activeChatId: null,
       error: `Dew could not be charged, so nothing was sent to a provider: ${message.replace(/^dew:\s*/, "")}`,
     };
   }
 
   const row = (Array.isArray(data) ? data[0] : data) as
-    | { session_id: string; started: boolean; expires_at: string; balance: number | string; price: number | string }
+    | {
+        session_id?: string;
+        started?: boolean;
+        expires_at?: string;
+        balance?: number | string;
+        wallet?: number | string;
+        price?: number | string;
+        combined?: boolean;
+      }
     | undefined;
 
   if (!row) {
-    return { ok: false, balance: null, error: "Dew did not return a session." };
+    return {
+      ok: false,
+      balance: null,
+      code: "no-dew",
+      activeChatId: null,
+      error: "Dew did not return a session.",
+    };
   }
 
   return {
     ok: true,
     session: {
-      sessionId: String(row.session_id),
-      started: Boolean(row.started),
-      expiresAt: String(row.expires_at),
-      balance: Number(row.balance),
-      price: Number(row.price),
+      sessionId: row.session_id ? String(row.session_id) : "",
+      // A per-request charge is always a charge; an hour may already be running
+      // for this chat, in which case the turn is free.
+      started: mode === "request" ? true : Boolean(row.started),
+      expiresAt: row.expires_at ? String(row.expires_at) : "",
+      balance: Number(row.balance ?? 0),
+      wallet: Number(row.wallet ?? 0),
+      price: Number(row.price ?? price),
+      mode,
+      combined: Boolean(row.combined),
     },
   };
+}
+
+/** Ends the running hour so a new one can start in this chat. No refund. */
+export async function endHourSession(
+  supabase: Client,
+  chatId: string | null
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("end_hour_session", {
+    p_chat_id: chatId,
+  });
+
+  return !error && Boolean(data);
 }
 
 export async function refundDewSession(
@@ -163,7 +254,7 @@ export async function readDewProfile(
 ): Promise<DewProfile | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("dew_balance, timezone, has_paid, invite_code, invited_by")
+    .select("dew_balance, wallet_dew, timezone, has_paid, invite_code, invited_by")
     .eq("id", owner)
     .maybeSingle();
 
@@ -171,6 +262,7 @@ export async function readDewProfile(
 
   const row = data as {
     dew_balance: number | string;
+    wallet_dew?: number | string;
     timezone: string;
     has_paid: boolean;
     invite_code: string | null;
@@ -179,6 +271,7 @@ export async function readDewProfile(
 
   return {
     balance: Number(row.dew_balance),
+    wallet: Number(row.wallet_dew ?? 0),
     timezone: row.timezone ?? "UTC",
     hasPaid: Boolean(row.has_paid),
     inviteCode: row.invite_code,

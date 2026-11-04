@@ -5,6 +5,7 @@ import {
   DAILY_FREE_DEW,
   DEW_DUST_FLOOR,
   DEW_PER_HOUR,
+  DEW_PER_REQUEST,
   DEW_PRECISION,
   HOUR_SESSION_MS,
   INVITE_REWARD_DEW,
@@ -40,6 +41,19 @@ test("the documented Dew numbers are the exported constants", () => {
   expect(LOW_BALANCE_DEW).toBe(10);
   expect(INVITE_REWARD_DEW).toBe(5);
   expect(MAX_INVITES_PER_ACCOUNT).toBe(10);
+});
+
+test("a request costs two Dew and the deployed function agrees", () => {
+  expect(DEW_PER_REQUEST).toBe(2);
+
+  const migration = readFileSync(
+    new URL("../supabase/migrations/019_chat_billing_modes.sql", import.meta.url),
+    "utf8"
+  );
+
+  expect(migration).toContain("select 2::numeric");
+  // The price is not a parameter any caller can set.
+  expect(migration).not.toMatch(/charge_dew_with_wallet\([\s\S]*p_price/);
 });
 
 test("the deployed refill allowance matches the constants", () => {
@@ -94,6 +108,19 @@ test("the activity timezones include the profile default and reject junk", () =>
 test("top-up packs are positive and ordered", () => {
   expect(TOPUP_PACKS[0]).toBeGreaterThan(0);
   expect([...TOPUP_PACKS]).toEqual([...TOPUP_PACKS].sort((a, b) => a - b));
+});
+
+test("top-ups read as paused, and the paid benefits are the ones advertised", () => {
+  const page = readFileSync(new URL("../app/pay/page.tsx", import.meta.url), "utf8");
+  const plans = readFileSync(new URL("../lib/billing/plans.ts", import.meta.url), "utf8");
+
+  expect(page).toContain("TOPUP_PAUSED");
+  expect(page).toContain("paused");
+  expect(page).toContain("PAID_BENEFITS");
+  expect(plans).toContain("export const TOPUP_PAUSED = true");
+  expect(plans).toContain("Bumped up to 15 Dew a day");
+  expect(plans).toContain("Priority support");
+  expect(plans).toContain("Everything in free");
 });
 
 test("the charge gate runs before any provider request", () => {

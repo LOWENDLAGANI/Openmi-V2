@@ -409,7 +409,7 @@ async function RepoSurface({
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const models = modelCatalogue();
 
-  const [messages, changesets, runningTurn] = await Promise.all([
+  const [messages, changesets, runningTurn, profileResult] = await Promise.all([
     listMessages(session.supabase, chat.id),
     loadChangesets(session.supabase, chat.id),
     // A turn keeps running after the tab closes. Reading the flag here is what
@@ -423,7 +423,25 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .gt("expires_at", new Date().toISOString())
       .limit(1)
       .maybeSingle(),
+    session.supabase
+      .from("profiles")
+      .select("dew_balance, wallet_dew")
+      .eq("id", session.user.id)
+      .maybeSingle(),
   ]);
+
+  const balances = (profileResult.data ?? {}) as {
+    dew_balance?: number | string;
+    wallet_dew?: number | string;
+  };
+  const dew = {
+    balance: Number(balances.dew_balance ?? 0),
+    wallet: Number(balances.wallet_dew ?? 0),
+  };
+  const chatChargeMode =
+    (chat as { charge_mode?: string }).charge_mode === "request"
+      ? ("request" as const)
+      : ("hour" as const);
 
   let repo: { fullName: string; branch: string; sha: string } | null = null;
   let validPaths: string[] = [];
@@ -489,18 +507,44 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           pinnedPath={null}
           providerReady={providersConfigured()}
           initialRunning={Boolean(runningTurn.data)}
+          dew={dew}
+          chargeMode={chatChargeMode}
         />
       </div>
     </div>
   );
 }
 
-function DraftChat({
+async function DraftChat({
   repo,
 }: {
   repo: { fullName: string; branch: string; sha: string } | null;
 }) {
   const models = modelCatalogue();
+
+  // The composer offers a price before the chat exists, so it needs both
+  // balances. Reading them here keeps the call site a repository and nothing
+  // else, which is what the draft-chat test pins.
+  let dew = { balance: 0, wallet: 0 };
+  const session = await getSession();
+
+  if (session.state === "signed-in") {
+    const { data } = await session.supabase
+      .from("profiles")
+      .select("dew_balance, wallet_dew")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    const row = (data ?? {}) as {
+      dew_balance?: number | string;
+      wallet_dew?: number | string;
+    };
+
+    dew = {
+      balance: Number(row.dew_balance ?? 0),
+      wallet: Number(row.wallet_dew ?? 0),
+    };
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -514,6 +558,8 @@ function DraftChat({
         pinnedPath={null}
         providerReady={providersConfigured()}
         initialRunning={false}
+        dew={dew}
+        chargeMode="hour"
       />
     </div>
   );
@@ -563,11 +609,18 @@ export default async function ChatPage({
       )
       .order("updated_at", { ascending: false }),
     readConnection(supabase, user.id),
-    supabase.from("profiles").select("dew_balance").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("dew_balance, wallet_dew")
+      .eq("id", user.id)
+      .maybeSingle(),
   ]);
 
   const dewBalance = Number(
     (profileResult.data as { dew_balance?: number | string } | null)?.dew_balance ?? 0
+  );
+  const dewWallet = Number(
+    (profileResult.data as { wallet_dew?: number | string } | null)?.wallet_dew ?? 0
   );
 
   const folders = (foldersResult.data ?? []) as Folder[];
@@ -742,7 +795,7 @@ export default async function ChatPage({
 
           <Link
             href="/activity"
-            title={`An hour of chat costs ${DEW_PER_HOUR} Dew. Low balance shows amber below ${LOW_BALANCE_DEW}.`}
+            title={`An hour of chat costs ${DEW_PER_HOUR} Dew, or ${2} Dew for one message. Wallet credit ${formatDew(dewWallet)}; low balance shows amber below ${LOW_BALANCE_DEW}.`}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
               lowBalance
                 ? "border-warn/35 bg-warn/8 text-warn"

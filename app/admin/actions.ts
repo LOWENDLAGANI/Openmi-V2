@@ -92,6 +92,38 @@ export async function grantDew(formData: FormData) {
   redirect("/admin?done=topup");
 }
 
+/**
+ * Giveaways: a batch of codes an operator can hand out.
+ *
+ * The codes are minted by the database and redeemed one at a time. A giveaway
+ * is kind `operator`, so it adds Dew without switching an account to the paid
+ * allowance — a gift is not a plan.
+ */
+export async function createGiveawayCodes(formData: FormData) {
+  const supabase = await actingClient();
+
+  const amount = Number(field(formData, "amount"));
+  const count = Number(field(formData, "count") || "1");
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    fail("Enter a positive Dew amount.");
+  }
+  if (!Number.isFinite(count) || count < 1 || count > 50) {
+    fail("Issue between 1 and 50 codes.");
+  }
+
+  const { error } = await supabase.rpc("admin_create_dew_codes", {
+    p_amount: Math.round(amount * 1000) / 1000,
+    p_count: Math.round(count),
+    p_note: field(formData, "note") || null,
+  });
+
+  if (error) fail(error.message.replace(/^giveaway:\s*/, ""));
+
+  revalidatePath("/admin");
+  redirect("/admin?done=giveaway");
+}
+
 export async function setAdmin(formData: FormData) {
   const supabase = await actingClient();
 

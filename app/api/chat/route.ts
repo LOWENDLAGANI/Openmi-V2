@@ -19,7 +19,12 @@ import {
 import { assembleContext } from "@/lib/context";
 import { formatDew } from "@/lib/dew";
 import { refundReasonFor } from "@/lib/dew/refund";
-import { refundDewSession, startDewSession } from "@/lib/dew/store";
+import {
+  refundDewSession,
+  startDewSession,
+  type ChargeMode,
+  type DewGate,
+} from "@/lib/dew/store";
 import { executionConfigured, serverEnv } from "@/lib/env";
 import {
   getFile,
@@ -57,6 +62,8 @@ type ChatRequest = {
   model?: unknown;
   path?: unknown;
   turn?: unknown;
+  /** "hour" or "request": how this message is paid for. */
+  mode?: unknown;
   /** The repository a draft chat was started from, if any. */
   repo?: unknown;
   branch?: unknown;
@@ -111,6 +118,8 @@ export async function POST(request: Request) {
 
   const continuationToken = typeof body.turn === "string" ? body.turn : null;
   const content = typeof body.content === "string" ? body.content.trim() : "";
+  const requestedMode: ChargeMode | null =
+    body.mode === "request" ? "request" : body.mode === "hour" ? "hour" : null;
 
   let chatId =
     typeof body.chatId === "string" && body.chatId.length > 0 ? body.chatId : "";
@@ -173,7 +182,7 @@ export async function POST(request: Request) {
 
     const { data: created, error: createError } = await session.supabase
       .from("chats")
-      .insert({ owner: session.user.id, title: "New chat", ...pin })
+      .insert({ owner: session.user.id, title: "New chat", charge_mode: requestedMode ?? "hour", ...pin })
       .select("id")
       .single();
 
@@ -204,16 +213,24 @@ export async function POST(request: Request) {
     ? (body.model as string)
     : DEFAULT_MODEL;
 
+
   // RLS decides whether this chat exists for this account; the select is the
   // request, not a second authority.
   const { data: chat, error } = await session.supabase
     .from("chats")
-    .select("id, repo_full_name, repo_base_sha")
+    .select("id, repo_full_name, repo_base_sha, charge_mode")
     .eq("id", chatId)
     .maybeSingle();
 
   if (error) return json({ error: error.message }, 500);
   if (!chat) return json({ error: "That chat does not exist." }, 404);
+
+  // A chat's first answer decides how the rest of it is paid for, so the mode
+  // lives on the row rather than in the tab that typed the question.
+  const chatChargeMode: ChargeMode =
+    (chat as { charge_mode?: string }).charge_mode === "request"
+      ? "request"
+      : "hour";
 
   // The gate is before any provider call, not after. Nothing has been spent
   // when this returns, and the composer says so rather than failing silently.
@@ -228,22 +245,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Charged only after the deployment can actually answer, so a missing
-  // provider key never costs an hour. An hour that is still running is reused,
-  // so a second turn inside it costs nothing more.
-  const dew = await startDewSession(
-    session.supabase,
-    model,
-    typeof chat.repo_full_name === "string" ? chat.repo_full_name : null
-  );
-
-  if (!dew.ok) {
-    return json({ error: dew.error, code: "no-dew" }, 402);
-  }
-
   const sealKey = serverEnv().githubTokenKey;
 
   let continuation: { turnId: string; steps: number; exp: number } | null = null;
+  let turnChargeMode: ChargeMode = requestedMode ?? chatChargeMode;
 
   if (continuationToken) {
     if (!sealKey) {
@@ -276,7 +281,7 @@ export async function POST(request: Request) {
     // longer has is a replay of a spent turn, and it is refused here.
     const { data: row, error: rowError } = await session.supabase
       .from("agent_turns")
-      .select("turn_id, steps, expires_at")
+      .select("turn_id, steps, expires_at, charge_mode")
       .eq("turn_id", verified.payload.turnId)
       .maybeSingle();
 
@@ -302,6 +307,46 @@ export async function POST(request: Request) {
       steps: Number(row.steps),
       exp: verified.payload.exp,
     };
+
+    turnChargeMode =
+      (row as { charge_mode?: string }).charge_mode === "request"
+        ? "request"
+        : "hour";
+  }
+
+  // Charged only after the deployment can answer and after a continuation has
+  // proved it belongs to this chat, so a bad token never costs anything. A
+  // continuation of a per-request turn is the same request, not a second one,
+  // so it is not charged again.
+  let dew: DewGate;
+  if (continuation && turnChargeMode === "request") {
+    dew = {
+      ok: true,
+      session: {
+        sessionId: "",
+        started: false,
+        expiresAt: "",
+        balance: 0,
+        wallet: 0,
+        price: 0,
+        mode: "request",
+        combined: false,
+      },
+    };
+  } else {
+    dew = await startDewSession(
+      session.supabase,
+      model,
+      typeof chat.repo_full_name === "string" ? chat.repo_full_name : null,
+      { chatId, mode: turnChargeMode }
+    );
+  }
+
+  if (!dew.ok) {
+    return json(
+      { error: dew.error, code: dew.code, activeChatId: dew.activeChatId },
+      dew.code === "hour-active" ? 409 : 402
+    );
   }
 
   const turnId = continuation?.turnId ?? newTurnId();
@@ -335,6 +380,7 @@ export async function POST(request: Request) {
       owner: session.user.id,
       chat_id: chatId,
       model,
+      charge_mode: turnChargeMode,
       prompt_hash: hashPrompt(content),
       max_steps: MAX_STEPS,
       expires_at: new Date(expiresAt).toISOString(),
@@ -519,14 +565,20 @@ export async function POST(request: Request) {
       });
 
       // A charge is a fact the reader should see, not a silent balance change.
-      // Sent only when an hour actually started: a turn inside a running hour
-      // costs nothing and says nothing.
+      // Sent only when something was actually charged: a turn inside a running
+      // hour costs nothing and says nothing.
       if (dew.session.started) {
         send("dew", {
           charged: true,
+          mode: dew.session.mode,
           price: dew.session.price,
           balance: dew.session.balance,
-          label: `Started an hour of chat: ${formatDew(dew.session.price)} Dew charged. Balance ${formatDew(dew.session.balance)}.`,
+          wallet: dew.session.wallet,
+          combined: dew.session.combined,
+          label:
+            dew.session.mode === "request"
+              ? `Charged ${formatDew(dew.session.price)} Dew for this message. Balance ${formatDew(dew.session.balance)}.`
+              : `Started an hour of chat: ${formatDew(dew.session.price)} Dew charged. Balance ${formatDew(dew.session.balance)}.`,
         });
       }
 

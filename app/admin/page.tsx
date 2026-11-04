@@ -10,7 +10,7 @@ import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { grantDew, reviewReceipt, setAdmin } from "./actions";
+import { createGiveawayCodes, grantDew, reviewReceipt, setAdmin } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +125,7 @@ export default async function AdminPage({
     );
   }
 
-  const [requestsResult, adminsResult, membersResult, balancesResult] =
+  const [requestsResult, adminsResult, membersResult, balancesResult, codesResult] =
     await Promise.all([
       admin
         .from("payment_requests")
@@ -141,7 +141,19 @@ export default async function AdminPage({
         .limit(50),
       admin.from("profiles").select("id", { count: "exact", head: true }),
       admin.from("profiles").select("dew_balance").limit(5000),
+      admin
+        .from("dew_codes")
+        .select("code, dew_amount, note, created_at, redeemed_at")
+        .order("created_at", { ascending: false })
+        .limit(12),
     ]);
+
+  const giveawayCodes = (codesResult.data ?? []) as Array<{
+    code: string;
+    dew_amount: number | string;
+    note: string | null;
+    redeemed_at: string | null;
+  }>;
 
   const requests = (requestsResult.data ?? []) as RequestRow[];
   const adminRows = (adminsResult.data ?? []) as Array<{
@@ -262,7 +274,9 @@ export default async function AdminPage({
               ? "Receipt rejected. The note is visible to the member."
               : params.done === "topup"
                 ? "Dew added to that account."
-                : params.done === "granted"
+                : params.done === "giveaway"
+                  ? "Giveaway codes created. They are listed below."
+                  : params.done === "granted"
                   ? "Admin access granted."
                   : "Admin access revoked."}
         </p>
@@ -574,6 +588,78 @@ export default async function AdminPage({
               Add Dew
             </SubmitButton>
           </form>
+        </section>
+
+        <section aria-labelledby="giveaway-heading" className="panel p-5">
+          <h2
+            id="giveaway-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
+            Giveaway codes
+          </h2>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
+            Mint codes that add Dew once each, for a launch or a support gesture.
+            A giveaway does not switch an account to the paid allowance.
+          </p>
+
+          <form action={createGiveawayCodes} className="mt-3 space-y-2">
+            <Field label="Dew each">
+              <input
+                name="amount"
+                type="number"
+                min="1"
+                step="1"
+                required
+                className="field py-1.5 font-mono text-[12px]"
+              />
+            </Field>
+            <Field label="How many">
+              <input
+                name="count"
+                type="number"
+                min="1"
+                max="50"
+                defaultValue="5"
+                required
+                className="field py-1.5 font-mono text-[12px]"
+              />
+            </Field>
+            <Field label="Note">
+              <input
+                name="note"
+                maxLength={120}
+                placeholder="launch giveaway"
+                className="field py-1.5 text-[12px]"
+              />
+            </Field>
+            <SubmitButton
+              className="btn btn-primary w-full py-2 text-[12px]"
+              pendingText="Minting codes…"
+            >
+              Create codes
+            </SubmitButton>
+          </form>
+
+          {giveawayCodes.length === 0 ? (
+            <p className="mt-3 text-[11.5px] text-low">No codes issued yet.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-line">
+              {giveawayCodes.map((row) => (
+                <li
+                  key={row.code}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2"
+                >
+                  <span className="break-all font-mono text-[11px] text-hi">
+                    {row.code}
+                  </span>
+                  <span className="font-mono text-[10px] text-low">
+                    {formatDew(Number(row.dew_amount))} Dew ·{" "}
+                    {row.redeemed_at ? "redeemed" : "unused"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section aria-labelledby="admins-heading" className="panel p-5">
