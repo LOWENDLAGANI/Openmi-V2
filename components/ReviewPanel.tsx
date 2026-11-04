@@ -57,10 +57,13 @@ export function ReviewPanel({
   changesets,
   chatId,
   chatSha,
+  autopilot,
 }: {
   changesets: ReviewChangeset[];
   chatId: string;
   chatSha: string | null;
+  /** When the chat is in autopilot, the card starts the run without a click. */
+  autopilot: boolean;
 }) {
   if (changesets.length === 0) return null;
 
@@ -164,7 +167,11 @@ export function ReviewPanel({
                 ))}
               </ul>
 
-              <ExecutionPanel changesetId={changeset.id} status={status} />
+              <ExecutionPanel
+                changesetId={changeset.id}
+                status={status}
+                autopilot={autopilot}
+              />
 
               {status === "ready" && (
                 <form

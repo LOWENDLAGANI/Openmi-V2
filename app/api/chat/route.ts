@@ -636,6 +636,25 @@ export async function POST(request: Request) {
             status: finalized.status,
             files: finalized.files,
           });
+
+          // Autopilot: this turn only says the diff is ready. The review card
+          // starts the run on its own request, because a build needs more time
+          // than this function's 60 s ceiling allows — the card's route has its
+          // own 300 s budget and is the only place a sandbox is created.
+          if (finalized.status === "ready" && githubToken) {
+            const { data: chatRow } = await session.supabase
+              .from("chats")
+              .select("autopilot")
+              .eq("id", chatId)
+              .maybeSingle();
+
+            if (Boolean((chatRow as { autopilot?: boolean } | null)?.autopilot)) {
+              send("notice", {
+                message:
+                  "Autopilot is on: this diff will be built in a sandbox, and a pull request opens only if the build exits 0.",
+              });
+            }
+          }
         } catch (caught) {
           send("notice", {
             message: `The changeset could not be prepared: ${messageOf(caught)}`,

@@ -144,6 +144,7 @@ export async function POST(request: Request) {
   after(async () => {
     await executeRun({
       admin,
+      supabase: session.supabase,
       owner,
       runId,
       token: githubToken,

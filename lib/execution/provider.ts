@@ -51,6 +51,8 @@ export type SandboxHandle = {
   id: string;
   exec: (command: string, cwd?: string) => Promise<ExecResult>;
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
+  /** Reads a workspace file for a repair pass. Bounded before it is decoded. */
+  readText: (remotePath: string, maxBytes?: number) => Promise<string>;
   destroy: () => Promise<void>;
 };
 
@@ -165,6 +167,15 @@ export async function createSandbox(runId: string): Promise<SandboxHandle> {
     },
     async upload(bytes, remotePath) {
       await sandbox.fs.uploadFile(bytes, remotePath);
+    },
+    async readText(remotePath, maxBytes = 200_000) {
+      const bytes = await sandbox.fs.downloadFile(remotePath);
+
+      if (bytes.byteLength > maxBytes) {
+        throw new Error(`${remotePath} is ${bytes.byteLength} bytes, over the ${maxBytes} byte cap`);
+      }
+
+      return bytes.toString("utf8");
     },
     async destroy() {
       try {

@@ -314,6 +314,19 @@ files into it, runs the command the runner detected from the lockfile and
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.
 
+### Autopilot
+
+A chat can be put in autopilot from the header (`autopilot off → on`). With it
+on, a turn that proposes a changeset keeps going: the run seeds a workspace,
+applies the diff, builds, and lets the model repair what failed — up to two
+passes, each bounded by the run's wall-clock cap. A pull request opens **only
+if the build really exits 0**. If it still fails, the diff stays on the card and
+nothing is written to GitHub.
+
+That is the whole change: it moves who approves from you to the build result. It
+still writes one `openmi/agent/` branch, still never the default branch, and the
+card still reports what was observed rather than what was hoped.
+
 The four decisions this depends on — what may run (D6.1), what a minute costs
 (D6.2), which secrets are absent (D6.3), and what the card says when a sandbox
 cannot start (D6.4) — are answered in

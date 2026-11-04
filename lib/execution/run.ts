@@ -3,16 +3,30 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { safeRepoPath } from "@/lib/changesets";
-import { changesetDisplayStatus, type ChangesetStatus } from "@/lib/changesets";
+import {
+  changesetContentHash,
+  changesetDisplayStatus,
+  signChangeset,
+  type ChangesetStatus,
+} from "@/lib/changesets";
+import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
+import { unifiedDiff } from "@/lib/diff";
 import { getFile, getTree } from "@/lib/github/read";
+import type { ModelId } from "@/lib/models";
 import type { supabaseAdmin } from "@/lib/supabase/admin";
 import type { supabaseServer } from "@/lib/supabase/server";
 
 import { fetchRepoArchive } from "./archive";
-import { EXEC_WORKDIR, detectCommands, type DetectedCommands } from "./commands";
+import {
+  EXEC_STEP_TIMEOUT_MS,
+  EXEC_WORKDIR,
+  detectCommands,
+  type DetectedCommands,
+} from "./commands";
 import { reserveExecutionDew, settleExecutionDew } from "@/lib/dew/store";
 
 import { EXEC_MAX_MINUTES, EXEC_RESERVE_DEW, chargeForDuration } from "./cost";
+import { MAX_REPAIR_PASSES, requestRepair } from "./repair";
 import { createSandbox, SandboxStartError, type SandboxHandle } from "./provider";
 import { appendEvent, clearStaleRuns, createRun, updateRun } from "./store";
 import type { ExecutionStage, FailureCode } from "./status";
@@ -46,6 +60,8 @@ export type RunContext = {
   changesetId: string;
   repo: string;
   baseSha: string;
+  /** The chat's model, used only for a repair pass. */
+  model: string;
   files: ProposedFile[];
 };
 
@@ -133,6 +149,17 @@ export async function startExecutionRun(input: {
     };
   }
 
+  const { data: chatRow } = await supabase
+    .from("chats")
+    .select("model")
+    .eq("id", changeset.chat_id)
+    .maybeSingle();
+
+  const model =
+    typeof (chatRow as { model?: unknown } | null)?.model === "string"
+      ? String((chatRow as { model: string }).model)
+      : "auto";
+
   // A unique index allows one live run per account. Clearing a stale row first
   // is what keeps a crashed run from locking the account out forever.
   await clearStaleRuns(admin, owner);
@@ -188,6 +215,7 @@ export async function startExecutionRun(input: {
       changesetId,
       repo: changeset.repo_full_name,
       baseSha: changeset.base_sha,
+      model,
       files,
     },
   };
@@ -200,10 +228,17 @@ export async function startExecutionRun(input: {
  */
 export async function executeRun(input: {
   admin: AdminClient;
+  /** The request's own client, used only for the automatic approval. */
+  supabase: SessionClient;
   owner: string;
   runId: string;
   token: string;
   context: RunContext;
+  /** Let the model repair a failing build, up to MAX_REPAIR_PASSES. */
+  repair?: boolean;
+  /** Open the pull request when the build really exits 0. */
+  autoApprove?: boolean;
+  sealKey?: string | null;
 }): Promise<void> {
   const startedAt = Date.now();
   let seq = 0;
@@ -350,20 +385,84 @@ export async function executeRun(input: {
       return;
     }
 
-    if (detected.build) {
-      await stage("build");
-      const result = await sandbox.exec(detected.build, EXEC_WORKDIR);
-      await event("step", `${detected.build} → exit ${result.exitCode}`);
-      await event("output", result.output || "(no output)");
+    const buildCommand = detected.build;
+
+    if (buildCommand) {
+      const runBuild = async () => {
+        await stage("build");
+        // The cast is for the closure boundary: `sandbox` is assigned in the
+        // `provision` stage above and every failure path there returns.
+        const result = await (sandbox as SandboxHandle).exec(buildCommand, EXEC_WORKDIR);
+        await event("step", `${buildCommand} → exit ${result.exitCode}`);
+        await event("output", result.output || "(no output)");
+        return result;
+      };
+
+      let result = await runBuild();
+      let repairs = 0;
+
+      // The autonomy loop: build, show the model the failure, rebuild. Bounded
+      // twice — two passes, and the run's own wall-clock cap — because a model
+      // that has not fixed a compile error twice is not going to on the fifth.
+      while (
+        result.exitCode !== 0 &&
+        input.repair &&
+        repairs < MAX_REPAIR_PASSES &&
+        Date.now() - startedAt < EXEC_MAX_MINUTES * 60_000
+      ) {
+        repairs += 1;
+        await event("observation", `repair pass ${repairs} after exit ${result.exitCode}`);
+
+        const repaired = await repairOnce({
+          // Narrowed by the successful `createSandbox` above; the cast is for
+          // the closure boundary, not a claim that it could still be null.
+          sandbox: sandbox as SandboxHandle,
+          admin: input.admin,
+          owner: input.owner,
+          model: input.context.model,
+          repo: input.context.repo,
+          changesetId: input.context.changesetId,
+          command: buildCommand,
+          exitCode: result.exitCode,
+          output: result.output,
+          paths: input.context.files.map((file) => file.path),
+          attempt: repairs,
+          signal: AbortSignal.timeout(EXEC_STEP_TIMEOUT_MS * 2),
+          event,
+        });
+
+        if (!repaired.ok) {
+          await event(
+            "observation",
+            `repair ${repairs} produced nothing usable: ${repaired.error}`
+          );
+          break;
+        }
+
+        result = await runBuild();
+      }
 
       if (result.exitCode !== 0) {
         await finish({
           status: "failed",
           failure_code: "build_failed",
-          failure_detail: `\`${detected.build}\` exited ${result.exitCode}.`,
+          failure_detail: `\`${buildCommand}\` exited ${result.exitCode}${
+            repairs > 0 ? ` after ${repairs} repair pass(es)` : ""
+          }.`,
           exit_code: result.exitCode,
         });
         return;
+      }
+
+      if (input.autoApprove) {
+        await autoApproveRun({
+          supabase: input.supabase,
+          admin: input.admin,
+          owner: input.owner,
+          context: input.context,
+          sealKey: input.sealKey ?? null,
+          event,
+        });
       }
 
       await finish({ status: "done", exit_code: 0 });
@@ -518,4 +617,213 @@ async function applyFiles(
 
   await event("observation", `${files.length} file(s) applied to ${repo}`);
   return { ok: true };
+}
+
+/**
+ * One repair pass: read what this turn changed, ask the model for whole files,
+ * write them into the workspace, and keep the changeset in step with them.
+ *
+ * The changeset is updated rather than recreated, so the diff a reader sees
+ * after a repair is the diff that will be committed — not the first attempt.
+ */
+async function repairOnce(input: {
+  sandbox: SandboxHandle;
+  admin: AdminClient;
+  owner: string;
+  model: string;
+  repo: string;
+  changesetId: string;
+  command: string;
+  exitCode: number;
+  output: string;
+  paths: string[];
+  attempt: number;
+  signal: AbortSignal;
+  event: (kind: "status" | "step" | "output" | "observation", body: string) => Promise<void>;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const files: Array<{ path: string; text: string }> = [];
+
+  for (const path of input.paths) {
+    const safe = safeRepoPath(path);
+    if (!safe) continue;
+
+    try {
+      files.push({
+        path: safe,
+        text: await input.sandbox.readText(`${EXEC_WORKDIR}/${safe}`),
+      });
+    } catch {
+      // A file that cannot be read is simply not shown to the model; it is
+      // still in the workspace and still part of the changeset.
+    }
+  }
+
+  const proposed = await requestRepair({
+    model: input.model as ModelId,
+    repo: input.repo,
+    command: input.command,
+    exitCode: input.exitCode,
+    output: input.output,
+    files,
+    attempt: input.attempt,
+    signal: input.signal,
+  });
+
+  if (!proposed.ok) return { ok: false, error: proposed.error };
+  if (proposed.edits.length === 0) {
+    return { ok: false, error: "the model proposed no edits" };
+  }
+
+  for (const edit of proposed.edits) {
+    const path = safeRepoPath(edit.path);
+    if (!path) return { ok: false, error: `${edit.path} is not a repository path` };
+
+    const content = edit.content ?? "";
+
+    try {
+      await input.sandbox.upload(Buffer.from(content, "utf8"), `${EXEC_WORKDIR}/${path}`);
+    } catch (caught) {
+      return {
+        ok: false,
+        error: `${path} could not be written: ${
+          caught instanceof Error ? caught.message : "upload failed"
+        }`,
+      };
+    }
+
+    const saved = await saveRepairedFile(input.admin, {
+      changesetId: input.changesetId,
+      owner: input.owner,
+      path,
+      content,
+    });
+
+    if (!saved.ok) return { ok: false, error: saved.error };
+
+    await input.event("step", `repaired ${path}`);
+  }
+
+  return { ok: true };
+}
+
+async function saveRepairedFile(
+  admin: AdminClient,
+  input: { changesetId: string; owner: string; path: string; content: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data } = await admin
+    .from("changeset_files")
+    .select("id, original_content")
+    .eq("changeset_id", input.changesetId)
+    .eq("path", input.path)
+    .maybeSingle();
+
+  const existing = data as { id: string; original_content: string | null } | null;
+  const original = existing?.original_content ?? null;
+  const diff = unifiedDiff(original ?? "", input.content);
+
+  const row = {
+    changeset_id: input.changesetId,
+    owner: input.owner,
+    path: input.path,
+    mode: "write",
+    original_content: original,
+    proposed_content: input.content,
+    diff: diff.text,
+    additions: diff.additions,
+    deletions: diff.deletions,
+    diff_truncated: diff.truncated,
+    accepted: true,
+    error: null,
+  };
+
+  const { error } = existing
+    ? await admin.from("changeset_files").update(row).eq("id", existing.id)
+    : await admin.from("changeset_files").insert(row);
+
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/**
+ * The automatic approval.
+ *
+ * It re-signs first, because a repair changed the content and the signature
+ * covers exactly that content. Then it calls the one approval function the
+ * product has — the same one a click calls — so the branch namespace, the
+ * default-branch refusal and the idempotency all still apply.
+ */
+async function autoApproveRun(input: {
+  supabase: SessionClient;
+  admin: AdminClient;
+  owner: string;
+  context: RunContext;
+  sealKey: string | null;
+  event: (kind: "status" | "step" | "output" | "observation", body: string) => Promise<void>;
+}): Promise<void> {
+  if (!input.sealKey) {
+    await input.event(
+      "observation",
+      "autopilot could not sign the changeset: GITHUB_TOKEN_KEY is missing"
+    );
+    return;
+  }
+
+  const { data } = await input.admin
+    .from("changeset_files")
+    .select("path, proposed_content, accepted, error")
+    .eq("changeset_id", input.context.changesetId);
+
+  const accepted = ((data ?? []) as Array<{
+    path: string;
+    proposed_content: string;
+    accepted: boolean;
+    error: string | null;
+  }>).filter((file) => file.accepted && file.error === null);
+
+  if (accepted.length === 0) {
+    await input.event("observation", "autopilot had no accepted files to commit");
+    return;
+  }
+
+  const contentHash = changesetContentHash(
+    accepted.map((file) => ({ path: file.path, proposed: file.proposed_content }))
+  );
+  const signature = signChangeset(
+    {
+      changesetId: input.context.changesetId,
+      baseSha: input.context.baseSha,
+      contentHash,
+    },
+    input.sealKey
+  );
+
+  const { error } = await input.admin
+    .from("changesets")
+    .update({ content_hash: contentHash, signature })
+    .eq("id", input.context.changesetId);
+
+  if (error) {
+    await input.event("observation", `autopilot could not re-sign: ${error.message}`);
+    return;
+  }
+
+  const approved = await approveChangesetAndOpenPullRequest(input.supabase, {
+    changesetId: input.context.changesetId,
+    owner: input.owner,
+    sealKey: input.sealKey,
+  });
+
+  if (!approved.ok) {
+    await input.event(
+      "observation",
+      `autopilot could not open a pull request: ${approved.error}`
+    );
+    return;
+  }
+
+  await input.event(
+    "observation",
+    approved.prUrl
+      ? `autopilot opened ${approved.prUrl} on ${approved.branch}`
+      : `autopilot committed ${approved.branch}`
+  );
 }

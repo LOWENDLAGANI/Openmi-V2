@@ -162,6 +162,31 @@ export async function purgeChat(formData: FormData) {
   redirect("/chat?trash=1");
 }
 
+/**
+ * Autopilot is a property of one conversation, not an account preference:
+ * "finish this and push it" is a decision about this request. Turning it on
+ * does not approve anything by itself; it lets the turn that follows verify its
+ * own diff and open the pull request if the build exits 0.
+ */
+export async function setAutopilot(formData: FormData) {
+  const { supabase, user } = await acting();
+  const chatId = field(formData, "chatId");
+  const enabled = field(formData, "enabled") === "1";
+
+  if (!chatId) fail("That chat no longer exists.");
+
+  const { error } = await supabase
+    .from("chats")
+    .update({ autopilot: enabled })
+    .eq("id", chatId)
+    .eq("owner", user.id);
+
+  if (error) fail(error.message);
+
+  revalidatePath("/chat");
+  redirect(`/chat?chat=${encodeURIComponent(chatId)}`);
+}
+
 export async function emptyTrash() {
   const { supabase, user } = await acting();
 

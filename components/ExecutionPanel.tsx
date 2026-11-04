@@ -31,15 +31,19 @@ const POLL_MS = 2_500;
 export function ExecutionPanel({
   changesetId,
   status,
+  autopilot = false,
 }: {
   changesetId: string;
   status: string;
+  /** Start the run without a click when the chat is in autopilot. */
+  autopilot?: boolean;
 }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const autoStartedRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -123,6 +127,18 @@ export function ExecutionPanel({
       setCancelling(false);
     }
   }
+
+  // Autopilot starts exactly one run per card. The ref makes a re-render or a
+  // reload that finds a fresh payload harmless, and a server that already has a
+  // run keeps the decision instead of starting a second one.
+  useEffect(() => {
+    if (!autopilot || status !== "ready") return;
+    if (!payload || payload.configured === false) return;
+    if (payload.run || autoStartedRef.current) return;
+
+    autoStartedRef.current = true;
+    void start();
+  }, [autopilot, status, payload]);
 
   const run = payload?.run ?? null;
   const description = payload?.description ?? describeRun(run);

@@ -9,7 +9,11 @@ What ships is seed → apply → install → build, with the exit code recorded 
 rendered. What is deliberately *not* in this build:
 
 - the agent does not get a shell of its own; it proposes a changeset in chat,
-  and the run verifies that changeset (P10-T3 below is still open);
+  and the run verifies that changeset. Autopilot (`chats.autopilot`) closes the
+  loop without a shell: a failing build is fed back to the model as a request
+  for whole files, for at most two passes, and only a build that exits 0 opens
+  the pull request (the remaining half of P10-T3 is the model driving the
+  workspace directly, which this deliberately does not do);
 - charging is implemented through the existing ledger
   (`017_execution_dew.sql`): reserve 0.5 Dew before the sandbox, settle at 0.05
   Dew per started minute, refund the unused part;
