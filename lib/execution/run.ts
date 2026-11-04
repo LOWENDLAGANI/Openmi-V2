@@ -762,7 +762,7 @@ async function autoApproveRun(input: {
   if (!input.sealKey) {
     await input.event(
       "observation",
-      "autopilot could not sign the changeset: GITHUB_TOKEN_KEY is missing"
+      "the automatic approval could not sign the changeset: GITHUB_TOKEN_KEY is missing"
     );
     return;
   }
@@ -780,7 +780,7 @@ async function autoApproveRun(input: {
   }>).filter((file) => file.accepted && file.error === null);
 
   if (accepted.length === 0) {
-    await input.event("observation", "autopilot had no accepted files to commit");
+    await input.event("observation", "the automatic approval had no accepted files to commit");
     return;
   }
 
@@ -802,7 +802,7 @@ async function autoApproveRun(input: {
     .eq("id", input.context.changesetId);
 
   if (error) {
-    await input.event("observation", `autopilot could not re-sign: ${error.message}`);
+    await input.event("observation", `the automatic approval could not re-sign: ${error.message}`);
     return;
   }
 
@@ -815,7 +815,7 @@ async function autoApproveRun(input: {
   if (!approved.ok) {
     await input.event(
       "observation",
-      `autopilot could not open a pull request: ${approved.error}`
+      `the automatic approval could not open a pull request: ${approved.error}`
     );
     return;
   }
@@ -823,7 +823,7 @@ async function autoApproveRun(input: {
   await input.event(
     "observation",
     approved.prUrl
-      ? `autopilot opened ${approved.prUrl} on ${approved.branch}`
-      : `autopilot committed ${approved.branch}`
+      ? `the automatic approval opened ${approved.prUrl} on ${approved.branch}`
+      : `the automatic approval committed ${approved.branch}`
   );
 }

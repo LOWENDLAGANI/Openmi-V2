@@ -1,4 +1,4 @@
-import { acceptChange, approveProposal, rejectChange } from "@/app/chat/actions";
+import { acceptChange, approveProposal, forgetAutoApproval, rejectChange } from "@/app/chat/actions";
 import { ExecutionPanel } from "@/components/ExecutionPanel";
 import { SubmitButton } from "@/components/SubmitButton";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
@@ -57,13 +57,16 @@ export function ReviewPanel({
   changesets,
   chatId,
   chatSha,
-  autopilot,
+  chatBranch,
+  autoApproveBranch,
 }: {
   changesets: ReviewChangeset[];
   chatId: string;
   chatSha: string | null;
-  /** When the chat is in autopilot, the card starts the run without a click. */
-  autopilot: boolean;
+  /** The branch this chat is pinned to, shown on the standing approval. */
+  chatBranch: string | null;
+  /** Set when this branch is already approved without asking. */
+  autoApproveBranch: string | null;
 }) {
   if (changesets.length === 0) return null;
 
@@ -118,6 +121,30 @@ export function ReviewPanel({
                 </p>
               )}
 
+              {autoApproveBranch && (
+                <div className="rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5">
+                  <p className="text-[11px] leading-relaxed text-accent-text">
+                    Auto-approve is on for{" "}
+                    <span className="font-mono">{autoApproveBranch}</span>: a ready
+                    diff on this branch is written without asking.
+                  </p>
+                  <form action={forgetAutoApproval} className="mt-2">
+                    <input type="hidden" name="chatId" value={chatId} />
+                    <input
+                      type="hidden"
+                      name="branch"
+                      value={autoApproveBranch}
+                    />
+                    <SubmitButton
+                      className="btn px-3 py-1 text-[10.5px]"
+                      pendingText="Saving…"
+                    >
+                      Turn off
+                    </SubmitButton>
+                  </form>
+                </div>
+              )}
+
               <ul className="space-y-2">
                 {changeset.files.map((file) => (
                   <li
@@ -167,11 +194,7 @@ export function ReviewPanel({
                 ))}
               </ul>
 
-              <ExecutionPanel
-                changesetId={changeset.id}
-                status={status}
-                autopilot={autopilot}
-              />
+              <ExecutionPanel changesetId={changeset.id} status={status} />
 
               {status === "ready" && (
                 <form
@@ -180,6 +203,20 @@ export function ReviewPanel({
                 >
                   <input type="hidden" name="changesetId" value={changeset.id} />
                   <input type="hidden" name="chatId" value={chatId} />
+
+                  <label className="flex items-start gap-2 text-[11px] leading-relaxed text-body">
+                    <input
+                      type="checkbox"
+                      name="remember"
+                      value="1"
+                      className="mt-0.5 size-3 accent-current"
+                    />
+                    <span>
+                      Approve and don&apos;t ask again for{" "}
+                      <span className="font-mono">{chatBranch ?? "main"}</span>.
+                      Future diffs on this branch are written without this step.
+                    </span>
+                  </label>
 
                   <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <legend className="eyebrow mb-1 w-full">Destination</legend>

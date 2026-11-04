@@ -106,6 +106,20 @@ test("the step list cannot drift from what detection produces", () => {
   expect(EXEC_STEPS).toEqual(["install", "build", "typecheck"]);
 });
 
+test("a run repairs its own build and approves only a zero exit by default", () => {
+  const route = readFileSync(
+    new URL("../app/api/execution/runs/route.ts", import.meta.url),
+    "utf8"
+  );
+
+  expect(route).toContain("repair: true");
+  expect(route).toContain("autoApprove: true");
+  expect(route).toContain("sealKey: serverEnv().githubTokenKey");
+  // No switch left to read: verification is the default.
+  expect(route).not.toContain("autopilot");
+  expect(route).not.toContain("autoApprove = Boolean(");
+});
+
 test("the egress allowlist is opt-in, because restricted orgs reject it", () => {
   const provider = readFileSync(
     new URL("../lib/execution/provider.ts", import.meta.url),

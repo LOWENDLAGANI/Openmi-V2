@@ -297,10 +297,12 @@ These need a real project and token, so they are steps rather than specs:
 ## Sandbox verification
 
 A ready changeset can be installed and built on a real Linux workspace in a
-[Daytona](https://www.daytona.io) sandbox. The card offers **Install and build**;
-the run seeds a copy of the repository at the pinned commit, writes the accepted
-files into it, runs the command the runner detected from the lockfile and
-`package.json`, and records the exit code, the duration and the output tail.
+[Daytona](https://www.daytona.io) sandbox. The card starts the build on its own,
+and a failing build gets up to two model repair passes before it is reported;
+**Install and build** stays available as a manual re-run. The run seeds a copy
+of the repository at the pinned commit, writes the accepted files into it, runs
+the command the runner detected from the lockfile and `package.json`, and
+records the exit code, the duration and the output tail.
 
 - With no `DAYTONA_API_KEY`, the button is disabled and the card says execution
   is not configured. Nothing else in the product depends on it.
@@ -318,14 +320,20 @@ files into it, runs the command the runner detected from the lockfile and
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.
 
-### Autopilot
+### Automatic verification and standing approval
 
-A chat can be put in autopilot from the header (`autopilot off → on`). With it
-on, a turn that proposes a changeset keeps going: the run seeds a workspace,
-applies the diff, builds, and lets the model repair what failed — up to two
-passes, each bounded by the run's wall-clock cap. A pull request opens **only
-if the build really exits 0**. If it still fails, the diff stays on the card and
-nothing is written to GitHub.
+A turn that proposes a changeset keeps going on its own: the run seeds a
+workspace, applies the diff, builds, and lets the model repair what failed — up
+to two passes, each bounded by the run's wall-clock cap. A pull request opens
+**only if the build really exits 0**. If it still fails, the diff stays on the
+card and nothing is written to GitHub. There is no switch to turn this on: it is
+the default for every ready diff.
+
+The approval form has a second option: **Approve and don't ask again for this
+branch**. It writes the diff now, then remembers the account, the repository and
+the chat's pinned branch. A later ready diff on that branch is written without
+waiting for the approval step. The review card names the branch and offers
+**Turn off** in one click.
 
 That is the whole change: it moves who approves from you to the build result. It
 still writes one `openmi/agent/` branch, still never the default branch, and the

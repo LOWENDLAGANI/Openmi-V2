@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 
+import { serverEnv } from "@/lib/env";
 import { executionConfigured } from "@/lib/execution/provider";
 import { executeRun, startExecutionRun } from "@/lib/execution/run";
 import { readEvents, readRunForChangeset } from "@/lib/execution/store";
@@ -141,6 +142,9 @@ export async function POST(request: Request) {
   const owner = session.user.id;
   const githubToken = token;
 
+  // Verification is the default, not a mode. The run repairs a failing build,
+  // and the approval that follows is gated on a real exit 0 inside
+  // `executeRun`, so nothing is written to GitHub unless the build passes.
   after(async () => {
     await executeRun({
       admin,
@@ -149,6 +153,9 @@ export async function POST(request: Request) {
       runId,
       token: githubToken,
       context,
+      repair: true,
+      autoApprove: true,
+      sealKey: serverEnv().githubTokenKey,
     });
   });
 

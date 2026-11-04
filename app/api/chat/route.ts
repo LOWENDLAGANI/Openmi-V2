@@ -10,6 +10,8 @@ import {
 } from "@/lib/agent/envelope";
 import { runAgent } from "@/lib/agent/run";
 import type { EditRequest } from "@/lib/changesets";
+import { readAutoApproval } from "@/lib/changesets/autoapproval";
+import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import {
   addEdits,
   createChangeset,
@@ -218,7 +220,7 @@ export async function POST(request: Request) {
   // request, not a second authority.
   const { data: chat, error } = await session.supabase
     .from("chats")
-    .select("id, repo_full_name, repo_base_sha, charge_mode")
+    .select("id, repo_full_name, repo_base_sha, charge_mode, repo_branch")
     .eq("id", chatId)
     .maybeSingle();
 
@@ -693,22 +695,57 @@ export async function POST(request: Request) {
             files: finalized.files,
           });
 
-          // Autopilot: this turn only says the diff is ready. The review card
-          // starts the run on its own request, because a build needs more time
-          // than this function's 60 s ceiling allows — the card's route has its
-          // own 300 s budget and is the only place a sandbox is created.
+          // The build itself starts from the card, because it needs more time
+          // than this function's 60 s ceiling allows. A ready diff is verified
+          // automatically; a branch with a standing approval is written now
+          // instead of waiting for that build.
           if (finalized.status === "ready" && githubToken) {
             const { data: chatRow } = await session.supabase
               .from("chats")
-              .select("autopilot")
+              .select("repo_branch")
               .eq("id", chatId)
               .maybeSingle();
 
-            if (Boolean((chatRow as { autopilot?: boolean } | null)?.autopilot)) {
-              send("notice", {
-                message:
-                  "Autopilot is on: this diff will be built in a sandbox, and a pull request opens only if the build exits 0.",
+            const chatRowValue = chatRow as { repo_branch?: string | null } | null;
+
+            send("notice", {
+              message:
+                "This diff is built in a sandbox; a failing build is repaired, and a pull request opens only if it exits 0.",
+            });
+
+            if (sealKey && repoFullName) {
+              const remembered = await readAutoApproval(session.supabase, {
+                owner: session.user.id,
+                repo: repoFullName,
+                branch: chatRowValue?.repo_branch ?? "main",
               });
+
+              if (remembered) {
+                const approved = await approveChangesetAndOpenPullRequest(
+                  session.supabase,
+                  {
+                    changesetId: changesetId as string,
+                    owner: session.user.id,
+                    sealKey,
+                  }
+                );
+
+                send("notice", {
+                  message: approved.ok
+                    ? approved.prUrl
+                      ? `Auto-approved on ${approved.branch}: ${approved.prUrl}`
+                      : `Auto-approved on ${approved.branch}.`
+                    : `The standing approval could not write this diff: ${approved.error}`,
+                });
+
+                if (approved.ok) {
+                  send("changeset", {
+                    id: changesetId,
+                    status: "approved",
+                    files: finalized.files,
+                  });
+                }
+              }
             }
           }
         } catch (caught) {

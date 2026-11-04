@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
+import {
+  forgetAutoApproval as forgetBranchAutoApproval,
+  rememberAutoApproval,
+} from "@/lib/changesets/autoapproval";
 import { reviewChangesetFile } from "@/lib/changesets/store";
 import { serverEnv } from "@/lib/env";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -162,31 +166,6 @@ export async function purgeChat(formData: FormData) {
   redirect("/chat?trash=1");
 }
 
-/**
- * Autopilot is a property of one conversation, not an account preference:
- * "finish this and push it" is a decision about this request. Turning it on
- * does not approve anything by itself; it lets the turn that follows verify its
- * own diff and open the pull request if the build exits 0.
- */
-export async function setAutopilot(formData: FormData) {
-  const { supabase, user } = await acting();
-  const chatId = field(formData, "chatId");
-  const enabled = field(formData, "enabled") === "1";
-
-  if (!chatId) fail("That chat no longer exists.");
-
-  const { error } = await supabase
-    .from("chats")
-    .update({ autopilot: enabled })
-    .eq("id", chatId)
-    .eq("owner", user.id);
-
-  if (error) fail(error.message);
-
-  revalidatePath("/chat");
-  redirect(`/chat?chat=${encodeURIComponent(chatId)}`);
-}
-
 export async function emptyTrash() {
   const { supabase, user } = await acting();
 
@@ -279,5 +258,59 @@ export async function approveProposal(formData: FormData) {
     redirect(`${chatHref(chatId)}${chatId ? "&" : "?"}error=${encodeURIComponent(result.error)}`);
   }
 
+  // "Never ask again" is remembered only after a write succeeded, and the
+  // branch comes from the chat row rather than from the form.
+  if (field(formData, "remember") === "1") {
+    const { data } = await supabase
+      .from("changesets")
+      .select("chat_id, repo_full_name")
+      .eq("id", changesetId)
+      .maybeSingle();
+
+    const record = data as { chat_id?: string; repo_full_name?: string } | null;
+
+    if (record?.chat_id && record.repo_full_name) {
+      const { data: chatRow } = await supabase
+        .from("chats")
+        .select("repo_branch")
+        .eq("id", record.chat_id)
+        .maybeSingle();
+
+      const rememberedBranch =
+        (chatRow as { repo_branch?: string | null } | null)?.repo_branch ?? "main";
+
+      await rememberAutoApproval(supabase, {
+        owner: user.id,
+        repo: record.repo_full_name,
+        branch: rememberedBranch,
+      });
+    }
+  }
+
+  redirect(chatHref(chatId));
+}
+
+/** Turns the standing approval off again, for one branch of this chat. */
+export async function forgetAutoApproval(formData: FormData) {
+  const { supabase, user } = await acting();
+  const chatId = field(formData, "chatId");
+  const branch = field(formData, "branch");
+
+  if (!chatId) fail("That chat no longer exists.");
+  if (!branch) fail("That branch is not named.");
+
+  const { data } = await supabase
+    .from("chats")
+    .select("repo_full_name")
+    .eq("id", chatId)
+    .eq("owner", user.id)
+    .maybeSingle();
+
+  const repo = (data as { repo_full_name?: string | null } | null)?.repo_full_name;
+  if (!repo) fail("That chat has no repository to clear.");
+
+  await forgetBranchAutoApproval(supabase, { owner: user.id, repo, branch });
+
+  revalidatePath("/chat");
   redirect(chatHref(chatId));
 }

@@ -34,7 +34,7 @@ import { DEFAULT_MODEL, hasModel } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
-import { emptyTrash, purgeChat, restoreChat, setAutopilot } from "./actions";
+import { emptyTrash, purgeChat, restoreChat } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -409,7 +409,8 @@ async function RepoSurface({
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const models = modelCatalogue();
 
-  const [messages, changesets, runningTurn, profileResult] = await Promise.all([
+  const [messages, changesets, runningTurn, profileResult, autoApproval] =
+    await Promise.all([
     listMessages(session.supabase, chat.id),
     loadChangesets(session.supabase, chat.id),
     // A turn keeps running after the tab closes. Reading the flag here is what
@@ -428,6 +429,13 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .select("dew_balance, wallet_dew")
       .eq("id", session.user.id)
       .maybeSingle(),
+    session.supabase
+      .from("branch_autoapprovals")
+      .select("branch")
+      .eq("owner", session.user.id)
+      .eq("repo_full_name", chat.repo_full_name ?? "")
+      .eq("branch", chat.repo_branch ?? "main")
+      .maybeSingle(),
   ]);
 
   const balances = (profileResult.data ?? {}) as {
@@ -442,6 +450,8 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     (chat as { charge_mode?: string }).charge_mode === "request"
       ? ("request" as const)
       : ("hour" as const);
+  const autoApproveBranch =
+    (autoApproval.data as { branch?: string } | null)?.branch ?? null;
 
   let repo: { fullName: string; branch: string; sha: string } | null = null;
   let validPaths: string[] = [];
@@ -491,7 +501,8 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             changesets={changesets}
             chatId={chat.id}
             chatSha={chat.repo_base_sha}
-            autopilot={Boolean((chat as { autopilot?: boolean }).autopilot)}
+            chatBranch={chat.repo_branch ?? null}
+            autoApproveBranch={autoApproveBranch}
           />
         </div>
       )}
@@ -605,7 +616,7 @@ export default async function ChatPage({
     supabase
       .from("chats")
       .select(
-        "id, title, folder_id, repo_full_name, repo_branch, repo_base_sha, model, autopilot, created_at, updated_at, deleted_at, last_message_at"
+        "id, title, folder_id, repo_full_name, repo_branch, repo_base_sha, model, created_at, updated_at, deleted_at, last_message_at"
       )
       .order("updated_at", { ascending: false }),
     readConnection(supabase, user.id),
@@ -723,9 +734,6 @@ export default async function ChatPage({
   }
 
   const lowBalance = isLowBalance(dewBalance);
-  const autopilot = Boolean(
-    (activeChat as { autopilot?: boolean } | null)?.autopilot
-  );
 
   const banner =
     params.error || (params.connected && !params.error) ? (
@@ -773,24 +781,6 @@ export default async function ChatPage({
             >
               Files
             </Link>
-          )}
-
-          {activeChat && (
-            <form action={setAutopilot}>
-              <input type="hidden" name="chatId" value={activeChat.id} />
-              <input type="hidden" name="enabled" value={autopilot ? "0" : "1"} />
-              <SubmitButton
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
-                  autopilot
-                    ? "border-accent/40 bg-accent/8 text-accent-text"
-                    : "border-line bg-card text-low"
-                }`}
-                pendingText="Saving…"
-              >
-                <span aria-hidden="true" className="size-1 rounded-full bg-current" />
-                autopilot {autopilot ? "on" : "off"}
-              </SubmitButton>
-            </form>
           )}
 
           <Link
