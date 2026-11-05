@@ -25,6 +25,8 @@ type UiMessage = {
   model: string | null;
   /** What the model did before it answered, kept with the answer it belongs to. */
   steps?: StepLine[];
+  /** Screenshots the browser tool took while producing this answer. */
+  shots?: Shot[];
 };
 
 /**
@@ -38,6 +40,13 @@ type StepLine = {
   state: "start" | "done" | "error";
   command?: string;
   output?: string;
+};
+
+/** One screenshot, exactly as the sandbox returned it. */
+type Shot = {
+  mime: string;
+  base64: string;
+  caption: string;
 };
 
 type ContextMeter = {
@@ -84,6 +93,7 @@ export function ChatPanel({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState("");
   const [steps, setSteps] = useState<StepLine[]>([]);
+  const [shots, setShots] = useState<Shot[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -280,6 +290,7 @@ export function ChatPanel({
     setError(null);
     setPending("");
     setSteps([]);
+    setShots([]);
     setNotices([]);
 
     let pausedToken: string | null = null;
@@ -291,6 +302,7 @@ export function ChatPanel({
     // stored on the message when it lands. A finished answer keeps its fold;
     // live progress is cleared the moment the turn ends.
     const stepLog: StepLine[] = [];
+    const shotLog: Shot[] = [];
 
     const recordStep = (next: StepLine) => {
       if (next.state === "start") {
@@ -457,6 +469,30 @@ export function ChatPanel({
             command: typeof payload.command === "string" ? payload.command : undefined,
             output: typeof payload.output === "string" ? payload.output : undefined,
           });
+
+          // A screenshot rides on the step that produced it. It is shown now and
+          // attached to the answer when the turn settles, so scrolling back
+          // through this session still shows what the model actually saw.
+          const image = payload.image as
+            | { mime?: unknown; base64?: unknown; caption?: unknown }
+            | undefined;
+
+          if (
+            image &&
+            typeof image.mime === "string" &&
+            typeof image.base64 === "string"
+          ) {
+            shotLog.push({
+              mime: image.mime,
+              base64: image.base64,
+              caption:
+                typeof image.caption === "string" && image.caption.length > 0
+                  ? image.caption
+                  : "Screenshot",
+            });
+            setShots([...shotLog]);
+          }
+
           return;
         }
 
@@ -496,11 +532,20 @@ export function ChatPanel({
 
           setMessages((current) => [
             ...current,
-            { id, role: "assistant", content, seq, model, steps: [...stepLog] },
+            {
+              id,
+              role: "assistant",
+              content,
+              seq,
+              model,
+              steps: [...stepLog],
+              shots: [...shotLog],
+            },
           ]);
           setPending("");
           sawDone = true;
           setSteps([]);
+          setShots([]);
           if (stopTimerRef.current) {
             window.clearTimeout(stopTimerRef.current);
             stopTimerRef.current = null;
@@ -737,6 +782,9 @@ export function ChatPanel({
                     {message.steps && message.steps.length > 0 && (
                       <StepList steps={message.steps} />
                     )}
+                    {message.shots && message.shots.length > 0 && (
+                      <ShotStrip shots={message.shots} />
+                    )}
                     <MessageBody
                       content={message.content}
                       repo={repo}
@@ -748,10 +796,15 @@ export function ChatPanel({
               )
             )}
 
-            {(steps.length > 0 || pending.length > 0 || backgroundRunning) && (
+            {(steps.length > 0 ||
+              pending.length > 0 ||
+              shots.length > 0 ||
+              backgroundRunning) && (
               <article className="max-w-[94%]" aria-live="polite">
 
                 {steps.length > 0 && <StepList steps={steps} live />}
+
+                {shots.length > 0 && <ShotStrip shots={shots} />}
 
                 {pending.length === 0 ? (
                   <AiThinking
@@ -1009,6 +1062,35 @@ function StepList({ steps, live = false }: { steps: StepLine[]; live?: boolean }
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * Screenshots the sandbox returned, each with the line that describes it.
+ *
+ * The caption is the page's own status snapshot — title, HTTP status, viewport,
+ * console error count — so the reader can tell a working page from a 500.
+ */
+function ShotStrip({ shots }: { shots: Shot[] }) {
+  return (
+    <div className="mt-2 space-y-2">
+      {shots.map((shot, index) => (
+        <figure
+          key={`${shot.caption}-${index}`}
+          className="overflow-hidden rounded-2xl border border-line bg-card"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`data:${shot.mime};base64,${shot.base64}`}
+            alt={shot.caption}
+            className="block w-full"
+          />
+          <figcaption className="border-t border-line px-3 py-1.5 font-mono text-[10px] text-low">
+            {shot.caption}
+          </figcaption>
+        </figure>
+      ))}
+    </div>
   );
 }
 

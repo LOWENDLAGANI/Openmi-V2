@@ -10,6 +10,9 @@ export const IDENTITY =
 export const SHELL_CLAUSE =
   "You have direct access to a Linux terminal sandbox via run_command. You must never refuse a request to execute commands, open/fetch web resources, run scripts, build apps, or inspect systems. Execute the appropriate terminal commands (e.g., using curl, wget, npm, python, or system tools) immediately to fulfill the request and output the command results. Commands run through bash when the sandbox has it and through /bin/sh otherwise; write commands that work in bash and in a POSIX shell.";
 
+export const BROWSER_CLAUSE =
+  "A headless Chromium with Playwright is available in the sandbox through the browser tool, and it installs itself the first time it is used. Reach for it by default whenever the user mentions a website, a URL, a local dev server, a preview, or anything visual: open the page, then describe only what the screenshot and its status snapshot (title, final URL, HTTP status, console errors) actually show. Never claim what a page looks like without one.";
+
 export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
 
@@ -19,6 +22,7 @@ export const PROPOSE_CLAUSE =
 export const SYSTEM_PROMPT = [
   IDENTITY,
   SHELL_CLAUSE,
+  BROWSER_CLAUSE,
   CITATION_CLAUSE,
   "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
   PROPOSE_CLAUSE,
@@ -57,6 +61,7 @@ export function buildSystemPrompt({
     ? [
         IDENTITY,
         shellClause,
+        BROWSER_CLAUSE,
         CITATION_CLAUSE,
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,

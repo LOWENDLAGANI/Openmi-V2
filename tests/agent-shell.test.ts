@@ -17,12 +17,13 @@ import {
  * quoting and the caps are asserted here rather than trusted to the prompt.
  */
 
-test("the tool names are the five a chat turn offers", () => {
+test("the tools a chat turn offers include the sandbox browser", () => {
   expect(isShellTool("run_command")).toBe(true);
   expect(isShellTool("read_file")).toBe(true);
   expect(isShellTool("write_file")).toBe(true);
   expect(isShellTool("list_files")).toBe(true);
   expect(isShellTool("search_files")).toBe(true);
+  expect(isShellTool("browser")).toBe(true);
   // The mission loop's process and finish tools are not part of a chat turn.
   expect(isShellTool("start_process")).toBe(false);
   expect(isShellTool("finish")).toBe(false);

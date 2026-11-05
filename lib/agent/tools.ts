@@ -136,6 +136,8 @@ export type ToolResult =
       failed?: boolean;
       /** The output tail a step row can fold open. */
       tail?: string;
+      /** A screenshot the turn should show the reader, not only describe. */
+      image?: { mime: string; base64: string; caption: string };
     }
   | { ok: false; error: string; tail?: string };
 

@@ -356,6 +356,14 @@ A turn holds a lease on its workspace for the duration of the response. A
 second tab on the same chat waits rather than starting a second container, and
 neither the idle sweep nor the wipe may touch a leased box.
 
+- The `browser` tool opens a page in headless Chromium through Playwright and
+  sends the screenshot back to the conversation, with the page's own status
+  snapshot: final URL, title, HTTP status and console errors. Chromium installs
+  itself on first use, outside the workspace, so it never reaches a diff. The
+  model reaches for it by default when a website, a local server, a preview or
+  anything visual is involved. The image is shown with the answer it belongs to;
+  it is not stored, so a reload keeps the transcript but not the picture.
+
 The contract, state machine and failure matrix are in
 [docs/SANDBOX_LIFECYCLE_PLAN.md](docs/SANDBOX_LIFECYCLE_PLAN.md).
 

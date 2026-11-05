@@ -15,6 +15,25 @@ import {
 } from "@/lib/execution/mission/tools";
 
 import {
+  BROWSER_COMMAND_MS,
+  BROWSER_HOME,
+  BROWSER_INSTALL_MS,
+  BROWSER_MAX_IMAGE_BYTES,
+  BROWSER_SCRIPT_PATH,
+  BROWSER_SHOT_DIR,
+  BROWSER_TOOL_SPEC,
+  BROWSER_VIEWPORT,
+  browserInstallCommand,
+  browserScript,
+  browserShotCommand,
+  clampViewport,
+  clampWaitMs,
+  parseShotMeta,
+  shotCaption,
+  shotReport,
+  validateBrowserTarget,
+} from "./browser";
+import {
   CHAT_SHELL_COMMAND_MS,
   CHAT_SHELL_LIST_MAX,
   CHAT_SHELL_READ_LINES,
@@ -89,7 +108,7 @@ export type ShellTurnOptions = {
  * up telling the user something untrue.
  */
 function specs(): MissionToolDefinition[] {
-  return MISSION_TOOL_SPECS.filter((tool) =>
+  const base = MISSION_TOOL_SPECS.filter((tool) =>
     (CHAT_SHELL_TOOL_NAMES as readonly string[]).includes(tool.name)
   ).map((tool) => {
     if (tool.name === "run_command") {
@@ -110,6 +129,11 @@ function specs(): MissionToolDefinition[] {
 
     return tool;
   });
+
+  // The browser is a chat tool, not a mission tool: a mission answers a goal in
+  // the workspace it was given, while a page is a question about something
+  // outside it.
+  return [...base, BROWSER_TOOL_SPEC as unknown as MissionToolDefinition];
 }
 
 function failure(message: string): { ok: false; error: string } {
@@ -232,6 +256,116 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
       text: `${status}\n${output.text.length > 0 ? output.text : "(no output)"}`,
       failed: result.exitCode !== 0,
       tail: output.text,
+    };
+  }
+
+  /**
+   * One screenshot, with the page's own status.
+   *
+   * The install is lazy and shared by every turn on this box: the first call
+   * pays for Chromium and the rest reuse it. The script is rewritten on every
+   * call so a source change cannot leave a stale copy running, and the image is
+   * read back through the provider rather than through command output, which is
+   * capped and would truncate a PNG.
+   */
+  async function screenshot(
+    handle: SandboxHandle,
+    args: Record<string, unknown>
+  ): Promise<ToolResult> {
+    const allowed = ["url", "full_page", "width", "height", "wait_ms", "purpose"];
+    if (!Object.keys(args).every((key) => allowed.includes(key))) {
+      return failure("bad-input: unexpected argument");
+    }
+
+    const target = validateBrowserTarget(args.url);
+    if (!target) return failure("bad-input: url must be an http(s) address");
+
+    if (Date.now() > options.deadline) {
+      return failure(
+        "The sandbox time budget for this message is spent. Answer with what you already have, and say that the page was not opened."
+      );
+    }
+
+    const remaining = Math.max(5_000, options.deadline - Date.now());
+    const width = clampViewport(args.width, BROWSER_VIEWPORT.width);
+    const height = clampViewport(args.height, BROWSER_VIEWPORT.height);
+    const waitMs = clampWaitMs(args.wait_ms);
+    const fullPage = args.full_page === true;
+    const outputPath = `${BROWSER_SHOT_DIR}/shot-${Date.now()}.jpg`;
+
+    const installed = await handle.exec(
+      browserInstallCommand(),
+      BROWSER_HOME,
+      Math.min(BROWSER_INSTALL_MS, remaining)
+    );
+
+    if (installed.exitCode !== 0) {
+      return failure(
+        `The headless browser could not be installed. This sandbox may refuse its downloads.\n${installed.output}`
+      );
+    }
+
+    try {
+      await handle.upload(Buffer.from(browserScript(), "utf8"), BROWSER_SCRIPT_PATH);
+    } catch (caught) {
+      return failure(
+        caught instanceof Error
+          ? `The browser script could not be written: ${caught.message}`
+          : "The browser script could not be written."
+      );
+    }
+
+    const ran = await handle.exec(
+      browserShotCommand({
+        url: target.url,
+        outputPath,
+        width,
+        height,
+        fullPage,
+        waitMs,
+      }),
+      BROWSER_HOME,
+      Math.min(BROWSER_COMMAND_MS, remaining)
+    );
+
+    const meta = parseShotMeta(ran.output);
+
+    if (!meta) {
+      return failure(`The browser produced no snapshot.\n${ran.output}`);
+    }
+
+    if (!meta.ok) {
+      return failure(
+        `The page could not be opened: ${meta.error ?? "the browser reported a failure"}`
+      );
+    }
+
+    let bytes: Buffer;
+    try {
+      bytes = await handle.readBytes(outputPath, BROWSER_MAX_IMAGE_BYTES);
+    } catch (caught) {
+      return failure(
+        caught instanceof Error
+          ? `The screenshot could not be read: ${caught.message}`
+          : "The screenshot could not be read."
+      );
+    }
+
+    // The file is transport, not workspace state: one per shot would fill the
+    // disk and appear in `git status` for a box the user is reviewing.
+    void handle.exec(`rm -f ${outputPath}`, BROWSER_HOME, 10_000).catch(() => {});
+
+    const report = shotReport(meta, bytes.byteLength);
+
+    return {
+      ok: true,
+      text: report,
+      tail: report,
+      image: {
+        mime: "image/jpeg",
+        base64: bytes.toString("base64"),
+        caption: shotCaption(meta),
+      },
     };
   }
 
@@ -360,6 +494,10 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
         text: `${found.tail.trim().length > 0 ? `${found.tail.trim().split("\n").length} match(es), up to ${CHAT_SHELL_SEARCH_MAX}` : "No matches."}\n\n${found.tail.trim()}`,
         tail: found.tail,
       };
+    }
+
+    if (name === "browser") {
+      return screenshot(handle, args);
     }
 
     return failure(`unknown tool: ${name}`);

@@ -28,6 +28,8 @@ export type AgentStepEvent = {
   command?: string;
   /** The output tail, when this step produced one. */
   output?: string;
+  /** A screenshot the step produced, for the transcript to show. */
+  image?: { mime: string; base64: string; caption: string };
 };
 
 export type AgentResult = {
@@ -272,6 +274,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
         state: result.ok && !result.failed ? "done" : "error",
         command,
         output: result.ok ? result.tail : result.tail,
+        ...(result.ok && result.image ? { image: result.image } : {}),
       });
     }
   }

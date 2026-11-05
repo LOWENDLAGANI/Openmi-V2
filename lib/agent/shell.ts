@@ -17,6 +17,9 @@ export const CHAT_SHELL_TOOL_NAMES = [
   "write_file",
   "list_files",
   "search_files",
+  // The headless browser is part of the same box, so it is part of the same
+  // surface: a question about a page is answered by looking at the page.
+  "browser",
 ] as const;
 
 export type ChatShellToolName = (typeof CHAT_SHELL_TOOL_NAMES)[number];
@@ -73,6 +76,13 @@ export function describeShellCall(
 
   if (name === "search_files" && typeof args.query === "string") {
     return `Search for ${JSON.stringify(args.query)}`;
+  }
+
+  if (name === "browser") {
+    const purpose = typeof args.purpose === "string" ? args.purpose.trim() : "";
+    if (purpose.length > 0) return purpose;
+    const url = typeof args.url === "string" ? args.url : "";
+    return url.length > 0 ? `Open ${url}` : "Open a page";
   }
 
   return name;

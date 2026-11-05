@@ -125,6 +125,8 @@ export type SandboxHandle = {
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
   /** Reads a workspace file for a repair pass or a mission's diff. */
   readText: (remotePath: string, maxBytes?: number) => Promise<string>;
+  /** Binary read, for a screenshot the text reader would mangle. */
+  readBytes: (remotePath: string, maxBytes?: number) => Promise<Buffer>;
   /** The provider's current state, refreshed rather than remembered. */
   state: () => Promise<SandboxState>;
   /** Boots a stopped or archived box; a no-op for a running one. */
@@ -325,6 +327,17 @@ function handleFor(sandbox: RemoteSandbox, id: string): SandboxHandle {
       }
 
       return bytes.toString("utf8");
+    },
+    async readBytes(remotePath, maxBytes = 200_000) {
+      const bytes = await sandbox.fs.downloadFile(remotePath);
+
+      if (bytes.byteLength > maxBytes) {
+        throw new Error(
+          `${remotePath} is ${bytes.byteLength} bytes, over the ${maxBytes} byte cap`
+        );
+      }
+
+      return Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
     },
     async state() {
       try {
