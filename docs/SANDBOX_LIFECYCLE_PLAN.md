@@ -1,11 +1,12 @@
 # Chat-scoped sandbox lifecycle — design plan (Phase 12)
 
-**Status: proposal. Nothing here is implemented.** This document plans the
-change from "one sandbox per message, destroyed at the end" to "one sandbox per
-chat, stopped when idle and wiped after 48 hours of inactivity". The code it
-touches is `lib/agent/sandbox.ts`, `app/api/chat/route.ts`,
-`lib/execution/provider.ts`, `app/chat/actions.ts`, one new migration, and one
-new sweep route.
+**Status: implemented (P12-T1 … P12-T7).** This document planned the change from
+"one sandbox per message, destroyed at the end" to "one sandbox per chat,
+stopped when idle and wiped after 48 hours of inactivity". It now also records
+what shipped and how to operate it; see §15 for the runbook. The code it touches
+is `lib/agent/sandbox.ts`, `app/api/chat/route.ts`,
+`lib/execution/provider.ts`, `app/chat/actions.ts`, migration 023, and
+`app/api/cron/sandbox-sweep/route.ts`.
 
 The three requirements, restated as the invariants the implementation must hold:
 
@@ -641,3 +642,73 @@ Two, both operational rather than architectural:
 
 Everything else above is decided, because the code and the provider semantics
 decide it.
+
+---
+
+## 15. What shipped, and how to run it
+
+### 15.1 Implementation status
+
+| Task | Delivered |
+|---|---|
+| P12-T1 | `supabase/migrations/023_chat_sandboxes.sql`; `lib/execution/chat-env/lifecycle.ts`; env spec entries; migration check updated |
+| P12-T2 | `state/start/stop/setTtl` on the handle; `createChatSandbox`; `missing` classification |
+| P12-T3 | `chat-env/store.ts`, `seed.ts`, `open.ts`; provisional row before seed; marker; LRU eviction; lease claim |
+| P12-T4 | Chat turn opens the chat's workspace, releases on turn end, resume notice, paused continuation, prompt paragraph |
+| P12-T5 | `/api/cron/sandbox-sweep` (expire → stop → reconcile, `?dry=1`), `vercel.json`, confirmed provider delete, labelled list, admin counts |
+| P12-T6 | Trash stops and queues the disk; purge and empty-trash mark wiping and destroy before the chat row goes |
+| P12-T7 | This section and the README configuration |
+
+Two departures from the sketch above, both deliberate:
+
+- The row is claimed with a conditional `update … where lease_until is null or
+  lease_until < now` rather than a read-then-write. Two deployments otherwise
+  both see a free lease.
+- A failed provider delete leaves the row `wiping` with `wipe_attempts + 1`.
+  `chat_id` stays attached until the chat row goes; the cascade then nulls it,
+  which is why the row is keyed by its own `id`.
+
+### 15.2 Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `CHAT_SANDBOX_ENABLED` | on | `off` restores one box per message (rollback) |
+| `CHAT_SANDBOX_IDLE_MINUTES` | 5 | idle before stop; clamped 1–60 |
+| `CHAT_SANDBOX_TTL_HOURS` | 48 | inactivity before wipe; clamped 1–168 |
+| `CHAT_SANDBOX_ARCHIVE_HOURS` | 0 (off) | archive stopped disks; `24` when quota is the limit |
+| `CHAT_SANDBOX_MAX_PER_OWNER` | 3 | live environments per account; clamped 1–10 |
+| `CRON_SECRET` | unset | required for the sweep; unset → 503, provider timers only |
+
+The provider receives `autoStopInterval = idle`, `autoDeleteInterval = 48h` and a
+wall-clock `ttlMinutes = 48h + 60min` refreshed on open and close. Archiving is
+sent only when the hours are greater than zero: in the provider, zero means the
+maximum interval, not "off".
+
+### 15.3 Deploy and verify
+
+1. Apply migration 023 before deploying (`bun run check:migrations` proves it is
+   safe twice; `supabase db push` is still the deployment step).
+2. Set `CRON_SECRET` and confirm `vercel.json` was picked up (Vercel → Cron
+   Jobs). Call `GET /api/cron/sandbox-sweep?dry=1` with the bearer token: it must
+   return the three pass reports and change nothing.
+3. Send two messages in one chat, each running `pwd` and writing a file. The
+   second must see the first file. This is the product claim.
+4. Wait past the idle window and confirm the provider state is `stopped` while
+   the row says `stopped`; send another message and confirm it starts and the
+   file is still there.
+5. Gated manual provider smoke (never in CI, needs `DAYTONA_API_KEY`):
+   `createChatSandbox` → write a file → `stop()` → `start()` → read the file →
+   `destroySandboxConfirmed()`. This is the one claim mocks cannot prove.
+6. Trash a chat with a workspace: the container stops, the row becomes
+   `wiping` with `delete_after = now`. Purge it: the row and the container go.
+   A failed provider delete must leave a `wiping` row, not a missing one.
+
+### 15.4 Triage
+
+| Symptom | First place to look |
+|---|---|
+| A chat never resumes | `chat_sandboxes.state`, `failure_code`, `wipe_attempts`; then provider state for `sandbox_id` |
+| The sweep returns 503 | `CRON_SECRET` unset; the provider timers are still enforcing stop/delete |
+| A container bills with no row | sweep `reconcile` pass; provider label `app=openmi, kind=chat` |
+| Duplicate workspaces | the row's `lease_until`; a live lease should make the second turn wait |
+| Wipe never lands | `delete_after` in the past and `lease_until` in the past; the provider delete is retried by every sweep |

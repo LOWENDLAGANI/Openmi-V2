@@ -270,7 +270,10 @@ both as a light fill and as dark text on paper. Focus rings come from a single
 3. Add `https://<domain>/auth/callback` and the localhost equivalent in
    Supabase → Authentication → URL configuration.
 4. Import the repo into Vercel and set every key in §6 for **Preview** and
-   **Production** separately.
+   **Production** separately. Include `CRON_SECRET` (a long random value):
+   Vercel Cron sends it as a bearer token to the sandbox sweep. On a Hobby plan
+   the cron runs less often than `vercel.json` asks; the provider's own
+   idle-stop and auto-delete timers are the backstop.
 5. Apply migrations with `supabase link --project-ref <ref> && supabase db push`.
    Vercel does not run them; the order is always migrate, then deploy.
 6. Deploy, sign in, open `/admin` → **Configuration & probes**, and make every
@@ -319,6 +322,38 @@ records the exit code, the duration and the output tail.
 - A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.
+
+### Chat environments
+
+A chat pinned to a repository keeps **one** Linux workspace across its messages.
+The first tool call in a chat creates it; later messages reattach to the same
+disk, so installed packages and uncommitted files survive between answers. A
+message that never runs a command still creates nothing.
+
+- After `CHAT_SANDBOX_IDLE_MINUTES` (default 5) of inactivity the container is
+  **stopped**: compute is released, the filesystem stays. The next message
+  starts it again before the first command.
+- After `CHAT_SANDBOX_TTL_HOURS` (default 48) of inactivity the container and
+  its disk are destroyed. The chat transcript is untouched; the next message
+  reseeds at the pinned commit.
+- `CHAT_SANDBOX_ENABLED=off` is the rollback: every message gets a fresh box
+  again, exactly as before this feature.
+- `CHAT_SANDBOX_MAX_PER_OWNER` (default 3) bounds storage; the
+  least-recently-active environment is evicted to make room.
+- Trashing a chat stops its workspace and queues the disk for deletion;
+  restoring it starts from a fresh seed. Purging destroys the container inline.
+- The sweep at `/api/cron/sandbox-sweep` (`vercel.json`, every ten minutes,
+  `Authorization: Bearer $CRON_SECRET`, `?dry=1` to preview) enforces the
+  deadlines, stops idle boxes, and destroys labelled containers that no row
+  points at. Without `CRON_SECRET` it returns 503 and does nothing; the
+  provider timers still act.
+
+A turn holds a lease on its workspace for the duration of the response. A
+second tab on the same chat waits rather than starting a second container, and
+neither the idle sweep nor the wipe may touch a leased box.
+
+The contract, state machine and failure matrix are in
+[docs/SANDBOX_LIFECYCLE_PLAN.md](docs/SANDBOX_LIFECYCLE_PLAN.md).
 
 ### Automatic verification and standing approval
 
