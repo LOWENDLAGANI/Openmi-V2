@@ -103,7 +103,7 @@ async function provision(
   admin: Admin,
   mission: MissionRow,
   token: string
-): Promise<{ ok: true; sandbox: SandboxHandle } | { ok: false; failure: "repo_too_large" | "seed_failed" | "quota" | "refused" | "not_configured"; detail: string }> {
+): Promise<{ ok: true; sandbox: SandboxHandle } | { ok: false; failure: "repo_too_large" | "seed_failed" | "quota" | "refused" | "not_configured" | "missing"; detail: string }> {
   const archive = await fetchRepoArchive({
     token,
     repo: mission.repo_full_name,

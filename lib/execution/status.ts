@@ -50,6 +50,7 @@ export type FailureCode =
   | "no_changes"
   | "stalled"
   | "sandbox_expired"
+  | "missing"
   | "collect_failed";
 
 export type ExecutionRunRow = {
@@ -108,6 +109,7 @@ const FAILURE_LABEL: Record<FailureCode, string> = {
   no_changes: "The agent finished without changing a file.",
   stalled: "The agent stopped acting without finishing.",
   sandbox_expired: "The sandbox expired before the mission finished.",
+  missing: "The sandbox no longer exists; a new one is needed.",
   collect_failed: "The changes could not be collected from the sandbox.",
 };
 

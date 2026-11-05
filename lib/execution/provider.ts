@@ -2,6 +2,7 @@ import "server-only";
 
 import { Daytona } from "@daytona/sdk";
 
+import { shellQuote } from "@/lib/agent/shell";
 import { executionConfigured } from "@/lib/env";
 
 import {
@@ -9,7 +10,6 @@ import {
   EXEC_ALLOWED_DOMAINS,
   EXEC_STEP_TIMEOUT_MS,
   EXEC_WORKDIR,
-  shellQuote,
   tailOf,
 } from "./commands";
 import { EXEC_MAX_MINUTES } from "./cost";
@@ -23,9 +23,12 @@ import { EXEC_MAX_MINUTES } from "./cost";
  * `executionConfigured()` is true, which is what keeps a deployment without a
  * key behaving exactly as it did before this phase existed.
  *
- * Two callers now: a verification run (create, use, destroy inside one
- * function) and a mission (create once, `attachSandbox` on every later tick).
- * The handle is identical, so the tools cannot tell which one they are in.
+ * Three callers now: a verification run (create, use, destroy inside one
+ * function), a mission (create once, `attachSandbox` on every later tick), and a
+ * chat environment (create once per chat, stopped when idle and started again
+ * on the next message). The handle is identical, so the tools cannot tell which
+ * one they are in; the factories are separate so a persistent box is never
+ * created by forgetting a flag.
  */
 
 export { executionConfigured };
@@ -59,35 +62,133 @@ export type ExecResult = {
   timedOut: boolean;
 };
 
+/**
+ * A lifecycle state, normalised from the provider's own vocabulary.
+ *
+ * `unknown` is deliberate: a provider that adds a state must not make the
+ * resolver guess that the box is gone. Every consumer treats unknown as "do not
+ * destroy, look again" rather than as a stop or a wipe.
+ */
+export type SandboxState =
+  | "pending"
+  | "starting"
+  | "started"
+  | "stopping"
+  | "stopped"
+  | "pausing"
+  | "paused"
+  | "resuming"
+  | "archiving"
+  | "archived"
+  | "restoring"
+  | "deleting"
+  | "deleted"
+  | "error"
+  | "unknown";
+
+function normalizeState(value: unknown): SandboxState {
+  const state = typeof value === "string" ? value.trim().toLowerCase() : "";
+
+  switch (state) {
+    case "started":
+    case "starting":
+    case "stopping":
+    case "stopped":
+    case "pausing":
+    case "paused":
+    case "resuming":
+    case "archiving":
+    case "archived":
+    case "restoring":
+    case "deleting":
+    case "deleted":
+    case "error":
+      return state;
+    case "creating":
+    case "pending_build":
+    case "building_snapshot":
+    case "pulling_snapshot":
+    case "resizing":
+    case "snapshotting":
+    case "forking":
+      // Not ready yet, but not broken: the caller should wait, not destroy.
+      return "pending";
+    default:
+      // A state this build has never heard of is never read as "gone".
+      return "unknown";
+  }
+}
+
 export type SandboxHandle = {
   id: string;
   exec: (command: string, cwd?: string, timeoutMs?: number) => Promise<ExecResult>;
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
   /** Reads a workspace file for a repair pass or a mission's diff. */
   readText: (remotePath: string, maxBytes?: number) => Promise<string>;
+  /** The provider's current state, refreshed rather than remembered. */
+  state: () => Promise<SandboxState>;
+  /** Boots a stopped or archived box; a no-op for a running one. */
+  start: (timeoutSeconds?: number) => Promise<void>;
+  /** Releases compute and keeps the filesystem. Never deletes. */
+  stop: (options?: { force?: boolean }) => Promise<void>;
+  /** Refreshes the wall-clock ceiling. Persistent boxes only. */
+  setTtl: (minutes: number) => Promise<void>;
   destroy: () => Promise<void>;
 };
 
 export class SandboxStartError extends Error {
-  readonly failure: "quota" | "refused" | "not_configured";
+  readonly failure: "quota" | "refused" | "not_configured" | "missing";
 
-  constructor(failure: "quota" | "refused" | "not_configured", message: string) {
+  constructor(
+    failure: "quota" | "refused" | "not_configured" | "missing",
+    message: string
+  ) {
     super(message);
     this.failure = failure;
     this.name = "SandboxStartError";
   }
 }
 
-/** A Daytona failure, classified once so callers do not parse English. */
-function classifyStartError(caught: unknown): SandboxStartError {
+/**
+ * A Daytona failure, classified once so callers do not parse English.
+ *
+ * `context` matters for exactly one case: a 404 while attaching means the box
+ * is gone and the chat can reseed, while a 404 while creating usually means the
+ * snapshot is missing and retrying would fail the same way. Those are different
+ * answers, so they get different codes.
+ */
+function classifyStartError(
+  caught: unknown,
+  context: "create" | "attach" = "create"
+): SandboxStartError {
   const message =
     caught instanceof Error ? caught.message : "The sandbox could not be started.";
 
-  if (/429|rate.?limit|quota|too many requests/i.test(message)) {
+  const status =
+    typeof (caught as { statusCode?: unknown } | null)?.statusCode === "number"
+      ? (caught as { statusCode: number }).statusCode
+      : null;
+
+  if (
+    context === "attach" &&
+    (status === 404 ||
+      status === 410 ||
+      /not found|no such sandbox|does not exist|already deleted|has been deleted/i.test(
+        message
+      ))
+  ) {
+    return new SandboxStartError("missing", message);
+  }
+
+  if (status === 429 || /429|rate.?limit|quota|too many requests/i.test(message)) {
     return new SandboxStartError("quota", message);
   }
 
-  if (/401|403|unauthor|forbidden|api.?key/i.test(message)) {
+  if (
+    status === 401 ||
+    status === 403 ||
+    /401|403|unauthor|forbidden|api.?key/i.test(message)
+  ) {
     return new SandboxStartError(
       "not_configured",
       `Daytona rejected the configured key: ${message}`
@@ -225,6 +326,29 @@ function handleFor(sandbox: RemoteSandbox, id: string): SandboxHandle {
 
       return bytes.toString("utf8");
     },
+    async state() {
+      try {
+        await sandbox.refreshData();
+      } catch {
+        // A transient refresh failure reports the last known state. Turning it
+        // into "missing" would make a healthy box look wipeable.
+      }
+
+      return normalizeState(sandbox.state);
+    },
+    async start(timeoutSeconds = 90) {
+      try {
+        await sandbox.start(Math.max(1, Math.trunc(timeoutSeconds)));
+      } catch (caught) {
+        throw classifyStartError(caught, "attach");
+      }
+    },
+    async stop(options = {}) {
+      await sandbox.stop(undefined, options.force ?? false);
+    },
+    async setTtl(minutes) {
+      await sandbox.setTtl(Math.max(1, Math.trunc(minutes)));
+    },
     async destroy() {
       try {
         await sandbox.delete(60, true);
@@ -275,7 +399,89 @@ export async function createSandbox(
       { timeout: 120 }
     );
   } catch (caught) {
-    throw classifyStartError(caught);
+    throw classifyStartError(caught, "create");
+  }
+
+  return handleFor(sandbox, String(sandbox.id));
+}
+
+export type ChatSandboxOptions = {
+  chatId: string;
+  owner: string;
+  /** Wall-clock ceiling, refreshed on activity. 48 h plus slack. */
+  ttlMinutes: number;
+  /** Delete after this many continuously stopped minutes. 48 h. */
+  autoDeleteMinutes: number;
+  /** Stop after this many idle minutes. */
+  idleMinutes: number;
+  /** Archive a stopped box after this many minutes; 0 leaves the field unset. */
+  archiveMinutes?: number;
+};
+
+/**
+ * Creates the one long-lived sandbox a chat owns.
+ *
+ * It is **not** ephemeral: an ephemeral sandbox is deleted on stop, which would
+ * throw away every installed package and every uncommitted file the moment the
+ * chat went quiet. The three timers are the provider-side backstops for the
+ * policy in `chat-env/lifecycle.ts`:
+ *
+ *   - `autoStopInterval` releases compute after idleness;
+ *   - `autoDeleteInterval` counts continuously stopped time, so a box nobody
+ *     resumes is deleted even if the sweep never runs;
+ *   - `ttlMinutes` is wall-clock from creation or the last `setTtl`, so it is
+ *     always refreshed on activity and carries an hour of slack.
+ *
+ * `archiveMinutes` is sent only when non-zero: in the provider, zero means the
+ * maximum interval (30 days), not "off".
+ */
+export async function createChatSandbox(
+  options: ChatSandboxOptions
+): Promise<SandboxHandle> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  if (options.chatId.trim().length === 0 || options.owner.trim().length === 0) {
+    throw new SandboxStartError(
+      "refused",
+      "A chat sandbox needs a chat and an owner."
+    );
+  }
+
+  const idle = Math.max(1, Math.trunc(options.idleMinutes));
+  const autoDelete = Math.max(idle + 1, Math.trunc(options.autoDeleteMinutes));
+  const ttl = Math.max(autoDelete, Math.trunc(options.ttlMinutes));
+  const archive = Math.max(0, Math.trunc(options.archiveMinutes ?? 0));
+
+  let sandbox: RemoteSandbox;
+  try {
+    sandbox = await client().create(
+      {
+        snapshot: executionSnapshot(),
+        ephemeral: false,
+        ttlMinutes: ttl,
+        autoStopInterval: idle,
+        autoDeleteInterval: autoDelete,
+        ...(archive > 0 ? { autoArchiveInterval: archive } : {}),
+        labels: {
+          app: "openmi",
+          kind: "chat",
+          chat: options.chatId,
+          owner: options.owner.slice(0, 8),
+        },
+        public: false,
+        ...(networkAllowlistEnabled()
+          ? { domainAllowList: EXEC_ALLOWED_DOMAINS.join(",") }
+          : {}),
+      },
+      { timeout: 120 }
+    );
+  } catch (caught) {
+    throw classifyStartError(caught, "create");
   }
 
   return handleFor(sandbox, String(sandbox.id));
@@ -301,7 +507,7 @@ export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
   try {
     sandbox = await client().get(sandboxId);
   } catch (caught) {
-    throw classifyStartError(caught);
+    throw classifyStartError(caught, "attach");
   }
 
   return handleFor(sandbox, String(sandbox.id ?? sandboxId));
