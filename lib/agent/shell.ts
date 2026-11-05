@@ -81,8 +81,13 @@ export function describeShellCall(
   if (name === "browser") {
     const purpose = typeof args.purpose === "string" ? args.purpose.trim() : "";
     if (purpose.length > 0) return purpose;
-    const url = typeof args.url === "string" ? args.url : "";
-    return url.length > 0 ? `Open ${url}` : "Open a page";
+
+    const url = typeof args.url === "string" ? args.url.trim() : "";
+    const count = Array.isArray(args.actions) ? args.actions.length : 0;
+    const steps = count > 0 ? ` (${count} step${count === 1 ? "" : "s"})` : "";
+
+    if (url.length > 0) return `Open ${url}${steps}`;
+    return count > 0 ? `Drive the page${steps}` : "Open a page";
   }
 
   return name;

@@ -28,10 +28,12 @@ import {
   browserShotCommand,
   clampViewport,
   clampWaitMs,
+  parseBrowserActions,
   parseShotMeta,
   shotCaption,
   shotReport,
   validateBrowserTarget,
+  type BrowserAction,
 } from "./browser";
 import {
   CHAT_SHELL_COMMAND_MS,
@@ -260,25 +262,53 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
   }
 
   /**
-   * One screenshot, with the page's own status.
+   * Drive the page, then photograph where the turn ended up.
    *
    * The install is lazy and shared by every turn on this box: the first call
-   * pays for Chromium and the rest reuse it. The script is rewritten on every
-   * call so a source change cannot leave a stale copy running, and the image is
-   * read back through the provider rather than through command output, which is
-   * capped and would truncate a PNG.
+   * pays for Chromium and the rest reuse it. The plan is written as a file and
+   * never as a command-line argument, so a filled password stays out of argv
+   * and out of every message the transcript prints. The image is read back
+   * through the provider rather than through command output, which is capped
+   * and would truncate a JPEG.
    */
-  async function screenshot(
+  async function browse(
     handle: SandboxHandle,
     args: Record<string, unknown>
   ): Promise<ToolResult> {
-    const allowed = ["url", "full_page", "width", "height", "wait_ms", "purpose"];
+    const allowed = [
+      "url",
+      "actions",
+      "full_page",
+      "width",
+      "height",
+      "wait_ms",
+      "purpose",
+    ];
+
     if (!Object.keys(args).every((key) => allowed.includes(key))) {
       return failure("bad-input: unexpected argument");
     }
 
-    const target = validateBrowserTarget(args.url);
-    if (!target) return failure("bad-input: url must be an http(s) address");
+    const parsed = parseBrowserActions(args.actions);
+    if (!parsed.ok) return failure(`bad-input: ${parsed.error}`);
+
+    // The URL is optional: a later call continues on the page the session is
+    // already showing, the way a second click does not renavigate.
+    const hasUrl = typeof args.url === "string" && args.url.trim().length > 0;
+    const target = hasUrl ? validateBrowserTarget(args.url) : null;
+
+    if (hasUrl && !target) {
+      return failure("bad-input: url must be an http(s) address");
+    }
+
+    const actions: BrowserAction[] = [
+      ...(target ? [{ type: "goto" as const, url: target.url }] : []),
+      ...parsed.actions,
+    ];
+
+    if (actions.length === 0) {
+      return failure("bad-input: give a url, an action, or both");
+    }
 
     if (Date.now() > options.deadline) {
       return failure(
@@ -291,7 +321,9 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
     const height = clampViewport(args.height, BROWSER_VIEWPORT.height);
     const waitMs = clampWaitMs(args.wait_ms);
     const fullPage = args.full_page === true;
-    const outputPath = `${BROWSER_SHOT_DIR}/shot-${Date.now()}.jpg`;
+    const stamp = Date.now();
+    const outputPath = `${BROWSER_SHOT_DIR}/shot-${stamp}.jpg`;
+    const planPath = `${BROWSER_SHOT_DIR}/plan-${stamp}.json`;
 
     const installed = await handle.exec(
       browserInstallCommand(),
@@ -307,6 +339,10 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
 
     try {
       await handle.upload(Buffer.from(browserScript(), "utf8"), BROWSER_SCRIPT_PATH);
+      await handle.upload(
+        Buffer.from(JSON.stringify({ actions }), "utf8"),
+        planPath
+      );
     } catch (caught) {
       return failure(
         caught instanceof Error
@@ -316,27 +352,30 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
     }
 
     const ran = await handle.exec(
-      browserShotCommand({
-        url: target.url,
-        outputPath,
-        width,
-        height,
-        fullPage,
-        waitMs,
-      }),
+      browserShotCommand({ planPath, outputPath, width, height, fullPage, waitMs }),
       BROWSER_HOME,
       Math.min(BROWSER_COMMAND_MS, remaining)
     );
 
+    // Both files are transport, not workspace state: the shot would fill the
+    // disk and show up in `git status`, and the plan holds whatever was typed.
+    const cleanup = () => {
+      void handle
+        .exec(`rm -f ${outputPath} ${planPath}`, BROWSER_HOME, 10_000)
+        .catch(() => {});
+    };
+
     const meta = parseShotMeta(ran.output);
 
     if (!meta) {
+      cleanup();
       return failure(`The browser produced no snapshot.\n${ran.output}`);
     }
 
     if (!meta.ok) {
+      cleanup();
       return failure(
-        `The page could not be opened: ${meta.error ?? "the browser reported a failure"}`
+        `The browser could not run: ${meta.error ?? "the browser reported a failure"}`
       );
     }
 
@@ -344,6 +383,7 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
     try {
       bytes = await handle.readBytes(outputPath, BROWSER_MAX_IMAGE_BYTES);
     } catch (caught) {
+      cleanup();
       return failure(
         caught instanceof Error
           ? `The screenshot could not be read: ${caught.message}`
@@ -351,9 +391,7 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
       );
     }
 
-    // The file is transport, not workspace state: one per shot would fill the
-    // disk and appear in `git status` for a box the user is reviewing.
-    void handle.exec(`rm -f ${outputPath}`, BROWSER_HOME, 10_000).catch(() => {});
+    cleanup();
 
     const report = shotReport(meta, bytes.byteLength);
 
@@ -497,7 +535,7 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
     }
 
     if (name === "browser") {
-      return screenshot(handle, args);
+      return browse(handle, args);
     }
 
     return failure(`unknown tool: ${name}`);
