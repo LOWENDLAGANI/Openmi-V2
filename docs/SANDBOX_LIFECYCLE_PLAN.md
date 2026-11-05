@@ -459,10 +459,21 @@ the provider timers still stop and wipe boxes.
 `vercel.json`:
 
 ```jsonc
-{ "crons": [{ "path": "/api/cron/sandbox-sweep", "schedule": "*/10 * * * *" }] }
+{ "crons": [{ "path": "/api/cron/sandbox-sweep", "schedule": "0 5 * * *" }] }
 ```
 
-Vercel Hobby runs crons much less often; that is acceptable because of §D12.5.
+The schedule is daily because Vercel Hobby rejects any cron that runs more than
+once a day (`*/10` fails the deployment outright), and Pro is not required for a
+backstop. A less frequent sweep is acceptable because of §D12.5: the provider's
+own `autoStopInterval`, `autoDeleteInterval` and `ttlMinutes` timers enforce the
+idle stop and the wipe times, and the resolver cleans up lazily on every open.
+The sweep is what reconciles the database and the provider ledger, not the
+clock that keeps boxes from billing.
+
+To run it every ten minutes on a Hobby plan, call the same route from an
+external scheduler (for example a GitHub Actions `schedule` workflow) with the
+`Authorization: Bearer $CRON_SECRET` header; the route does not care who
+invokes it.
 The route is safe to call by hand with `?dry=1`, which returns the planned
 actions and changes nothing.
 

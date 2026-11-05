@@ -100,6 +100,6 @@ test("the provider exposes a confirmed delete and a labelled list", () => {
 
 test("the sweep is scheduled", () => {
   expect(vercel.crons).toEqual([
-    { path: "/api/cron/sandbox-sweep", schedule: "*/10 * * * *" },
+    { path: "/api/cron/sandbox-sweep", schedule: "0 5 * * *" },
   ]);
 });

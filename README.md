@@ -271,9 +271,9 @@ both as a light fill and as dark text on paper. Focus rings come from a single
    Supabase → Authentication → URL configuration.
 4. Import the repo into Vercel and set every key in §6 for **Preview** and
    **Production** separately. Include `CRON_SECRET` (a long random value):
-   Vercel Cron sends it as a bearer token to the sandbox sweep. On a Hobby plan
-   the cron runs less often than `vercel.json` asks; the provider's own
-   idle-stop and auto-delete timers are the backstop.
+   Vercel Cron sends it as a bearer token to the sandbox sweep. `vercel.json`
+   asks for a daily run, which is all a Hobby plan allows; the provider's own
+   idle-stop and auto-delete timers are the backstop between runs.
 5. Apply migrations with `supabase link --project-ref <ref> && supabase db push`.
    Vercel does not run them; the order is always migrate, then deploy.
 6. Deploy, sign in, open `/admin` → **Configuration & probes**, and make every
@@ -342,11 +342,15 @@ message that never runs a command still creates nothing.
   least-recently-active environment is evicted to make room.
 - Trashing a chat stops its workspace and queues the disk for deletion;
   restoring it starts from a fresh seed. Purging destroys the container inline.
-- The sweep at `/api/cron/sandbox-sweep` (`vercel.json`, every ten minutes,
-  `Authorization: Bearer $CRON_SECRET`, `?dry=1` to preview) enforces the
-  deadlines, stops idle boxes, and destroys labelled containers that no row
-  points at. Without `CRON_SECRET` it returns 503 and does nothing; the
-  provider timers still act.
+- The sweep at `/api/cron/sandbox-sweep` (`vercel.json`, once a day at 05:00
+  UTC — the most often a Hobby-plan cron may run — `Authorization: Bearer
+  $CRON_SECRET`, `?dry=1` to preview) enforces the deadlines, stops idle boxes,
+  and destroys labelled containers that no row points at. Without `CRON_SECRET`
+  it returns 503 and does nothing. The provider's own idle-stop, auto-delete and
+  TTL timers keep running at their real intervals in between, and every
+  workspace open cleans up its own rows, so the daily run is reconciliation
+  rather than the primary clock. Point any external scheduler at the route with
+  the same bearer header if you want the tighter cadence.
 
 A turn holds a lease on its workspace for the duration of the response. A
 second tab on the same chat waits rather than starting a second container, and
