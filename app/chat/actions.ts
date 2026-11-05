@@ -9,6 +9,11 @@ import {
   rememberAutoApproval,
 } from "@/lib/changesets/autoapproval";
 import { reviewChangesetFile } from "@/lib/changesets/store";
+import {
+  trashChatSandbox,
+  wipeChatSandbox,
+  wipeChatSandboxes,
+} from "@/lib/execution/chat-env/destroy";
 import { serverEnv } from "@/lib/env";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
@@ -125,6 +130,10 @@ export async function trashChat(formData: FormData) {
 
   if (error) fail(error.message);
 
+  // The container is not part of the database cascade. Trash releases its
+  // compute and marks it wipe-due; restore starts from a fresh seed.
+  await trashChatSandbox(chatId);
+
   revalidatePath("/chat");
   redirect("/chat");
 }
@@ -151,6 +160,11 @@ export async function purgeChat(formData: FormData) {
   const chatId = field(formData, "chatId");
   if (!chatId) fail("That chat no longer exists.");
 
+  // The environment row is marked wiping before the chat delete, because the
+  // foreign key nulls `chat_id` and only that ordering leaves the sweep a row
+  // to finish from. This also destroys the container inline.
+  await wipeChatSandbox(chatId);
+
   // Purge is the only path that removes rows, and it only touches rows already
   // in the trash. An active chat cannot be destroyed by guessing its id.
   const { error } = await supabase
@@ -168,6 +182,19 @@ export async function purgeChat(formData: FormData) {
 
 export async function emptyTrash() {
   const { supabase, user } = await acting();
+
+  // Ids first: after the delete there is nothing to look the environments up
+  // by. Each one is marked and wiped before the rows are removed.
+  const { data: trashed } = await supabase
+    .from("chats")
+    .select("id")
+    .eq("owner", user.id)
+    .not("deleted_at", "is", null)
+    .limit(50);
+
+  await wipeChatSandboxes(
+    ((trashed ?? []) as Array<{ id: string }>).map((row) => String(row.id))
+  );
 
   const { error } = await supabase
     .from("chats")
