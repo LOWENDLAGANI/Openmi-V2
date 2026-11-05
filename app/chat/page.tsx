@@ -509,7 +509,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
         </div>
       )}
 
-      {repo && (
+      {repo && executionConfigured() && (
         <div className="mb-3 shrink-0">
           <MissionPanel chatId={chat.id} repo={repo} />
         </div>
@@ -601,14 +601,13 @@ export default async function ChatPage({
   if (session.state === "unconfigured") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-        <p className="eyebrow">not configured</p>
+        <p className="eyebrow">unavailable</p>
         <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
-          The workspace needs Supabase
+          Openmi is unavailable right now
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Chats, folders and the trash live in Postgres behind row-level
-          security. Without a project configured there is nowhere to put them.
-          Ask the operator to finish the deployment configuration.
+          We can&apos;t load your workspace at the moment. Try again in a few
+          minutes.
         </p>
       </main>
     );

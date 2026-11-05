@@ -76,7 +76,7 @@ export function AboutLogoGate() {
     const supabase = supabaseBrowser();
 
     if (!supabase) {
-      setError("Supabase is not configured for this deployment.");
+      setError("This tool is unavailable right now.");
       return;
     }
 

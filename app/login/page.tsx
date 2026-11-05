@@ -45,22 +45,22 @@ export default async function LoginPage({
         </div>
       </header>
 
-      <div className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid flex-1 content-start items-start gap-10 py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:content-center lg:items-center">
         <section className="max-w-lg">
           <p className="eyebrow">sign in</p>
           <h1 className="mt-4 text-[clamp(2rem,5.4vw,3.1rem)] font-semibold leading-[1.04] tracking-[-0.03em] text-hi">
             Sign in to Openmi
           </h1>
-          <p className="mt-4 text-[13.5px] leading-relaxed text-mid">
-            Your chats, folders and repository connection belong to your account
-            and are protected by row-level security, not by a route guard.
+          <p className="mt-4 text-[13.5px] leading-[1.7] text-mid">
+            Your chats, files and repository connection stay private to your
+            account. Nothing is written to your repository without your
+            approval.
           </p>
 
           <div className="rule my-8 max-w-sm" />
 
           <p className="max-w-sm text-[11px] leading-relaxed text-low">
-            By signing in you accept that the agent reads repository content you
-            have access to, and that nothing is committed without your approval.
+            The agent reads only repositories you already have access to.
           </p>
         </section>
 

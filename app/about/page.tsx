@@ -27,23 +27,23 @@ const DOES = [
 ];
 
 const DOES_NOT = [
-  "It runs an install and a build in a sandbox when one is configured; it does not run your tests or start a preview server.",
+  "It runs install and build commands in a fresh sandbox. It does not run your test suite or start a preview server.",
   "It does not write to the default branch. The write client refuses it, and a test asserts the refusal.",
   "It does not merge pull requests, push to a protected branch or clean up branches.",
   "It does not generate a project from nothing, and there is no guest mode.",
-  "It does not take card payments; top-ups are operator-issued redeem codes.",
+  "It does not take card payments; top-ups arrive as one-time redeem codes.",
   "It does not run tests. A card says what a build did, and only from an exit code it observed.",
 ];
 
 export default function AboutPage() {
   return (
     <main className="animate-enter mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2">
         <Link href="/" aria-label="Openmi home">
           <Brand />
         </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-1.5">
-          <ThemeSwitcher />
+        <nav className="flex items-center gap-1.5">
+          <ThemeSwitcher variant="icon" />
           <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
             Open workspace
           </Link>
@@ -163,8 +163,8 @@ export default function AboutPage() {
           failing silently.
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Full environment and migration status live in the admin panel, behind
-          the operator role. It is not part of the public site.
+          Deployment status lives in an internal admin panel, separate from the
+          product.
         </p>
       </section>
 

@@ -978,7 +978,7 @@ export function ChatPanel({
                     ? missionDefault && repo
                       ? "Give the agent a goal…"
                       : "Message Openmi…"
-                    : "No provider key is configured — ask the operator."
+                    : "Chat is unavailable right now."
                 }
                 className="composer-input max-h-[168px] min-h-[44px] px-2 pt-0.5 text-[14px] leading-[1.6] focus:outline-none"
               />

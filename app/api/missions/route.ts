@@ -120,8 +120,7 @@ export async function POST(request: Request) {
   if (!executionConfigured()) {
     return NextResponse.json(
       {
-        error:
-          "The sandbox is not configured on this deployment. Set DAYTONA_API_KEY to give the agent an environment.",
+        error: "Command execution isn't available right now. Try again shortly.",
       },
       { status: 503, headers: NO_STORE }
     );

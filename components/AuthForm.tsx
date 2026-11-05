@@ -29,7 +29,7 @@ export function AuthForm({
 
     const supabase = supabaseBrowser();
     if (!supabase) {
-      setError("Supabase is not configured for this deployment.");
+      setError("Sign-in is unavailable right now. Try again in a moment.");
       return;
     }
 
@@ -88,12 +88,11 @@ export function AuthForm({
     return (
       <div className="panel mt-8 p-5">
         <p className="text-[13.5px] font-semibold text-hi">
-          Supabase is not configured
+          Sign-in is unavailable
         </p>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
-          Sign-in needs a project URL and an anon key. Ask the operator to finish
-          the deployment configuration; the admin panel lists exactly what is
-          missing and where each value comes from.
+          Openmi can&apos;t reach its accounts service right now. Try again in a
+          moment, or check back shortly.
         </p>
       </div>
     );

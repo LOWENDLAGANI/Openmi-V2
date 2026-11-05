@@ -239,8 +239,7 @@ export async function POST(request: Request) {
   if (!providersConfigured()) {
     return json(
       {
-        error:
-          "No AI provider key is configured, so there is nothing to answer with. The setup page lists the keys.",
+        error: "Openmi can't answer right now. Try again in a moment.",
         code: "no-provider",
       },
       409
@@ -898,8 +897,8 @@ export async function POST(request: Request) {
         if (chain.length === 0) {
           failure = new Error(
             model === "auto"
-              ? "No AI provider key is configured for this deployment."
-              : "This model's provider key is not configured."
+              ? "Openmi can't answer right now. Try again in a moment."
+              : "That model isn't available right now. Pick another one."
           );
         }
 

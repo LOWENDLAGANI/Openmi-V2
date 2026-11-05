@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(
       new URL(
         `/chat?error=${encodeURIComponent(
-          "GitHub OAuth is not configured on this deployment. Connect with a personal access token instead."
+          "GitHub sign-in is unavailable right now. Connect with a personal access token instead."
         )}`,
         url.origin
       )

@@ -180,7 +180,7 @@ export function ExecutionPanel({
               disabled={starting || payload?.configured === false}
               title={
                 payload?.configured === false
-                  ? "DAYTONA_API_KEY is not set on this deployment."
+                  ? "Execution isn't available right now."
                   : undefined
               }
               className="btn px-3 py-0.5 text-[10.5px] disabled:opacity-50"
@@ -213,8 +213,7 @@ export function ExecutionPanel({
 
       {payload?.configured === false && (
         <p className="text-[11px] leading-relaxed text-low">
-          This deployment has no sandbox key, so nothing can run. The operator
-          sets DAYTONA_API_KEY to turn it on.
+          Command execution isn&apos;t available on this workspace right now.
         </p>
       )}
 

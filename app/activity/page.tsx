@@ -33,7 +33,7 @@ const KIND_LABEL: Record<string, string> = {
   refund: "Refund",
   invite: "Invite reward",
   topup: "Top-up",
-  adjustment: "Operator adjustment",
+  adjustment: "Adjustment",
 };
 
 type LedgerRow = {
@@ -73,14 +73,13 @@ export default async function ActivityPage({
   if (session.state === "unconfigured") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-        <p className="eyebrow">not configured</p>
+        <p className="eyebrow">unavailable</p>
         <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
-          Activity needs Supabase
+          Openmi is unavailable right now
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Dew balances and the ledger live in Postgres behind row-level
-          security. Without a project configured there is nothing to show. Ask
-          the operator to finish the deployment configuration.
+          We can&apos;t load your activity at the moment. Try again in a few
+          minutes.
         </p>
       </main>
     );
@@ -242,7 +241,7 @@ export default async function ActivityPage({
             Redeem a code
           </h2>
           <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-            Codes are issued by an operator. Each one can be redeemed once.
+            Each code can be redeemed once.
           </p>
 
           <form action={redeemCode} className="mt-3 flex gap-2">
@@ -273,8 +272,8 @@ export default async function ActivityPage({
             ))}
           </ul>
           <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-            Or pay on the plans page and upload the receipt; an operator reviews
-            it and the Dew lands here.
+            Or pay on the plans page and upload the receipt; we review it and
+            the Dew lands here.
           </p>
 
           <Link href="/pay" className="btn mt-3 px-3 py-1.5 text-[11.5px]">

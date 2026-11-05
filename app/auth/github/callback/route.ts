@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!oauthConfigured()) {
-    return failure(request, "GitHub OAuth is not configured on this deployment.");
+    return failure(request, "GitHub sign-in is unavailable right now.");
   }
 
   if (url.searchParams.get("error")) {

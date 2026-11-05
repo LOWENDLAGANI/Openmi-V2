@@ -71,14 +71,13 @@ export default async function PayPage({
   if (session.state === "unconfigured") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-        <p className="eyebrow">not configured</p>
+        <p className="eyebrow">unavailable</p>
         <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
-          Plans need Supabase
+          Openmi is unavailable right now
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Receipts are stored privately and requests live in Postgres behind
-          row-level security. Without a project there is nothing to attach them
-          to. Ask the operator to finish the deployment configuration.
+          We can&apos;t load plans and receipts at the moment. Try again in a few
+          minutes.
         </p>
       </main>
     );
@@ -173,8 +172,8 @@ export default async function PayPage({
           role="status"
           className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
         >
-          Receipt received. It is pending until an operator reviews it; the
-          status below updates in place.
+          Receipt received. It is pending until we review it; the status below
+          updates in place.
         </p>
       )}
 
@@ -333,8 +332,8 @@ export default async function PayPage({
         </div>
 
         <p className="mt-2 rounded-2xl border border-line bg-raised px-4 py-2.5 text-[10.5px] leading-relaxed text-low">
-          Codes still work while top-ups are paused: an operator issues them and
-          no checkout is involved.
+          Codes still work while top-ups are paused: we issue them directly, with
+          no checkout involved.
         </p>
 
         <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-mid">
@@ -373,7 +372,7 @@ export default async function PayPage({
             </SubmitButton>
 
             <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-              Codes are issued by the operator and can be used once.
+              Each code can be used once.
             </p>
           </form>
 
@@ -433,8 +432,7 @@ export default async function PayPage({
         </h2>
         <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
           One request per payment. It stays here with a pending, approved or
-          rejected status, and the operator sees the same receipt in the admin
-          panel.
+          rejected status, so you can follow it from submission to approval.
         </p>
 
         <form action={submitReceipt} className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -491,7 +489,7 @@ export default async function PayPage({
               name="note"
               maxLength={500}
               className="field py-2 text-[12px]"
-              placeholder="Anything the operator should know"
+              placeholder="Anything we should know"
             />
           </label>
 
@@ -602,8 +600,8 @@ export default async function PayPage({
       </section>
 
       <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
-        Approval is recorded with the operator&apos;s account and the Dew moves
-        through the same ledger as every other balance change. A rejected receipt
+        Approval is recorded against your receipt, and the Dew moves through the
+        same ledger as every other balance change. A rejected receipt
         keeps its note and can be resubmitted with a corrected reference.
       </p>
     </main>

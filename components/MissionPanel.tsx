@@ -226,7 +226,7 @@ export function MissionPanel({
   const elapsed = mission ? Math.max(0, now - new Date(mission.started_at).getTime()) : 0;
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-4">
+    <section className="rounded-2xl border border-line bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-[13px] font-medium text-body">
           Mission · {repo.fullName.split("/")[1] ?? repo.fullName}
@@ -237,20 +237,12 @@ export function MissionPanel({
             </span>
           )}
         </h2>
-        <span className="text-[11px] text-low">
+        <span className="text-[11.5px] text-low">
           {live
             ? `${clock(elapsed)} elapsed · ${commandCount} command(s)`
             : `${repo.sha.slice(0, 7)} · ${commandCount} command(s)`}
         </span>
       </div>
-
-      {payload?.configured === false && (
-        <p className="mt-3 rounded-xl border border-line bg-page px-3 py-2 text-[12px] text-mid">
-          The sandbox is not configured on this deployment. Set{" "}
-          <code>DAYTONA_API_KEY</code> to give the agent an environment to work
-          in.
-        </p>
-      )}
 
       {!live && (
         <div className="mt-3 flex flex-col gap-2">
@@ -365,7 +357,7 @@ export function MissionPanel({
                   isRunning ? "border-accent/50 bg-accent-soft/40" : "border-line bg-page"
                 }`}
               >
-                <div className="flex flex-wrap items-baseline gap-2 text-[11.5px]">
+                <div className="flex flex-wrap items-baseline gap-2 text-[12px]">
                   <span className="text-low">{command.seq}</span>
                   <span className="text-mid">{command.purpose}</span>
                   <span
@@ -382,7 +374,7 @@ export function MissionPanel({
                     )}
                     {commandLine(command)}
                   </span>
-                  <span className="ml-auto text-[10px] text-low">
+                  <span className="ml-auto text-[10.5px] text-low">
                     {timeOf(command.at)}
                   </span>
                 </div>
@@ -392,7 +384,7 @@ export function MissionPanel({
                     <summary className="cursor-pointer text-[11px] text-low">
                       output{command.truncated ? " (tail)" : ""}
                     </summary>
-                    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10.5px] text-mid">
+                    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-[1.6] text-mid">
                       {command.output_tail}
                     </pre>
                   </details>
