@@ -31,6 +31,7 @@ import {
   type DewGate,
 } from "@/lib/dew/store";
 import { executionConfigured, serverEnv } from "@/lib/env";
+import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
 import {
   getFile,
   getRepo,
@@ -456,6 +457,11 @@ export async function POST(request: Request) {
   // and the chat is pinned to a repository. Nothing is created here — the
   // handle is lazy, so a message that never runs a command never pays for a
   // sandbox. The model chooses by calling a tool or not.
+  // Notices are raised from inside the stream (a stopped workspace may have to
+  // wake before the first command), so the callback is bound to the stream's
+  // `send` once it exists rather than assuming one here.
+  let sendNotice: (message: string) => void = () => {};
+
   const shellTurn =
     executionConfigured() && repoFullName && sha && githubToken
       ? createShellTurn({
@@ -464,8 +470,12 @@ export async function POST(request: Request) {
           sha,
           runId: turnId,
           deadline: startedAt + CHAT_SHELL_BUDGET_MS,
+          chatId,
+          owner: session.user.id,
+          onNotice: (message) => sendNotice(message),
         })
       : null;
+  const persistentShell = Boolean(shellTurn) && chatSandboxesEnabled();
 
   const system = buildSystemPrompt({
     repo: repoFullName,
@@ -479,6 +489,9 @@ export async function POST(request: Request) {
     sandbox: executionConfigured(),
     // With a handle in hand the answer is different, and so is the prompt.
     shell: Boolean(shellTurn),
+    // A persistent workspace may be described as such; a per-message box may
+    // not, because its files are gone when the answer ends.
+    persistentShell,
   });
 
   const plainMessages: ChatMessage[] = [
@@ -522,6 +535,8 @@ export async function POST(request: Request) {
           closed = true;
         }
       };
+
+      sendNotice = (message: string) => send("notice", { message });
 
       // Generation is deliberately NOT wired to request.signal. Closing the
       // tab ends this stream, not the work. Only an explicit Stop — the
@@ -828,15 +843,17 @@ export async function POST(request: Request) {
 
         if (refundReason) await refundTurn(refundReason);
 
-        // A paused shell turn is not continued: its sandbox does not outlive
-        // this invocation, so the continuation would re-provision and re-run
-        // what the reader already watched. It ends here instead.
-        const pausable = result.stopped === "paused" && !shellTurn;
+        // A paused turn continues when its workspace survives the invocation.
+        // With a chat-scoped environment the continuation reattaches to the
+        // same disk; with the per-message box it would reseed and re-run what
+        // the reader already watched, so that path still ends here.
+        const retainedWorkspace = shellTurn?.retainsWorkspace() ?? false;
+        const pausable = result.stopped === "paused" && (!shellTurn || retainedWorkspace);
 
         if (result.notice) {
           send("notice", {
             message:
-              result.stopped === "paused" && shellTurn
+              result.stopped === "paused" && shellTurn && !retainedWorkspace
                 ? "This message reached its time limit. The sandbox was released; send another message to carry on."
                 : result.notice,
           });
@@ -898,7 +915,7 @@ export async function POST(request: Request) {
         const text =
           result.stopped === "aborted" && result.text.length > 0
             ? `${result.text}\n\n_(stopped before this answer finished)_`
-            : result.stopped === "paused" && shellTurn && result.text.length > 0
+            : result.stopped === "paused" && shellTurn && !retainedWorkspace && result.text.length > 0
               ? `${result.text}\n\n_(this message reached its time limit in the sandbox)_`
               : result.text;
 

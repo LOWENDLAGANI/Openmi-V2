@@ -32,6 +32,7 @@ export function buildSystemPrompt({
   edits = false,
   sandbox = false,
   shell = true,
+  persistentShell = false,
 }: {
   repo: string | null;
   sha: string | null;
@@ -42,12 +43,20 @@ export function buildSystemPrompt({
   sandbox?: boolean;
   /** True when this message may run commands itself. */
   shell?: boolean;
+  /** True when the workspace survives between messages in this chat. */
+  persistentShell?: boolean;
 }): string {
+  // A persistent workspace changes what the model may promise: files stay, but
+  // a command that never exits still does not outlive its timeout.
+  const shellClause = persistentShell
+    ? `${SHELL_CLAUSE} This chat's workspace persists between messages: files you create or change stay for the next message in this chat. Background processes do not; every command must finish within its timeout.`
+    : SHELL_CLAUSE;
+
   // Default to shell execution for standard runs.
   const head = shell
     ? [
         IDENTITY,
-        SHELL_CLAUSE,
+        shellClause,
         CITATION_CLAUSE,
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,

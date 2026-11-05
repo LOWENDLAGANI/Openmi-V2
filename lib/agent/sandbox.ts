@@ -1,11 +1,11 @@
 import "server-only";
 
-import { fetchRepoArchive } from "@/lib/execution/archive";
+import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
+import { openChatSandbox, releaseChatSandbox } from "@/lib/execution/chat-env/open";
+import { seedChatWorkspace } from "@/lib/execution/chat-env/seed";
 import { createSandbox, type SandboxHandle } from "@/lib/execution/provider";
-import {
-  MISSION_MAX_OUTPUT_BYTES,
-  MISSION_WORKDIR,
-} from "@/lib/execution/mission/budget";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { MISSION_MAX_OUTPUT_BYTES, MISSION_WORKDIR } from "@/lib/execution/mission/budget";
 import {
   MISSION_TOOL_SPECS,
   missionOutput,
@@ -30,11 +30,16 @@ import {
 import type { ToolResult } from "./tools";
 
 /**
- * A Linux box a conversation can borrow, for as long as it is talking.
+ * A Linux box a conversation can borrow.
  *
- * The sandbox is created on the first tool call and destroyed when the turn
- * ends. Nothing is provisioned for a message that never needed one, which is
- * the whole point of putting the decision in the model's hands: "what does this
+ * With chat environments on, the box belongs to the chat rather than to this
+ * invocation: the first tool call opens the chat's workspace, later messages
+ * reattach to the same disk, and the turn's end releases the lease instead of
+ * destroying anything. With the feature switched off — the rollback path — the
+ * old behaviour is kept: one box per turn, destroyed when the answer ends.
+ *
+ * Either way nothing is provisioned for a message that never needed one, which
+ * is the point of putting the decision in the model's hands: "what does this
  * function do" costs a provider call, and "does this build" costs a sandbox.
  *
  * The repository arrives as one tarball at the pinned commit, the same way a
@@ -50,6 +55,14 @@ export type ShellTurn = {
   commands: () => number;
   run: (name: string, args: Record<string, unknown> | null) => Promise<ToolResult>;
   close: () => Promise<void>;
+  /**
+   * True when this turn's workspace is the chat's, not the invocation's.
+   *
+   * The caller uses it to decide whether a paused turn may continue: a
+   * continuation of a chat-scoped workspace reattaches to the same disk, while
+   * a continuation of a per-message box would reseed and repeat itself.
+   */
+  retainsWorkspace: () => boolean;
 };
 
 export type ShellTurnOptions = {
@@ -59,6 +72,12 @@ export type ShellTurnOptions = {
   runId: string;
   /** Epoch ms: no command may start after this, so the response can still close. */
   deadline: number;
+  /** The chat this turn belongs to. Required for a persistent workspace. */
+  chatId: string | null;
+  /** The account that owns the chat; never taken from the request body. */
+  owner: string | null;
+  /** A fact worth telling the reader (a workspace is waking, for example). */
+  onNotice?: (message: string) => void;
 };
 
 /**
@@ -97,67 +116,19 @@ function failure(message: string): { ok: false; error: string } {
   return { ok: false, error: message };
 }
 
-/**
- * Fills the workspace with the repository at the pinned commit.
- *
- * Returns null on success, or the sentence the model should be told. Every
- * failure here is about the deployment — a large repo, a refused quota — so it
- * is reported as a fact rather than retried inside the turn.
- */
-async function seed(
-  options: ShellTurnOptions,
-  sandbox: SandboxHandle
-): Promise<string | null> {
-  if (!options.token || !options.repo || !options.sha) {
-    return "This chat has no readable repository, so there is no workspace to seed.";
-  }
-
-  const archive = await fetchRepoArchive({
-    token: options.token,
-    repo: options.repo,
-    sha: options.sha,
-  });
-
-  if (!archive.ok) return archive.detail;
-
-  const made = await sandbox.exec(`mkdir -p ${MISSION_WORKDIR}`, ".", 60_000);
-  if (made.exitCode !== 0) {
-    return made.output.length > 0 ? made.output : "The workspace directory could not be created.";
-  }
-
-  try {
-    await sandbox.upload(archive.bytes, `${MISSION_WORKDIR}/src.tgz`);
-  } catch (caught) {
-    return caught instanceof Error ? caught.message : "The archive could not be uploaded.";
-  }
-
-  const extracted = await sandbox.exec(
-    [
-      "tar xzf src.tgz",
-      "rm -f src.tgz",
-      "rm -rf node_modules .next dist build vendor target .git",
-      "find . -maxdepth 2 -name '.env*' -delete",
-      "git init -q .",
-      "git config user.name Openmi",
-      "git config user.email openmi@users.noreply.github.com",
-      "git add -A",
-      "git -c commit.gpgsign=false commit -qm base",
-    ].join(" && "),
-    MISSION_WORKDIR,
-    120_000
-  );
-
-  if (extracted.exitCode !== 0) {
-    return `The archive could not be extracted: ${extracted.output}`;
-  }
-
-  return null;
-}
-
 export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
   if (!options.token || !options.repo || !options.sha) return null;
 
+  // Configuration intent, not the state of the box: a turn that never runs a
+  // command still keeps its chat's workspace, so a paused answer may continue.
+  const persistent =
+    chatSandboxesEnabled() && Boolean(options.chatId) && Boolean(options.owner);
+
   let sandbox: SandboxHandle | null = null;
+  let chatRow: {
+    admin: NonNullable<ReturnType<typeof supabaseAdmin>>;
+    rowId: string;
+  } | null = null;
   let starting: Promise<ToolResult | null> | null = null;
   let commands = 0;
   let closed = false;
@@ -168,6 +139,37 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
 
     if (!starting) {
       starting = (async () => {
+        if (persistent) {
+          const admin = supabaseAdmin();
+
+          if (!admin) {
+            return failure(
+              "This deployment has no database connection for the chat's workspace."
+            );
+          }
+
+          const opened = await openChatSandbox({
+            admin,
+            chatId: options.chatId as string,
+            owner: options.owner as string,
+            repo: options.repo as string,
+            sha: options.sha as string,
+            token: options.token as string,
+          });
+
+          if (!opened.ok) {
+            return failure(
+              `The Linux sandbox could not be started: ${opened.message}`
+            );
+          }
+
+          if (opened.notice) options.onNotice?.(opened.notice);
+
+          chatRow = { admin, rowId: opened.row.id };
+          sandbox = opened.handle;
+          return null;
+        }
+
         let handle: SandboxHandle;
         try {
           handle = await createSandbox(options.runId, {
@@ -184,11 +186,19 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
           );
         }
 
-        const problem = await seed(options, handle);
+        const seeded = await seedChatWorkspace({
+          sandbox: handle,
+          token: options.token as string,
+          repo: options.repo as string,
+          sha: options.sha as string,
+          chatId: options.chatId ?? options.runId,
+        });
 
-        if (problem) {
+        if (!seeded.ok) {
           await handle.destroy();
-          return failure(`The repository could not be seeded into the sandbox: ${problem}`);
+          return failure(
+            `The repository could not be seeded into the sandbox: ${seeded.detail}`
+          );
         }
 
         sandbox = handle;
@@ -359,6 +369,7 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
     specs: specs(),
     started: () => sandbox !== null,
     commands: () => commands,
+    retainsWorkspace: () => persistent,
     run,
     async close() {
       if (closed) return;
@@ -377,7 +388,21 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
 
       const handle = sandbox;
       sandbox = null;
-      if (handle) await handle.destroy();
+
+      if (!handle) return;
+
+      if (persistent && chatRow) {
+        // The disk is the chat's; only this turn's claim on it ends. The sweep
+        // stops it after the idle window and wipes it at the 48-hour deadline.
+        await releaseChatSandbox({
+          admin: chatRow.admin,
+          rowId: chatRow.rowId,
+          handle,
+        });
+        return;
+      }
+
+      await handle.destroy();
     },
   };
 }
