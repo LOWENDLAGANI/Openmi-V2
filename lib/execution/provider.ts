@@ -9,6 +9,7 @@ import {
   EXEC_ALLOWED_DOMAINS,
   EXEC_STEP_TIMEOUT_MS,
   EXEC_WORKDIR,
+  shellQuote,
   tailOf,
 } from "./commands";
 import { EXEC_MAX_MINUTES } from "./cost";
@@ -125,12 +126,18 @@ function handleFor(sandbox: RemoteSandbox, id: string): SandboxHandle {
         Math.ceil((timeoutMs ?? EXEC_STEP_TIMEOUT_MS) / 1000)
       );
 
+      // The sandbox runtime must have a working shell. Some Daytona images only
+      // ship /bin/sh, so run everything through bash when present and fall back
+      // to the POSIX shell instead of depending on the template default.
+      const shellCommand = `bash -c ${shellQuote(command)}`;
+      const fallbackCommand = `/bin/sh -c ${shellQuote(command)}`;
+
       let response: unknown;
       let timedOut = false;
 
       try {
         response = await sandbox.process.executeCommand(
-          command,
+          shellCommand,
           cwd ?? EXEC_WORKDIR,
           undefined,
           limitSeconds
@@ -138,16 +145,44 @@ function handleFor(sandbox: RemoteSandbox, id: string): SandboxHandle {
       } catch (caught) {
         const message =
           caught instanceof Error ? caught.message : "The command could not run.";
-        timedOut = /timeout|timed out|deadline/i.test(message);
 
-        return {
-          command,
-          exitCode: timedOut ? 124 : 1,
-          output: message,
-          truncated: false,
-          durationMs: Date.now() - startedAt,
-          timedOut,
-        };
+        // If bash is missing, the sandbox template likely has no /usr/bin/zsh
+        // either, so retry through the POSIX shell before reporting failure.
+        if (/no such file|not found/i.test(message) && command !== fallbackCommand) {
+          try {
+            response = await sandbox.process.executeCommand(
+              fallbackCommand,
+              cwd ?? EXEC_WORKDIR,
+              undefined,
+              limitSeconds
+            );
+          } catch (fallbackCaught) {
+            const fallbackMessage =
+              fallbackCaught instanceof Error
+                ? fallbackCaught.message
+                : "The command could not run.";
+
+            return {
+              command,
+              exitCode: 1,
+              output: `Shell unavailable: ${message}\nFallback shell also failed: ${fallbackMessage}`,
+              truncated: false,
+              durationMs: Date.now() - startedAt,
+              timedOut: false,
+            };
+          }
+        } else {
+          timedOut = /timeout|timed out|deadline/i.test(message);
+
+          return {
+            command,
+            exitCode: timedOut ? 124 : 1,
+            output: message,
+            truncated: false,
+            durationMs: Date.now() - startedAt,
+            timedOut,
+          };
+        }
       }
 
       const wire = response as {

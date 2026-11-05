@@ -486,7 +486,7 @@ export async function runMissionTick(input: {
             ? `mkdir -p .openmi && nohup setsid bash -c ${shellQuote(
                 validated.command
               )} > ${relLog} 2>&1 & echo $! > ${relPid}`
-            : validated.command;
+            : `bash -c ${shellQuote(validated.command)}`;
 
           const cwd = validated.cwd
             ? `${MISSION_WORKDIR}/${validated.cwd}`

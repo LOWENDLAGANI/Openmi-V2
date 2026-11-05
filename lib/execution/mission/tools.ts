@@ -345,7 +345,10 @@ export function missionOutput(
   };
 }
 
-/** Single-quote a string for `bash -c`, so a command stays one argument. */
+/**
+ * Single-quote a string for `bash -c` or `/bin/sh -c`, so a command stays one
+ * argument. The result is safe inside a quoted shell command string.
+ */
 export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }

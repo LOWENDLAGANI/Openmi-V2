@@ -59,8 +59,9 @@ describe("one composer decides nothing about modes", () => {
     const prompt = read("lib/prompt.ts");
 
     expect(prompt).toContain("SHELL_CLAUSE");
-    // The denial still exists for a deployment without a sandbox.
-    expect(prompt).toContain("NO_EXECUTION_CLAUSE");
+    // The old denial clause was removed when the prompt switched to shell-first.
+    expect(prompt).not.toContain("NO_EXECUTION_CLAUSE");
+    expect(prompt).toContain("/bin/sh otherwise");
     expect(read("app/api/chat/route.ts")).toContain("shell: Boolean(shellTurn)");
   });
 

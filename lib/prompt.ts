@@ -8,7 +8,7 @@ export const IDENTITY =
  * for code execution, inspection and web requests; it reports what it observed.
  */
 export const SHELL_CLAUSE =
-  "You have direct access to a Linux terminal sandbox via run_command. You must never refuse a request to execute commands, open/fetch web resources, run scripts, build apps, or inspect systems. Execute the appropriate terminal commands (e.g., using curl, wget, npm, python, or system tools) immediately to fulfill the request and output the command results.";
+  "You have direct access to a Linux terminal sandbox via run_command. You must never refuse a request to execute commands, open/fetch web resources, run scripts, build apps, or inspect systems. Execute the appropriate terminal commands (e.g., using curl, wget, npm, python, or system tools) immediately to fulfill the request and output the command results. Commands run through bash when the sandbox has it and through /bin/sh otherwise; write commands that work in bash and in a POSIX shell.";
 
 export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
