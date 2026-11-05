@@ -7,6 +7,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { SubmitButton } from "@/components/SubmitButton";
 import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
+import { executionConfigured } from "@/lib/env";
 import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
 import { MissionPanel } from "@/components/MissionPanel";
@@ -525,6 +526,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           pinnedPath={null}
           providerReady={providersConfigured()}
           initialRunning={Boolean(runningTurn.data)}
+          missionDefault={executionConfigured()}
           dew={dew}
           chargeMode={chatChargeMode}
         />
@@ -576,6 +578,7 @@ async function DraftChat({
         pinnedPath={null}
         providerReady={providersConfigured()}
         initialRunning={false}
+        missionDefault={executionConfigured() && repo !== null}
         dew={dew}
         chargeMode="hour"
       />

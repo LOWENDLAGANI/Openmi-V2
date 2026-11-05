@@ -82,6 +82,18 @@ export function MissionPanel({
     void load();
   }, [load]);
 
+  // The composer is the usual way to start a mission, so the console has to
+  // hear about one it did not start itself.
+  useEffect(() => {
+    function onStarted() {
+      setPinned(true);
+      void load();
+    }
+
+    window.addEventListener("openmi:mission-started", onStarted);
+    return () => window.removeEventListener("openmi:mission-started", onStarted);
+  }, [load]);
+
   const tick = useCallback(async (id: string) => {
     if (ticking.current) return;
 
@@ -234,8 +246,9 @@ export function MissionPanel({
 
       {payload?.configured === false && (
         <p className="mt-3 rounded-xl border border-line bg-page px-3 py-2 text-[12px] text-mid">
-          Missions are off on this deployment. Set <code>MISSION_MODE_ENABLED=on</code>{" "}
-          and <code>DAYTONA_API_KEY</code> to let the agent run commands.
+          The sandbox is not configured on this deployment. Set{" "}
+          <code>DAYTONA_API_KEY</code> to give the agent an environment to work
+          in.
         </p>
       )}
 

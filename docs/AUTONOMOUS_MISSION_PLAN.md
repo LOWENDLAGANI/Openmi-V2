@@ -548,12 +548,14 @@ Checks after every task, unchanged from the README:
 
 ## 16. Rollout and kill switch
 
-- `MISSION_MODE_ENABLED` (new env, off unless explicitly `on`) gates the
+- Missions are the default for a chat with a repository; `DAYTONA_API_KEY`
+  (plus `EXECUTION_ENABLED=off` as the kill switch) is the only switch. The
+  plan originally put them behind `MISSION_MODE_ENABLED` (new env, off unless explicitly `on`) gating the
   composer and the routes. `EXECUTION_ENABLED=off` still kills everything.
 - Week 1: admin allowlist only (`lib/admin/allowlist.ts` already exists), cap
   10 minutes, `act` only.
 - Week 2: all accounts, 20 minutes, `plan`/`act`/`ship`.
-- Rollback is the flag: with `MISSION_MODE_ENABLED` unset, `/api/missions/*`
+- Rollback is the sandbox key: with `DAYTONA_API_KEY` unset, `/api/missions/*`
   returns `503` with the same "not configured" sentence and no sandbox is ever
   created. Existing verify runs are untouched.
 

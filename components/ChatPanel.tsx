@@ -43,6 +43,7 @@ export function ChatPanel({
   pinnedPath,
   providerReady,
   initialRunning,
+  missionDefault = false,
   dew,
   chargeMode,
 }: {
@@ -55,6 +56,8 @@ export function ChatPanel({
   pinnedPath: string | null;
   providerReady: boolean;
   initialRunning: boolean;
+  /** A goal in a repo chat is a mission, not a turn: the agent decides the commands. */
+  missionDefault?: boolean;
   /** The two balances a charge can draw on. */
   dew: { balance: number; wallet: number };
   /** How this chat's messages are paid for after the first choice. */
@@ -183,8 +186,26 @@ export function ChatPanel({
     };
   }, []);
 
-  const suggestions = repo
+  const suggestions = missionDefault && repo
     ? [
+        {
+          label: "Make it build",
+          prompt:
+            "Make this repository install and build cleanly, and fix whatever fails.",
+        },
+        {
+          label: "Fix the type errors",
+          prompt:
+            "Find and fix the type errors in this repository, then confirm the typecheck exits 0.",
+        },
+        {
+          label: "Add a test",
+          prompt:
+            "Add a test for the most important untested function, and make it pass.",
+        },
+      ]
+    : repo
+      ? [
         {
           label: "Explain this repo",
           prompt: "Explain what this repository does and how it is structured.",
@@ -199,7 +220,7 @@ export function ChatPanel({
           prompt: "Review the most important file in this repository and its risks.",
         },
       ]
-    : [
+      : [
         {
           label: "What can you do?",
           prompt: "What can you do, and what do you refuse to do?",
@@ -251,6 +272,104 @@ export function ChatPanel({
     await send(pendingChoose.content, undefined, pendingChoose.mode);
   }
 
+  /**
+   * A goal in a chat with a repository is a mission, not a turn.
+   *
+   * The message is recorded server-side with the goal, so the transcript and
+   * the command ledger describe the same request; the optimistic copy is what
+   * makes the goal appear while the sandbox is still starting. The price is the
+   * chat's own mode — the mission's model calls cost the same credits.
+   */
+  async function startMission(goal: string, mode: ChargeMode) {
+    busyRef.current = true;
+    setStreaming(true);
+    setError(null);
+    setPending("");
+    setSteps([]);
+    setNotices([]);
+    setLastSent(goal);
+    setDraft("");
+
+    const optimisticId = `local-mission-${Date.now()}`;
+    setMessages((current) => [
+      ...current,
+      { id: optimisticId, role: "user", content: goal, seq: null, model },
+    ]);
+
+    try {
+      const response = await fetch("/api/missions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chatId: activeChatId ?? undefined,
+          goal,
+          autonomy: "act",
+          mode,
+          // A draft has no chat row yet, so the pinned repository travels with
+          // the goal and the route creates the chat around it.
+          repo: repo?.fullName,
+          branch: repo?.branch,
+          sha: repo?.sha,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            missionId?: string;
+            chatId?: string;
+            error?: string;
+            code?: string;
+            activeChatId?: string | null;
+            charged?: number;
+            reservedDew?: number;
+          }
+        | null;
+
+      if (!response.ok || !payload?.missionId) {
+        setError(payload?.error ?? `The mission could not start (${response.status}).`);
+
+        if (payload?.code === "hour-active") {
+          setConflict({ content: goal, mode, chatId: payload.activeChatId ?? null });
+        }
+
+        // A chat created before the refusal is still a real chat; adopting its
+        // URL is what stops the next attempt from creating a second one.
+        if (payload?.chatId && payload.chatId !== activeChatId) {
+          setActiveChatId(payload.chatId);
+          router.replace(`/chat?chat=${payload.chatId}`, { scroll: false });
+          return;
+        }
+
+        setMessages((current) => current.filter((message) => message.id !== optimisticId));
+        return;
+      }
+
+      if (payload.chatId && payload.chatId !== activeChatId) {
+        setActiveChatId(payload.chatId);
+        router.replace(`/chat?chat=${payload.chatId}`, { scroll: false });
+      }
+
+      if (typeof payload.charged === "number" && payload.charged > 0) {
+        setNotices((current) => [
+          ...current,
+          `${payload.charged} Dew charged; ${payload.reservedDew ?? 0} reserved for the sandbox.`,
+        ]);
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("openmi:mission-started", { detail: { chatId: payload.chatId } })
+      );
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The mission could not start.");
+      setMessages((current) => current.filter((message) => message.id !== optimisticId));
+    } finally {
+      busyRef.current = false;
+      setStreaming(false);
+      setStopping(false);
+    }
+  }
+
   async function send(
     content: string,
     turnToken?: string,
@@ -260,6 +379,14 @@ export function ChatPanel({
 
     if (busyRef.current) return;
     if (!continuation && content.trim().length === 0) return;
+
+    // Missions are the default for a repository: the goal is the prompt and the
+    // agent chooses the commands. A chat with no repository keeps the answer
+    // path, because there is nothing to run anything against.
+    if (!continuation && missionDefault && repo) {
+      await startMission(content, mode);
+      return;
+    }
 
     busyRef.current = true;
     setStreaming(true);
@@ -623,7 +750,11 @@ export function ChatPanel({
             className="flex h-full flex-col items-center justify-center py-10 text-center"
           >
             <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-              {(repo ? "Ask about this repo." : "What are you building?")
+              {(missionDefault && repo
+                ? "What should the agent do?"
+                : repo
+                  ? "Ask about this repo."
+                  : "What are you building?")
                 .split(" ")
                 .map((word, index) => (
                   <span key={`${word}-${index}`} className="motion-word inline-block">
@@ -633,9 +764,11 @@ export function ChatPanel({
                 ))}
             </h2>
             <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-low">
-              {repo
-                ? "Answers cite files. Nothing is pushed."
-                : "Pick a repository for answers that cite code."}
+              {missionDefault && repo
+                ? "It decides the commands and runs them in a Linux sandbox. Nothing is pushed without approval."
+                : repo
+                  ? "Answers cite files. Nothing is pushed."
+                  : "Pick a repository for answers that cite code."}
             </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -842,7 +975,9 @@ export function ChatPanel({
                 rows={1}
                 placeholder={
                   providerReady
-                    ? "Message Openmi…"
+                    ? missionDefault && repo
+                      ? "Give the agent a goal…"
+                      : "Message Openmi…"
                     : "No provider key is configured — ask the operator."
                 }
                 className="composer-input max-h-[168px] min-h-[44px] px-2 pt-0.5 text-[14px] leading-[1.6] focus:outline-none"
