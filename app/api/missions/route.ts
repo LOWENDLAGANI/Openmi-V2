@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 
 import { executionConfigured, serverEnv } from "@/lib/env";
-import { settleExecutionDew, startDewSession, type ChargeMode } from "@/lib/dew/store";
+import { settleExecutionDew, startDewSession } from "@/lib/dew/store";
 import { runMissionTick } from "@/lib/execution/mission/loop";
 import {
   readCommands,
@@ -29,9 +29,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
  * open for a clone. The goal is stored as the chat's user message, so the
  * transcript still reads as a conversation about the work.
  *
- * The message is charged the way the chat prices itself — an hour or one
- * request, recorded on the chat row — because the model calls inside the
- * mission cost the same provider credits.
+ * The message is charged as an hour of chat — started here when the chat has
+ * none running — because the model calls inside the mission cost the same
+ * provider credits.
  */
 
 export const runtime = "nodejs";
@@ -48,7 +48,6 @@ type ChatRow = {
   repo_branch: string | null;
   repo_base_sha: string | null;
   model: string | null;
-  charge_mode: string | null;
 };
 
 export async function GET(request: Request) {
@@ -132,7 +131,6 @@ export async function POST(request: Request) {
         goal?: unknown;
         autonomy?: unknown;
         minutes?: unknown;
-        mode?: unknown;
         repo?: unknown;
         branch?: unknown;
         sha?: unknown;
@@ -142,7 +140,6 @@ export async function POST(request: Request) {
   const askedChatId = body && typeof body.chatId === "string" ? body.chatId.trim() : "";
   const goal = body && typeof body.goal === "string" ? body.goal.trim() : "";
   const autonomy = readAutonomy(body?.autonomy);
-  const requestedMode: ChargeMode = body?.mode === "request" ? "request" : "hour";
 
   if (goal.length < 3 || goal.length > MAX_GOAL_CHARS) {
     return NextResponse.json(
@@ -204,7 +201,7 @@ export async function POST(request: Request) {
       .insert({
         owner: session.user.id,
         title: goal.slice(0, 80),
-        charge_mode: requestedMode,
+        charge_mode: "hour",
         repo_full_name: repo,
         repo_branch: branch,
         repo_base_sha: sha,
@@ -224,7 +221,7 @@ export async function POST(request: Request) {
 
   const { data: row, error: chatError } = await session.supabase
     .from("chats")
-    .select("id, repo_full_name, repo_branch, repo_base_sha, model, charge_mode")
+    .select("id, repo_full_name, repo_branch, repo_base_sha, model")
     .eq("id", chatId)
     .maybeSingle();
 
@@ -287,12 +284,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const mode: ChargeMode =
-    requestedMode === "request" || chat.charge_mode === "request" ? "request" : "hour";
-
   const dew = await startDewSession(session.supabase, model, chat.repo_full_name, {
     chatId,
-    mode,
   });
 
   if (!dew.ok) {
@@ -344,7 +337,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(
-    { missionId: runId, chatId, reservedDew: started.reservedDew, charged: dew.session.price, mode },
+    { missionId: runId, chatId, reservedDew: started.reservedDew, charged: dew.session.price },
     { status: 202, headers: NO_STORE }
   );
 }

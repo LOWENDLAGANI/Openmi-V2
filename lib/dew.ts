@@ -10,13 +10,6 @@
  */
 
 export const DEW_PER_HOUR = 3;
-
-/**
- * Dew charged for one chat request when "this message" is chosen instead of an
- * hour. Two questions cost 4 Dew, so the hour is cheaper from the second
- * question on; the dialog says that rather than hiding the arithmetic.
- */
-export const DEW_PER_REQUEST = 2;
 export const HOUR_SESSION_MS = 3_600_000;
 export const DAILY_FREE_DEW = 6;
 export const PAID_DAILY_FREE_DEW = 15;

@@ -5,8 +5,8 @@ import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { DewChip } from "@/components/DewChip";
 import { SubmitButton } from "@/components/SubmitButton";
-import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
 import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
 import { ReviewPanel } from "@/components/ReviewPanel";
@@ -446,10 +446,6 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     balance: Number(balances.dew_balance ?? 0),
     wallet: Number(balances.wallet_dew ?? 0),
   };
-  const chatChargeMode =
-    (chat as { charge_mode?: string }).charge_mode === "request"
-      ? ("request" as const)
-      : ("hour" as const);
   const autoApproveBranch =
     (autoApproval.data as { branch?: string } | null)?.branch ?? null;
 
@@ -519,7 +515,6 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           providerReady={providersConfigured()}
           initialRunning={Boolean(runningTurn.data)}
           dew={dew}
-          chargeMode={chatChargeMode}
         />
       </div>
     </div>
@@ -570,7 +565,6 @@ async function DraftChat({
         providerReady={providersConfigured()}
         initialRunning={false}
         dew={dew}
-        chargeMode="hour"
       />
     </div>
   );
@@ -732,8 +726,6 @@ export default async function ChatPage({
     body = <DraftChat repo={latestRepo} />;
   }
 
-  const lowBalance = isLowBalance(dewBalance);
-
   const banner =
     params.error || (params.connected && !params.error) ? (
       <p
@@ -782,18 +774,7 @@ export default async function ChatPage({
             </Link>
           )}
 
-          <Link
-            href="/activity"
-            title={`An hour of chat costs ${DEW_PER_HOUR} Dew, or ${2} Dew for one message. Wallet credit ${formatDew(dewWallet)}; low balance shows amber below ${LOW_BALANCE_DEW}.`}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
-              lowBalance
-                ? "border-warn/35 bg-warn/8 text-warn"
-                : "border-line bg-card text-low"
-            }`}
-          >
-            <span aria-hidden="true" className="size-1 rounded-full bg-current" />
-            dew {formatDew(dewBalance)}
-          </Link>
+          <DewChip initialBalance={dewBalance} initialWallet={dewWallet} />
 
         </>
       }

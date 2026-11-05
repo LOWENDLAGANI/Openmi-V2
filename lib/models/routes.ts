@@ -17,7 +17,6 @@ export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
   "kimi-k2": { provider: "openrouter", upstream: "moonshotai/kimi-k2" },
   "deepseek-chat": { provider: "deepseek", upstream: "deepseek-chat" },
   "deepseek-reasoner": { provider: "deepseek", upstream: "deepseek-reasoner" },
-  "llama-3.3-70b": { provider: "groq", upstream: "llama-3.3-70b-versatile" },
 };
 
 export type CustomRouteInput = {

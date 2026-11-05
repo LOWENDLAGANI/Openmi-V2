@@ -5,9 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
-import { ChargeDialog, type ChargeMode } from "@/components/ChargeDialog";
+import { ChargeDialog } from "@/components/ChargeDialog";
+import { DEW_EVENT } from "@/components/DewChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
-import { DEW_PER_HOUR, DEW_PER_REQUEST } from "@/lib/dew";
+import { DEW_PER_HOUR } from "@/lib/dew";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
@@ -56,7 +57,6 @@ export function ChatPanel({
   providerReady,
   initialRunning,
   dew,
-  chargeMode,
 }: {
   chatId: string | null;
   repo: RepoRef;
@@ -69,8 +69,6 @@ export function ChatPanel({
   initialRunning: boolean;
   /** The two balances a charge can draw on. */
   dew: { balance: number; wallet: number };
-  /** How this chat's messages are paid for after the first choice. */
-  chargeMode: ChargeMode;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<UiMessage[]>(() =>
@@ -96,19 +94,14 @@ export function ChatPanel({
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
   const [atBottom, setAtBottom] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId);
-  // The first message of a new chat waits here until a price is chosen.
+  // The first message of a new chat waits here until the hour is confirmed.
   const [chargeFor, setChargeFor] = useState<string | null>(null);
-  // What the reader picked for this chat, so the messages after the first one
-  // keep the same mode before the server-rendered row catches up.
-  const [chosenMode, setChosenMode] = useState<ChargeMode>(chargeMode);
-  const [modeChosen, setModeChosen] = useState(chatId !== null);
   const heroRef = useStagger<HTMLDivElement>(".motion-word, .motion-chip", {
     stagger: 0.05,
     delay: 0.05,
   });
   const [conflict, setConflict] = useState<{
     content: string;
-    mode: ChargeMode;
     chatId: string | null;
   } | null>(null);
 
@@ -243,15 +236,17 @@ export function ChatPanel({
     if (busyRef.current) return;
     if (content.trim().length === 0) return;
 
+    // A new chat confirms the hour before it spends anything; an existing chat
+    // is already paid for, so its messages go straight out.
     if (activeChatId === null) {
       setChargeFor(content);
       return;
     }
 
-    void send(content, undefined, chosenMode);
+    void send(content);
   }
 
-  async function endAndRetry(pendingChoose: { content: string; mode: ChargeMode }) {
+  async function endAndRetry(pendingChoose: { content: string }) {
     try {
       await fetch("/api/dew/end-session", {
         method: "POST",
@@ -263,14 +258,10 @@ export function ChatPanel({
     }
 
     setConflict(null);
-    await send(pendingChoose.content, undefined, pendingChoose.mode);
+    await send(pendingChoose.content);
   }
 
-  async function send(
-    content: string,
-    turnToken?: string,
-    mode: ChargeMode = chosenMode
-  ) {
+  async function send(content: string, turnToken?: string) {
     const continuation = typeof turnToken === "string";
 
     if (busyRef.current) return;
@@ -350,7 +341,6 @@ export function ChatPanel({
                 repo: repo?.fullName,
                 branch: repo?.branch,
                 sha: repo?.sha,
-                mode,
               }
         ),
         signal: controller.signal,
@@ -368,7 +358,6 @@ export function ChatPanel({
         if (payload?.code === "hour-active") {
           setConflict({
             content,
-            mode,
             chatId: payload.activeChatId ?? null,
           });
         }
@@ -434,9 +423,24 @@ export function ChatPanel({
               : "An hour of chat was charged.";
 
           // The charge is a fact, not a silent balance change. It is shown with
-          // the turn's other notices, and one refresh is what makes the Dew chip
-          // in the header show the balance this charge produced.
+          // the turn's other notices, and the balance is handed to the header
+          // chip now instead of waiting for the refresh round trip.
           setNotices((current) => [...current, label]);
+
+          const balance = Number(payload.balance);
+          const wallet = Number(payload.wallet);
+
+          if (Number.isFinite(balance)) {
+            window.dispatchEvent(
+              new CustomEvent(DEW_EVENT, {
+                detail: {
+                  balance,
+                  wallet: Number.isFinite(wallet) ? wallet : undefined,
+                },
+              })
+            );
+          }
+
           router.refresh();
           return;
         }
@@ -878,24 +882,20 @@ export function ChatPanel({
                       surprise after the answer. */}
                   <span
                     title={
-                      modeChosen
-                        ? chosenMode === "hour"
-                          ? "Every message in this chat is covered for the hour."
-                          : "Each message in this chat is charged separately."
-                        : "You choose the price when the first message sends."
+                      activeChatId !== null
+                        ? "Every message in this chat is covered for the hour."
+                        : "The hour starts when the first message sends."
                     }
                     className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
                   >
                     <span
                       aria-hidden="true"
                       className={`size-1 rounded-full ${
-                        modeChosen ? "bg-accent" : "bg-line-strong"
+                        activeChatId !== null ? "bg-accent" : "bg-line-strong"
                       }`}
                     />
-                    {modeChosen
-                      ? chosenMode === "hour"
-                        ? `hour · ${DEW_PER_HOUR} dew`
-                        : `msg · ${DEW_PER_REQUEST} dew`
+                    {activeChatId !== null
+                      ? `hour · ${DEW_PER_HOUR} dew`
                       : "pay on send"}
                   </span>
 
@@ -960,15 +960,12 @@ export function ChatPanel({
         balance={dew.balance}
         wallet={dew.wallet}
         hourPrice={DEW_PER_HOUR}
-        requestPrice={DEW_PER_REQUEST}
         pending={streaming}
         onCancel={() => setChargeFor(null)}
-        onChoose={(mode) => {
+        onConfirm={() => {
           const content = chargeFor;
           setChargeFor(null);
-          setChosenMode(mode);
-          setModeChosen(true);
-          if (content) void send(content, undefined, mode);
+          if (content) void send(content);
         }}
       />
     </div>

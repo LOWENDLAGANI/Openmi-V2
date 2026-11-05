@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { DAILY_FREE_DEW, DEW_PER_HOUR, DEW_PER_REQUEST } from "@/lib/dew";
+import { DAILY_FREE_DEW, DEW_PER_HOUR } from "@/lib/dew";
 import { getSession } from "@/lib/session";
 
 // The landing page reads the session to send a signed-in reader to /chat, so it
@@ -283,9 +283,8 @@ export default async function HomePage() {
               {DEW_PER_HOUR} Dew an hour. {DAILY_FREE_DEW} free every day.
             </h2>
             <p className="mt-2 max-w-xl text-[13.5px] leading-[1.7] text-mid">
-              One hour covers every message and mission inside it. Prefer to pay
-              per message? {DEW_PER_REQUEST} Dew each. Top-ups are one-off, and
-              nothing renews on its own.
+              One hour covers every message and mission inside it. Top-ups are
+              one-off, and nothing renews on its own.
             </p>
           </div>
 

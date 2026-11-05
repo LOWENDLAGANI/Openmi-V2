@@ -45,7 +45,9 @@ const OPENROUTER: Provider = {
 const GROQ: Provider = {
   id: "groq",
   endpoint: "https://api.groq.com/openai/v1/chat/completions",
-  model: "llama-3.3-70b-versatile",
+  // Groq is asked for one model only. Anything else it serves is ignored, so a
+  // stray upstream id cannot become a second, unpriced path.
+  model: "openai/gpt-oss-120b",
   keyName: "GROQ_API_KEY",
 };
 

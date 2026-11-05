@@ -7,34 +7,30 @@ import { MOTION_EASE, useReducedMotion } from "@/components/Motion";
 import { gsap } from "gsap";
 import { formatDew } from "@/lib/dew";
 
-export type ChargeMode = "hour" | "request";
-
 /**
- * The choice a new chat's first message asks for: one hour, or this message.
+ * The confirmation a new chat's first message asks for: one hour, charged once.
  *
- * It is a question about money, so it shows the two prices, the balance it will
- * spend, and — when the daily balance cannot cover a price but the wallet can —
- * that the two will be combined. When neither covers either price, no charge
- * button is rendered at all: there is nothing to choose, and a disabled button
- * would only invite a click that cannot work.
+ * It is a question about money, so it shows the price, the balance it will
+ * spend, and — when the daily balance cannot cover the price but the wallet can
+ * — that the two will be combined. When neither covers it, no charge button is
+ * rendered at all: there is nothing to confirm, and a disabled button would only
+ * invite a click that cannot work.
  */
 export function ChargeDialog({
   open,
   balance,
   wallet,
   hourPrice,
-  requestPrice,
   pending,
-  onChoose,
+  onConfirm,
   onCancel,
 }: {
   open: boolean;
   balance: number;
   wallet: number;
   hourPrice: number;
-  requestPrice: number;
   pending: boolean;
-  onChoose: (mode: ChargeMode) => void;
+  onConfirm: () => void;
   onCancel: () => void;
 }) {
   // Hooks run before the early return so the dialog animates on open and the
@@ -81,11 +77,8 @@ export function ChargeDialog({
   if (!open) return null;
 
   const total = balance + wallet;
-  const canHour = total >= hourPrice;
-  const canRequest = total >= requestPrice;
-  const anything = canHour || canRequest;
-
-  const combined = (price: number) => balance < price && total >= price;
+  const canStart = total >= hourPrice;
+  const combined = balance < hourPrice && total >= hourPrice;
 
   return (
     <div
@@ -104,67 +97,42 @@ export function ChargeDialog({
           id="charge-heading"
           className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-hi"
         >
-          One hour, or this message?
+          Start an hour of chat?
         </h2>
 
         <p className="mt-2 text-[11.5px] leading-relaxed text-mid">
           {formatDew(balance)} Dew balance
-          {wallet > 0 ? ` · ${formatDew(wallet)} Dew wallet` : ""}. An hour covers
-          every message in this chat until it ends; a single request covers only
-          this one.
+          {wallet > 0 ? ` · ${formatDew(wallet)} Dew wallet` : ""}. One hour
+          covers every message in this chat until it ends.
         </p>
 
-        {anything ? (
+        {canStart ? (
           <div className="mt-4 space-y-2">
-            {canHour && (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => onChoose("hour")}
-                className="lift flex w-full items-center justify-between rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-left disabled:opacity-60"
-              >
-                <span>
-                  <span className="block text-[12.5px] font-semibold text-hi">
-                    1 hour session
-                  </span>
-                  <span className="mt-0.5 block text-[10.5px] text-mid">
-                    every message in this chat for an hour
-                    {combined(hourPrice) ? " · wallet covers the rest" : ""}
-                  </span>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onConfirm}
+              className="lift flex w-full items-center justify-between rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-left disabled:opacity-60"
+            >
+              <span>
+                <span className="block text-[12.5px] font-semibold text-hi">
+                  1 hour session
                 </span>
-                <span className="font-mono text-[12px] text-accent-text">
-                  {formatDew(hourPrice)} Dew
+                <span className="mt-0.5 block text-[10.5px] text-mid">
+                  every message in this chat for an hour
+                  {combined ? " · wallet covers the rest" : ""}
                 </span>
-              </button>
-            )}
-
-            {canRequest && (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => onChoose("request")}
-                className="lift flex w-full items-center justify-between rounded-2xl border border-line-strong bg-raised px-4 py-3 text-left disabled:opacity-60"
-              >
-                <span>
-                  <span className="block text-[12.5px] font-semibold text-hi">
-                    This message only
-                  </span>
-                  <span className="mt-0.5 block text-[10.5px] text-mid">
-                    cheapest for one question
-                    {combined(requestPrice) ? " · wallet covers the rest" : ""}
-                  </span>
-                </span>
-                <span className="font-mono text-[12px] text-hi">
-                  {formatDew(requestPrice)} Dew
-                </span>
-              </button>
-            )}
+              </span>
+              <span className="font-mono text-[12px] text-accent-text">
+                {formatDew(hourPrice)} Dew
+              </span>
+            </button>
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3">
             <p className="text-[11.5px] leading-relaxed text-warn">
-              Not enough Dew for either option. Redeem a code or wait for the
-              daily refill.
+              Not enough Dew for an hour. Redeem a code or wait for the daily
+              refill.
             </p>
             <Link
               href="/pay"

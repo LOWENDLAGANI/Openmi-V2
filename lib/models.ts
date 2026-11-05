@@ -99,14 +99,6 @@ export const MODELS: ModelCapability[] = [
     images: false,
     documents: false,
   },
-  {
-    id: "llama-3.3-70b",
-    name: "Llama 3.3 70B",
-    category: "general",
-    blurb: "Open-weight general model, fast enough for small edits.",
-    images: false,
-    documents: false,
-  },
 ];
 
 export const DEFAULT_MODEL: ModelId = "auto";

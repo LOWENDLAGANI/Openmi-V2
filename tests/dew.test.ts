@@ -5,7 +5,6 @@ import {
   DAILY_FREE_DEW,
   DEW_DUST_FLOOR,
   DEW_PER_HOUR,
-  DEW_PER_REQUEST,
   DEW_PRECISION,
   HOUR_SESSION_MS,
   INVITE_REWARD_DEW,
@@ -41,19 +40,6 @@ test("the documented Dew numbers are the exported constants", () => {
   expect(LOW_BALANCE_DEW).toBe(10);
   expect(INVITE_REWARD_DEW).toBe(5);
   expect(MAX_INVITES_PER_ACCOUNT).toBe(10);
-});
-
-test("a request costs two Dew and the deployed function agrees", () => {
-  expect(DEW_PER_REQUEST).toBe(2);
-
-  const migration = readFileSync(
-    new URL("../supabase/migrations/019_chat_billing_modes.sql", import.meta.url),
-    "utf8"
-  );
-
-  expect(migration).toContain("select 2::numeric");
-  // The price is not a parameter any caller can set.
-  expect(migration).not.toMatch(/charge_dew_with_wallet\([\s\S]*p_price/);
 });
 
 test("the deployed refill allowance matches the constants", () => {
