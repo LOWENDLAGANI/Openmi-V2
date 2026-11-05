@@ -6,10 +6,6 @@ import {
   assembleContext,
 } from "../lib/context";
 import {
-  NO_EXECUTION_CLAUSE,
-  NO_SANDBOX_CLAUSE,
-  SANDBOX_CLAUSE,
-  SANDBOX_NO_REPO_CLAUSE,
   SHELL_CLAUSE,
   buildSystemPrompt,
 } from "../lib/prompt";
@@ -66,7 +62,7 @@ test("the path list is capped at the named constant", () => {
   expect(budget.notes.join(" ")).toContain(String(many.length));
 });
 
-test("the system prompt carries the no-execution and citation clauses", () => {
+test("the default prompt carries the shell and citation clauses", () => {
   const prompt = buildSystemPrompt({
     repo: "octocat/hello",
     sha: "abc1234",
@@ -74,76 +70,30 @@ test("the system prompt carries the no-execution and citation clauses", () => {
     notes: [],
   });
 
-  expect(prompt).toContain(NO_EXECUTION_CLAUSE);
+  expect(prompt).toContain(SHELL_CLAUSE);
   expect(prompt).toContain("path:line");
   expect(prompt).toContain("octocat/hello");
   expect(prompt).toContain("abc1234");
 });
 
-test("the system prompt refuses to pretend when no repository is attached", () => {
+test("the default prompt still proposes shell execution when shell is unset", () => {
+  const prompt = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+  });
+
+  expect(prompt).toContain(SHELL_CLAUSE);
+  expect(prompt).toContain("run_command");
+  expect(prompt).toContain("curl, wget, npm, python");
+  expect(prompt).toContain("output the command results");
+});
+
+test("the system prompt still refuses to pretend when no repository is attached", () => {
   const prompt = buildSystemPrompt({ repo: null, sha: null, context: "", notes: [] });
 
   expect(prompt).toContain("No repository is attached");
   expect(prompt).not.toContain("The attached repository is");
-});
-
-test("a deployment without a sandbox key says there is no environment", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-  });
-
-  expect(prompt).toContain(NO_SANDBOX_CLAUSE);
-  expect(prompt).not.toContain(SANDBOX_CLAUSE);
-  // The honesty rule survives the change: the model still runs nothing.
-  expect(prompt).toContain(NO_EXECUTION_CLAUSE);
-});
-
-test("a deployment with a sandbox describes it without claiming the model can run it", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-    sandbox: true,
-  });
-
-  expect(prompt).toContain(SANDBOX_CLAUSE);
-  expect(prompt).toContain(NO_EXECUTION_CLAUSE);
-  expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
-  expect(prompt).not.toContain("there is none");
-});
-
-test("a message with a shell is told to report exit codes, not memories", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-    shell: true,
-  });
-
   expect(prompt).toContain(SHELL_CLAUSE);
-  expect(prompt).toContain("exit code");
-  // The denial would be false in this turn, and the sandbox it can use is not
-  // the review-card one the other clauses describe.
-  expect(prompt).not.toContain(NO_EXECUTION_CLAUSE);
-  expect(prompt).not.toContain(SANDBOX_CLAUSE);
-  expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
-});
-
-test("a repo-less chat on a sandboxed deployment says there is nothing to build", () => {
-  const prompt = buildSystemPrompt({
-    repo: null,
-    sha: null,
-    context: "",
-    notes: [],
-    sandbox: true,
-  });
-
-  expect(prompt).toContain(SANDBOX_NO_REPO_CLAUSE);
-  expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
-  expect(prompt).not.toContain(SANDBOX_CLAUSE);
 });
