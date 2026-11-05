@@ -15,7 +15,7 @@ import { parseSealKey } from "../crypto";
  * directly. Same key material, different purpose, no new secret to configure.
  */
 
-export const MAX_STEPS = 50;
+export const MAX_STEPS = 40;
 export const MAX_TURN_TOKENS = 120_000;
 export const TURN_TTL_MS = 30 * 60 * 1000;
 /** Leave room inside the function's 60s ceiling to write the answer down. */

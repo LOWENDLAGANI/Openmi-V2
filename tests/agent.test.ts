@@ -37,7 +37,7 @@ function payload(overrides: Partial<Parameters<typeof signEnvelope>[0]> = {}) {
 }
 
 test("the documented caps are the exported constants", () => {
-  expect(MAX_STEPS).toBe(50);
+  expect(MAX_STEPS).toBe(40);
   expect(MAX_TURN_TOKENS).toBe(120_000);
   expect(TURN_TTL_MS).toBe(1_800_000);
   expect(CONTINUE_AT_MS).toBeLessThan(60_000);
