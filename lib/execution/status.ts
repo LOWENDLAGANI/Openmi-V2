@@ -15,7 +15,11 @@ export type ExecutionStatus =
   | "done"
   | "failed"
   | "timed_out"
-  | "cancelled";
+  | "cancelled"
+  /** A mission with no tick arriving; the sandbox is still alive. */
+  | "paused"
+  /** A mission that stopped acting. Terminal. */
+  | "stalled";
 
 export type ExecutionStage =
   | "provision"
@@ -23,7 +27,10 @@ export type ExecutionStage =
   | "apply"
   | "install"
   | "build"
-  | "typecheck";
+  | "typecheck"
+  | "plan"
+  | "work"
+  | "collect";
 
 export type FailureCode =
   | "not_configured"
@@ -37,7 +44,13 @@ export type FailureCode =
   | "insufficient_dew"
   | "changeset_not_ready"
   | "refused"
-  | "crashed";
+  | "crashed"
+  | "agent_failed"
+  | "budget_exhausted"
+  | "no_changes"
+  | "stalled"
+  | "sandbox_expired"
+  | "collect_failed";
 
 export type ExecutionRunRow = {
   id: string;
@@ -72,6 +85,9 @@ const STAGE_LABEL: Record<ExecutionStage, string> = {
   install: "Installing dependencies",
   build: "Building",
   typecheck: "Type-checking",
+  plan: "Planning the mission",
+  work: "Working the goal",
+  collect: "Collecting the diff",
 };
 
 const FAILURE_LABEL: Record<FailureCode, string> = {
@@ -87,6 +103,12 @@ const FAILURE_LABEL: Record<FailureCode, string> = {
   changeset_not_ready: "Only a signed, ready changeset can be verified.",
   refused: "The sandbox refused the request.",
   crashed: "The run stopped reporting. No result was recorded.",
+  agent_failed: "The agent stopped: the model call failed.",
+  budget_exhausted: "The mission used its whole budget.",
+  no_changes: "The agent finished without changing a file.",
+  stalled: "The agent stopped acting without finishing.",
+  sandbox_expired: "The sandbox expired before the mission finished.",
+  collect_failed: "The changes could not be collected from the sandbox.",
 };
 
 /** A claim, and the row it came from. `tone` drives colour, nothing else. */
@@ -141,6 +163,19 @@ export function describeRun(run: ExecutionRunRow | null): RunDescription {
         : "The sandbox is being prepared.",
       charge,
       tone: "neutral",
+    };
+  }
+
+  if (run.status === "paused" || run.status === "stalled") {
+    return {
+      state: run.status === "paused" ? "running" : "failed",
+      title: run.status === "paused" ? "Paused" : "Stopped acting",
+      detail:
+        run.status === "paused"
+          ? "This mission is waiting for its next tick. The sandbox is still alive."
+          : "This mission stopped acting before it finished.",
+      charge,
+      tone: run.status === "paused" ? "warn" : "danger",
     };
   }
 

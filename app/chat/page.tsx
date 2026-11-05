@@ -9,6 +9,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
 import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
+import { MissionPanel } from "@/components/MissionPanel";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { Workspace } from "@/components/Workspace";
@@ -504,6 +505,12 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             chatBranch={chat.repo_branch ?? null}
             autoApproveBranch={autoApproveBranch}
           />
+        </div>
+      )}
+
+      {repo && (
+        <div className="mb-3 shrink-0">
+          <MissionPanel chatId={chat.id} repo={repo} />
         </div>
       )}
 

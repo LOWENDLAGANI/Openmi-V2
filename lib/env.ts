@@ -215,6 +215,20 @@ export const ENV_SPEC: EnvSpec[] = [
     unlocks: "An explicit sandbox egress allowlist (Daytona Tier 3 only)",
     hint: 'Leave unset on restricted organisations; "on" sends domainAllowList, which they reject',
   },
+  {
+    key: "MISSION_MODE_ENABLED",
+    scope: "server",
+    required: false,
+    unlocks: "Goal-driven missions: the agent decides and runs its own commands",
+    hint: 'Off unless "on"; a mission also needs DAYTONA_API_KEY',
+  },
+  {
+    key: "EXEC_MISSION_MINUTES",
+    scope: "server",
+    required: false,
+    unlocks: "How long one mission may run",
+    hint: "Defaults to 20, clamped to 1..30; the Dew reserve is minutes × 0.05",
+  },
 ];
 
 export type EnvStatus = EnvSpec & { present: boolean };
@@ -289,6 +303,22 @@ export function executionConfigured(
   return flag !== "off" && flag !== "false" && flag !== "0";
 }
 
+/**
+ * Whether goal-driven missions are on.
+ *
+ * A mission runs arbitrary commands, so it ships behind its own switch even
+ * when a Daytona key exists: `MISSION_MODE_ENABLED=on` is the operator saying
+ * the organisation has accepted that. Verification runs are unaffected.
+ */
+export function missionModeEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  if (!executionConfigured(env)) return false;
+
+  const flag = (env.MISSION_MODE_ENABLED ?? "").trim().toLowerCase();
+  return flag === "on" || flag === "true" || flag === "1";
+}
+
 /** Typed access for server code. `null` means "not configured", never a throw. */
 export function serverEnv() {
   return {
@@ -304,5 +334,7 @@ export function serverEnv() {
     daytonaTarget: process.env.DAYTONA_TARGET ?? null,
     executionEnabled: process.env.EXECUTION_ENABLED ?? null,
     executionSnapshot: process.env.EXECUTION_SNAPSHOT ?? null,
+    missionEnabled: process.env.MISSION_MODE_ENABLED ?? null,
+    execMissionMinutes: process.env.EXEC_MISSION_MINUTES ?? null,
   };
 }

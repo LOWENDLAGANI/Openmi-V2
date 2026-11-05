@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
 import { EXEC_MAX_MINUTES, EXEC_RESERVE_DEW } from "./cost";
+import { MISSION_HARD_MAX_MINUTES } from "./mission/budget";
 import type {
   ExecutionEventRow,
   ExecutionRunRow,
@@ -27,7 +28,8 @@ type SessionClient = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
 type AdminClient = NonNullable<ReturnType<typeof supabaseAdmin>>;
 
 /** A run older than this without a heartbeat is not running any more. */
-const STALE_AFTER_MS = (EXEC_MAX_MINUTES + 5) * 60_000;
+const STALE_AFTER_MS =
+  (Math.max(EXEC_MAX_MINUTES, MISSION_HARD_MAX_MINUTES) + 5) * 60_000;
 
 export async function clearStaleRuns(admin: AdminClient, owner: string): Promise<void> {
   const cutoff = new Date(Date.now() - STALE_AFTER_MS).toISOString();

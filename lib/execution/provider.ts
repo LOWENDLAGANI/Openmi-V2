@@ -21,17 +21,12 @@ import { EXEC_MAX_MINUTES } from "./cost";
  * provider swap is one file. Nothing here is reached unless
  * `executionConfigured()` is true, which is what keeps a deployment without a
  * key behaving exactly as it did before this phase existed.
+ *
+ * Two callers now: a verification run (create, use, destroy inside one
+ * function) and a mission (create once, `attachSandbox` on every later tick).
+ * The handle is identical, so the tools cannot tell which one they are in.
  */
 
-/**
- * Off only when the operator says so, or when there is no key. A deployment
- * that adds `DAYTONA_API_KEY` gets execution; a deployment that wants it back
- * off sets `EXECUTION_ENABLED=off` without removing the key.
- *
- * The gate itself lives in `lib/env.ts`, which imports no SDK, so the chat
- * prompt and the setup page can ask the same question without loading Daytona.
- * Re-exported here because this module is the runner's public face.
- */
 export { executionConfigured };
 
 export function executionSnapshot(): string {
@@ -59,13 +54,15 @@ export type ExecResult = {
   output: string;
   truncated: boolean;
   durationMs: number;
+  /** True only when the provider said the command hit its limit. */
+  timedOut: boolean;
 };
 
 export type SandboxHandle = {
   id: string;
-  exec: (command: string, cwd?: string) => Promise<ExecResult>;
+  exec: (command: string, cwd?: string, timeoutMs?: number) => Promise<ExecResult>;
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
-  /** Reads a workspace file for a repair pass. Bounded before it is decoded. */
+  /** Reads a workspace file for a repair pass or a mission's diff. */
   readText: (remotePath: string, maxBytes?: number) => Promise<string>;
   destroy: () => Promise<void>;
 };
@@ -99,20 +96,8 @@ function classifyStartError(caught: unknown): SandboxStartError {
   return new SandboxStartError("refused", message);
 }
 
-/**
- * Creates one ephemeral sandbox and hands back the three operations a run
- * needs. The TTL is not decoration: if this process dies, the sandbox still
- * destroys itself, so a crash cannot bill an account indefinitely.
- */
-export async function createSandbox(runId: string): Promise<SandboxHandle> {
-  if (!executionConfigured()) {
-    throw new SandboxStartError(
-      "not_configured",
-      "Execution is not configured on this deployment."
-    );
-  }
-
-  const daytona = new Daytona({
+function client(): Daytona {
+  return new Daytona({
     apiKey: process.env.DAYTONA_API_KEY?.trim(),
     ...(process.env.DAYTONA_API_URL?.trim()
       ? { apiUrl: process.env.DAYTONA_API_URL.trim() }
@@ -121,16 +106,128 @@ export async function createSandbox(runId: string): Promise<SandboxHandle> {
       ? { target: process.env.DAYTONA_TARGET.trim() }
       : {}),
   });
+}
 
-  let sandbox: Awaited<ReturnType<typeof daytona.create>>;
+type RemoteSandbox = Awaited<ReturnType<Daytona["get"]>>;
+
+/**
+ * The three operations a run needs, over any sandbox — freshly created or
+ * reattached. A mission reattaches on every tick; a verification run never
+ * does, and neither difference is visible above this function.
+ */
+function handleFor(sandbox: RemoteSandbox, id: string): SandboxHandle {
+  return {
+    id,
+    async exec(command, cwd, timeoutMs) {
+      const startedAt = Date.now();
+      const limitSeconds = Math.max(
+        5,
+        Math.ceil((timeoutMs ?? EXEC_STEP_TIMEOUT_MS) / 1000)
+      );
+
+      let response: unknown;
+      let timedOut = false;
+
+      try {
+        response = await sandbox.process.executeCommand(
+          command,
+          cwd ?? EXEC_WORKDIR,
+          undefined,
+          limitSeconds
+        );
+      } catch (caught) {
+        const message =
+          caught instanceof Error ? caught.message : "The command could not run.";
+        timedOut = /timeout|timed out|deadline/i.test(message);
+
+        return {
+          command,
+          exitCode: timedOut ? 124 : 1,
+          output: message,
+          truncated: false,
+          durationMs: Date.now() - startedAt,
+          timedOut,
+        };
+      }
+
+      const wire = response as {
+        exitCode?: number;
+        exit_code?: number;
+        result?: string;
+        output?: string;
+      };
+
+      const raw = wire?.result ?? wire?.output ?? "";
+      const exitCode =
+        typeof wire?.exitCode === "number"
+          ? wire.exitCode
+          : typeof wire?.exit_code === "number"
+            ? wire.exit_code
+            : 1;
+
+      const tail = tailOf(String(raw));
+
+      return {
+        command,
+        exitCode,
+        output: tail.text,
+        truncated: tail.truncated,
+        durationMs: Date.now() - startedAt,
+        timedOut,
+      };
+    },
+    async upload(bytes, remotePath) {
+      await sandbox.fs.uploadFile(bytes, remotePath);
+    },
+    async readText(remotePath, maxBytes = 200_000) {
+      const bytes = await sandbox.fs.downloadFile(remotePath);
+
+      if (bytes.byteLength > maxBytes) {
+        throw new Error(
+          `${remotePath} is ${bytes.byteLength} bytes, over the ${maxBytes} byte cap`
+        );
+      }
+
+      return bytes.toString("utf8");
+    },
+    async destroy() {
+      try {
+        await sandbox.delete(60, true);
+      } catch {
+        // The TTL is the backstop. A failed delete must not fail the run that
+        // already has a real result recorded.
+      }
+    },
+  };
+}
+
+/**
+ * Creates one ephemeral sandbox. The TTL is not decoration: if this process
+ * dies, the sandbox still destroys itself, so a crash cannot bill an account
+ * indefinitely.
+ */
+export async function createSandbox(
+  runId: string,
+  options: { ttlMinutes?: number; labels?: Record<string, string> } = {}
+): Promise<SandboxHandle> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  const ttl = Math.max(5, Math.trunc(options.ttlMinutes ?? EXEC_MAX_MINUTES + 5));
+
+  let sandbox: RemoteSandbox;
   try {
-    sandbox = await daytona.create(
+    sandbox = await client().create(
       {
         snapshot: executionSnapshot(),
         ephemeral: true,
-        ttlMinutes: EXEC_MAX_MINUTES + 5,
-        autoStopInterval: EXEC_MAX_MINUTES + 2,
-        labels: { app: "openmi", run: runId },
+        ttlMinutes: ttl,
+        autoStopInterval: Math.max(2, ttl - 3),
+        labels: { app: "openmi", run: runId, ...(options.labels ?? {}) },
         public: false,
         // Sent only when the operator says this organisation is on a tier that
         // accepts it. A restricted org refuses the whole create call when the
@@ -146,62 +243,31 @@ export async function createSandbox(runId: string): Promise<SandboxHandle> {
     throw classifyStartError(caught);
   }
 
-  const id = String(sandbox.id);
+  return handleFor(sandbox, String(sandbox.id));
+}
 
-  return {
-    id,
-    async exec(command, cwd) {
-      const startedAt = Date.now();
+/**
+ * Reattaches to a sandbox a previous tick created.
+ *
+ * This is what makes a mission longer than one request: the row holds the id,
+ * the workspace lives in the sandbox, and every tick gets a fresh handle to the
+ * same box. A sandbox removed by its TTL makes this throw, which the caller
+ * records as `sandbox_expired` rather than retrying forever.
+ */
+export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
 
-      const response = (await sandbox.process.executeCommand(
-        command,
-        cwd ?? EXEC_WORKDIR,
-        undefined,
-        Math.max(5, Math.ceil(EXEC_STEP_TIMEOUT_MS / 1000))
-      )) as unknown as {
-        exitCode?: number;
-        exit_code?: number;
-        result?: string;
-        output?: string;
-      };
+  let sandbox: RemoteSandbox;
+  try {
+    sandbox = await client().get(sandboxId);
+  } catch (caught) {
+    throw classifyStartError(caught);
+  }
 
-      const raw = response?.result ?? response?.output ?? "";
-      const exitCode =
-        typeof response?.exitCode === "number"
-          ? response.exitCode
-          : typeof response?.exit_code === "number"
-            ? response.exit_code
-            : 1;
-
-      const tail = tailOf(String(raw));
-
-      return {
-        command,
-        exitCode,
-        output: tail.text,
-        truncated: tail.truncated,
-        durationMs: Date.now() - startedAt,
-      };
-    },
-    async upload(bytes, remotePath) {
-      await sandbox.fs.uploadFile(bytes, remotePath);
-    },
-    async readText(remotePath, maxBytes = 200_000) {
-      const bytes = await sandbox.fs.downloadFile(remotePath);
-
-      if (bytes.byteLength > maxBytes) {
-        throw new Error(`${remotePath} is ${bytes.byteLength} bytes, over the ${maxBytes} byte cap`);
-      }
-
-      return bytes.toString("utf8");
-    },
-    async destroy() {
-      try {
-        await sandbox.delete(60, true);
-      } catch {
-        // The TTL is the backstop. A failed delete must not fail the run that
-        // already has a real result recorded.
-      }
-    },
-  };
+  return handleFor(sandbox, String(sandbox.id ?? sandboxId));
 }
