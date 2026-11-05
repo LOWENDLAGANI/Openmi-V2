@@ -236,6 +236,58 @@ export function needsReseed(
 }
 
 /**
+ * What opening a chat should do, before any provider call is made.
+ *
+ * Kept pure so the expensive half (attach, start, seed, evict) can be tested by
+ * inspection and the decision itself by execution. `wait` is not an error: it
+ * means another turn holds the lease, and starting a second box would give one
+ * chat two filesystems.
+ */
+export type ChatSandboxOpenDecision =
+  | "provision"
+  | "reseed"
+  | "attach"
+  | "start"
+  | "wait";
+
+export function decideChatSandboxOpen(input: {
+  row:
+    | (Pick<ChatSandboxLifecycleRow, "state" | "leaseUntil"> & {
+        repoFullName: string;
+        baseSha: string;
+        createdAt: string;
+      })
+    | null;
+  repo: string;
+  sha: string;
+  now?: number;
+}): ChatSandboxOpenDecision {
+  const now = input.now ?? Date.now();
+  const row = input.row;
+
+  if (!row) return "provision";
+  if (needsReseed(row, input.repo, input.sha)) return "reseed";
+  if (isLeaseLive(row.leaseUntil, now)) return "wait";
+
+  switch (row.state) {
+    case "running":
+      return "attach";
+    case "stopped":
+    case "archived":
+      return "start";
+    case "provisioning":
+      // Within the orphan window the first turn may still be seeding; after
+      // it, the turn that owned the row is gone and the box is replaceable.
+      return isProvisioningOrphan(row, now) ? "provision" : "wait";
+    case "failed":
+    case "wiping":
+      return "provision";
+    default:
+      return "wait";
+  }
+}
+
+/**
  * Which environments to destroy before creating one more.
  *
  * The cap counts every row for the owner, including a `wiping` orphan: those

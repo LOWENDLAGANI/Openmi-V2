@@ -13,6 +13,7 @@ import {
   chatSandboxTtlHours,
   chatSandboxTtlMinutes,
   chatSandboxesEnabled,
+  decideChatSandboxOpen,
   deleteAfter,
   evictionsForNew,
   isLeaseLive,
@@ -221,6 +222,50 @@ test("an orphan row with no chat still counts against the cap", () => {
   ];
 
   expect(evictionsForNew(rows, 2).map((row) => row.chatId)).toEqual([null]);
+});
+
+test("opening a chat decides on the row before touching the provider", () => {
+  const createdAt = iso(T0);
+  const pin = { repoFullName: "openmi/v2", baseSha: "a".repeat(40) };
+  const decide = (
+    patch: { state: Row["state"]; leaseUntil: string | null } | null,
+    now = T0
+  ) =>
+    decideChatSandboxOpen({
+      row:
+        patch === null
+          ? null
+          : { ...pin, state: patch.state, leaseUntil: patch.leaseUntil, createdAt },
+      repo: "openmi/v2",
+      sha: "a".repeat(40),
+      now,
+    });
+
+  expect(decide(null)).toBe("provision");
+  expect(decide({ state: "running", leaseUntil: null })).toBe("attach");
+  expect(decide({ state: "stopped", leaseUntil: null })).toBe("start");
+  expect(decide({ state: "archived", leaseUntil: null })).toBe("start");
+  expect(decide({ state: "failed", leaseUntil: null })).toBe("provision");
+  expect(decide({ state: "wiping", leaseUntil: null })).toBe("provision");
+
+  // A live lease is waited on, whatever the state says.
+  expect(decide({ state: "running", leaseUntil: iso(T0 + MINUTE) })).toBe("wait");
+
+  // A fresh provisioning row may still be seeding; an old one is an orphan.
+  expect(decide({ state: "provisioning", leaseUntil: null })).toBe("wait");
+  expect(
+    decide({ state: "provisioning", leaseUntil: null }, T0 + CHAT_SANDBOX_PROVISION_ORPHAN_MS)
+  ).toBe("provision");
+
+  // A different pin is a reseed even while the lease is free.
+  expect(
+    decideChatSandboxOpen({
+      row: { ...pin, baseSha: "b".repeat(40), createdAt, state: "running", leaseUntil: null },
+      repo: "openmi/v2",
+      sha: "a".repeat(40),
+      now: T0,
+    })
+  ).toBe("reseed");
 });
 
 test("the provider TTL is the wipe deadline plus slack", () => {
