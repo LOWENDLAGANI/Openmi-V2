@@ -5,6 +5,11 @@ answers the four blocking decisions (D6.1–D6.4) and prices the work. The code
 that follows those answers is `lib/execution/*`, `supabase/migrations/016_execution.sql`,
 `app/api/execution/runs/*` and `components/ExecutionPanel.tsx`.
 
+> **Proposed change to §3.** Verification runs and missions remain one-run
+> ephemeral boxes, but chat turns are planned to keep a chat-scoped environment
+> that is stopped when idle and wiped after 48 hours of inactivity. See
+> [`SANDBOX_LIFECYCLE_PLAN.md`](./SANDBOX_LIFECYCLE_PLAN.md).
+
 What ships is seed → apply → install → build, with the exit code recorded and
 rendered. What is deliberately *not* in this build:
 

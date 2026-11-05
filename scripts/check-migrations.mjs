@@ -104,6 +104,7 @@ const REQUIRED_TABLES = [
   "rate_limits",
   "admin_users",
   "payment_requests",
+  "chat_sandboxes",
 ];
 
 const REQUIRED_FUNCTIONS = [
@@ -139,6 +140,10 @@ const REQUIRED_COLUMNS = [
   ["payment_requests", "status"],
   ["payment_requests", "receipt_path"],
   ["payment_requests", "dew_granted"],
+  ["chat_sandboxes", "sandbox_id"],
+  ["chat_sandboxes", "chat_id"],
+  ["chat_sandboxes", "delete_after"],
+  ["chat_sandboxes", "lease_until"],
 ];
 
 async function schemaProblems(db) {

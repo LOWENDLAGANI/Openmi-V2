@@ -222,6 +222,41 @@ export const ENV_SPEC: EnvSpec[] = [
     unlocks: "How long one mission may run",
     hint: "Defaults to 20, clamped to 1..30; the Dew reserve is minutes × 0.05",
   },
+  {
+    key: "CHAT_SANDBOX_ENABLED",
+    scope: "server",
+    required: false,
+    unlocks: "Chat-scoped sandboxes (set to \"off\" to fall back to one box per message)",
+    hint: "Defaults to on; only takes effect when DAYTONA_API_KEY is set",
+  },
+  {
+    key: "CHAT_SANDBOX_IDLE_MINUTES",
+    scope: "server",
+    required: false,
+    unlocks: "How long a chat's sandbox stays warm after the last activity",
+    hint: "Defaults to 5, clamped to 1..60; stopped boxes keep their disk",
+  },
+  {
+    key: "CHAT_SANDBOX_TTL_HOURS",
+    scope: "server",
+    required: false,
+    unlocks: "How long an inactive chat keeps its sandbox",
+    hint: "Defaults to 48, clamped to 1..168; then the container and disk are destroyed",
+  },
+  {
+    key: "CHAT_SANDBOX_ARCHIVE_HOURS",
+    scope: "server",
+    required: false,
+    unlocks: "Archive a stopped chat sandbox to free disk quota",
+    hint: "Defaults to 0 (off); 24 is the sensible value when quota, not cost, is the limit",
+  },
+  {
+    key: "CHAT_SANDBOX_MAX_PER_OWNER",
+    scope: "server",
+    required: false,
+    unlocks: "How many chat sandboxes one account may keep",
+    hint: "Defaults to 3, clamped to 1..10; the least-recently-active is evicted first",
+  },
 ];
 
 export type EnvStatus = EnvSpec & { present: boolean };
@@ -312,5 +347,10 @@ export function serverEnv() {
     executionEnabled: process.env.EXECUTION_ENABLED ?? null,
     executionSnapshot: process.env.EXECUTION_SNAPSHOT ?? null,
     execMissionMinutes: process.env.EXEC_MISSION_MINUTES ?? null,
+    chatSandboxEnabled: process.env.CHAT_SANDBOX_ENABLED ?? null,
+    chatSandboxIdleMinutes: process.env.CHAT_SANDBOX_IDLE_MINUTES ?? null,
+    chatSandboxTtlHours: process.env.CHAT_SANDBOX_TTL_HOURS ?? null,
+    chatSandboxArchiveHours: process.env.CHAT_SANDBOX_ARCHIVE_HOURS ?? null,
+    chatSandboxMaxPerOwner: process.env.CHAT_SANDBOX_MAX_PER_OWNER ?? null,
   };
 }

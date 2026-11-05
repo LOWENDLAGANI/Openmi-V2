@@ -169,10 +169,21 @@ test("a second account reads no row owned by the first", async () => {
     "Audit chat",
   ]);
 
+  // Only tables a signed-in account can actually read are queried here. A
+  // service-only table with an owner column (chat_sandboxes) would answer this
+  // query with "permission denied" rather than a count; the previous test is
+  // what proves it is not readable, and a permission denial is not isolation
+  // evidence. Filtering by the client grant keeps this test about the tables
+  // where a cross-account read is even possible.
   const { rows: owned } = await db.query<{ table_name: string }>(
-    `select table_name
-       from information_schema.columns
-      where table_schema = 'public' and column_name = 'owner'`
+    `select c.table_name
+       from information_schema.columns c
+       join information_schema.role_table_grants g
+         on g.table_schema = c.table_schema
+        and g.table_name = c.table_name
+        and g.grantee = 'authenticated'
+      where c.table_schema = 'public' and c.column_name = 'owner'
+      group by c.table_name`
   );
 
   await actAs("authenticated", USER_B);
