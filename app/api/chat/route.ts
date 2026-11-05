@@ -27,7 +27,7 @@ import {
   type ChargeMode,
   type DewGate,
 } from "@/lib/dew/store";
-import { serverEnv } from "@/lib/env";
+import { executionConfigured, serverEnv } from "@/lib/env";
 import {
   getFile,
   getRepo,
@@ -450,6 +450,10 @@ export async function POST(request: Request) {
     context: context.text,
     notes: context.notes,
     edits: Boolean(repoFullName && sha && sealKey),
+    // The model is told what this deployment can actually do, so "do you have
+    // a Linux environment" gets the true answer: a sandbox exists for a ready
+    // diff, but not as a shell for this chat.
+    sandbox: executionConfigured(),
   });
 
   const plainMessages: ChatMessage[] = [
@@ -704,7 +708,10 @@ export async function POST(request: Request) {
 
             const chatRowValue = chatRow as { repo_branch?: string | null } | null;
 
-
+            send("notice", {
+              message:
+                "This diff is built in a sandbox; a failing build is repaired, and a pull request opens only if it exits 0.",
+            });
 
             if (sealKey && repoFullName) {
               const remembered = await readAutoApproval(session.supabase, {

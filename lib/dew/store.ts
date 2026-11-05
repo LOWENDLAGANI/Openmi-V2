@@ -206,6 +206,48 @@ export async function refundDewSession(
   return !error;
 }
 
+type AdminClient = NonNullable<ReturnType<typeof supabaseAdmin>>;
+
+/**
+ * Sandbox runs: a reservation up front, a settlement against real minutes.
+ *
+ * Both go through service-role functions in `017_execution_dew.sql`. The run
+ * route has already proven the account owns the changeset, and the function
+ * refuses a reservation the balance cannot cover — so a run that cannot be
+ * paid for never reaches a provider.
+ */
+export async function reserveExecutionDew(
+  admin: AdminClient,
+  owner: string,
+  runId: string,
+  amount: number
+): Promise<{ ok: true; balance: number } | { ok: false; error: string }> {
+  const { data, error } = await admin.rpc("execution_reserve_dew", {
+    p_owner: owner,
+    p_run_id: runId,
+    p_amount: amount,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, balance: Number(data ?? 0) };
+}
+
+export async function settleExecutionDew(
+  admin: AdminClient,
+  owner: string,
+  runId: string,
+  charged: number
+): Promise<{ ok: true; balance: number } | { ok: false; error: string }> {
+  const { data, error } = await admin.rpc("execution_settle_dew", {
+    p_owner: owner,
+    p_run_id: runId,
+    p_charged: charged,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, balance: Number(data ?? 0) };
+}
+
 export async function readDewProfile(
   supabase: Client,
   owner: string

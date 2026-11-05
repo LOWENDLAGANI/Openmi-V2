@@ -7,6 +7,9 @@ import {
 } from "../lib/context";
 import {
   NO_EXECUTION_CLAUSE,
+  NO_SANDBOX_CLAUSE,
+  SANDBOX_CLAUSE,
+  SANDBOX_NO_REPO_CLAUSE,
   buildSystemPrompt,
 } from "../lib/prompt";
 
@@ -83,4 +86,45 @@ test("the system prompt refuses to pretend when no repository is attached", () =
   expect(prompt).not.toContain("The attached repository is");
 });
 
+test("a deployment without a sandbox key says there is no environment", () => {
+  const prompt = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+  });
 
+  expect(prompt).toContain(NO_SANDBOX_CLAUSE);
+  expect(prompt).not.toContain(SANDBOX_CLAUSE);
+  // The honesty rule survives the change: the model still runs nothing.
+  expect(prompt).toContain(NO_EXECUTION_CLAUSE);
+});
+
+test("a deployment with a sandbox describes it without claiming the model can run it", () => {
+  const prompt = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+    sandbox: true,
+  });
+
+  expect(prompt).toContain(SANDBOX_CLAUSE);
+  expect(prompt).toContain(NO_EXECUTION_CLAUSE);
+  expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
+  expect(prompt).not.toContain("there is none");
+});
+
+test("a repo-less chat on a sandboxed deployment says there is nothing to build", () => {
+  const prompt = buildSystemPrompt({
+    repo: null,
+    sha: null,
+    context: "",
+    notes: [],
+    sandbox: true,
+  });
+
+  expect(prompt).toContain(SANDBOX_NO_REPO_CLAUSE);
+  expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
+  expect(prompt).not.toContain(SANDBOX_CLAUSE);
+});

@@ -1,7 +1,7 @@
 # Openmi — Build Phases
 
 **Target:** a greenfield Openmi web app on **Vercel** (hosting) and **Supabase** (Postgres, Auth, RLS).
-**Status:** phases 0–4 are built, checked and pushed to `main`. Phases 5–9 are built. This file is the build order: ten phases, one merge window each, one task per pull request.
+**Status:** phases 0–4 are built, checked and pushed to `main`. Phases 5–10 are open. This file is the build order: eleven phases, one merge window each, one task per pull request.
 **Repository state:** wiped at the start of this plan. See §1 for what was removed and what was kept.
 
 ---
@@ -26,11 +26,12 @@
 16. [Phase 7 — Dew billing](#16-phase-7--dew-billing)
 17. [Phase 8 — Setup and about truth surface](#17-phase-8--setup-and-about-truth-surface)
 18. [Phase 9 — Hardening and launch](#18-phase-9--hardening-and-launch)
-19. [Requirement coverage](#19-requirement-coverage)
-20. [Open decisions](#20-open-decisions)
-21. [Per-PR gates](#21-per-pr-gates)
-22. [Deploy runbook](#22-deploy-runbook)
-23. [Rollback](#23-rollback)
+19. [Phase 10 — Execution (gated, not v1)](#19-phase-10--execution-gated-not-v1)
+20. [Requirement coverage](#20-requirement-coverage)
+21. [Open decisions](#21-open-decisions)
+22. [Per-PR gates](#22-per-pr-gates)
+23. [Deploy runbook](#23-deploy-runbook)
+24. [Rollback](#24-rollback)
 
 ---
 
@@ -175,6 +176,7 @@ P0 foundation
    └──────────────── P7 billing ────────────────────────────────────────────┤
                                                                             ├── P9 launch
    P8 setup/about (starts P0, completed after P7) ──────────────────────────┘
+                                                                            └── P10 execution (gated)
 ```
 
 | Phase | Name | Tasks | Depends on | Exit gate |
@@ -189,6 +191,7 @@ P0 foundation
 | **P7** | Dew billing | 8 | P3 | Concurrent start impossible; exactly 3 Dew/hour; ledger sums to balance |
 | **P8** | Setup and about | 4 | P0, P7 | `/setup` accurate at zero config and at full config |
 | **P9** | Hardening and launch | 6 | P6, P7, P8 | RLS audit green; contrast gate green; smoke tests pass |
+| **P10** | Execution (gated) | 4+ | P9, §21 D6 | Review card can truthfully say "tests passed" |
 
 **Why this order.** P0 first because every later phase needs the migration harness and an honest setup page. P2 before P3 because a chat about a repository with no repository is a chat about nothing. P5 before P6 because the approval gate is only meaningful if the artefact is signed before it can be committed. P7 lands after chat exists so the charge has something to gate, and before P8 so the setup page can report billing state truthfully.
 
@@ -361,7 +364,29 @@ P0 foundation
 
 ---
 
-## 19. Requirement coverage
+## 19. Phase 10 — Execution (gated, not v1)
+
+**Status: built, verification only.** The four decisions are answered in
+`docs/EXECUTION_ENVIRONMENT_PLAN.md`: enumerated commands, 0.05 Dew per started
+minute, no secrets in the sandbox, and a specific state for every way a run can
+fail. What ships is the verification half of this phase — seed, apply, install,
+build — because it is the half whose result can be observed and stated without
+inventing anything. The agent does not yet run commands of its own inside the
+workspace; its edits still arrive as a changeset, which is exactly what a run
+verifies.
+
+| Task | Work | Blocked on |
+|---|---|---|
+| **P10-T1** | Design doc: what runs, where, for how long, at what cost, with which secrets absent | D6.1–D6.4 |
+| **P10-T2** | Provider selection and a cost model in Dew/hour | D6.2 |
+| **P10-T3** | Wire results into the review card, including failure text | P10-T1 |
+| **P10-T4** | Contract tests: "tests passed" is impossible without a real run; a failed run cannot render as success | P10-T3 |
+
+The rule that cannot be relaxed: **every card state must be reachable from a real observation.** Timeout says timed out. Cannot start says cannot start. There is no optimistic default.
+
+---
+
+## 20. Requirement coverage
 
 | Requirement | Phase | Tasks |
 |---|---|---|
@@ -388,7 +413,7 @@ P0 foundation
 
 ---
 
-## 20. Open decisions
+## 21. Open decisions
 
 | ID | Decision | Blocks | Recommendation |
 |---|---|---|---|
@@ -397,10 +422,14 @@ P0 foundation
 | **D3** | A shared rate limiter without Upstash: Postgres RPC or per-instance? | P9-T3 | Postgres RPC. No new vendor, and the app must boot unconfigured |
 | **D4** | Is Dew spendable on an agent turn separately from chat, or does one hour cover both? | P7-T3, P4-T4 | One hour covers both; the caps bound cost, not price |
 | **D5** | Top-up: manual receipt upload, redeem codes, or a payment provider? | P7-T8 | Redeem codes in v1; a provider is its own project with tax and webhook work |
+| **D6.1** | What may the sandbox execute? | P10-T1 | Enumerated commands, never "the project's tests" |
+| **D6.2** | How is sandbox time priced in Dew? | P10-T2 | Per minute, prepaid, refused before start |
+| **D6.3** | Which secrets are absent from the sandbox? | P10-T1 | All of them |
+| **D6.4** | What happens when the sandbox cannot start? | P10-T3 | The card says so, and the gate stays closed on a claim |
 
 ---
 
-## 21. Per-PR gates
+## 22. Per-PR gates
 
 Every PR runs the same commands, and all must be green before review:
 
@@ -433,7 +462,7 @@ bun run test:rls
 
 ---
 
-## 22. Deploy runbook
+## 23. Deploy runbook
 
 **First deploy**
 
@@ -460,7 +489,7 @@ bun run test:rls
 
 ---
 
-## 23. Rollback
+## 24. Rollback
 
 | Phase | Revertible by `git revert`? | Notes |
 |---|---|---|
@@ -476,4 +505,4 @@ A revert never deletes a PR that was already opened. That is a human decision on
 
 ---
 
-*Plan written for a greenfield Vercel + Supabase build. Every task names its proving check; a task that cannot name one belongs in §20 instead.*
+*Plan written for a greenfield Vercel + Supabase build. Every task names its proving check; a task that cannot name one belongs in §21 instead.*
