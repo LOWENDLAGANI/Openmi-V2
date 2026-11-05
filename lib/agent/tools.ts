@@ -129,8 +129,15 @@ export type ToolContext = {
 };
 
 export type ToolResult =
-  | { ok: true; text: string }
-  | { ok: false; error: string };
+  | {
+      ok: true;
+      text: string;
+      /** A command that ran and exited non-zero: a fact for the reader, not a retry. */
+      failed?: boolean;
+      /** The output tail a step row can fold open. */
+      tail?: string;
+    }
+  | { ok: false; error: string; tail?: string };
 
 function badInput(message: string): ToolResult {
   return { ok: false, error: `bad-input: ${message}` };

@@ -11,7 +11,6 @@ import { DEW_PER_HOUR, DEW_PER_REQUEST } from "@/lib/dew";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
-import { QuickActions } from "@/components/QuickActions";
 import type { ModelCapability, ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
@@ -23,9 +22,22 @@ type UiMessage = {
   content: string;
   seq: number | null;
   model: string | null;
+  /** What the model did before it answered, kept with the answer it belongs to. */
+  steps?: StepLine[];
 };
 
-type StepLine = { detail: string; state: "start" | "done" | "error" };
+/**
+ * One thing the model did. A step is a sentence, not a log line: the command
+ * and its output live behind the fold so the conversation still reads as a
+ * conversation.
+ */
+type StepLine = {
+  tool: string;
+  detail: string;
+  state: "start" | "done" | "error";
+  command?: string;
+  output?: string;
+};
 
 type ContextMeter = {
   usedChars: number;
@@ -43,7 +55,6 @@ export function ChatPanel({
   pinnedPath,
   providerReady,
   initialRunning,
-  missionDefault = false,
   dew,
   chargeMode,
 }: {
@@ -56,8 +67,6 @@ export function ChatPanel({
   pinnedPath: string | null;
   providerReady: boolean;
   initialRunning: boolean;
-  /** A goal in a repo chat is a mission, not a turn: the agent decides the commands. */
-  missionDefault?: boolean;
   /** The two balances a charge can draw on. */
   dew: { balance: number; wallet: number };
   /** How this chat's messages are paid for after the first choice. */
@@ -186,41 +195,26 @@ export function ChatPanel({
     };
   }, []);
 
-  const suggestions = missionDefault && repo
+  // Every suggestion is a message, not a mode: two of these are answered from
+  // the context and one of them makes the model open a shell.
+  const suggestions = repo
     ? [
-        {
-          label: "Make it build",
-          prompt:
-            "Make this repository install and build cleanly, and fix whatever fails.",
-        },
-        {
-          label: "Fix the type errors",
-          prompt:
-            "Find and fix the type errors in this repository, then confirm the typecheck exits 0.",
-        },
-        {
-          label: "Add a test",
-          prompt:
-            "Add a test for the most important untested function, and make it pass.",
-        },
-      ]
-    : repo
-      ? [
         {
           label: "Explain this repo",
           prompt: "Explain what this repository does and how it is structured.",
+        },
+        {
+          label: "Make it build",
+          prompt:
+            "Install and build this repository, and fix whatever fails.",
         },
         {
           label: "Find a bug",
           prompt:
             "Look for a likely bug in this repository and point at the file and line.",
         },
-        {
-          label: "Review a file",
-          prompt: "Review the most important file in this repository and its risks.",
-        },
       ]
-      : [
+    : [
         {
           label: "What can you do?",
           prompt: "What can you do, and what do you refuse to do?",
@@ -272,104 +266,6 @@ export function ChatPanel({
     await send(pendingChoose.content, undefined, pendingChoose.mode);
   }
 
-  /**
-   * A goal in a chat with a repository is a mission, not a turn.
-   *
-   * The message is recorded server-side with the goal, so the transcript and
-   * the command ledger describe the same request; the optimistic copy is what
-   * makes the goal appear while the sandbox is still starting. The price is the
-   * chat's own mode — the mission's model calls cost the same credits.
-   */
-  async function startMission(goal: string, mode: ChargeMode) {
-    busyRef.current = true;
-    setStreaming(true);
-    setError(null);
-    setPending("");
-    setSteps([]);
-    setNotices([]);
-    setLastSent(goal);
-    setDraft("");
-
-    const optimisticId = `local-mission-${Date.now()}`;
-    setMessages((current) => [
-      ...current,
-      { id: optimisticId, role: "user", content: goal, seq: null, model },
-    ]);
-
-    try {
-      const response = await fetch("/api/missions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chatId: activeChatId ?? undefined,
-          goal,
-          autonomy: "act",
-          mode,
-          // A draft has no chat row yet, so the pinned repository travels with
-          // the goal and the route creates the chat around it.
-          repo: repo?.fullName,
-          branch: repo?.branch,
-          sha: repo?.sha,
-        }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            missionId?: string;
-            chatId?: string;
-            error?: string;
-            code?: string;
-            activeChatId?: string | null;
-            charged?: number;
-            reservedDew?: number;
-          }
-        | null;
-
-      if (!response.ok || !payload?.missionId) {
-        setError(payload?.error ?? `The mission could not start (${response.status}).`);
-
-        if (payload?.code === "hour-active") {
-          setConflict({ content: goal, mode, chatId: payload.activeChatId ?? null });
-        }
-
-        // A chat created before the refusal is still a real chat; adopting its
-        // URL is what stops the next attempt from creating a second one.
-        if (payload?.chatId && payload.chatId !== activeChatId) {
-          setActiveChatId(payload.chatId);
-          router.replace(`/chat?chat=${payload.chatId}`, { scroll: false });
-          return;
-        }
-
-        setMessages((current) => current.filter((message) => message.id !== optimisticId));
-        return;
-      }
-
-      if (payload.chatId && payload.chatId !== activeChatId) {
-        setActiveChatId(payload.chatId);
-        router.replace(`/chat?chat=${payload.chatId}`, { scroll: false });
-      }
-
-      if (typeof payload.charged === "number" && payload.charged > 0) {
-        setNotices((current) => [
-          ...current,
-          `${payload.charged} Dew charged; ${payload.reservedDew ?? 0} reserved for the sandbox.`,
-        ]);
-      }
-
-      window.dispatchEvent(
-        new CustomEvent("openmi:mission-started", { detail: { chatId: payload.chatId } })
-      );
-      router.refresh();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The mission could not start.");
-      setMessages((current) => current.filter((message) => message.id !== optimisticId));
-    } finally {
-      busyRef.current = false;
-      setStreaming(false);
-      setStopping(false);
-    }
-  }
-
   async function send(
     content: string,
     turnToken?: string,
@@ -380,14 +276,9 @@ export function ChatPanel({
     if (busyRef.current) return;
     if (!continuation && content.trim().length === 0) return;
 
-    // Missions are the default for a repository: the goal is the prompt and the
-    // agent chooses the commands. A chat with no repository keeps the answer
-    // path, because there is nothing to run anything against.
-    if (!continuation && missionDefault && repo) {
-      await startMission(content, mode);
-      return;
-    }
-
+    // One path for every message. Whether this answer needs a command, a file
+    // read or nothing at all is the model's call, and the sandbox it would use
+    // is provisioned inside that call, not before it.
     busyRef.current = true;
     setStreaming(true);
     setStopping(false);
@@ -404,6 +295,28 @@ export function ChatPanel({
     let assembled = "";
     let sawDone = false;
     let optimisticId: string | null = null;
+
+    // Steps belong to the answer they produced, so they are collected here and
+    // stored on the message when it lands. A finished answer keeps its fold;
+    // live progress is cleared the moment the turn ends.
+    const stepLog: StepLine[] = [];
+
+    const recordStep = (next: StepLine) => {
+      if (next.state === "start") {
+        stepLog.push(next);
+      } else {
+        let index = -1;
+        for (let i = stepLog.length - 1; i >= 0; i -= 1) {
+          if (stepLog[i].state === "start" && stepLog[i].detail === next.detail) {
+            index = i;
+            break;
+          }
+        }
+        if (index >= 0) stepLog[index] = next;
+        else stepLog.push(next);
+      }
+      setSteps([...stepLog]);
+    };
 
     if (!continuation) {
       setLastSent(content);
@@ -533,12 +446,12 @@ export function ChatPanel({
           const state =
             payload.state === "done" || payload.state === "error" ? payload.state : "start";
 
-          setSteps((current) => {
-            const withoutPending = current.filter(
-              (step) => !(step.detail === detail && step.state === "start")
-            );
-            if (state === "start") return [...current, { detail, state }];
-            return [...withoutPending, { detail, state }];
+          recordStep({
+            tool: typeof payload.tool === "string" ? payload.tool : "step",
+            detail,
+            state,
+            command: typeof payload.command === "string" ? payload.command : undefined,
+            output: typeof payload.output === "string" ? payload.output : undefined,
           });
           return;
         }
@@ -579,7 +492,7 @@ export function ChatPanel({
 
           setMessages((current) => [
             ...current,
-            { id, role: "assistant", content, seq, model },
+            { id, role: "assistant", content, seq, model, steps: [...stepLog] },
           ]);
           setPending("");
           sawDone = true;
@@ -750,11 +663,7 @@ export function ChatPanel({
             className="flex h-full flex-col items-center justify-center py-10 text-center"
           >
             <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-              {(missionDefault && repo
-                ? "What should the agent do?"
-                : repo
-                  ? "Ask about this repo."
-                  : "What are you building?")
+              {(repo ? "What should Openmi do?" : "What are you building?")
                 .split(" ")
                 .map((word, index) => (
                   <span key={`${word}-${index}`} className="motion-word inline-block">
@@ -764,11 +673,9 @@ export function ChatPanel({
                 ))}
             </h2>
             <p className="mt-2 max-w-xs text-[13px] leading-relaxed text-low">
-              {missionDefault && repo
-                ? "It decides the commands and runs them in a Linux sandbox. Nothing is pushed without approval."
-                : repo
-                  ? "Answers cite files. Nothing is pushed."
-                  : "Pick a repository for answers that cite code."}
+              {repo
+                ? "Ask for an explanation or ask it to build, test or change something. It opens a Linux sandbox only when the answer needs one. Nothing is pushed without your approval."
+                : "Pick a repository for answers that cite code."}
             </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -823,6 +730,9 @@ export function ChatPanel({
                     </button>
                   </div>
                   <div className="msg-ai-card">
+                    {message.steps && message.steps.length > 0 && (
+                      <StepList steps={message.steps} />
+                    )}
                     <MessageBody
                       content={message.content}
                       repo={repo}
@@ -837,18 +747,7 @@ export function ChatPanel({
             {(steps.length > 0 || pending.length > 0 || backgroundRunning) && (
               <article className="max-w-[94%]" aria-live="polite">
 
-                {steps.length > 0 && (
-                  <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2.5 font-mono text-[10.5px] leading-relaxed text-low">
-                    {steps.map((step, index) => (
-                      <li key={`${step.detail}-${index}`} className="truncate">
-                        <span aria-hidden="true">
-                          {step.state === "done" ? "✓" : step.state === "error" ? "✕" : "…"}
-                        </span>{" "}
-                        {step.detail}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {steps.length > 0 && <StepList steps={steps} live />}
 
                 {pending.length === 0 ? (
                   <AiThinking
@@ -943,18 +842,6 @@ export function ChatPanel({
             <AdSlot slot="mobile" className="w-full max-w-[320px] opacity-80" />
           </div>
 
-          {messages.length === 0 && pending.length === 0 && (
-            <div className="mb-1.5 min-w-0">
-              <QuickActions
-                onSelect={(prompt) => {
-                  setDraft(prompt);
-                  textareaRef.current?.focus();
-                }}
-                disabled={streaming}
-              />
-            </div>
-          )}
-
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -974,11 +861,7 @@ export function ChatPanel({
                 }}
                 rows={1}
                 placeholder={
-                  providerReady
-                    ? missionDefault && repo
-                      ? "Give the agent a goal…"
-                      : "Message Openmi…"
-                    : "Chat is unavailable right now."
+                  providerReady ? "Ask anything…" : "Chat is unavailable right now."
                 }
                 className="composer-input max-h-[168px] min-h-[44px] px-2 pt-0.5 text-[14px] leading-[1.6] focus:outline-none"
               />
@@ -1089,6 +972,46 @@ export function ChatPanel({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * What the model did, folded into the answer it produced.
+ *
+ * A row says what the step was for, in the model's own words: "install
+ * dependencies", "Read lib/prompt.ts". The command and its output are one tap
+ * away, because the reader who wants proof is not the reader who wants a
+ * conversation. A live step shows its state; a stored one is already settled.
+ */
+function StepList({ steps, live = false }: { steps: StepLine[]; live?: boolean }) {
+  return (
+    <ol className="agent-steps" data-live={live ? "true" : "false"}>
+      {steps.map((step, index) => (
+        <li key={`${step.detail}-${index}`} className="agent-step" data-state={step.state}>
+          <details>
+            <summary>
+              <span aria-hidden="true" className="agent-step-icon">
+                {step.state === "start"
+                  ? "…"
+                  : step.state === "error"
+                    ? "✕"
+                    : step.command || step.output
+                      ? "›_"
+                      : "·"}
+              </span>
+              <span className="agent-step-title">{step.detail}</span>
+              <span aria-hidden="true" className="agent-step-chevron">
+                ›
+              </span>
+            </summary>
+            {step.command && <pre className="agent-step-command">{step.command}</pre>}
+            {step.output && step.output.trim().length > 0 && (
+              <pre className="agent-step-output">{step.output}</pre>
+            )}
+          </details>
+        </li>
+      ))}
+    </ol>
   );
 }
 

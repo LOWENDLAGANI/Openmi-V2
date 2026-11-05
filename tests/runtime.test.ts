@@ -22,7 +22,9 @@ const WORKSPACE = readFileSync(new URL("../app/chat/page.tsx", import.meta.url),
 test("the chat route is dynamic, bounded and unbuffered", () => {
   expect(CHAT).toContain('export const runtime = "nodejs"');
   expect(CHAT).toContain('export const dynamic = "force-dynamic"');
-  expect(CHAT).toContain("export const maxDuration = 60");
+  // The chat route now hosts a sandbox on demand, so it asks for the same
+  // ceiling the verification and mission routes already use.
+  expect(CHAT).toContain("export const maxDuration = 300");
   expect(CHAT).toContain('"cache-control": "no-store');
   expect(CHAT).toContain('"x-accel-buffering": "no"');
   expect(CHAT).toContain('"content-type": "text/event-stream; charset=utf-8"');

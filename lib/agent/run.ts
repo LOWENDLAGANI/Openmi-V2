@@ -9,6 +9,8 @@ import {
 } from "@/lib/providers";
 
 import { CONTINUE_AT_MS, MAX_STEPS, MAX_TURN_TOKENS } from "./envelope";
+import type { ShellTurn } from "./sandbox";
+import { describeShellCall, isShellTool } from "./shell";
 import {
   TOOL_SPECS,
   describeToolCall,
@@ -22,6 +24,10 @@ export type AgentStepEvent = {
   tool: string;
   detail: string;
   state: "start" | "done" | "error";
+  /** The shell string, when this step was a command. */
+  command?: string;
+  /** The output tail, when this step produced one. */
+  output?: string;
 };
 
 export type AgentResult = {
@@ -45,6 +51,16 @@ type RunOptions = {
   emitText: (text: string) => void;
   emitStep: (event: AgentStepEvent) => void;
   propose?: ToolContext["propose"];
+  /**
+   * A Linux sandbox this turn may use.
+   *
+   * Present only when the deployment has one and the chat has a repository.
+   * The model decides whether any of it is needed: a question that needs no
+   * command never provisions anything.
+   */
+  shell?: ShellTurn | null;
+  /** Milliseconds after `startedAt` at which this turn must stop asking. */
+  deadlineMs?: number;
   signal: AbortSignal;
   startedAt: number;
 };
@@ -70,6 +86,16 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
   ];
 
   const chain = providersFor(options.model);
+
+  // A shell supersedes the GitHub reads it can do itself. Two tools with the
+  // same name would be one too many: the provider would see `list_files` twice
+  // with different parameters, and the dispatch below would silently prefer the
+  // sandbox. So the repository reads step aside when a workspace exists.
+  const shellNames = new Set(options.shell?.specs.map((tool) => tool.name) ?? []);
+  const tools = options.shell
+    ? [...TOOL_SPECS.filter((tool) => !shellNames.has(tool.name)), ...options.shell.specs]
+    : TOOL_SPECS;
+  const deadline = options.deadlineMs ?? CONTINUE_AT_MS;
   let steps = options.steps;
 
   // A named model resolves to one provider; without its key there is nothing
@@ -111,7 +137,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
       };
     }
 
-    if (Date.now() - options.startedAt > CONTINUE_AT_MS) {
+    if (Date.now() - options.startedAt > deadline) {
       return {
         text,
         steps,
@@ -132,7 +158,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
           provider,
           apiKeys: providerKeys(provider),
           messages,
-          tools: TOOL_SPECS,
+          tools,
           signal: options.signal,
         })) {
           if (event.type === "text") {
@@ -206,16 +232,32 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
       steps = next;
 
       const args = parseArguments(call.args);
-      const detail = describeToolCall(call.name, args ?? {});
-      options.emitStep({ type: "step", tool: call.name, detail, state: "start" });
+      const wantsShell = Boolean(options.shell) && isShellTool(call.name);
+      const detail = wantsShell
+        ? describeShellCall(call.name, args ?? {})
+        : describeToolCall(call.name, args ?? {});
+      const command =
+        wantsShell && typeof (args ?? {}).command === "string"
+          ? String((args ?? {}).command)
+          : undefined;
 
-      const result = await runTool(call.name, args, {
-        token: options.githubToken,
-        fullName: options.repo,
-        sha: options.sha,
-        paths: options.paths,
-        propose: options.propose,
+      options.emitStep({
+        type: "step",
+        tool: call.name,
+        detail,
+        state: "start",
+        command,
       });
+
+      const result = wantsShell
+        ? await (options.shell as ShellTurn).run(call.name, args)
+        : await runTool(call.name, args, {
+            token: options.githubToken,
+            fullName: options.repo,
+            sha: options.sha,
+            paths: options.paths,
+            propose: options.propose,
+          });
 
       messages.push({
         role: "tool",
@@ -227,7 +269,9 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
         type: "step",
         tool: call.name,
         detail,
-        state: result.ok ? "done" : "error",
+        state: result.ok && !result.failed ? "done" : "error",
+        command,
+        output: result.ok ? result.tail : result.tail,
       });
     }
   }

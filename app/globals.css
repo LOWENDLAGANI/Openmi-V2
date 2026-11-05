@@ -433,6 +433,89 @@ html.ink {
     color: var(--text-hi);
   }
 
+  /* ── A step the model took ────────────────────────────────────────────────
+     One sentence per step, the way a colleague would describe what they did.
+     The command and its output are the proof, so they stay one tap away
+     instead of filling the conversation. */
+
+  .agent-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin: 0 0 0.7rem;
+  }
+
+  .agent-step > details > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    list-style: none;
+    border-radius: 10px;
+    padding: 0.3rem 0.4rem;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-low);
+  }
+
+  .agent-step > details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .agent-step > details > summary:hover {
+    background-color: var(--hover);
+    color: var(--text-mid);
+  }
+
+  .agent-step-icon {
+    flex: none;
+    min-width: 1.1rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-low);
+  }
+
+  .agent-step[data-state="error"] .agent-step-icon {
+    color: var(--danger);
+  }
+
+  .agent-step-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-step-chevron {
+    flex: none;
+    margin-left: auto;
+    color: var(--text-low);
+    transition: transform 160ms ease;
+  }
+
+  .agent-step details[open] .agent-step-chevron {
+    transform: rotate(90deg);
+  }
+
+  .agent-step pre {
+    margin: 0.3rem 0 0.45rem;
+    max-height: 220px;
+    overflow: auto;
+    border-radius: 10px;
+    background-color: var(--raised);
+    padding: 0.55rem 0.65rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-mid);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .agent-step pre.agent-step-command {
+    color: var(--text-hi);
+  }
+
   .composer-dock {
     position: sticky;
     bottom: 0;

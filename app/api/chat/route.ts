@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import {
+  CONTINUE_AT_MS,
   MAX_STEPS,
   TURN_TTL_MS,
   hashPrompt,
@@ -9,6 +10,8 @@ import {
   verifyEnvelope,
 } from "@/lib/agent/envelope";
 import { runAgent } from "@/lib/agent/run";
+import { createShellTurn } from "@/lib/agent/sandbox";
+import { CHAT_SHELL_BUDGET_MS } from "@/lib/agent/shell";
 import type { EditRequest } from "@/lib/changesets";
 import { readAutoApproval } from "@/lib/changesets/autoapproval";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
@@ -54,7 +57,12 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+/**
+ * A message that decides to use its sandbox needs the sandbox's own ceiling.
+ * The same 300 s the mission and verification routes ask for: provisioning,
+ * any command, and the model call around them inside one invocation.
+ */
+export const maxDuration = 300;
 
 const MAX_MESSAGE_CHARS = 20_000;
 
@@ -442,6 +450,22 @@ export async function POST(request: Request) {
   }
 
   const history = recentHistory(await listMessages(session.supabase, chatId));
+  const startedAt = Date.now();
+
+  // The one composer: a message carries a sandbox if this deployment has one
+  // and the chat is pinned to a repository. Nothing is created here — the
+  // handle is lazy, so a message that never runs a command never pays for a
+  // sandbox. The model chooses by calling a tool or not.
+  const shellTurn =
+    executionConfigured() && repoFullName && sha && githubToken
+      ? createShellTurn({
+          token: githubToken,
+          repo: repoFullName,
+          sha,
+          runId: turnId,
+          deadline: startedAt + CHAT_SHELL_BUDGET_MS,
+        })
+      : null;
 
   const system = buildSystemPrompt({
     repo: repoFullName,
@@ -453,6 +477,8 @@ export async function POST(request: Request) {
     // a Linux environment" gets the true answer: a sandbox exists for a ready
     // diff, but not as a shell for this chat.
     sandbox: executionConfigured(),
+    // With a handle in hand the answer is different, and so is the prompt.
+    shell: Boolean(shellTurn),
   });
 
   const plainMessages: ChatMessage[] = [
@@ -619,8 +645,6 @@ export async function POST(request: Request) {
         }
       };
 
-      const startedAt = Date.now();
-
       // A proposal is a row, created on first use and signed when the turn
       // settles. A paused turn keeps its draft so the continuation adds to the
       // same card instead of starting a second one.
@@ -755,35 +779,45 @@ export async function POST(request: Request) {
       };
 
       if (repoFullName && sha && githubToken) {
-        const result = await runAgent({
-          githubToken,
-          repo: repoFullName,
-          sha,
-          paths,
-          model,
-          system,
-          history: history.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
-          steps: continuation?.steps ?? 0,
-          consume: async (expected) => {
-            const { data, error: stepError } = await session.supabase.rpc(
-              "consume_agent_step",
-              { p_turn_id: turnId, p_steps: expected }
-            );
+        // The sandbox is released before anything else runs, so a failure in
+        // the answer path cannot leave a box billing behind the chat.
+        const result = await (async () => {
+          try {
+            return await runAgent({
+              githubToken,
+              repo: repoFullName,
+              sha,
+              paths,
+              model,
+              system,
+              history: history.map((message) => ({
+                role: message.role,
+                content: message.content,
+              })),
+              steps: continuation?.steps ?? 0,
+              consume: async (expected) => {
+                const { data, error: stepError } = await session.supabase.rpc(
+                  "consume_agent_step",
+                  { p_turn_id: turnId, p_steps: expected }
+                );
 
-            if (stepError || !data) return null;
+                if (stepError || !data) return null;
 
-            const row = data as { steps: number };
-            return Number(row.steps);
-          },
-          emitText: (text) => send("delta", { text }),
-          emitStep: (event) => send("step", event),
-          propose,
-          signal: abort.signal,
-          startedAt,
-        });
+                const row = data as { steps: number };
+                return Number(row.steps);
+              },
+              emitText: (text) => send("delta", { text }),
+              emitStep: (event) => send("step", event),
+              propose,
+              shell: shellTurn,
+              deadlineMs: shellTurn ? CHAT_SHELL_BUDGET_MS : CONTINUE_AT_MS,
+              signal: abort.signal,
+              startedAt,
+            });
+          } finally {
+            await shellTurn?.close();
+          }
+        })();
 
         // Any failure that produced no answer is refunded, including an
         // empty completion and a turn that could not advance.
@@ -794,9 +828,21 @@ export async function POST(request: Request) {
 
         if (refundReason) await refundTurn(refundReason);
 
-        if (result.notice) send("notice", { message: result.notice });
+        // A paused shell turn is not continued: its sandbox does not outlive
+        // this invocation, so the continuation would re-provision and re-run
+        // what the reader already watched. It ends here instead.
+        const pausable = result.stopped === "paused" && !shellTurn;
 
-        if (result.stopped === "paused") {
+        if (result.notice) {
+          send("notice", {
+            message:
+              result.stopped === "paused" && shellTurn
+                ? "This message reached its time limit. The sandbox was released; send another message to carry on."
+                : result.notice,
+          });
+        }
+
+        if (pausable) {
           // Still a draft: the signed continuation is what may add to it.
           if (changesetId) {
             send("changeset", {
@@ -809,7 +855,7 @@ export async function POST(request: Request) {
           await settleChangeset();
         }
 
-        if (result.stopped === "paused") {
+        if (pausable) {
           if (result.text.length > 0) {
             try {
               await persist(
@@ -852,7 +898,9 @@ export async function POST(request: Request) {
         const text =
           result.stopped === "aborted" && result.text.length > 0
             ? `${result.text}\n\n_(stopped before this answer finished)_`
-            : result.text;
+            : result.stopped === "paused" && shellTurn && result.text.length > 0
+              ? `${result.text}\n\n_(this message reached its time limit in the sandbox)_`
+              : result.text;
 
         turnText = text;
 
@@ -879,6 +927,11 @@ export async function POST(request: Request) {
           });
         } else if (result.stopped === "aborted") {
           send("error", { message: "Stopped before the first token.", code: "aborted" });
+        } else if (result.stopped === "paused") {
+          send("error", {
+            message: "The sandbox reached its time limit before there was an answer.",
+            code: "paused",
+          });
         } else {
           send("error", {
             message: "The provider returned an empty answer.",

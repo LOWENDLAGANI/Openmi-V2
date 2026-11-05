@@ -10,6 +10,7 @@ import {
   NO_SANDBOX_CLAUSE,
   SANDBOX_CLAUSE,
   SANDBOX_NO_REPO_CLAUSE,
+  SHELL_CLAUSE,
   buildSystemPrompt,
 } from "../lib/prompt";
 
@@ -113,6 +114,24 @@ test("a deployment with a sandbox describes it without claiming the model can ru
   expect(prompt).toContain(NO_EXECUTION_CLAUSE);
   expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
   expect(prompt).not.toContain("there is none");
+});
+
+test("a message with a shell is told to report exit codes, not memories", () => {
+  const prompt = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+    shell: true,
+  });
+
+  expect(prompt).toContain(SHELL_CLAUSE);
+  expect(prompt).toContain("exit code");
+  // The denial would be false in this turn, and the sandbox it can use is not
+  // the review-card one the other clauses describe.
+  expect(prompt).not.toContain(NO_EXECUTION_CLAUSE);
+  expect(prompt).not.toContain(SANDBOX_CLAUSE);
+  expect(prompt).not.toContain(NO_SANDBOX_CLAUSE);
 });
 
 test("a repo-less chat on a sandboxed deployment says there is nothing to build", () => {
