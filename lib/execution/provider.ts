@@ -512,3 +512,86 @@ export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
 
   return handleFor(sandbox, String(sandbox.id ?? sandboxId));
 }
+
+/**
+ * Destroys a recorded sandbox and says what the provider confirmed.
+ *
+ * The ordinary `destroy()` swallows failures because a run that already has a
+ * result must not fail on teardown. The sweep needs the opposite: a row is only
+ * deleted once the provider says the container is gone (or never existed), so a
+ * failed delete stays visible and is retried instead of leaking a disk.
+ */
+export async function destroySandboxConfirmed(
+  sandboxId: string
+): Promise<"deleted" | "missing"> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  let sandbox: RemoteSandbox;
+  try {
+    sandbox = await client().get(sandboxId);
+  } catch (caught) {
+    const error = classifyStartError(caught, "attach");
+    if (error.failure === "missing") return "missing";
+    throw error;
+  }
+
+  try {
+    await sandbox.delete(60, true);
+  } catch (caught) {
+    const error = classifyStartError(caught, "attach");
+    if (error.failure === "missing") return "missing";
+    throw error;
+  }
+
+  return "deleted";
+}
+
+export type RemoteSandboxSummary = {
+  id: string;
+  labels: Record<string, string>;
+  createdAt: string | null;
+};
+
+/**
+ * Lists provider sandboxes that carry the chat label.
+ *
+ * This is the ledger that survives a crash before the row insert: the label is
+ * written at create time, so a container with no row can still be found and
+ * destroyed. Bounded because reconciliation is a safety net, not a scan of the
+ * whole organisation's estate.
+ */
+export async function listChatSandboxes(
+  limit = 200
+): Promise<RemoteSandboxSummary[]> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  const found: RemoteSandboxSummary[] = [];
+
+  try {
+    for await (const sandbox of client().list({
+      labels: { app: "openmi", kind: "chat" },
+    })) {
+      found.push({
+        id: String(sandbox.id),
+        labels: (sandbox.labels ?? {}) as Record<string, string>,
+        createdAt: sandbox.createdAt ?? null,
+      });
+
+      if (found.length >= limit) break;
+    }
+  } catch (caught) {
+    throw classifyStartError(caught, "attach");
+  }
+
+  return found;
+}

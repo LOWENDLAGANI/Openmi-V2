@@ -4,7 +4,12 @@ import { randomUUID } from "node:crypto";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-import type { ChatSandboxState } from "./lifecycle";
+import {
+  CHAT_SANDBOX_SWEEP_LIMIT,
+  isLeaseLive,
+  toMillis,
+  type ChatSandboxState,
+} from "./lifecycle";
 
 /**
  * Reads and writes for chat environments.
@@ -212,4 +217,96 @@ export async function markChatSandboxFailed(
 
 export async function deleteChatSandboxRow(admin: Admin, id: string): Promise<void> {
   await admin.from("chat_sandboxes").delete().eq("id", id);
+}
+
+const iso = (ms: number) => new Date(ms).toISOString();
+
+/**
+ * Rows whose wipe deadline has passed and that no live turn holds.
+ *
+ * The lease filter is repeated here even though `shouldWipe` also checks it:
+ * this is the query that decides what the sweep touches, and a race that slips a
+ * leased row into the result must still be refused by the caller.
+ */
+export async function listChatSandboxesDue(
+  admin: Admin,
+  now: number,
+  limit: number = CHAT_SANDBOX_SWEEP_LIMIT
+): Promise<ChatSandboxRow[]> {
+  const nowIso = iso(now);
+
+  const { data } = await admin
+    .from("chat_sandboxes")
+    .select(COLUMNS)
+    .lt("delete_after", nowIso)
+    .or(`lease_until.is.null,lease_until.lt.${nowIso}`)
+    .order("delete_after", { ascending: true })
+    .limit(limit);
+
+  return ((data ?? []) as Array<Record<string, unknown>>).map(toRow);
+}
+
+/** Running rows quiet for longer than the idle window, with no live lease. */
+export async function listChatSandboxesIdle(
+  admin: Admin,
+  idleBefore: number,
+  limit: number = CHAT_SANDBOX_SWEEP_LIMIT
+): Promise<ChatSandboxRow[]> {
+  const cutoff = iso(idleBefore);
+  const nowIso = iso(Date.now());
+
+  const { data } = await admin
+    .from("chat_sandboxes")
+    .select(COLUMNS)
+    .eq("state", "running")
+    .lt("last_active_at", cutoff)
+    .or(`lease_until.is.null,lease_until.lt.${nowIso}`)
+    .order("last_active_at", { ascending: true })
+    .limit(limit);
+
+  return ((data ?? []) as Array<Record<string, unknown>>).map(toRow);
+}
+
+/** Every recorded provider id, for reconciliation against the provider list. */
+export async function listChatSandboxIds(admin: Admin): Promise<Set<string>> {
+  const { data } = await admin
+    .from("chat_sandboxes")
+    .select("sandbox_id")
+    .limit(1_000);
+
+  return new Set(
+    ((data ?? []) as Array<{ sandbox_id: string }>).map((row) =>
+      String(row.sandbox_id)
+    )
+  );
+}
+
+/** Counts for the admin status surface and the sweep's own log line. */
+export async function chatSandboxCounts(
+  admin: Admin,
+  now: number = Date.now()
+): Promise<{ live: number; stopped: number; due: number }> {
+  const { data } = await admin
+    .from("chat_sandboxes")
+    .select("state, delete_after, lease_until")
+    .limit(1_000);
+
+  let live = 0;
+  let stopped = 0;
+  let due = 0;
+
+  for (const raw of (data ?? []) as Array<Record<string, unknown>>) {
+    const state = String(raw.state);
+    if (state === "stopped") stopped += 1;
+    if (state === "running" || state === "provisioning" || state === "stopped" || state === "archived") {
+      live += 1;
+    }
+
+    const deadline = toMillis(raw.delete_after ? String(raw.delete_after) : null);
+    if (deadline !== null && deadline <= now && !isLeaseLive(raw.lease_until ? String(raw.lease_until) : null, now)) {
+      due += 1;
+    }
+  }
+
+  return { live, stopped, due };
 }

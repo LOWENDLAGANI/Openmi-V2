@@ -257,6 +257,13 @@ export const ENV_SPEC: EnvSpec[] = [
     unlocks: "How many chat sandboxes one account may keep",
     hint: "Defaults to 3, clamped to 1..10; the least-recently-active is evicted first",
   },
+  {
+    key: "CRON_SECRET",
+    scope: "server",
+    required: false,
+    unlocks: "The chat sandbox sweep (idle stops and the 48-hour wipe)",
+    hint: "Without it the sweep returns 503 and the provider timers are the only backstop",
+  },
 ];
 
 export type EnvStatus = EnvSpec & { present: boolean };
@@ -352,5 +359,6 @@ export function serverEnv() {
     chatSandboxTtlHours: process.env.CHAT_SANDBOX_TTL_HOURS ?? null,
     chatSandboxArchiveHours: process.env.CHAT_SANDBOX_ARCHIVE_HOURS ?? null,
     chatSandboxMaxPerOwner: process.env.CHAT_SANDBOX_MAX_PER_OWNER ?? null,
+    cronSecret: process.env.CRON_SECRET ?? null,
   };
 }
