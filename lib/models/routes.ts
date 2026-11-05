@@ -12,11 +12,10 @@ export type ModelRoute = { provider: RouteProvider; upstream: string };
 
 export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
   "gpt-oss-120b": { provider: "groq", upstream: "openai/gpt-oss-120b" },
-  "glm-4.6": { provider: "openrouter", upstream: "z-ai/glm-4.6" },
-  "qwen3-coder": { provider: "openrouter", upstream: "qwen/qwen3-coder" },
-  "kimi-k2": { provider: "openrouter", upstream: "moonshotai/kimi-k2" },
-  "deepseek-chat": { provider: "deepseek", upstream: "deepseek-chat" },
-  "deepseek-reasoner": { provider: "deepseek", upstream: "deepseek-reasoner" },
+  // Groq is asked for one model and DeepSeek for one model. Every other id
+  // those vendors serve is deliberately absent: an unused route is an unpriced
+  // path nobody chose.
+  "deepseek-flash": { provider: "deepseek", upstream: "deepseek-flash" },
 };
 
 export type CustomRouteInput = {

@@ -41,7 +41,7 @@ import {
 } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
-import { DEFAULT_MODEL, hasModel, type ModelId } from "@/lib/models";
+import { firstAvailableModel, hasModel, type ModelId } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/prompt";
 import {
   modelCatalogue,
@@ -213,11 +213,14 @@ export async function POST(request: Request) {
     }
   }
 
-  // An id the catalogue does not know — an old tab, a renamed custom entry —
-  // falls back to auto instead of failing the turn.
-  const model: ModelId = hasModel(modelCatalogue(), body.model)
+  // An id the catalogue does not know — an old tab, a renamed custom entry, a
+  // chat written before the catalogue shrank — opens the first model this
+  // deployment can actually call, instead of failing the turn or opening on a
+  // model whose key is missing.
+  const modelOptions = modelCatalogue();
+  const model: ModelId = hasModel(modelOptions, body.model)
     ? (body.model as string)
-    : DEFAULT_MODEL;
+    : firstAvailableModel(modelOptions);
 
 
   // RLS decides whether this chat exists for this account; the select is the
@@ -927,9 +930,7 @@ export async function POST(request: Request) {
         // answer, which blames the model for a configuration gap.
         if (chain.length === 0) {
           failure = new Error(
-            model === "auto"
-              ? "Openmi can't answer right now. Try again in a moment."
-              : "That model isn't available right now. Pick another one."
+            "That model isn't available right now. Pick another one."
           );
         }
 

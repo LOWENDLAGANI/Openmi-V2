@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { MODELS, MODEL_CATEGORIES } from "../lib/models";
+import {
+  DEFAULT_MODEL,
+  MODELS,
+  MODEL_CATEGORIES,
+  firstAvailableModel,
+} from "../lib/models";
 import { MAX_CUSTOM_MODELS, parseCustomModels } from "../lib/models/custom";
 import { BUILTIN_ROUTES, routeForModel } from "../lib/models/routes";
 
@@ -12,16 +17,24 @@ test("every built-in model has a category the picker can group", () => {
     expect(ids).toContain(model.category);
   }
 
-  // No group is defined but empty, so the picker never shows a bare heading.
-  for (const category of MODEL_CATEGORIES) {
-    expect(MODELS.some((model) => model.category === category.id)).toBe(true);
-  }
-
   expect(MODEL_CATEGORIES.map((category) => category.label)).toEqual([
     "General",
     "Coding",
     "Reasoning",
   ]);
+});
+
+test("the opening model is one the deployment can call", () => {
+  const catalogue = [
+    { ...MODELS[0]!, available: false },
+    { ...MODELS[1]!, available: true },
+  ];
+
+  expect(firstAvailableModel(catalogue)).toBe("deepseek-flash");
+  expect(firstAvailableModel([])).toBe(DEFAULT_MODEL);
+
+  // Without a probe yet, the first entry is as good as any.
+  expect(firstAvailableModel(MODELS)).toBe(MODELS[0]?.id ?? DEFAULT_MODEL);
 });
 
 test("a custom model picks its own category and defaults to general", () => {
@@ -79,14 +92,34 @@ test("the picker renders one group per category", () => {
   expect(menu).toContain("{group.label}");
 });
 
-test("every built-in model except auto has a provider route", () => {
+test("every built-in model has a provider route", () => {
   for (const model of MODELS) {
-    if (model.id === "auto") continue;
     expect(BUILTIN_ROUTES[model.id]).toBeDefined();
   }
 
+  // Retired ids have no route and are not silently remapped by the router; the
+  // chat route is the one place that maps an unknown id to the default model.
   expect(routeForModel("auto")).toBeNull();
+  expect(routeForModel("glm-4.6")).toBeNull();
   expect(routeForModel("nope")).toBeNull();
+});
+
+test("DeepSeek is one model, and it is deepseek-flash", () => {
+  const deepseek = MODELS.filter(
+    (model) => BUILTIN_ROUTES[model.id]?.provider === "deepseek"
+  );
+
+  expect(deepseek.map((model) => model.id)).toEqual(["deepseek-flash"]);
+  expect(BUILTIN_ROUTES["deepseek-flash"]).toEqual({
+    provider: "deepseek",
+    upstream: "deepseek-flash",
+  });
+
+  // Groq stays on the one model it was locked to.
+  const groq = MODELS.filter(
+    (model) => BUILTIN_ROUTES[model.id]?.provider === "groq"
+  );
+  expect(groq.map((model) => model.id)).toEqual(["gpt-oss-120b"]);
 });
 
 test("a well-formed custom model parses and routes", () => {
@@ -114,7 +147,7 @@ test("a built-in id cannot be redefined by a custom entry", () => {
   const { models } = parseCustomModels(
     JSON.stringify([
       {
-        id: "glm-4.6",
+        id: "deepseek-flash",
         name: "Impostor",
         provider: "groq",
         upstream: "someone/else",
@@ -122,7 +155,9 @@ test("a built-in id cannot be redefined by a custom entry", () => {
     ])
   );
 
-  expect(routeForModel("glm-4.6", models)).toEqual(BUILTIN_ROUTES["glm-4.6"]);
+  expect(routeForModel("deepseek-flash", models)).toEqual(
+    BUILTIN_ROUTES["deepseek-flash"]
+  );
 });
 
 test("bad configuration is reported, never thrown", () => {

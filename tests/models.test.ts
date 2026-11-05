@@ -18,16 +18,23 @@ const MODELS_SOURCE = readFileSync(
 // scanned.
 const MODELS_CODE = MODELS_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("the picker offers model names, with Auto first and as the default", () => {
-  const names = MODELS.map((model) => model.name);
-
-  expect(MODELS[0]?.id).toBe("auto");
-  expect(DEFAULT_MODEL).toBe("auto");
-  expect(names).toContain("GPT OSS 120B");
-  expect(names).toContain("GLM 4.6");
-  expect(names).toContain("DeepSeek V3");
-  expect(modelName("glm-4.6")).toBe("GLM 4.6");
+test("the picker offers exactly the two models this deployment serves", () => {
+  expect(MODELS.map((model) => model.id)).toEqual([
+    "gpt-oss-120b",
+    "deepseek-flash",
+  ]);
+  expect(DEFAULT_MODEL).toBe("gpt-oss-120b");
+  expect(MODELS.map((model) => model.name)).toEqual([
+    "GPT OSS 120B",
+    "DeepSeek V4.1 flash",
+  ]);
+  expect(modelName("deepseek-flash")).toBe("DeepSeek V4.1 flash");
   expect(modelName("unknown-model")).toBe("unknown-model");
+
+  // The retired entries are gone, not hidden behind an alias.
+  for (const gone of ["auto", "glm-4.6", "qwen3-coder", "kimi-k2", "deepseek-chat", "deepseek-reasoner"]) {
+    expect(hasModel(MODELS, gone)).toBe(false);
+  }
 });
 
 test("ids are lowercase slugs and lookups are exact", () => {
@@ -42,8 +49,8 @@ test("ids are lowercase slugs and lookups are exact", () => {
   expect(isModelId(undefined)).toBe(false);
   expect(isModelId(42)).toBe(false);
 
-  expect(hasModel(MODELS, "deepseek-chat")).toBe(true);
-  expect(hasModel(MODELS, "deepseek-chat-v9")).toBe(false);
+  expect(hasModel(MODELS, "deepseek-flash")).toBe(true);
+  expect(hasModel(MODELS, "deepseek-flash-v9")).toBe(false);
 });
 
 test("the browser catalogue carries no endpoint, upstream id or key", () => {

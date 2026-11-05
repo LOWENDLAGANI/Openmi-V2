@@ -2,7 +2,7 @@
  * The model catalogue the browser is allowed to see.
  *
  * Display names are public on purpose: the picker shows a model name ("GPT OSS
- * 120B", "GLM 4.6"), not a capability alias. What stays server-only is the
+ * 120B", "DeepSeek V4.1 flash"), not a capability alias. What stays server-only is the
  * vendor, the upstream id, the endpoint and the key — those live in
  * lib/models/routes.ts and lib/providers.ts, which no client component imports.
  *
@@ -44,14 +44,6 @@ export type ModelCapability = {
 
 export const MODELS: ModelCapability[] = [
   {
-    id: "auto",
-    name: "Auto",
-    category: "general",
-    blurb: "Picks a model per request, with a fallback if one provider fails.",
-    images: false,
-    documents: false,
-  },
-  {
     id: "gpt-oss-120b",
     name: "GPT OSS 120B",
     category: "general",
@@ -60,48 +52,16 @@ export const MODELS: ModelCapability[] = [
     documents: false,
   },
   {
-    id: "glm-4.6",
-    name: "GLM 4.6",
-    category: "coding",
-    blurb: "Strong at coding and long-context edits.",
-    images: false,
-    documents: false,
-  },
-  {
-    id: "qwen3-coder",
-    name: "Qwen3 Coder",
-    category: "coding",
-    blurb: "Tuned for repository work and frequent tool calls.",
-    images: false,
-    documents: false,
-  },
-  {
-    id: "kimi-k2",
-    name: "Kimi K2",
-    category: "coding",
-    blurb: "Large context, comfortable with long files.",
-    images: false,
-    documents: false,
-  },
-  {
-    id: "deepseek-chat",
-    name: "DeepSeek V3",
+    id: "deepseek-flash",
+    name: "DeepSeek V4.1 flash",
     category: "general",
-    blurb: "Balanced speed and price for everyday questions.",
-    images: false,
-    documents: false,
-  },
-  {
-    id: "deepseek-reasoner",
-    name: "DeepSeek Reasoner",
-    category: "reasoning",
-    blurb: "Thinks longer before answering, slower and more literal.",
+    blurb: "DeepSeek's fast model, and the only DeepSeek model offered here.",
     images: false,
     documents: false,
   },
 ];
 
-export const DEFAULT_MODEL: ModelId = "auto";
+export const DEFAULT_MODEL: ModelId = "gpt-oss-120b";
 
 const SLUG = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
@@ -125,4 +85,18 @@ export function modelName(
   catalogue: readonly ModelCapability[] = MODELS
 ): string {
   return catalogue.find((model) => model.id === id)?.name ?? id;
+}
+
+/**
+ * The model to open with when the requested one is gone.
+ *
+ * The first usable entry beats a fixed id: a deployment that set only the
+ * DeepSeek key should not open on a Groq model it cannot call. A catalogue with
+ * no availability probe yet treats every entry as usable.
+ */
+export function firstAvailableModel(
+  catalogue: readonly ModelCapability[],
+  fallback: ModelId = DEFAULT_MODEL
+): ModelId {
+  return catalogue.find((model) => model.available !== false)?.id ?? fallback;
 }

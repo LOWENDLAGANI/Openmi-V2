@@ -30,7 +30,7 @@ import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
 import { oauthConfigured } from "@/lib/oauth/github";
-import { DEFAULT_MODEL, hasModel } from "@/lib/models";
+import { firstAvailableModel, hasModel } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
@@ -508,7 +508,9 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           chatId={chat.id}
           repo={repo}
           models={models}
-          initialModel={hasModel(models, chat.model) ? chat.model : DEFAULT_MODEL}
+          initialModel={
+            hasModel(models, chat.model) ? chat.model : firstAvailableModel(models)
+          }
           initialMessages={messages}
           validPaths={validPaths}
           pinnedPath={null}
@@ -558,7 +560,7 @@ async function DraftChat({
         chatId={null}
         repo={repo}
         models={models}
-        initialModel={DEFAULT_MODEL}
+        initialModel={firstAvailableModel(models)}
         initialMessages={[]}
         validPaths={[]}
         pinnedPath={null}

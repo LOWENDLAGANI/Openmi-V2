@@ -15,7 +15,7 @@ import { isCommitSha, isRepoFullName } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage } from "@/lib/messages";
-import { DEFAULT_MODEL, hasModel } from "@/lib/models";
+import { DEFAULT_MODEL, firstAvailableModel, hasModel } from "@/lib/models";
 import { modelCatalogue } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -245,7 +245,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const model = hasModel(modelCatalogue(), chat.model) ? chat.model ?? DEFAULT_MODEL : DEFAULT_MODEL;
+  const modelOptions = modelCatalogue();
+  const model = hasModel(modelOptions, chat.model)
+    ? (chat.model ?? DEFAULT_MODEL)
+    : firstAvailableModel(modelOptions);
 
   // One live mission per chat, checked before the charge so a double click does
   // not cost an hour for a refusal the database was always going to make.

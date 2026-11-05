@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  DEFAULT_MODEL,
   MODELS,
   type ModelCapability,
   type ModelId,
@@ -12,9 +13,9 @@ import { routeForModel } from "@/lib/models/routes";
  * The vendor layer. Server only.
  *
  * Everything here — endpoints, model ids, key names — stays on the server. The
- * browser asks for a capability id ("auto", "code", "flash") and never learns
- * which vendor answered, because that answer is not useful to a user and is
- * useful to someone probing the deployment.
+ * browser asks for a model id and never learns which vendor answered, because
+ * that answer is not useful to a user and is useful to someone probing the
+ * deployment.
  *
  * All three providers speak the OpenAI chat-completions shape, so one streaming
  * parser covers them and a fallback chain is a list rather than three code
@@ -54,15 +55,10 @@ const GROQ: Provider = {
 const DEEPSEEK: Provider = {
   id: "deepseek",
   endpoint: "https://api.deepseek.com/chat/completions",
-  model: "deepseek-chat",
+  // The only DeepSeek model this deployment offers. A named route may override
+  // it, and the route table is where that decision lives.
+  model: "deepseek-flash",
   keyName: "DEEPSEEK_API_KEY",
-};
-
-/** Ordered per capability: the first configured provider that succeeds wins. */
-const CHAINS: Record<ModelId, Provider[]> = {
-  auto: [OPENROUTER, GROQ, DEEPSEEK],
-  code: [GROQ, OPENROUTER, DEEPSEEK],
-  flash: [DEEPSEEK, GROQ, OPENROUTER],
 };
 
 export const MAX_COMPLETION_TOKENS = 2_000;
@@ -136,13 +132,12 @@ export function providersFor(
   env: Record<string, string | undefined> = process.env,
   custom: readonly CustomModel[] = parseCustomModels(env.CUSTOM_MODELS).models
 ): Provider[] {
-  if (model === "auto") {
-    return CHAINS.auto.filter(
-      (provider) => providerKeys(provider, env).length > 0
-    );
-  }
+  // "auto" is no longer a picker entry, but rows written before the catalogue
+  // shrank still name it. It means "the default model", not a second routing
+  // rule, so an old chat answers instead of failing.
+  const id = model === "auto" ? DEFAULT_MODEL : model;
 
-  const route = routeForModel(model, custom);
+  const route = routeForModel(id, custom);
   if (!route) return [];
 
   const provider = providerById(route.provider);
@@ -186,7 +181,9 @@ export function modelCatalogue(
 export function providersConfigured(
   env: Record<string, string | undefined> = process.env
 ): boolean {
-  return providersFor("auto", env).length > 0;
+  // Ready means a model the picker actually offers can be called, not that some
+  // provider this build never routes to happens to have a key.
+  return modelCatalogue(env).some((model) => model.available === true);
 }
 
 /** Every provider, for the setup page to probe each configured key. */
