@@ -11,7 +11,6 @@ import {
   LOW_BALANCE_DEW,
   MAX_INVITES_PER_ACCOUNT,
   TIMEZONES,
-  TOPUP_PACKS,
   dailyAllowance,
   formatDew,
   isLowBalance,
@@ -210,77 +209,21 @@ export default async function ActivityPage({
             dew
           </span>
         </p>
-        <p className="mt-3 max-w-xl text-[12.5px] leading-relaxed text-mid">
+        <p className="mt-3 text-[12.5px] leading-relaxed text-mid">
           An hour of chat costs {DEW_PER_HOUR} Dew, charged before the provider is
           called. The daily allowance is {dailyAllowance(profile.hasPaid)} Dew,
           settled at local midnight in {profile.timezone}.
         </p>
 
-        {isLowBalance(profile.balance) && (
-          <p className="mt-3 max-w-xl rounded-2xl border border-warn/25 bg-warn/8 px-4 py-2.5 text-[11.5px] leading-relaxed text-warn">
-            Below {LOW_BALANCE_DEW} Dew. A chat turn will be refused once the
-            balance cannot cover an hour; redeem a code below or wait for the
-            daily refill.
-          </p>
-        )}
-
-        <p className="mt-3 text-[11.5px] leading-relaxed text-low">
-          {current
-            ? active
-              ? `An hour is running until ${utc(current.expires_at)} UTC; turns inside it are free.`
-              : `The last hour ended ${utc(current.expires_at)} UTC${
-                  current.refunded_at ? " and was refunded" : ""
-                }.`
-            : "No hour has started yet."}
-        </p>
+        {current ? (active
+          ? `An hour is running until ${utc(current.expires_at)} UTC; turns inside it are free.`
+          : `The last hour ended ${utc(current.expires_at)} UTC${
+              current.refunded_at ? " and was refunded": ""
+            }.`)
+          : "No hour has started yet."}
       </section>
 
       <div className="mt-5 grid gap-5 md:grid-cols-2">
-        <section className="panel p-5">
-          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
-            Redeem a code
-          </h2>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-            Each code can be redeemed once.
-          </p>
-
-          <form action={redeemCode} className="mt-3 flex gap-2">
-            <input
-              name="code"
-              required
-              maxLength={64}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="TOPUP-…"
-              aria-label="Dew code"
-              className="field min-w-0 flex-1 bg-canvas py-1.5 font-mono text-[12px]"
-            />
-            <SubmitButton className="btn px-3 py-1.5 text-[12px]" pendingText="Redeeming…">
-              Redeem
-            </SubmitButton>
-          </form>
-
-          <p className="eyebrow mt-4">top-up packs</p>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {TOPUP_PACKS.map((dew) => (
-              <li
-                key={dew}
-                className="rounded-full border border-line bg-chip px-3 py-1 font-mono text-[11px] text-mid"
-              >
-                {dew} Dew
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-            Or pay on the plans page and upload the receipt; we review it and
-            the Dew lands here.
-          </p>
-
-          <Link href="/pay" className="btn mt-3 px-3 py-1.5 text-[11.5px]">
-            Plans &amp; receipts
-          </Link>
-        </section>
-
         <section className="panel p-5">
           <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
             Invite

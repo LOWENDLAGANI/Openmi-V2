@@ -88,7 +88,7 @@ export const PAID_BENEFITS = [
  */
 export const TOPUP_PAUSED = true;
 
-export const PAYMENT_LINK_FALLBACK = "https://sociabuzz.com/minetallestmc/tribe";
+
 
 export function planById(value: string | null | undefined): Plan | null {
   if (!value) return null;

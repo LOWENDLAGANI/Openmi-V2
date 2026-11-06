@@ -239,7 +239,6 @@ export function Sidebar({
             <span className="block truncate text-[23px] font-semibold leading-none tracking-[-0.045em] text-hi">
               Openmi
             </span>
-            <span className="mt-1 block text-[10px] text-low">by Minetallest</span>
           </span>
         </Link>
       </div>

@@ -19,14 +19,13 @@ import { getMyrRates, withLiveRate } from "@/lib/billing/rates";
 import {
   PAID_BENEFITS,
   PLANS,
-  TOPUP_PAUSED,
   paymentLink,
   planById,
 } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
 import { getSession } from "@/lib/session";
-import { deductOwnDew, redeemTopUpCode, submitReceipt } from "./actions";
+import { submitReceipt } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -145,7 +144,7 @@ export default async function PayPage({
           <div>
             <p className="eyebrow">plans</p>
             <h1 className="text-[17px] font-semibold tracking-[-0.02em] text-hi">
-              Top up Dew
+              Plans
             </h1>
           </div>
         </div>
@@ -265,19 +264,6 @@ export default async function PayPage({
           </a>
         </div>
 
-        {TOPUP_PAUSED && (
-          <p
-            role="status"
-            className="mt-3 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] leading-relaxed text-warn"
-          >
-            <span className="mr-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
-              paused
-            </span>
-            Card and hosted-page top-ups are paused while payments are being
-            tested. Nothing is charged here; a code you already hold still works.
-          </p>
-        )}
-
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {PLANS.map((plan) => (
             <div
@@ -320,108 +306,6 @@ export default async function PayPage({
         </p>
       </section>
 
-      <section aria-labelledby="dew-actions-heading" className="panel mt-6 p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2
-            id="dew-actions-heading"
-            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
-          >
-            Top up or deduct Dew
-          </h2>
-          <p className="text-[10.5px] text-low">no receipt required</p>
-        </div>
-
-        <p className="mt-2 rounded-2xl border border-line bg-raised px-4 py-2.5 text-[10.5px] leading-relaxed text-low">
-          Codes still work while top-ups are paused: we issue them directly, with
-          no checkout involved.
-        </p>
-
-        <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-mid">
-          A code adds Dew the moment it is redeemed. Deducting takes Dew off your
-          own balance — a correction, or credit you want to give back. Neither
-          asks for a receipt, and both write the same ledger row a plan purchase
-          does.
-        </p>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <form
-            action={redeemTopUpCode}
-            className="rounded-2xl border border-line bg-raised p-4"
-          >
-            <p className="eyebrow">top up</p>
-
-            <label htmlFor="topup-code" className="mt-2 block text-[12px] font-medium text-hi">
-              Code
-            </label>
-            <input
-              id="topup-code"
-              name="code"
-              required
-              maxLength={64}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="TOPUP-…"
-              className="field mt-1.5 py-2 font-mono text-[12px]"
-            />
-
-            <SubmitButton
-              className="btn btn-primary mt-3 w-full py-2 text-[12px]"
-              pendingText="Redeeming…"
-            >
-              Redeem code
-            </SubmitButton>
-
-            <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-              Each code can be used once.
-            </p>
-          </form>
-
-          <form
-            action={deductOwnDew}
-            className="rounded-2xl border border-line bg-raised p-4"
-          >
-            <p className="eyebrow">deduct</p>
-
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <label className="block">
-                <span className="block text-[12px] font-medium text-hi">Dew</span>
-                <input
-                  name="amount"
-                  type="number"
-                  min="1"
-                  step="1"
-                  max={Math.floor(profile?.balance ?? 0)}
-                  required
-                  placeholder="1"
-                  className="field mt-1.5 py-2 font-mono text-[12px]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="block text-[12px] font-medium text-hi">Reason</span>
-                <input
-                  name="reason"
-                  maxLength={120}
-                  placeholder="correction"
-                  className="field mt-1.5 py-2 text-[12px]"
-                />
-              </label>
-            </div>
-
-            <SubmitButton
-              className="btn mt-3 w-full py-2 text-[12px]"
-              pendingText="Deducting…"
-              disabled={(profile?.balance ?? 0) <= 0}
-            >
-              Deduct Dew
-            </SubmitButton>
-
-            <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-              Only ever takes Dew off your balance; it cannot mint any.
-            </p>
-          </form>
-        </div>
-      </section>
 
       <section aria-labelledby="receipt-heading" className="panel mt-6 p-5">
         <h2
@@ -512,15 +396,8 @@ export default async function PayPage({
             pendingText="Uploading the receipt…"
             disabled={TOPUP_PAUSED}
           >
-            {TOPUP_PAUSED ? "Top-ups paused" : "Submit receipt"}
+            Submit receipt
           </SubmitButton>
-
-          {TOPUP_PAUSED && (
-            <p className="text-[10.5px] leading-relaxed text-warn sm:col-span-2">
-              Receipt uploads are paused with the rest of the top-up path. A
-              redeemed code is the only way Dew arrives while this is on.
-            </p>
-          )}
         </form>
       </section>
 
