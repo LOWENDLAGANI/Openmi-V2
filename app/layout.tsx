@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Suspense } from "react";
 
 import { CommandPalette } from "@/components/CommandPalette";
@@ -7,24 +6,12 @@ import { NavProgress } from "@/components/NavProgress";
 import "./globals.css";
 
 /**
- * One grotesk for everything, one mono for the labels.
+ * Type is the operating system's own face.
  *
- * Inter Tight is the closest freely available match to the tight neo-grotesk the
- * brand was drawn against: a single face carries the display headline and the
- * body copy, so the page has one voice instead of a headline font and a body
- * font that argue. The mono is only for metadata — eyebrows, paths, code.
+ * The reference interface ships no webfont, which is why it reads as a native
+ * app on every platform and why nothing reflows when a download finishes. The
+ * stacks live in app/globals.css so one file owns the typography.
  */
-const sans = Inter_Tight({
-  subsets: ["latin"],
-  variable: "--font-openmi-sans",
-  display: "swap",
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-openmi-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "openmi — your repository, with a reviewer built in",
@@ -49,7 +36,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f4f1e9",
+  themeColor: "#f8f9fa",
 };
 
 /**
@@ -63,11 +50,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${sans.variable} ${mono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>

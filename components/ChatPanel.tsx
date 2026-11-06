@@ -924,7 +924,49 @@ export function ChatPanel({
               beginSend(draft);
             }}
           >
-            <div className="rounded-[24px] border border-line-strong bg-card px-2 pb-2 pt-2 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.7)] transition-colors focus-within:border-accent/45">
+            {/* The model and the hour's price sit above the capsule, the way the
+                reference parks its context ring there: a message field with four
+                chips inside it stops reading as one field. */}
+            <div className="mb-1 flex items-center justify-between gap-2 px-1">
+              <ModelMenu
+                models={models}
+                value={model}
+                onChange={(id) => setModel(id as ModelId)}
+              />
+
+              <div className="flex min-w-0 items-center gap-1.5">
+                {/* What the next message costs, so the price is never a
+                    surprise after the answer. */}
+                <span
+                  title={
+                    activeChatId !== null
+                      ? "Every message in this chat is covered for the hour."
+                      : "The hour starts when the first message sends."
+                  }
+                  className="hidden items-center gap-1.5 rounded-full border border-line bg-bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`size-1 rounded-full ${
+                      activeChatId !== null ? "bg-accent" : "bg-line-strong"
+                    }`}
+                  />
+                  {activeChatId !== null
+                    ? `hour · ${modelHourDew(model, models)} dew`
+                    : "pay on send"}
+                </span>
+
+                {meter && (
+                  <ContextCircle
+                    usedChars={meter.usedChars}
+                    budgetChars={meter.budgetChars}
+                    notes={meter.notes}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -939,48 +981,10 @@ export function ChatPanel({
                 placeholder={
                   providerReady ? "Ask anything…" : "Chat is unavailable right now."
                 }
-                className="composer-input max-h-[168px] min-h-[44px] px-2 pt-0.5 text-[14px] leading-[1.6] focus:outline-none"
+                className="composer-input max-h-[168px] min-h-[40px] flex-1 px-2 py-2.5 text-[15px] leading-snug focus:outline-none"
               />
 
-              <div className="flex items-center justify-between gap-2 pl-1">
-                <div className="flex min-w-0 items-center gap-2">
-                  <ModelMenu
-                    models={models}
-                    value={model}
-                    onChange={(id) => setModel(id as ModelId)}
-                  />
-
-                  {/* What the next message costs, so the price is never a
-                      surprise after the answer. */}
-                  <span
-                    title={
-                      activeChatId !== null
-                        ? "Every message in this chat is covered for the hour."
-                        : "The hour starts when the first message sends."
-                    }
-                    className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`size-1 rounded-full ${
-                        activeChatId !== null ? "bg-accent" : "bg-line-strong"
-                      }`}
-                    />
-                    {activeChatId !== null
-                      ? `hour · ${modelHourDew(model, models)} dew`
-                      : "pay on send"}
-                  </span>
-
-                  {meter && (
-                    <ContextCircle
-                      usedChars={meter.usedChars}
-                      budgetChars={meter.budgetChars}
-                      notes={meter.notes}
-                    />
-                  )}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5">
                   {streaming && (
                     <button
                       type="button"
@@ -988,7 +992,7 @@ export function ChatPanel({
                       disabled={stopping}
                       aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
                       title={stopping ? "Stopping…" : "Stop"}
-                      className="lift grid size-9 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
+                      className="lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
                     >
                       <span
                         aria-hidden="true"
@@ -1001,7 +1005,11 @@ export function ChatPanel({
                     type="submit"
                     disabled={streaming || draft.trim().length === 0}
                     aria-label="Send message"
-                    className="lift grid size-9 place-items-center rounded-full bg-accent text-on-accent disabled:opacity-40"
+                    className={`lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
+                      streaming || draft.trim().length === 0
+                        ? "send-idle"
+                        : "bg-accent text-on-accent"
+                    }`}
                   >
                     <svg
                       aria-hidden="true"
@@ -1018,7 +1026,6 @@ export function ChatPanel({
                   </button>
                 </div>
               </div>
-            </div>
           </form>
 
           <p className="mt-1 text-center font-mono text-[9.5px] tracking-[0.05em] text-low">

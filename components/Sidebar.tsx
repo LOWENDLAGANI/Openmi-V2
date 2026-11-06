@@ -108,13 +108,9 @@ function NavRow({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] transition-colors ${
-        active
-          ? "bg-elevated font-medium text-hi"
-          : "text-body hover:bg-hover hover:text-hi"
-      }`}
+      className="rail-row flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px]"
     >
-      <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center">
+      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center">
         {icon}
       </span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -138,30 +134,17 @@ function ChatRow({
 }) {
   return (
     <div
-      className={`group relative flex items-center rounded-2xl transition-colors ${
-        active ? "bg-elevated" : "hover:bg-hover"
-      }`}
+      data-active={active}
+      className="rail-row group relative flex items-center rounded-xl"
     >
       <Link
         href={`/chat?chat=${chat.id}`}
         aria-current={active ? "page" : undefined}
         title={chat.title}
-        className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1"
+        className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-1"
       >
         <span
-          aria-hidden="true"
-          className={`grid size-8 shrink-0 place-items-center rounded-full ${
-            active ? "bg-accent text-on-accent" : "bg-accent-soft text-accent-text"
-          }`}
-        >
-          <Glyph name="cloud" className="size-4" />
-        </span>
-        <span
-          className={`min-w-0 flex-1 truncate text-[13px] ${
-            active
-              ? "font-medium text-hi"
-              : "text-body group-hover:text-hi"
-          }`}
+          className={`min-w-0 flex-1 truncate text-[13px] ${active ? "font-medium" : ""}`}
         >
           {chat.title}
         </span>
@@ -174,7 +157,7 @@ function ChatRow({
         >
           ⋯
         </summary>
-        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-2xl border border-line bg-card p-2 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-line bg-card p-1.5 shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
           <form action={moveChatToFolder} className="flex gap-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <select
@@ -241,54 +224,90 @@ export function Sidebar({
   const initial = email.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <aside className="flex h-full min-h-0 flex-col bg-raised md:border-r md:border-line">
-      <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-3">
-        <div className="min-w-0 flex-1">
-          <SearchLauncher />
-        </div>
+    <aside className="flex h-full min-h-0 flex-col bg-bg-raised md:border-r md:border-line">
+      {/* The reference opens the rail with the wordmark, not a search field:
+          identity first, then the one action worth being large, then a strip of
+          tools that are icons because every one of them is familiar. */}
+      <div className="safe-top flex items-center justify-between px-5 pb-4 pt-6">
         <Link
-          href={newChatHref}
-          aria-label="New chat"
-          title="New chat"
-          className="grid size-10 shrink-0 place-items-center rounded-full text-hi transition-colors hover:bg-hover"
+          href="/chat"
+          aria-label="Openmi — start a new chat"
+          className="flex min-w-0 items-center gap-3"
         >
-          <Glyph name="compose" className="size-[19px]" />
+          <OpenmiMark size={36} className="shrink-0" />
+          <span className="min-w-0">
+            <span className="block truncate text-[23px] font-semibold leading-none tracking-[-0.045em] text-hi">
+              Openmi
+            </span>
+            <span className="mt-1 block text-[10px] text-low">by Minetallest</span>
+          </span>
         </Link>
       </div>
 
-      <nav aria-label="Workspace" className="space-y-0.5 px-2 pb-1 pt-1">
-        <NavRow
-          href="/chat"
-          label="openmi"
-          active={!trashView && !activeChatId}
-          icon={
-            <span className="grid size-8 place-items-center rounded-full bg-accent text-on-accent">
-              <OpenmiMark size={16} />
-            </span>
-          }
-        />
-        <NavRow
+      <div className="px-4">
+        <Link
+          href={newChatHref}
+          aria-label="New chat"
+          className="rail-cta flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-medium text-hi"
+        >
+          <Glyph name="compose" className="size-[18px]" />
+          New chat
+        </Link>
+      </div>
+
+      {/* Five tools, five icons: search, the repository picker, spending, plans
+          and trash. Named rows would eat the height the conversation list needs
+          to breathe, and each of these is reachable by title and label. */}
+      <div
+        role="toolbar"
+        aria-label="Openmi tools"
+        className="mt-4 flex items-center justify-between px-4"
+      >
+        <SearchLauncher />
+        <Link
           href="/chat?view=repos"
-          label="Repositories"
-          badge={repo ? undefined : "New"}
-          icon={<Glyph name="folder" className="size-[19px]" />}
-        />
-        <NavRow
+          aria-label="Repositories"
+          title="Repositories"
+          className="rail-icon grid size-10 place-items-center rounded-xl"
+        >
+          <Glyph name="folder" className="size-[19px]" />
+        </Link>
+        <Link
           href="/activity"
-          label="Activity"
-          icon={<Glyph name="clock" className="size-[19px]" />}
-        />
-        <NavRow
+          aria-label="Activity"
+          title="Activity"
+          className="rail-icon grid size-10 place-items-center rounded-xl"
+        >
+          <Glyph name="clock" className="size-[19px]" />
+        </Link>
+        <Link
           href="/pay"
-          label="Plans &amp; receipts"
-          icon={<Glyph name="receipt" className="size-[19px]" />}
-        />
-      </nav>
+          aria-label="Plans and receipts"
+          title="Plans and receipts"
+          className="rail-icon grid size-10 place-items-center rounded-xl"
+        >
+          <Glyph name="receipt" className="size-[19px]" />
+        </Link>
+        <Link
+          href={trashView ? "/chat" : "/chat?trash=1"}
+          aria-label={trashView ? "Back to chats" : `Trash, ${trashedCount} chat(s)`}
+          title={trashView ? "Back to chats" : "Trash"}
+          aria-current={trashView ? "page" : undefined}
+          className="rail-icon relative grid size-10 place-items-center rounded-xl"
+        >
+          <Glyph name="trash" className="size-[19px]" />
+          {trashedCount > 0 && (
+            <span className="pointer-events-none absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[8px] font-bold text-on-accent">
+              {trashedCount > 99 ? "99+" : trashedCount}
+            </span>
+          )}
+        </Link>
+      </div>
 
-      <div className="mx-4 my-2 h-px bg-line" />
-
-      <nav aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        <p className="eyebrow px-3 pb-1.5">Chats</p>
+      <nav aria-label="Chats" className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        <p className="px-3 pb-1.5 pt-2 font-mono text-[9.5px] uppercase tracking-[0.14em] text-low">
+          Chats
+        </p>
 
         {ungrouped.length === 0 ? (
           <p className="px-3 pb-1.5 text-[11.5px] leading-relaxed text-low">
@@ -403,8 +422,8 @@ export function Sidebar({
         </details>
       </nav>
 
-      <div className="border-t border-line px-3 py-2.5">
-        <div className="flex items-center gap-2">
+      <div className="safe-bottom border-t border-line px-4 pb-4 pt-3">
+        <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
             className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft font-mono text-[11px] uppercase text-accent-text"
@@ -413,28 +432,11 @@ export function Sidebar({
           </span>
 
           <span
-            className="min-w-0 flex-1 truncate text-[12px] font-medium text-hi"
+            className="min-w-0 flex-1 truncate text-[12px] text-mid"
             title={email}
           >
             {email}
           </span>
-
-          <Link
-            href={trashView ? "/chat" : "/chat?trash=1"}
-            aria-label={trashView ? "Back to chats" : `Trash, ${trashedCount} chat(s)`}
-            title={trashView ? "Back to chats" : "Trash"}
-            aria-current={trashView ? "page" : undefined}
-            className={`relative grid size-9 shrink-0 place-items-center rounded-full transition-colors hover:bg-hover hover:text-hi ${
-              trashView ? "bg-elevated text-hi" : "text-mid"
-            }`}
-          >
-            <Glyph name="trash" className="size-[18px]" />
-            {trashedCount > 0 && (
-              <span className="absolute right-0 top-0 grid min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[9px] leading-4 text-on-accent">
-                {trashedCount}
-              </span>
-            )}
-          </Link>
 
           <ThemeSwitcher variant="icon" />
 
@@ -443,7 +445,7 @@ export function Sidebar({
               ariaLabel="Sign out"
               title="Sign out"
               pendingText=""
-              className="grid size-9 place-items-center rounded-full text-mid hover:bg-hover hover:text-hi"
+              className="rail-icon grid size-9 place-items-center rounded-full"
             >
               <Glyph name="signout" className="size-[18px]" />
             </SubmitButton>

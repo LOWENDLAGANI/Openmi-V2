@@ -47,20 +47,20 @@ export function AppShell({
             onClick={() => setOpen(false)}
             className="fade-in absolute inset-0 bg-black/45 backdrop-blur-[2px]"
           />
-          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-raised shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-bg-raised shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
             {sidebar}
           </div>
         </div>
       )}
 
       <main className="flex h-dvh min-w-0 flex-col md:h-full md:min-h-0">
-        <header className="glass sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3 md:px-7">
-          <div className="flex min-w-0 items-center gap-3">
+        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-xl md:px-7">
+          <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
               onClick={() => setOpen(true)}
               aria-label="Open chats"
-              className="grid size-9 shrink-0 place-items-center rounded-full border border-line-strong text-body md:hidden"
+              className="rail-icon grid size-9 shrink-0 place-items-center rounded-xl md:hidden"
             >
               <span aria-hidden="true" className="space-y-[3px]">
                 <span className="block h-[1.5px] w-4 bg-current" />
@@ -70,8 +70,10 @@ export function AppShell({
             </button>
 
             <div className="min-w-0">
-              <p className="eyebrow truncate">{eyebrow}</p>
-              <h1 className="truncate text-[16px] font-semibold tracking-[-0.02em] text-hi">
+              <p className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-low">
+                {eyebrow}
+              </p>
+              <h1 className="truncate text-[15px] font-medium tracking-[-0.02em] text-hi">
                 {title}
               </h1>
             </div>

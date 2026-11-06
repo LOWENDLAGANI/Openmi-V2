@@ -3,17 +3,20 @@
 import { useEffect, useState } from "react";
 
 /**
- * The three themes, as a class on <html>.
+ * The three appearances, as a class on <html>.
  *
- * Paper is the default and has no class of its own; Carbon and Ink are `dark`
- * and `ink`. The value is read once on mount — never during render — so the
- * server and the first client render agree. `localStorage` is the only store;
- * the bootstrap script in the root layout applies it before paint.
+ * Light is the default and has no class of its own; Dark and Ink are `dark` and
+ * `ink`. The ids stay `paper|dark|ink` because they are already written into
+ * people's localStorage: renaming them would reset every saved appearance to
+ * the default. Only the labels follow the reference. The value is read once on
+ * mount — never during render — so the server and the first client render
+ * agree. `localStorage` is the only store; the bootstrap script in the root
+ * layout applies it before paint.
  */
 const THEMES = [
-  { id: "paper", label: "Paper", swatch: "#f0501f", className: "" },
-  { id: "dark", label: "Carbon", swatch: "#171614", className: "dark" },
-  { id: "ink", label: "Ink", swatch: "#111922", className: "ink" },
+  { id: "paper", label: "Light", swatch: "#0066ff", className: "" },
+  { id: "dark", label: "Dark", swatch: "#6ec294", className: "dark" },
+  { id: "ink", label: "Ink", swatch: "#a09ad8", className: "ink" },
 ] as const;
 
 type ThemeId = (typeof THEMES)[number]["id"];
