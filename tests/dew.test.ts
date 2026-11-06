@@ -20,6 +20,7 @@ import {
   normalizeTimezone,
   roundDew,
 } from "../lib/dew";
+import { MODELS } from "../lib/models";
 
 const README = readFileSync(new URL("../README.md", import.meta.url), "utf8");
 
@@ -30,7 +31,7 @@ function documented(label: string): string | null {
 }
 
 test("the documented Dew numbers are the exported constants", () => {
-  expect(DEW_PER_HOUR).toBe(3);
+  expect(DEW_PER_HOUR).toBe(2);
   expect(HOUR_SESSION_MS).toBe(3_600_000);
   expect(DAILY_FREE_DEW).toBe(6);
   expect(PAID_DAILY_FREE_DEW).toBe(15);
@@ -40,6 +41,20 @@ test("the documented Dew numbers are the exported constants", () => {
   expect(LOW_BALANCE_DEW).toBe(10);
   expect(INVITE_REWARD_DEW).toBe(5);
   expect(MAX_INVITES_PER_ACCOUNT).toBe(10);
+});
+
+test("an hour is priced per model, and the database agrees with the catalogue", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/025_model_hour_pricing.sql", import.meta.url),
+    "utf8"
+  );
+
+  for (const model of MODELS) {
+    // The same number in both places, or the picker advertises a price the
+    // charge does not use.
+    expect(migration).toContain(`when '${model.id}' then ${model.dewPerHour}::numeric`);
+    expect(model.dewPerHour).toBe(DEW_PER_HOUR);
+  }
 });
 
 test("the deployed refill allowance matches the constants", () => {

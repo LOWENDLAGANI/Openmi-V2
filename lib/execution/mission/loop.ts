@@ -379,6 +379,11 @@ export async function runMissionTick(input: {
             if (event.type === "text") {
               assistantText += event.text;
               tokens += Math.max(1, Math.ceil(event.text.length / 4));
+            } else if (event.type === "reasoning") {
+              // A mission records commands and their output, not the model's
+              // working out. Skipping it keeps a thought from being stored as a
+              // tool call, which is what the branch below would do with it.
+              continue;
             } else {
               const existing = fragments.get(event.index) ?? { id: "", name: "", args: "" };
               fragments.set(event.index, {

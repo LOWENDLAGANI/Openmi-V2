@@ -51,6 +51,14 @@ type RunOptions = {
   steps: number;
   consume: (expectedSteps: number) => Promise<number | null>;
   emitText: (text: string) => void;
+  /**
+   * The chain of thought, on a channel of its own.
+   *
+   * The transcript folds it, so reading the working out stays optional. It also
+   * has to travel back to the provider on the next step: DeepSeek refuses a
+   * tool-calling assistant turn that dropped the reasoning it produced.
+   */
+  emitReasoning: (text: string) => void;
   emitStep: (event: AgentStepEvent) => void;
   propose?: ToolContext["propose"];
   /**
@@ -150,6 +158,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
     }
 
     let providerText = "";
+    let stepReasoning = "";
     const fragments = new Map<number, { id: string; name: string; args: string }>();
     let failure: Error | null = null;
     let completed = false;
@@ -169,6 +178,11 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
             tokens += Math.max(1, Math.ceil(event.text.length / 4));
             options.emitText(event.text);
             if (tokens >= MAX_TURN_TOKENS) break;
+          } else if (event.type === "reasoning") {
+            // Not counted against the turn's token budget and not appended to
+            // the answer: it is what the model was weighing, not what it says.
+            stepReasoning += event.text;
+            options.emitReasoning(event.text);
           } else {
             const existing = fragments.get(event.index) ?? { id: "", name: "", args: "" };
             fragments.set(event.index, {
@@ -213,6 +227,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
     messages.push({
       role: "assistant",
       content: providerText,
+      ...(stepReasoning.length > 0 ? { reasoning_content: stepReasoning } : {}),
       tool_calls: calls.map((call) => ({
         id: call.id,
         type: "function" as const,

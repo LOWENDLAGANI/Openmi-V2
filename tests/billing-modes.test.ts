@@ -145,7 +145,7 @@ test("an hour in another chat refuses both a new hour and a request", async () =
     [CHAT_A]
   );
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].balance)).toBe(7);
+  expect(Number(started.rows[0].balance)).toBe(8);
 
   // Same chat, same hour: reused, free, and not an error.
   const reused = await db.query<{ started: boolean; balance: string }>(
@@ -153,7 +153,7 @@ test("an hour in another chat refuses both a new hour and a request", async () =
     [CHAT_A]
   );
   expect(reused.rows[0].started).toBe(false);
-  expect(Number(reused.rows[0].balance)).toBe(7);
+  expect(Number(reused.rows[0].balance)).toBe(8);
 
   await expect(
     db.query("select * from public.start_hour_session('auto', null, $1)", [CHAT_B])
@@ -163,7 +163,35 @@ test("an hour in another chat refuses both a new hour and a request", async () =
     db.query("select * from public.charge_chat_request('auto', $1)", [CHAT_B])
   ).rejects.toThrow(/hour active/);
 
-  expect((await balances()).balance).toBe(7);
+  expect((await balances()).balance).toBe(8);
+});
+
+test("an hour is priced by its model and locked to it", async () => {
+  await actAsOwner();
+
+  const started = await db.query<{ price: string; started: boolean }>(
+    "select * from public.start_hour_session('gpt-oss-120b', null, $1)",
+    [CHAT_A]
+  );
+  expect(started.rows[0].started).toBe(true);
+  expect(Number(started.rows[0].price)).toBe(2);
+
+  // Same chat, same model: the hour is reused and costs nothing.
+  const again = await db.query<{ price: string; started: boolean }>(
+    "select * from public.start_hour_session('gpt-oss-120b', null, $1)",
+    [CHAT_A]
+  );
+  expect(again.rows[0].started).toBe(false);
+  expect(Number(again.rows[0].price)).toBe(2);
+
+  // A turn for another model cannot ride an hour it did not pay for.
+  await expect(
+    db.query("select * from public.start_hour_session('deepseek-flash', null, $1)", [
+      CHAT_A,
+    ])
+  ).rejects.toThrow(/hour on model/);
+
+  expect((await balances()).balance).toBe(8);
 });
 
 test("ending the hour lets the current chat start a new one", async () => {
@@ -180,7 +208,7 @@ test("ending the hour lets the current chat start a new one", async () => {
     [CHAT_B]
   );
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].balance)).toBe(4);
+  expect(Number(started.rows[0].balance)).toBe(6);
 });
 
 test("the wallet pays only what the balance cannot, and only when it covers it", async () => {

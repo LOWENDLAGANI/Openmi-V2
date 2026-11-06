@@ -175,8 +175,8 @@ test("an hour is charged once and reused inside the hour", async () => {
   }>("select * from public.start_hour_session('auto', 'octocat/hello')");
 
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].price)).toBe(3);
-  expect(Number(started.rows[0].balance)).toBe(8);
+  expect(Number(started.rows[0].price)).toBe(2);
+  expect(Number(started.rows[0].balance)).toBe(9);
 
   sessionA = String(started.rows[0].session_id);
 
@@ -184,11 +184,11 @@ test("an hour is charged once and reused inside the hour", async () => {
     session_id: string;
     started: boolean;
     balance: string;
-  }>("select * from public.start_hour_session('code', 'octocat/hello')");
+  }>("select * from public.start_hour_session('auto', 'octocat/hello')");
 
   expect(again.rows[0].started).toBe(false);
   expect(String(again.rows[0].session_id)).toBe(sessionA);
-  expect(Number(again.rows[0].balance)).toBe(8);
+  expect(Number(again.rows[0].balance)).toBe(9);
 
   await reset();
   const sessions = await db.query<{ count: number }>(
@@ -198,7 +198,7 @@ test("an hour is charged once and reused inside the hour", async () => {
   expect(Number(sessions.rows[0].count)).toBe(1);
 
   expect(await ledgerCount(A, "session")).toBe(1);
-  expect(await ledgerSum(A)).toBe(8);
+  expect(await ledgerSum(A)).toBe(9);
 });
 
 test("a provider failure is refunded once, never twice", async () => {
@@ -221,7 +221,7 @@ test("a provider failure is refunded once, never twice", async () => {
 test("a balance below one hour refuses the session before anything runs", async () => {
   await reset();
   await db.query(
-    "update public.profiles set dew_balance = 2, dew_day = (now() at time zone timezone)::date where id = $1",
+    "update public.profiles set dew_balance = 1, dew_day = (now() at time zone timezone)::date where id = $1",
     [A]
   );
   await db.query(

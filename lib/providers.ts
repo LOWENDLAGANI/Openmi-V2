@@ -8,13 +8,13 @@ import {
 } from "@/lib/models";
 import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
 import { routeForModel } from "@/lib/models/routes";
+import { DEW_PER_HOUR } from "@/lib/dew";
 import {
   EmptyCompletionError,
-  MAX_COMPLETION_TOKENS,
   ProviderError,
   assertAnswer,
+  completionBudget,
   readDelta,
-  thinkingOption,
 } from "@/lib/provider-stream";
 
 /**
@@ -181,6 +181,8 @@ export function modelCatalogue(
       blurb: model.blurb,
       images: false,
       documents: false,
+      // A custom entry has no price of its own, so it costs the default hour.
+      dewPerHour: DEW_PER_HOUR,
       available: providersFor(model.id, env, custom).length > 0,
     });
   }
@@ -223,11 +225,20 @@ export async function* streamCompletion({
   apiKeys,
   messages,
   signal,
+  onReasoning,
 }: {
   provider: Provider;
   apiKeys: string[];
   messages: ChatMessage[];
   signal: AbortSignal;
+  /**
+   * Where a thinking model's chain of thought goes.
+   *
+   * It is a callback rather than another yielded value because this generator's
+   * contract is "answer text": a caller that only wants the answer keeps
+   * working, and the transcript can still show what the model weighed.
+   */
+  onReasoning?: (text: string) => void;
 }): AsyncGenerator<string> {
   const keys = apiKeys.map((key) => key.trim()).filter((key) => key.length > 0);
 
@@ -246,6 +257,7 @@ export async function* streamCompletion({
         apiKey,
         messages,
         signal,
+        onReasoning,
       })) {
         produced = true;
         yield delta;
@@ -271,11 +283,13 @@ async function* streamCompletionOnce({
   apiKey,
   messages,
   signal,
+  onReasoning,
 }: {
   provider: Provider;
   apiKey: string;
   messages: ChatMessage[];
   signal: AbortSignal;
+  onReasoning?: (text: string) => void;
 }): AsyncGenerator<string> {
   const response = await fetch(provider.endpoint, {
     method: "POST",
@@ -289,8 +303,7 @@ async function* streamCompletionOnce({
       messages,
       stream: true,
       temperature: 0.2,
-      max_tokens: MAX_COMPLETION_TOKENS,
-      ...thinkingOption(provider),
+      max_tokens: completionBudget(provider),
     }),
     signal,
   });
@@ -338,7 +351,13 @@ async function* streamCompletionOnce({
         if (!frame) continue;
 
         if (frame.finishReason) finishReason = frame.finishReason;
-        if (frame.reasoning) sawReasoning = true;
+
+        if (frame.reasoning) {
+          sawReasoning = true;
+          // A thought is handed over as a thought, never as answer text: the two
+          // are different claims about the same turn.
+          onReasoning?.(frame.reasoning);
+        }
 
         if (frame.content) {
           sawAnswer = true;
@@ -364,11 +383,44 @@ export type WireToolCall = {
 };
 
 export type WireMessage =
-  | { role: "system" | "user" | "assistant"; content: string; tool_calls?: WireToolCall[] }
+  | {
+      role: "system" | "user" | "assistant";
+      content: string;
+      tool_calls?: WireToolCall[];
+      /**
+       * The chain of thought that produced this turn, echoed back with it.
+       *
+       * DeepSeek answers 400 when a tool-calling assistant message drops the
+       * reasoning it just sent, so a multi-step turn on a thinking model cannot
+       * work without carrying it. `withoutReasoning` keeps it away from the
+       * providers that never sent one.
+       */
+      reasoning_content?: string;
+    }
   | { role: "tool"; content: string; tool_call_id: string };
+
+/**
+ * Drops reasoning from a history that a non-thinking provider will receive.
+ *
+ * The field exists because one vendor needs it echoed back; handing it to a
+ * vendor that never heard of it risks a 400 on a field it does not validate.
+ */
+function withoutReasoning(messages: WireMessage[]): WireMessage[] {
+  return messages.map((message) => {
+    if (message.role === "tool" || !message.reasoning_content) return message;
+
+    return {
+      role: message.role,
+      content: message.content,
+      ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+    };
+  });
+}
 
 export type ChatEvent =
   | { type: "text"; text: string }
+  /** The model's chain of thought: something it said, not its answer. */
+  | { type: "reasoning"; text: string }
   | {
       type: "tool";
       index: number;
@@ -460,7 +512,9 @@ async function* streamChatOnce({
     },
     body: JSON.stringify({
       model: provider.model,
-      messages,
+      // Only the reasoning model is sent its own reasoning back; the others are
+      // handed a history they can validate.
+      messages: provider.thinksByDefault ? messages : withoutReasoning(messages),
       tools: tools.map((tool) => ({
         type: "function",
         function: {
@@ -472,8 +526,7 @@ async function* streamChatOnce({
       tool_choice: "auto",
       stream: true,
       temperature: 0.2,
-      max_tokens: MAX_COMPLETION_TOKENS,
-      ...thinkingOption(provider),
+      max_tokens: completionBudget(provider),
     }),
     signal,
   });
@@ -518,7 +571,11 @@ async function* streamChatOnce({
         if (!frame) continue;
 
         if (frame.finishReason) finishReason = frame.finishReason;
-        if (frame.reasoning) sawReasoning = true;
+
+        if (frame.reasoning) {
+          sawReasoning = true;
+          yield { type: "reasoning", text: frame.reasoning };
+        }
 
         if (frame.content) {
           sawAnswer = true;

@@ -786,6 +786,7 @@ export async function POST(request: Request) {
                 return Number(row.steps);
               },
               emitText: (text) => send("delta", { text }),
+              emitReasoning: (text) => send("reasoning", { text }),
               emitStep: (event) => send("step", event),
               propose,
               shell: shellTurn,
@@ -941,6 +942,7 @@ export async function POST(request: Request) {
               apiKeys: providerKeys(provider),
               messages: plainMessages,
               signal: abort.signal,
+              onReasoning: (text) => send("reasoning", { text }),
             })) {
               produced += delta;
               send("delta", { text: delta });

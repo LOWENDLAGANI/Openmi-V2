@@ -6,6 +6,7 @@ import {
   MODELS,
   hasModel,
   isModelId,
+  modelHourDew,
   modelName,
 } from "../lib/models";
 
@@ -64,6 +65,20 @@ test("the browser catalogue carries no endpoint, upstream id or key", () => {
   ]) {
     expect(MODELS_CODE).not.toContain(token);
   }
+});
+
+test("every model prices its own hour, and both cost the same today", () => {
+  for (const model of MODELS) {
+    expect(Number.isFinite(model.dewPerHour)).toBe(true);
+    expect(model.dewPerHour).toBeGreaterThan(0);
+  }
+
+  expect(modelHourDew("gpt-oss-120b")).toBe(2);
+  expect(modelHourDew("deepseek-flash")).toBe(2);
+
+  // A model the catalogue does not know is charged the default, never nothing:
+  // a missing price must not become a free hour.
+  expect(modelHourDew("not-a-model")).toBe(MODELS[0].dewPerHour);
 });
 
 test("no component claims a build or a test ran", () => {

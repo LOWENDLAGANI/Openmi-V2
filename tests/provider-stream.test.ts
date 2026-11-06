@@ -121,7 +121,7 @@ test("hitting the reply limit and sending nothing are different sentences", () =
   expect(limit).not.toBe(silent);
 });
 
-test("both request paths turn thinking off for the provider that defaults it on", () => {
+test("a thinking model is given room to think and to answer", () => {
   const source = readFileSync(
     new URL("../lib/providers.ts", import.meta.url),
     "utf8"
@@ -132,12 +132,16 @@ test("both request paths turn thinking off for the provider that defaults it on"
     "utf8"
   );
 
-  // The vendor knows it reasons by default; the request turns it off.
+  // The reasoning is not silenced; it is budgeted for and shown.
   expect(source).toContain("thinksByDefault: true");
-  expect(stream).toContain('thinking: { type: "disabled" }');
+  expect(source).not.toContain('thinking: { type: "disabled" }');
+  expect(stream).toContain("MAX_REASONING_COMPLETION_TOKENS");
 
-  // The text path and the tool path must not drift: one spread each.
-  expect(source.split("...thinkingOption(provider),").length - 1).toBe(2);
+  // The text path and the tool path must not drift: one budget each.
+  expect(source.split("completionBudget(provider)").length - 1).toBe(2);
+
+  // Reasoning is its own event, so no consumer can mistake it for the answer.
+  expect(source).toContain('type: "reasoning"');
 
   // An empty completion is not retried on the next key, which would only spend
   // a second key on the same refusal.

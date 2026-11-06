@@ -1,6 +1,7 @@
 import "server-only";
 
-import { DEW_PER_HOUR, formatDew } from "@/lib/dew";
+import { formatDew } from "@/lib/dew";
+import { modelHourDew, modelName } from "@/lib/models";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -83,7 +84,9 @@ export async function startDewSession(
   options: { chatId: string | null }
 ): Promise<DewGate> {
   const { chatId } = options;
-  const price = DEW_PER_HOUR;
+  // The price belongs to the model, so the sentence a refusal shows names the
+  // same number the database will charge rather than a global constant.
+  const price = modelHourDew(model);
 
   const { data, error } = await supabase.rpc("start_hour_session", {
     p_model: model,
@@ -93,6 +96,24 @@ export async function startDewSession(
 
   if (error) {
     const message = errorText(error);
+
+    // An hour is locked to the model it was bought for. Switching models mid-hour
+    // is a choice the reader has to make explicitly, so it is named as such
+    // rather than reported as "an hour is already running".
+    if (/hour on model/i.test(message)) {
+      const found = message.match(/hour on model (.+)$/i);
+      const startedOn = found ? found[1].trim() : "";
+
+      return {
+        ok: false,
+        balance: null,
+        code: "hour-active",
+        activeChatId: null,
+        error: startedOn
+          ? `This hour of chat was started on ${modelName(startedOn)}. Switch back to that model, or end the session and start a new hour here.`
+          : "This hour of chat is locked to the model that started it. End the session and start a new hour here.",
+      };
+    }
 
     // An active hour is a state, not a failure: the composer offers the chat
     // that holds it and an explicit "end session" instead of a retry loop.

@@ -8,11 +8,10 @@ import { AiThinking } from "@/components/AiThinking";
 import { ChargeDialog } from "@/components/ChargeDialog";
 import { DEW_EVENT } from "@/components/DewChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
-import { DEW_PER_HOUR } from "@/lib/dew";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
-import type { ModelCapability, ModelId } from "@/lib/models";
+import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
@@ -23,6 +22,8 @@ type UiMessage = {
   content: string;
   seq: number | null;
   model: string | null;
+  /** The chain of thought behind this answer, folded so reading it is optional. */
+  thinking?: string;
   /** What the model did before it answered, kept with the answer it belongs to. */
   steps?: StepLine[];
   /** Screenshots the browser tool took while producing this answer. */
@@ -92,6 +93,7 @@ export function ChatPanel({
   const [model, setModel] = useState<ModelId>(initialModel);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState("");
+  const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<StepLine[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
@@ -113,6 +115,8 @@ export function ChatPanel({
   const [conflict, setConflict] = useState<{
     content: string;
     chatId: string | null;
+    /** What the server said, so a model lock and a chat lock read apart. */
+    message: string;
   } | null>(null);
 
   const createdChatRef = useRef<string | null>(null);
@@ -289,12 +293,14 @@ export function ChatPanel({
     }
     setError(null);
     setPending("");
+    setThinking("");
     setSteps([]);
     setShots([]);
     setNotices([]);
 
     let pausedToken: string | null = null;
     let assembled = "";
+    let thinkingText = "";
     let sawDone = false;
     let optimisticId: string | null = null;
 
@@ -371,6 +377,7 @@ export function ChatPanel({
           setConflict({
             content,
             chatId: payload.activeChatId ?? null,
+            message: payload?.error ?? "An hour of chat is already running.",
           });
         }
 
@@ -508,6 +515,15 @@ export function ChatPanel({
           return;
         }
 
+        // The chain of thought arrives before the answer it precedes. It is kept
+        // apart from `pending` so it can fold away: seeing that the model
+        // thought is useful, reading it is a choice.
+        if (event === "reasoning") {
+          thinkingText += typeof payload.text === "string" ? payload.text : "";
+          setThinking(thinkingText);
+          return;
+        }
+
         if (event === "paused") {
           pausedToken = typeof payload.turn === "string" ? payload.turn : null;
           return;
@@ -538,6 +554,7 @@ export function ChatPanel({
               content,
               seq,
               model,
+              thinking: thinkingText,
               steps: [...stepLog],
               shots: [...shotLog],
             },
@@ -616,6 +633,7 @@ export function ChatPanel({
             content: `${assembled}\n\n_(stopped before this answer finished)_`,
             seq: null,
             model,
+            thinking: thinkingText,
           },
         ]);
       }
@@ -624,6 +642,7 @@ export function ChatPanel({
       // the "thinking" pill on screen after a turn had already ended.
       setSteps([]);
       setPending("");
+      setThinking("");
     }
 
     // A paused turn is continued once, with the signed token the server issued.
@@ -779,6 +798,7 @@ export function ChatPanel({
                     </button>
                   </div>
                   <div className="msg-ai-card">
+                    {message.thinking && <ThinkingBlock text={message.thinking} />}
                     {message.steps && message.steps.length > 0 && (
                       <StepList steps={message.steps} />
                     )}
@@ -798,9 +818,12 @@ export function ChatPanel({
 
             {(steps.length > 0 ||
               pending.length > 0 ||
+              thinking.length > 0 ||
               shots.length > 0 ||
               backgroundRunning) && (
               <article className="max-w-[94%]" aria-live="polite">
+
+                {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
                 {steps.length > 0 && <StepList steps={steps} live />}
 
@@ -841,11 +864,7 @@ export function ChatPanel({
           role="alert"
           className="mb-2 space-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] text-warn"
         >
-          <p className="leading-relaxed">
-            An hour of chat is already running
-            {conflict.chatId ? " in another chat" : ""}. Continue there, or end
-            that session and start a new one here.
-          </p>
+          <p className="leading-relaxed">{conflict.message}</p>
           <div className="flex flex-wrap items-center gap-2">
             {conflict.chatId && (
               <a
@@ -948,7 +967,7 @@ export function ChatPanel({
                       }`}
                     />
                     {activeChatId !== null
-                      ? `hour · ${DEW_PER_HOUR} dew`
+                      ? `hour · ${modelHourDew(model, models)} dew`
                       : "pay on send"}
                   </span>
 
@@ -1012,7 +1031,7 @@ export function ChatPanel({
         open={chargeFor !== null}
         balance={dew.balance}
         wallet={dew.wallet}
-        hourPrice={DEW_PER_HOUR}
+        hourPrice={modelHourDew(model, models)}
         pending={streaming}
         onCancel={() => setChargeFor(null)}
         onConfirm={() => {
@@ -1033,6 +1052,31 @@ export function ChatPanel({
  * away, because the reader who wants proof is not the reader who wants a
  * conversation. A live step shows its state; a stored one is already settled.
  */
+/**
+ * The chain of thought, folded.
+ *
+ * A thinking model streams what it is weighing before it answers, on a channel
+ * of its own. Printing it would put the working out into the conversation;
+ * dropping it would pretend the model does not think, and the reader who wants
+ * it is usually checking one claim. So it is one tap away, and it never renders
+ * as part of the answer.
+ */
+function ThinkingBlock({ text, live = false }: { text: string; live?: boolean }) {
+  return (
+    <details
+      className="mb-2 rounded-2xl border border-line bg-raised/60 px-3 py-1.5"
+      data-live={live ? "true" : "false"}
+    >
+      <summary className="cursor-pointer font-mono text-[9.5px] uppercase tracking-[0.1em] text-low">
+        {live ? "thinking…" : "reasoning"}
+      </summary>
+      <p className="mt-1.5 whitespace-pre-wrap text-[11.5px] leading-relaxed text-mid">
+        {text}
+      </p>
+    </details>
+  );
+}
+
 function StepList({ steps, live = false }: { steps: StepLine[]; live?: boolean }) {
   return (
     <ol className="agent-steps" data-live={live ? "true" : "false"}>

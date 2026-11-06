@@ -11,8 +11,18 @@
  * turn ended as "the provider returned an empty answer".
  */
 
-/** The reply budget per request. A turn may make several requests. */
+/** The reply budget per request for a model that answers straight away. */
 export const MAX_COMPLETION_TOKENS = 2_000;
+
+/**
+ * The reply budget for a model that thinks first.
+ *
+ * On DeepSeek the chain of thought is billed from the same budget as the answer,
+ * so 2,000 tokens can be spent entirely on thinking and the reader sees nothing.
+ * The extra room is what makes "reasoning is shown, and then there is an answer"
+ * true instead of a coin flip.
+ */
+export const MAX_REASONING_COMPLETION_TOKENS = 8_000;
 
 export class ProviderError extends Error {
   readonly status: number;
@@ -57,8 +67,7 @@ export type StreamDeltaFrame = {
  * `reasoning_content` is DeepSeek's spelling; `reasoning` is what several other
  * OpenAI-compatible servers call the same field, so both are read. A frame is
  * never dropped because it carries no `content`: a thought is still something
- * the model said, and knowing it arrived is what turns a blank error into an
- * explanation.
+ * the model said, and it is what the transcript shows behind the fold.
  */
 export function readDelta(payload: string): StreamDeltaFrame | null {
   let parsed: unknown;
@@ -164,16 +173,16 @@ export function assertAnswer(input: {
 }
 
 /**
- * Turns a vendor's reasoning off, explicitly.
+ * The reply budget for this provider.
  *
- * The transcript has no surface for a chain of thought, so asking for one buys
- * nothing and can cost the whole reply: with a 2,000-token budget, reasoning can
- * finish the budget before a single character of `content` arrives. It also
- * silently disables `temperature` on DeepSeek. Both request builders spread this,
- * so the text path and the tool path cannot drift apart.
+ * A thinking model spends the same budget on its reasoning before it writes a
+ * word, so it is given room for both. Every other provider keeps the smaller
+ * budget, because a longer answer is not a better one.
  */
-export function thinkingOption(provider: {
+export function completionBudget(provider: {
   thinksByDefault?: boolean;
-}): { thinking?: { type: "disabled" } } {
-  return provider.thinksByDefault ? { thinking: { type: "disabled" } } : {};
+}): number {
+  return provider.thinksByDefault
+    ? MAX_REASONING_COMPLETION_TOKENS
+    : MAX_COMPLETION_TOKENS;
 }

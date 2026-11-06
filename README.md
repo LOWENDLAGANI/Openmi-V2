@@ -161,13 +161,16 @@ pull request, so one approval cannot produce two PRs.
 
 ## Dew
 
-One hour of chat costs 3 Dew, charged before the provider is called. A running
-hour is reused, so more turns inside it are free. The charge is made by
-`start_hour_session(model, repo)`, which has no price parameter.
+One hour of chat costs 2 Dew, charged before the provider is called. The hour is
+priced per model and belongs to the model and chat that started it: a running
+hour is reused for free, and a turn for another model or another chat is refused
+with what holds it instead of silently riding it. The price is decided by
+`model_hour_dew(model)` and charged by `start_hour_session(model, repo)`, neither
+of which takes an amount.
 
 | Constant | Value |
 |---|---|
-| Hour price | 3 |
+| Hour price | 2 |
 | Daily free allowance | 6 |
 | Paid daily allowance | 15 |
 | Trial credit | 5 |

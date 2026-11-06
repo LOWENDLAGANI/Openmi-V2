@@ -11,6 +11,8 @@
  * code change, and it still never reaches the browser's routing logic.
  */
 
+import { DEW_PER_HOUR } from "./dew";
+
 export type ModelId = string;
 
 export type ModelCategory = "general" | "coding" | "reasoning";
@@ -38,6 +40,15 @@ export type ModelCapability = {
   blurb: string;
   images: boolean;
   documents: boolean;
+  /**
+   * What an hour of chat on this model costs.
+   *
+   * The hour is charged before the provider is called and belongs to the model
+   * that was chosen, so the price belongs to the model too. The number here and
+   * `model_hour_dew` in the database are the same decision, and a test reads
+   * both.
+   */
+  dewPerHour: number;
   /** Filled in on the server: is a key for this model's provider configured? */
   available?: boolean;
 };
@@ -50,6 +61,7 @@ export const MODELS: ModelCapability[] = [
     blurb: "Open-weight model with quick tool use, good for repository browsing.",
     images: false,
     documents: false,
+    dewPerHour: 2,
   },
   {
     id: "deepseek-flash",
@@ -58,6 +70,9 @@ export const MODELS: ModelCapability[] = [
     blurb: "DeepSeek's fast model, and the only DeepSeek model offered here.",
     images: false,
     documents: false,
+    // Kept level with GPT OSS: the hour is the chat, not the model's list price,
+    // and charging DeepSeek more would need a reason the ledger cannot explain.
+    dewPerHour: 2,
   },
 ];
 
@@ -85,6 +100,19 @@ export function modelName(
   catalogue: readonly ModelCapability[] = MODELS
 ): string {
   return catalogue.find((model) => model.id === id)?.name ?? id;
+}
+
+/**
+ * What an hour on this model costs.
+ *
+ * An unknown id is charged the catalogue default rather than nothing: a price
+ * the picker cannot find must never become a free hour.
+ */
+export function modelHourDew(
+  id: ModelId,
+  catalogue: readonly ModelCapability[] = MODELS
+): number {
+  return catalogue.find((model) => model.id === id)?.dewPerHour ?? DEW_PER_HOUR;
 }
 
 /**

@@ -9,7 +9,15 @@
  * exists to keep future partial charges from producing invisible fractions.
  */
 
-export const DEW_PER_HOUR = 3;
+/**
+ * The price of an hour on the default model, and on every built-in model today.
+ *
+ * An hour is priced per model, because the model is what the reader chooses:
+ * `ModelCapability.dewPerHour` carries that price and `model_hour_dew` decides
+ * it in the database, so the browser cannot ask for a cheaper hour. This value
+ * is the default a custom entry without a price of its own falls back to.
+ */
+export const DEW_PER_HOUR = 2;
 export const HOUR_SESSION_MS = 3_600_000;
 export const DAILY_FREE_DEW = 6;
 export const PAID_DAILY_FREE_DEW = 15;
