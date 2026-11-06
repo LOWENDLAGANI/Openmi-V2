@@ -8,6 +8,14 @@ import {
 } from "@/lib/models";
 import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
 import { routeForModel } from "@/lib/models/routes";
+import {
+  EmptyCompletionError,
+  MAX_COMPLETION_TOKENS,
+  ProviderError,
+  assertAnswer,
+  readDelta,
+  thinkingOption,
+} from "@/lib/provider-stream";
 
 /**
  * The vendor layer. Server only.
@@ -29,6 +37,15 @@ export type Provider = {
   endpoint: string;
   model: string;
   keyName: "OPENROUTER_API_KEY" | "GROQ_API_KEY" | "DEEPSEEK_API_KEY";
+  /**
+   * The vendor reasons before it answers unless the request says otherwise.
+   *
+   * DeepSeek's thinking mode is on by default, and its chain of thought arrives
+   * in `reasoning_content` — a different field from `content`. A parser that
+   * reads only `content` therefore sees a thinking model produce nothing, which
+   * is how a successful reply became "the provider returned an empty answer".
+   */
+  thinksByDefault?: boolean;
 };
 
 export type ChatMessage = {
@@ -59,19 +76,12 @@ const DEEPSEEK: Provider = {
   // it, and the route table is where that decision lives.
   model: "deepseek-flash",
   keyName: "DEEPSEEK_API_KEY",
+  thinksByDefault: true,
 };
 
-export const MAX_COMPLETION_TOKENS = 2_000;
-
-export class ProviderError extends Error {
-  readonly status: number;
-
-  constructor(message: string, status = 0) {
-    super(message);
-    this.name = "ProviderError";
-    this.status = status;
-  }
-}
+// Frame parsing and the reasoning toggle are pure, so they live in
+// lib/provider-stream.ts where a test can import them without the server-only
+// guard this file needs for API keys.
 
 /** How many numbered variants one provider may hold. */
 export const MAX_PROVIDER_KEYS = 3;
@@ -243,7 +253,11 @@ export async function* streamCompletion({
       return;
     } catch (caught) {
       lastError = caught;
-      if (produced || signal.aborted) throw caught;
+      // An empty completion would be empty on every key: retrying it spends a
+      // second key on the same request the model already declined.
+      if (produced || signal.aborted || caught instanceof EmptyCompletionError) {
+        throw caught;
+      }
     }
   }
 
@@ -276,6 +290,7 @@ async function* streamCompletionOnce({
       stream: true,
       temperature: 0.2,
       max_tokens: MAX_COMPLETION_TOKENS,
+      ...thinkingOption(provider),
     }),
     signal,
   });
@@ -297,8 +312,11 @@ async function* streamCompletionOnce({
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let sawAnswer = false;
+  let sawReasoning = false;
+  let finishReason: string | null = null;
 
-  while (true) {
+  frames: while (true) {
     const { value, done } = await reader.read();
     if (done) break;
 
@@ -314,21 +332,23 @@ async function* streamCompletionOnce({
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
         if (payload.length === 0) continue;
-        if (payload === "[DONE]") return;
+        if (payload === "[DONE]") break frames;
 
-        try {
-          const parsed = JSON.parse(payload) as {
-            choices?: Array<{ delta?: { content?: string } }>;
-          };
-          const delta = parsed.choices?.[0]?.delta?.content;
-          if (typeof delta === "string" && delta.length > 0) yield delta;
-        } catch {
-          // Keepalives and provider-specific frames are not answers. Skipping a
-          // frame we cannot read is honest; inventing text from it is not.
+        const frame = readDelta(payload);
+        if (!frame) continue;
+
+        if (frame.finishReason) finishReason = frame.finishReason;
+        if (frame.reasoning) sawReasoning = true;
+
+        if (frame.content) {
+          sawAnswer = true;
+          yield frame.content;
         }
       }
     }
   }
+
+  assertAnswer({ sawAnswer, sawReasoning, finishReason });
 }
 
 export type AgentToolDefinition = {
@@ -407,7 +427,9 @@ export async function* streamChat({
       return;
     } catch (caught) {
       lastError = caught;
-      if (produced || signal.aborted) throw caught;
+      if (produced || signal.aborted || caught instanceof EmptyCompletionError) {
+        throw caught;
+      }
     }
   }
 
@@ -451,6 +473,7 @@ async function* streamChatOnce({
       stream: true,
       temperature: 0.2,
       max_tokens: MAX_COMPLETION_TOKENS,
+      ...thinkingOption(provider),
     }),
     signal,
   });
@@ -469,8 +492,11 @@ async function* streamChatOnce({
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let sawAnswer = false;
+  let sawReasoning = false;
+  let finishReason: string | null = null;
 
-  while (true) {
+  frames: while (true) {
     const { value, done } = await reader.read();
     if (done) break;
 
@@ -486,44 +512,34 @@ async function* streamChatOnce({
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
         if (payload.length === 0) continue;
-        if (payload === "[DONE]") return;
+        if (payload === "[DONE]") break frames;
 
-        let parsed: {
-          choices?: Array<{
-            delta?: {
-              content?: string;
-              tool_calls?: Array<{
-                index: number;
-                id?: string;
-                function?: { name?: string; arguments?: string };
-              }>;
-            };
-          }>;
-        };
+        const frame = readDelta(payload);
+        if (!frame) continue;
 
-        try {
-          parsed = JSON.parse(payload) as typeof parsed;
-        } catch {
-          continue;
+        if (frame.finishReason) finishReason = frame.finishReason;
+        if (frame.reasoning) sawReasoning = true;
+
+        if (frame.content) {
+          sawAnswer = true;
+          yield { type: "text", text: frame.content };
         }
 
-        const delta = parsed.choices?.[0]?.delta;
-        if (!delta) continue;
-
-        if (typeof delta.content === "string" && delta.content.length > 0) {
-          yield { type: "text", text: delta.content };
-        }
-
-        for (const call of delta.tool_calls ?? []) {
+        // A step that asked for a tool is a complete step even with no prose:
+        // DeepSeek's own tool-call examples carry an empty `content`.
+        for (const call of frame.toolCalls ?? []) {
+          sawAnswer = true;
           yield {
             type: "tool",
-            index: call.index ?? 0,
+            index: call.index,
             id: call.id,
-            name: call.function?.name,
-            argumentsDelta: call.function?.arguments,
+            name: call.name,
+            argumentsDelta: call.arguments,
           };
         }
       }
     }
   }
+
+  assertAnswer({ sawAnswer, sawReasoning, finishReason });
 }
