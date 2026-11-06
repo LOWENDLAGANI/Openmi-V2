@@ -7,12 +7,14 @@ import {
   normalizeDomain,
 } from "../lib/admin/allowlist";
 import {
-  PAYMENT_LINK_FALLBACK,
   PLANS,
   PLAN_IDS,
   paymentLink,
   planById,
 } from "../lib/billing/plans";
+
+const PAYMENT_LINK_FALLBACK = "https://sociabuzz.com/minetallestmc/tribe";
+
 
 test("an exact allowlisted email matches case-insensitively", () => {
   const env = { ADMIN_EMAILS: " Boss@Example.com , second@example.com " };

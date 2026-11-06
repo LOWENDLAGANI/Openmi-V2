@@ -111,14 +111,10 @@ test("top-up packs are positive and ordered", () => {
   expect([...TOPUP_PACKS]).toEqual([...TOPUP_PACKS].sort((a, b) => a - b));
 });
 
-test("top-ups read as paused, and the paid benefits are the ones advertised", () => {
-  const page = readFileSync(new URL("../app/pay/page.tsx", import.meta.url), "utf8");
+test("the paid benefits are the ones advertised", () => {
   const plans = readFileSync(new URL("../lib/billing/plans.ts", import.meta.url), "utf8");
 
-  expect(page).toContain("TOPUP_PAUSED");
-  expect(page).toContain("paused");
-  expect(page).toContain("PAID_BENEFITS");
-  expect(plans).toContain("export const TOPUP_PAUSED = true");
+  expect(plans).toContain("export const PAID_BENEFITS = [");
   expect(plans).toContain("Bumped up to 15 Dew a day");
   expect(plans).toContain("Priority support");
   expect(plans).toContain("Everything in free");

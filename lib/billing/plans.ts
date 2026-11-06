@@ -101,15 +101,15 @@ export function planById(value: string | null | undefined): Plan | null {
  */
 export function paymentLink(env: Record<string, string | undefined> = process.env): string {
   const configured = (env.PAYMENT_LINK ?? "").trim();
-  if (configured.length === 0) return PAYMENT_LINK_FALLBACK;
+  if (configured.length === 0) return "https://sociabuzz.com/minetallestmc/tribe";
 
   try {
     const url = new URL(configured);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return PAYMENT_LINK_FALLBACK;
+      return "https://sociabuzz.com/minetallestmc/tribe";
     }
     return url.toString();
   } catch {
-    return PAYMENT_LINK_FALLBACK;
+    return "https://sociabuzz.com/minetallestmc/tribe";
   }
 }
