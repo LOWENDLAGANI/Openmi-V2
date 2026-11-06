@@ -16,38 +16,13 @@ export const metadata = {
     "Give the agent a goal. It runs the commands in a fresh Linux sandbox, shows every step live, and hands back a diff. Nothing reaches your default branch until you approve it.",
 };
 
-const STEPS = [
-  {
-    title: "Pick a repository",
-    body: "Choose a repo and a commit. That commit is the base for everything that follows, so the agent never works against a moving branch.",
-  },
-  {
-    title: "Give it a goal",
-    body: "Fix the failing build. Add the missing test. Explain the auth flow. The agent plans the work and runs the commands itself.",
-  },
-  {
-    title: "Review and ship",
-    body: "Watch each command as it runs. When the agent finishes you get a diff; approving it opens one branch and one pull request.",
-  },
-];
+const STEPS = ["Pick a repository", "Give it a goal", "Review and ship"];
 
 const SECURITY = [
-  {
-    title: "Ephemeral sandbox",
-    body: "Every mission gets its own Linux machine, destroyed when the work ends. State never leaks between runs.",
-  },
-  {
-    title: "No platform keys",
-    body: "The sandbox holds no database, model or provider credential. A prompt injection has nothing worth stealing.",
-  },
-  {
-    title: "Agent branches only",
-    body: "Writes go to an openmi/agent/ branch. The default branch is refused in code, not by convention.",
-  },
-  {
-    title: "Private by default",
-    body: "Chats, files and repository connections are scoped to your account. Row-level security, not a route guard.",
-  },
+  "Ephemeral sandbox",
+  "No platform keys",
+  "Agent branches only",
+  "Private by default",
 ];
 
 const SESSION = [
@@ -130,13 +105,6 @@ export default async function HomePage() {
               <span className="block">Ship the diff.</span>
             </h1>
 
-            <p className="mt-6 max-w-lg text-[15.5px] leading-[1.75] text-mid">
-              Openmi gives an agent its own Linux sandbox and your repository.
-              It runs the commands, shows you every step as it happens, and
-              hands back a reviewable diff. Nothing reaches your default branch
-              unless you approve it.
-            </p>
-
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/login" className="btn btn-primary px-5 py-2.5 text-[13.5px]">
                 Start with GitHub
@@ -211,9 +179,6 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <p className="mt-3 text-center font-mono text-[9.5px] uppercase tracking-[0.14em] text-low">
-              a session, as it appears in the workspace
-            </p>
           </div>
         </div>
       </section>
@@ -229,13 +194,12 @@ export default async function HomePage() {
           </h2>
 
           <div className="mt-10 grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-3">
-            {STEPS.map((step, index) => (
-              <article key={step.title} className="bg-canvas p-6 sm:p-8">
+            {STEPS.map((title, index) => (
+              <article key={title} className="bg-canvas p-6 sm:p-8">
                 <p className="eyebrow text-accent-text">step {index + 1}</p>
                 <h3 className="mt-3 text-[17px] font-semibold tracking-[-0.025em] text-hi">
-                  {step.title}
+                  {title}
                 </h3>
-                <p className="mt-2 text-[13.5px] leading-[1.7] text-mid">{step.body}</p>
               </article>
             ))}
           </div>
@@ -252,20 +216,14 @@ export default async function HomePage() {
             <h2 className="mt-4 text-[clamp(1.75rem,3.4vw,2.5rem)] font-semibold leading-[1.08] tracking-[-0.035em] text-hi">
               An open shell with the doors still locked.
             </h2>
-            <p className="mt-4 max-w-lg text-[14px] leading-[1.75] text-mid">
-              The sandbox can install, build and break things safely. It never
-              holds a platform key, and it cannot push to GitHub. The only way
-              code leaves is a diff you approve.
-            </p>
           </div>
 
           <ul className="grid gap-3 sm:grid-cols-2">
-            {SECURITY.map((item) => (
-              <li key={item.title} className="rounded-2xl border border-line bg-card p-5">
+            {SECURITY.map((title) => (
+              <li key={title} className="rounded-2xl border border-line bg-card p-5">
                 <h3 className="text-[13.5px] font-semibold tracking-[-0.02em] text-hi">
-                  {item.title}
+                  {title}
                 </h3>
-                <p className="mt-1.5 text-[12.5px] leading-[1.65] text-mid">{item.body}</p>
               </li>
             ))}
           </ul>
@@ -282,10 +240,6 @@ export default async function HomePage() {
             <h2 className="mt-3 text-[clamp(1.5rem,3vw,2.1rem)] font-semibold leading-[1.12] tracking-[-0.03em] text-hi">
               {DEW_PER_HOUR} Dew an hour. {DAILY_FREE_DEW} free every day.
             </h2>
-            <p className="mt-2 max-w-xl text-[13.5px] leading-[1.7] text-mid">
-              One hour covers every message and mission inside it. Top-ups are
-              one-off, and nothing renews on its own.
-            </p>
           </div>
 
           <Link href="/pay" className="btn shrink-0 px-5 py-2.5 text-[13px]">
@@ -299,10 +253,6 @@ export default async function HomePage() {
           <h2 className="mx-auto max-w-xl text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold leading-[1.1] tracking-[-0.035em] text-hi">
             Bring a repository. Leave with a pull request.
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-[13.5px] leading-[1.7] text-mid">
-            Free to start, no card. Sign in with GitHub, pick a repository, and
-            give the agent its first goal.
-          </p>
           <Link
             href="/login"
             className="btn btn-primary mt-7 px-6 py-2.5 text-[13.5px]"
@@ -319,9 +269,6 @@ export default async function HomePage() {
         <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-8 px-5 py-10 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:px-8">
           <div className="col-span-2 sm:col-span-1">
             <Brand />
-            <p className="mt-3 max-w-xs text-[12px] leading-relaxed text-low">
-              A repository agent that shows its work before it writes anything.
-            </p>
           </div>
 
           <nav aria-label="Product" className="space-y-2 text-[12.5px]">

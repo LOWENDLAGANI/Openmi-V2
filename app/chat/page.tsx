@@ -92,20 +92,8 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
       <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
         Connect GitHub
       </h2>
-      <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
-        Openmi reads repositories through the GitHub API with a token you
-        provide. Create a fine-grained token with{" "}
-        <span className="font-mono text-[12.5px] text-body">
-          Contents: read and write
-        </span>
-        {", "}
-        <span className="font-mono text-[12.5px] text-body">
-          Pull requests: read and write
-        </span>
-        {", and "}
-        <span className="font-mono text-[12.5px] text-body">Metadata: read</span>,
-        then paste it once. It is sealed with AES-256-GCM before it is stored, and
-        only its last four characters are ever shown again.
+      <p className="mt-3 text-[13px] leading-relaxed text-mid">
+        Token scopes: contents, pull requests, metadata.
       </p>
 
       {oauthEnabled && (
@@ -147,18 +135,6 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
         </SubmitButton>
       </form>
 
-      <ul className="mt-6 space-y-2">
-        {[
-          "The token is sent once over HTTPS and never returned to the browser.",
-          "Writes happen only after you approve a changeset, and only on an openmi/agent/ branch.",
-          "Disconnecting deletes the sealed value immediately.",
-        ].map((line) => (
-          <li key={line} className="flex items-start gap-2.5 text-[11.5px] leading-relaxed text-low">
-            <span aria-hidden="true" className="mt-[7px] size-1 shrink-0 rounded-full bg-accent" />
-            {line}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -171,10 +147,6 @@ function TrashList({ chats }: { chats: Chat[] }) {
         <h2 className="mt-2 text-[20px] font-semibold tracking-[-0.02em] text-hi">
           Trash is empty
         </h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Deleted chats wait here until you purge them. Restoring one puts it
-          back in the sidebar, in its folder.
-        </p>
         <Link href="/chat" className="btn mt-6">
           Back to chats
         </Link>
@@ -184,11 +156,6 @@ function TrashList({ chats }: { chats: Chat[] }) {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <p className="text-[13px] leading-relaxed text-mid">
-        Deleted chats keep their messages and folder until you purge them.
-        Purging is permanent.
-      </p>
-
       <ul className="panel mt-5 divide-y divide-line overflow-hidden">
         {chats.map((chat) => (
           <li
@@ -358,12 +325,6 @@ async function RepoSurface({
           </form>
         </div>
 
-        <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-mid">
-          A chat is anchored to one repository, so a proposed diff always has
-          exactly one base. Nothing is cloned; every read is an API call at the
-          commit shown in the workspace.
-        </p>
-
         {error ? (
           <Panel title="GitHub could not list repositories" message={error} />
         ) : repos.length === 0 ? (
@@ -481,7 +442,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       {!repo && (
         <p className="mb-3 flex flex-wrap items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-[11.5px] text-mid">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-line-strong" />
-          No repository attached, so answers have nothing to cite.
+          No repository attached.
           <Link
             href={`/chat?chat=${chat.id}&view=repos`}
             className="font-medium text-accent-text hover:underline"

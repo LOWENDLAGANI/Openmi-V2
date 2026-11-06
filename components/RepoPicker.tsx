@@ -54,8 +54,7 @@ export function RepoPicker({
 
       {visible.length === 0 ? (
         <p className="mt-6 text-[13px] leading-relaxed text-mid">
-          No repository matches “{filter}”. The list only contains repositories
-          this token can read, so a missing repo is a token scope, not a bug.
+          No repository matches “{filter}”.
         </p>
       ) : (
         <ul className="panel mt-4 divide-y divide-line overflow-hidden">
@@ -94,8 +93,7 @@ export function RepoPicker({
 
       {visible.length > MAX_RENDERED && (
         <p className="mt-3 text-[11px] text-low">
-          Showing the first {MAX_RENDERED} of {visible.length}. Filter to narrow
-          the list.
+          Showing the first {MAX_RENDERED} of {visible.length}.
         </p>
       )}
     </div>

@@ -102,8 +102,7 @@ export function ChargeDialog({
 
         <p className="mt-2 text-[11.5px] leading-relaxed text-mid">
           {formatDew(balance)} Dew balance
-          {wallet > 0 ? ` · ${formatDew(wallet)} Dew wallet` : ""}. One hour
-          covers every message in this chat until it ends.
+          {wallet > 0 ? ` · ${formatDew(wallet)} Dew wallet` : ""}
         </p>
 
         {canStart ? (
@@ -118,10 +117,11 @@ export function ChargeDialog({
                 <span className="block text-[12.5px] font-semibold text-hi">
                   1 hour session
                 </span>
-                <span className="mt-0.5 block text-[10.5px] text-mid">
-                  every message in this chat for an hour
-                  {combined ? " · wallet covers the rest" : ""}
-                </span>
+                {combined && (
+                  <span className="mt-0.5 block text-[10.5px] text-mid">
+                    wallet covers the rest
+                  </span>
+                )}
               </span>
               <span className="font-mono text-[12px] text-accent-text">
                 {formatDew(hourPrice)} Dew
@@ -131,8 +131,7 @@ export function ChargeDialog({
         ) : (
           <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3">
             <p className="text-[11.5px] leading-relaxed text-warn">
-              Not enough Dew for an hour. Redeem a code or wait for the daily
-              refill.
+              Not enough Dew.
             </p>
             <Link
               href="/pay"

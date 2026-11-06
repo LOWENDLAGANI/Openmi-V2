@@ -237,16 +237,13 @@ export function ExecutionPanel({
       )}
 
       <p className="text-[10.5px] leading-relaxed text-low">
-        The sandbox holds no tokens, no keys and no push credential. It reads a
-        copy of this repository at {run ? "the pinned commit" : "the base commit"},
-        applies the accepted files, and records the exit codes it saw. Nothing is
-        written to GitHub from here.
+        {run ? "Pinned commit" : "Base commit"} · no tokens, no keys, no push
+        credential.
       </p>
 
       {status === "ready" && (
         <p className="text-[10.5px] leading-relaxed text-low">
-          Verification runs automatically. A pull request opens only if the build
-          exits 0.
+          A pull request opens only if the build exits 0.
         </p>
       )}
     </section>

@@ -256,8 +256,8 @@ export function ReviewPanel({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="max-w-md text-[11px] leading-relaxed text-low">
                       {accepted.length === 0
-                        ? "No files are accepted, so there is nothing to approve."
-                        : `${accepted.length} file(s) accepted. A pull request goes on its own branch; a direct commit writes the branch you named, and only while it is still at the base shown above.`}
+                        ? "No files accepted."
+                        : `${accepted.length} file(s) accepted.`}
                     </p>
 
                     {accepted.length > 0 && (
@@ -274,9 +274,7 @@ export function ReviewPanel({
 
               {status === "draft" && (
                 <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-low">
-                  This card is not signed yet, so it cannot be approved. If the
-                  turn paused, continue it to finish the proposal; a draft
-                  expires after six hours.
+                  Draft · not signed.
                 </p>
               )}
 
@@ -332,15 +330,6 @@ export function ReviewPanel({
                           />
                         )}
 
-                        <p className="max-w-md text-[11px] leading-relaxed text-low">
-                          Retry reuses{" "}
-                          {changeset.branch_name
-                            ? `the branch ${changeset.branch_name}`
-                            : "the same branch"}{" "}
-                          and any commit already created; it never opens a second
-                          pull request or a second commit.
-                        </p>
-
                         <SubmitButton
                           className="btn px-4 py-1.5 text-[11.5px]"
                           pendingText="Retrying…"
@@ -355,15 +344,13 @@ export function ReviewPanel({
 
               {status === "expired" && (
                 <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-warn">
-                  Expired after six hours. Ask again for a fresh proposal; this
-                  one can no longer be approved.
+                  Expired.
                 </p>
               )}
 
               {status === "failed" && (
                 <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-danger">
-                  No file could be proposed. The errors above say why; nothing was
-                  stored as ready.
+                  No file could be proposed.
                 </p>
               )}
 
@@ -391,11 +378,10 @@ export function ReviewPanel({
                         className="text-accent-text underline-offset-2 hover:underline"
                       >
                         Pull request #{changeset.pr_number}
-                      </a>{" "}
-                      The default branch was not modified.
+                      </a>
                     </>
                   ) : (
-                    "No pull request was opened; this was a direct commit to the branch above."
+                    "Direct commit."
                   )}
                 </p>
               )}

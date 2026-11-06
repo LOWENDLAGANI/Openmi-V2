@@ -212,10 +212,6 @@ export function AuthForm({
         </button>
       </form>
 
-      <p className="mt-4 px-1 text-[11px] leading-relaxed text-low">
-        Passwords are handled by Supabase Auth and never reach this app&apos;s
-        database.
-      </p>
     </div>
   );
 }

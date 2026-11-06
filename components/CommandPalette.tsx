@@ -220,8 +220,7 @@ export function CommandPalette() {
         <div className="max-h-[52vh] overflow-y-auto p-2">
           {query.trim().length < MIN_QUERY_CHARS ? (
             <p className="px-3 py-6 text-center text-[12px] leading-relaxed text-low">
-              Type at least {MIN_QUERY_CHARS} characters. Search covers chat titles
-              and message text in this account only.
+              Type at least {MIN_QUERY_CHARS} characters.
             </p>
           ) : error ? (
             <p role="alert" className="px-3 py-6 text-center text-[12px] text-danger">

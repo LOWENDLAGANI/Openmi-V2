@@ -96,8 +96,7 @@ function CodeView({ text, highlight }: { text: string; highlight: number | null 
 
       {lines.length > shown.length && (
         <p className="border-t border-line px-4 py-2 text-[11px] text-mid">
-          Showing the first {shown.length} of {lines.length} lines. The rest is on
-          GitHub.
+          Showing the first {shown.length} of {lines.length} lines.
         </p>
       )}
     </div>
@@ -310,10 +309,6 @@ export function Workspace(props: WorkspaceProps) {
                 </ul>
               )}
 
-              <p className="px-2 pt-2 text-[10px] leading-relaxed text-low">
-                GitHub searches the default branch; line numbers are resolved at{" "}
-                {sha.slice(0, 7)}.
-              </p>
             </section>
           )}
         </aside>
@@ -353,10 +348,6 @@ export function Workspace(props: WorkspaceProps) {
               <p className="eyebrow">nothing open</p>
               <p className="mt-2 text-[17px] font-semibold tracking-[-0.02em] text-hi">
                 Pick a file from the tree.
-              </p>
-              <p className="mx-auto mt-2 max-w-sm text-[12.5px] leading-relaxed text-mid">
-                Everything is read at {sha.slice(0, 7)}, so the line numbers you
-                see are the ones a diff will use.
               </p>
             </div>
           )}
