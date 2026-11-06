@@ -38,7 +38,7 @@ const SECURITY = [
   },
   {
     title: "No platform keys",
-    body: "The sandbox holds no database, model or Daytona credential. A prompt injection has nothing worth stealing.",
+    body: "The sandbox holds no database, model or provider credential. A prompt injection has nothing worth stealing.",
   },
   {
     title: "Agent branches only",

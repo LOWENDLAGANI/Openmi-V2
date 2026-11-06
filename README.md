@@ -299,15 +299,15 @@ These need a real project and token, so they are steps rather than specs:
 
 ## Sandbox verification
 
-A ready changeset can be installed and built on a real Linux workspace in a
-[Daytona](https://www.daytona.io) sandbox. The card starts the build on its own,
+A ready changeset can be installed and built on a real Linux workspace in an
+[orkestr](https://orkestr.eu) sandbox. The card starts the build on its own,
 and a failing build gets up to two model repair passes before it is reported;
 **Install and build** stays available as a manual re-run. The run seeds a copy
 of the repository at the pinned commit, writes the accepted files into it, runs
 the command the runner detected from the lockfile and `package.json`, and
 records the exit code, the duration and the output tail.
 
-- With no `DAYTONA_API_KEY`, the button is disabled and the card says execution
+- With no `ORKESTR_API_KEY`, the button is disabled and the card says execution
   is not configured. Nothing else in the product depends on it.
 - Every sentence comes from a stored row. A run that stops reporting says so; a
   timed-out run says it timed out; a build that exits non-zero says that.
@@ -315,10 +315,13 @@ records the exit code, the duration and the output tail.
 - The sandbox holds no tokens, no provider keys and no push credential. It
   cannot write to GitHub. Approval is still the only write path, and it still
   only opens an `openmi/agent/` branch.
-- Egress follows the organisation's Daytona network policy by default. A
-  restricted org refuses a per-sandbox `domainAllowList` outright, so the
-  explicit list is sent only when `EXEC_NETWORK_ALLOWLIST=on`, on a tier that
-  accepts it.
+- Egress is deny-by-default: `EXEC_NETWORK_MODE=restricted` (the default) sends
+  the enumerated allowlist from `lib/execution/commands.ts`, which *replaces* the
+  platform's own list — an install reaches a registry and nothing else. `open`
+  reaches any host; `off` cannot install at all.
+- The sandbox boots from `EXECUTION_TEMPLATE` (default `node-22`) at
+  `EXECUTION_SIZE` (default `medium`, 2 vCPU / 4 GiB). A repository that needs
+  bun or pnpm preinstalled wants a custom `tmpl_` template.
 - A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.

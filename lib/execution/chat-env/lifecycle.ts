@@ -69,8 +69,9 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * Whether chat-scoped environments are on.
  *
- * A kill switch, not a capability check: the resolver still requires a Daytona
- * key. Off means the old one-box-per-message path, so this is the rollback.
+ * A kill switch, not a capability check: the resolver still requires a sandbox
+ * provider token. Off means the old one-box-per-message path, so this is the
+ * rollback.
  */
 export function chatSandboxesEnabled(
   env: Record<string, string | undefined> = process.env

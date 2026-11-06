@@ -188,11 +188,11 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Upstash Redis REST token",
   },
   {
-    key: "DAYTONA_API_KEY",
+    key: "ORKESTR_API_KEY",
     scope: "server",
     required: false,
     unlocks: "Sandbox verification (install + build on a real Linux workspace)",
-    hint: "Daytona dashboard → API keys; runs stay off until this is set",
+    hint: "orkestr console → Settings → API tokens, scoped sandboxes:read + sandboxes:write; runs stay off until this is set",
   },
   {
     key: "EXECUTION_ENABLED",
@@ -202,18 +202,25 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: 'Set to "off" to disable runs without removing the key',
   },
   {
-    key: "EXECUTION_SNAPSHOT",
+    key: "EXECUTION_TEMPLATE",
     scope: "server",
     required: false,
     unlocks: "The sandbox image runs start from",
-    hint: "Defaults to daytona-medium (2 vCPU, 4 GiB)",
+    hint: "Defaults to node-22; also python-3.12, debian-12, ubuntu-24.04, or a tmpl_ id with bun baked in",
   },
   {
-    key: "EXEC_NETWORK_ALLOWLIST",
+    key: "EXECUTION_SIZE",
     scope: "server",
     required: false,
-    unlocks: "An explicit sandbox egress allowlist (Daytona Tier 3 only)",
-    hint: 'Leave unset on restricted organisations; "on" sends domainAllowList, which they reject',
+    unlocks: "How much machine a sandbox gets",
+    hint: "Defaults to medium (2 vCPU, 4 GiB), the shape the Dew rate was computed on; free keys are limited to small",
+  },
+  {
+    key: "EXEC_NETWORK_MODE",
+    scope: "server",
+    required: false,
+    unlocks: "Sandbox egress: off, restricted (an enumerated allowlist) or open",
+    hint: 'Defaults to "restricted"; "open" reaches any host, "off" cannot install anything',
   },
   {
     key: "EXEC_MISSION_MINUTES",
@@ -227,7 +234,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Chat-scoped sandboxes (set to \"off\" to fall back to one box per message)",
-    hint: "Defaults to on; only takes effect when DAYTONA_API_KEY is set",
+    hint: "Defaults to on; only takes effect when ORKESTR_API_KEY is set",
   },
   {
     key: "CHAT_SANDBOX_IDLE_MINUTES",
@@ -331,7 +338,7 @@ export function readEnvReport(
 export function executionConfigured(
   env: Record<string, string | undefined> = process.env
 ): boolean {
-  const key = (env.DAYTONA_API_KEY ?? "").trim();
+  const key = (env.ORKESTR_API_KEY ?? "").trim();
   if (key.length === 0) return false;
 
   const flag = (env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
@@ -348,11 +355,13 @@ export function serverEnv() {
     githubTokenKey: process.env.GITHUB_TOKEN_KEY ?? null,
     githubOauthClientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? null,
     githubOauthClientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? null,
-    daytonaApiKey: process.env.DAYTONA_API_KEY ?? null,
-    daytonaApiUrl: process.env.DAYTONA_API_URL ?? null,
-    daytonaTarget: process.env.DAYTONA_TARGET ?? null,
+    orkestrApiKey: process.env.ORKESTR_API_KEY ?? null,
+    orkestrApiUrl: process.env.ORKESTR_API_URL ?? null,
+    orkestrRegion: process.env.ORKESTR_REGION ?? null,
     executionEnabled: process.env.EXECUTION_ENABLED ?? null,
-    executionSnapshot: process.env.EXECUTION_SNAPSHOT ?? null,
+    executionTemplate: process.env.EXECUTION_TEMPLATE ?? null,
+    executionSize: process.env.EXECUTION_SIZE ?? null,
+    executionNetworkMode: process.env.EXEC_NETWORK_MODE ?? null,
     execMissionMinutes: process.env.EXEC_MISSION_MINUTES ?? null,
     chatSandboxEnabled: process.env.CHAT_SANDBOX_ENABLED ?? null,
     chatSandboxIdleMinutes: process.env.CHAT_SANDBOX_IDLE_MINUTES ?? null,

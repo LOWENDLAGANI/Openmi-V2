@@ -120,17 +120,19 @@ test("a run repairs its own build and approves only a zero exit by default", () 
   expect(route).not.toContain("autoApprove = Boolean(");
 });
 
-test("the egress allowlist is opt-in, because restricted orgs reject it", () => {
+test("the egress allowlist is sent only to a restricted sandbox", () => {
   const provider = readFileSync(
     new URL("../lib/execution/provider.ts", import.meta.url),
     "utf8"
   );
 
-  // A restricted Daytona org refuses the whole create call when the field is
-  // present, so it must not be sent unconditionally.
-  expect(provider).toContain("networkAllowlistEnabled()");
-  expect(provider).toContain("domainAllowList: EXEC_ALLOWED_DOMAINS.join");
-  expect(provider).toContain("...(networkAllowlistEnabled()");
+  // On a restricted sandbox the list REPLACES the platform's default, so it has
+  // to be the whole allowlist. `off` and `open` ignore the field, and sending it
+  // there would imply a policy that is not being applied.
+  expect(provider).toContain("allowDomainsOption()");
+  expect(provider).toContain("allowDomains: [...EXEC_ALLOWED_DOMAINS]");
+  expect(provider).toContain('executionNetworkMode() === "restricted"');
+  expect(provider).toContain("...allowDomainsOption()");
 });
 
 test("a terminal run with nothing charged does not read as still pending", () => {

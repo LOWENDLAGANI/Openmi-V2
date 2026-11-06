@@ -94,7 +94,7 @@ test("reconciliation only destroys boxes older than the provisioning window", ()
 
 test("the provider exposes a confirmed delete and a labelled list", () => {
   expect(provider).toContain("export async function destroySandboxConfirmed");
-  expect(provider).toContain('labels: { app: "openmi", kind: "chat" }');
+  expect(provider).toContain('metadata: { app: "openmi", kind: "chat" }');
   expect(provider).toContain("if (error.failure === \"missing\") return \"missing\"");
 });
 

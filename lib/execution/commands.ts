@@ -30,16 +30,39 @@ export const EXEC_MAX_TARBALL_BYTES = 80_000_000;
 export const EXEC_MAX_FILES = 40;
 export const EXEC_MAX_PATCH_BYTES = 400_000;
 
-/** Relative to the sandbox user's home, so no home path is hard-coded. */
-export const EXEC_WORKDIR = "openmi-workspace";
-
-/** The snapshot the runner asks for when none is configured. */
-export const DEFAULT_SNAPSHOT = "daytona-medium";
+/**
+ * Absolute, because the file API only writes under a writable root and `/workspace`
+ * is the one every template has. It is deliberately not a subdirectory of the
+ * home: an image that changes its home must not move the workspace.
+ */
+export const EXEC_WORKDIR = "/workspace/openmi-workspace";
 
 /**
- * Hosts an install is allowed to reach. Deny-by-default: Daytona enforces this
- * at the network layer, so a `postinstall` script cannot post a token anywhere
- * even though it runs as arbitrary code.
+ * The template the runner asks for when none is configured.
+ *
+ * `node-22` is the JavaScript-first default, which matches what the detected
+ * commands in this file install. A repository that needs bun or pnpm baked in
+ * wants a custom `tmpl_` template instead of an install at boot.
+ */
+export const DEFAULT_TEMPLATE = "node-22";
+
+/**
+ * The longest lifetime the provider accepts: 24 h, on an account with a card.
+ * A chat's own deadline is 48 h and is enforced by the sweep; this is only the
+ * ceiling handed to the sandbox itself.
+ */
+export const EXEC_MAX_TIMEOUT_SECONDS = 86_400;
+
+/** What a key without a card on file accepts. One retry falls back to this. */
+export const EXEC_FREE_TIER_TIMEOUT_SECONDS = 1_800;
+
+/**
+ * Hosts an install is allowed to reach. Deny-by-default: the provider enforces
+ * this at the network layer, so a `postinstall` script cannot post a token
+ * anywhere even though it runs as arbitrary code.
+ *
+ * Sent on every restricted sandbox, where it *replaces* the platform's default
+ * list rather than extending it — so anything an install needs has to be here.
  */
 export const EXEC_ALLOWED_DOMAINS: readonly string[] = [
   "registry.npmjs.org",

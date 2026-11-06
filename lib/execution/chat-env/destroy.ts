@@ -18,7 +18,7 @@ import {
 /**
  * Destructive chat actions and the containers behind them.
  *
- * Postgres cascades; Daytona does not. Trashing a chat destroys the workspace it
+ * Postgres cascades; the sandbox provider does not. Trashing a chat destroys the workspace it
  * was warming — restore gets a fresh seed — and purging destroys the container
  * inline. Both mark the row `wiping` with a deadline of now *before* the chat
  * row is touched, because `chat_id` is `on delete set null`: the row survives

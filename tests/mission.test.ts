@@ -27,7 +27,7 @@ import {
  * The important ones are negative: a claim of a passing check that was never
  * run is refused, a path cannot leave the workspace, and no card can reach a
  * success sentence without a collected diff. A real sandbox test needs a
- * Daytona key and is deliberately not pretended here.
+ * sandbox provider key and is deliberately not pretended here.
  */
 
 describe("mission budget", () => {
