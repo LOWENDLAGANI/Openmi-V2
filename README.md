@@ -396,6 +396,8 @@ The four decisions this depends on — what may run (D6.1), what a minute costs
 cannot start (D6.4) — are answered in
 [docs/EXECUTION_ENVIRONMENT_PLAN.md](docs/EXECUTION_ENVIRONMENT_PLAN.md).
 
+test
+
 ## Rules for contributors
 
 - Pushes are authored as **`Openmi`** — see
