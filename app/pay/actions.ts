@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { planById } from "@/lib/billing/plans";
 import { redeemDewCode } from "@/lib/dew/store";
 import { sendReceiptNotification } from "@/lib/email/receipt";
+import { RECEIPT_TYPES, receiptBytesMatchType } from "@/lib/receipts";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -26,13 +27,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
-const RECEIPT_TYPES: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "application/pdf": "pdf",
-};
-
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
@@ -47,6 +41,18 @@ export async function submitReceipt(formData: FormData) {
 
   if (session.state === "unconfigured") redirect("/setup");
   if (session.state !== "signed-in") redirect("/login?next=%2Fpay");
+
+  const admin = supabaseAdmin();
+  if (!admin) {
+    fail("Receipt uploads need SUPABASE_SERVICE_ROLE_KEY on the server.");
+  }
+
+  // A receipt uploads a file and sends mail to the operator, so the ceiling is
+  // checked before the body reaches storage or the mail client.
+  const limited = await checkRateLimit(admin, "receipt", session.user.id);
+  if (!limited.allowed) {
+    fail(`Too many receipt uploads. Try again in ${limited.retryAfterSeconds} seconds.`);
+  }
 
   const plan = planById(field(formData, "plan"));
   if (!plan) fail("Choose a plan first.");
@@ -72,13 +78,14 @@ export async function submitReceipt(formData: FormData) {
   if (!extension) fail("Receipts must be PNG, JPEG, WebP or PDF.");
   if (upload.size > MAX_BYTES) fail("That receipt is larger than 5 MB.");
 
-  const admin = supabaseAdmin();
-  if (!admin) {
-    fail("Receipt uploads need SUPABASE_SERVICE_ROLE_KEY on the server.");
-  }
-
   const path = `${session.user.id}/${randomUUID()}.${extension}`;
   const bytes = new Uint8Array(await upload.arrayBuffer());
+
+  // The type is a browser-supplied label; the signature is the file. This is
+  // what keeps an HTML page from being stored and mailed as a PNG.
+  if (!receiptBytesMatchType(bytes, upload.type)) {
+    fail("That file does not match the image or PDF type it claims.");
+  }
 
   const { error: uploadError } = await admin.storage
     .from("receipts")
@@ -154,8 +161,11 @@ function done(message: string): never {
 export async function redeemTopUpCode(formData: FormData) {
   const session = await account();
 
+  const admin = supabaseAdmin();
+  if (!admin) fail("Code redemption needs the server database connection.");
+
   // A code is a bearer value, so attempts are counted before one is looked up.
-  const limited = await checkRateLimit(supabaseAdmin(), "redeem", session.user.id);
+  const limited = await checkRateLimit(admin, "redeem", session.user.id);
   if (!limited.allowed) {
     fail(`Too many code attempts. Try again in ${limited.retryAfterSeconds} seconds.`);
   }
@@ -165,7 +175,7 @@ export async function redeemTopUpCode(formData: FormData) {
   if (code.length === 0) fail("Enter a code first.");
   if (code.length > 64) fail("That code is too long.");
 
-  const result = await redeemDewCode(session.supabase, code);
+  const result = await redeemDewCode(admin, session.user.id, code);
   if (!result.ok) fail(result.error);
 
   revalidatePath("/pay");

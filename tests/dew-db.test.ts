@@ -151,12 +151,16 @@ test("signup writes a profile and an invite code, and no Dew yet", async () => {
   expect(await ledgerSum(A)).toBe(0);
 });
 
-test("the first request grants the trial once, and once per address", async () => {
+test("the trial is a service-role grant, once, and once per address", async () => {
   await actAs("authenticated", A);
+  await expect(
+    db.query("select public.grant_trial_dew($1) as amount", [IP_ONE])
+  ).rejects.toThrow(/permission denied/);
 
+  await reset();
   const granted = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1) as amount",
-    [IP_ONE]
+    "select public.grant_trial_dew($1, $2) as amount",
+    [A, IP_ONE]
   );
   expect(Number(granted.rows[0].amount)).toBe(5);
   expect(await balance(A)).toBe(5);
@@ -165,19 +169,17 @@ test("the first request grants the trial once, and once per address", async () =
 
   // Asking twice from the same account pays nothing.
   const again = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1) as amount",
-    [IP_ONE]
+    "select public.grant_trial_dew($1, $2) as amount",
+    [A, IP_ONE]
   );
   expect(Number(again.rows[0].amount)).toBe(0);
   expect(await ledgerCount(A, "trial")).toBe(1);
 
   // A second account on the same address is not paid either.
   await signUp(C, "c@example.test");
-  await actAs("authenticated", C);
-
   const refused = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1) as amount",
-    [IP_ONE]
+    "select public.grant_trial_dew($1, $2) as amount",
+    [C, IP_ONE]
   );
   expect(Number(refused.rows[0].amount)).toBe(0);
   expect(await balance(C)).toBe(0);
@@ -185,11 +187,12 @@ test("the first request grants the trial once, and once per address", async () =
 });
 
 test("the daily allowance refills once, at the local day", async () => {
-  await actAs("authenticated", A);
+  await reset();
 
   // The trial is paid on first use; asking again here is a no-op.
-  await db.query("select public.grant_trial_dew($1)", [IP_ONE]);
+  await db.query("select public.grant_trial_dew($1, $2)", [A, IP_ONE]);
 
+  await actAs("authenticated", A);
   const first = await db.query<{ balance: string }>(
     "select public.refill_daily_dew() as balance"
   );
@@ -242,17 +245,21 @@ test("an hour is charged once and reused inside the hour", async () => {
   expect(await ledgerSum(A)).toBe(9);
 });
 
-test("a provider failure is refunded once, never twice", async () => {
+test("a refund is service-role only, and happens once", async () => {
   await actAs("authenticated", A);
+  await expect(
+    db.query("select public.refund_hour_session($1, 'provider failed')", [sessionA])
+  ).rejects.toThrow(/permission denied/);
 
+  await reset();
   const refund = await db.query<{ balance: string }>(
-    "select public.refund_hour_session($1, 'provider failed') as balance",
-    [sessionA]
+    "select public.refund_hour_session($1, $2, 'provider failed') as balance",
+    [A, sessionA]
   );
   expect(Number(refund.rows[0].balance)).toBe(11);
 
   await expect(
-    db.query("select public.refund_hour_session($1, 'again')", [sessionA])
+    db.query("select public.refund_hour_session($1, $2, 'again')", [A, sessionA])
   ).rejects.toThrow(/already refunded/);
 
   expect(await ledgerCount(A, "refund")).toBe(1);
@@ -281,23 +288,29 @@ test("a balance below one hour refuses the session before anything runs", async 
   await db.query("update public.profiles set dew_balance = 11 where id = $1", [A]);
 });
 
-test("a redeem code works once and marks the account as paid", async () => {
+test("a redeem code is service-role only, works once and marks the account as paid", async () => {
   await reset();
   await db.query(
     "insert into public.dew_codes (code, dew_amount, kind, note) values ('TOPUP-20', 20, 'topup', 'test')"
   );
 
   await actAs("authenticated", A);
+  await expect(
+    db.query("select * from public.redeem_dew_code('topup-20')")
+  ).rejects.toThrow(/permission denied/);
+
+  await reset();
   const redeemed = await db.query<{ amount: string; balance: string }>(
-    "select * from public.redeem_dew_code('topup-20')"
+    "select * from public.redeem_dew_code($1, 'topup-20')",
+    [A]
   );
 
   expect(Number(redeemed.rows[0].amount)).toBe(20);
   expect(Number(redeemed.rows[0].balance)).toBe(31);
 
-  await expect(db.query("select * from public.redeem_dew_code('TOPUP-20')")).rejects.toThrow(
-    /already redeemed/
-  );
+  await expect(
+    db.query("select * from public.redeem_dew_code($1, 'TOPUP-20')", [A])
+  ).rejects.toThrow(/already redeemed/);
 
   await reset();
   const { rows } = await db.query<{ has_paid: boolean }>(
@@ -350,10 +363,9 @@ test("both sides of an invite are rewarded once", async () => {
 
   // A different address still gets its own trial, so the invitee is paid on
   // first use exactly like anyone else who is not farming accounts.
-  await actAs("authenticated", B);
   const trial = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1) as amount",
-    [IP_TWO]
+    "select public.grant_trial_dew($1, $2) as amount",
+    [B, IP_TWO]
   );
   expect(Number(trial.rows[0].amount)).toBe(5);
   expect(await balance(B)).toBe(10);

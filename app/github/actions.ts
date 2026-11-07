@@ -103,7 +103,7 @@ export async function attachRepo(formData: FormData) {
   const target = `/chat?repo=${encodeURIComponent(fullName)}&branch=${encodeURIComponent(branch)}&sha=${sha}`;
 
   if (chatId) {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("chats")
       .update({
         repo_full_name: fullName,
@@ -112,9 +112,12 @@ export async function attachRepo(formData: FormData) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", chatId)
-      .eq("owner", user.id);
+      .eq("owner", user.id)
+      .select("id")
+      .maybeSingle();
 
     if (error) fail(error.message);
+    if (!updated) fail("That chat no longer exists.");
 
     revalidatePath("/chat");
     redirect(`${target}&chat=${chatId}`);

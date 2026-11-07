@@ -17,6 +17,7 @@ import { supabaseServer } from "@/lib/supabase/server";
  */
 
 type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
+type AdminClient = NonNullable<ReturnType<typeof supabaseAdmin>>;
 
 export type DewSession = {
   sessionId: string;
@@ -79,10 +80,12 @@ export async function refillDailyDew(supabase: Client): Promise<number | null> {
  * The address arrives as a keyed hash; the server never stores the address.
  */
 export async function grantTrialDew(
-  supabase: Client,
+  admin: AdminClient,
+  owner: string,
   ipHash: string
 ): Promise<number> {
-  const { data, error } = await supabase.rpc("grant_trial_dew", {
+  const { data, error } = await admin.rpc("grant_trial_dew", {
+    p_owner: owner,
     p_ip_hash: ipHash,
   });
 
@@ -223,19 +226,19 @@ export async function endHourSession(
 }
 
 export async function refundDewSession(
-  supabase: Client,
+  admin: AdminClient,
+  owner: string,
   sessionId: string,
   reason: string
 ): Promise<boolean> {
-  const { error } = await supabase.rpc("refund_hour_session", {
+  const { error } = await admin.rpc("refund_hour_session", {
+    p_owner: owner,
     p_session_id: sessionId,
     p_reason: reason,
   });
 
   return !error;
 }
-
-type AdminClient = NonNullable<ReturnType<typeof supabaseAdmin>>;
 
 /**
  * Sandbox runs: a reservation up front, a settlement against real minutes.
@@ -309,10 +312,14 @@ export async function readDewProfile(
 }
 
 export async function redeemDewCode(
-  supabase: Client,
+  admin: AdminClient,
+  owner: string,
   code: string
 ): Promise<{ ok: true; amount: number; balance: number } | { ok: false; error: string }> {
-  const { data, error } = await supabase.rpc("redeem_dew_code", { p_code: code });
+  const { data, error } = await admin.rpc("redeem_dew_code", {
+    p_owner: owner,
+    p_code: code,
+  });
 
   if (error) {
     const message = errorText(error);

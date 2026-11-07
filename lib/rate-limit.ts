@@ -20,6 +20,8 @@ export const RATE_LIMITS = {
   approval: { max: 10, windowMs: RATE_LIMIT_WINDOW_MS },
   // A code is a bearer value, so guessing is the attack this stops.
   redeem: { max: 6, windowMs: RATE_LIMIT_WINDOW_MS },
+  // Receipts upload a file and send mail to the operator.
+  receipt: { max: 5, windowMs: RATE_LIMIT_WINDOW_MS },
   // Deductions are cheap but append to the ledger; this is a spam ceiling.
   wallet: { max: 12, windowMs: RATE_LIMIT_WINDOW_MS },
   // Connecting GitHub mints an OAuth state and calls the provider.

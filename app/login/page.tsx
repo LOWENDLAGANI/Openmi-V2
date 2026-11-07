@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { safeNextPath } from "@/lib/http/next-path";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +13,10 @@ export const metadata = {
   title: "Sign in — Openmi",
 };
 
-/** Only ever redirect to a path on this origin. */
+/** Only ever redirect to a path on this origin, never back to sign-in. */
 function safeNext(value: string | undefined): string {
-  if (!value) return "/chat";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/chat";
-  if (value.startsWith("/login")) return "/chat";
-  return value;
+  const next = safeNextPath(value, "https://openmi.invalid");
+  return next.startsWith("/login") ? "/chat" : next;
 }
 
 export default async function LoginPage({

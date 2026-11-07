@@ -331,7 +331,10 @@ export async function POST(request: Request) {
   const callerIp = continuationToken ? null : requestIp(request.headers);
 
   if (callerIp && sealKey) {
-    await grantTrialDew(session.supabase, hashIp(callerIp, sealKey));
+    const admin = supabaseAdmin();
+    if (admin) {
+      await grantTrialDew(admin, session.user.id, hashIp(callerIp, sealKey));
+    }
   }
 
   // Charged only after the deployment can answer and after a continuation has
@@ -631,11 +634,15 @@ export async function POST(request: Request) {
         if (refunded || !dew.session.started) return;
         refunded = true;
 
-        const ok = await refundDewSession(
-          session.supabase,
-          dew.session.sessionId,
-          reason
-        );
+        const admin = supabaseAdmin();
+        const ok = admin
+          ? await refundDewSession(
+              admin,
+              session.user.id,
+              dew.session.sessionId,
+              reason
+            )
+          : false;
 
         if (ok) {
           send("notice", {

@@ -122,16 +122,20 @@ export async function trashChat(formData: FormData) {
   const chatId = field(formData, "chatId");
   if (!chatId) fail("That chat no longer exists.");
 
-  const { error } = await supabase
+  const { data: trashed, error } = await supabase
     .from("chats")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", chatId)
-    .eq("owner", user.id);
+    .eq("owner", user.id)
+    .select("id")
+    .maybeSingle();
 
   if (error) fail(error.message);
+  if (!trashed) fail("That chat no longer exists.");
 
   // The container is not part of the database cascade. Trash releases its
-  // compute and marks it wipe-due; restore starts from a fresh seed.
+  // compute and marks it wipe-due; restore starts from a fresh seed. Only an
+  // owned row reaches this point, so a guessed id cannot stop another box.
   await trashChatSandbox(chatId);
 
   revalidatePath("/chat");
@@ -160,21 +164,37 @@ export async function purgeChat(formData: FormData) {
   const chatId = field(formData, "chatId");
   if (!chatId) fail("That chat no longer exists.");
 
+  // Purge is the only path that removes rows, and it only touches rows already
+  // in the trash. Prove ownership before the service-role teardown: an update
+  // or delete that matches no row is not an error, so the sandbox call must not
+  // be the first place the id is checked.
+  const { data: trashed, error: readError } = await supabase
+    .from("chats")
+    .select("id")
+    .eq("id", chatId)
+    .eq("owner", user.id)
+    .not("deleted_at", "is", null)
+    .maybeSingle();
+
+  if (readError) fail(readError.message);
+  if (!trashed) fail("That chat is not in the trash.");
+
   // The environment row is marked wiping before the chat delete, because the
   // foreign key nulls `chat_id` and only that ordering leaves the sweep a row
   // to finish from. This also destroys the container inline.
   await wipeChatSandbox(chatId);
 
-  // Purge is the only path that removes rows, and it only touches rows already
-  // in the trash. An active chat cannot be destroyed by guessing its id.
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from("chats")
     .delete()
     .eq("id", chatId)
     .eq("owner", user.id)
-    .not("deleted_at", "is", null);
+    .not("deleted_at", "is", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) fail(error.message);
+  if (!deleted) fail("That chat is no longer in the trash.");
 
   revalidatePath("/chat");
   redirect("/chat?trash=1");
@@ -192,17 +212,23 @@ export async function emptyTrash() {
     .not("deleted_at", "is", null)
     .limit(50);
 
-  await wipeChatSandboxes(
-    ((trashed ?? []) as Array<{ id: string }>).map((row) => String(row.id))
-  );
+  const ids = ((trashed ?? []) as Array<{ id: string }>).map((row) => String(row.id));
 
-  const { error } = await supabase
-    .from("chats")
-    .delete()
-    .eq("owner", user.id)
-    .not("deleted_at", "is", null);
+  if (ids.length > 0) {
+    await wipeChatSandboxes(ids);
 
-  if (error) fail(error.message);
+    // Delete exactly the rows whose boxes were wiped in this pass. Deleting
+    // every trashed row here would leave sandboxes for the rows beyond the
+    // 50-row scan with no chat to find them by.
+    const { error } = await supabase
+      .from("chats")
+      .delete()
+      .eq("owner", user.id)
+      .in("id", ids)
+      .not("deleted_at", "is", null);
+
+    if (error) fail(error.message);
+  }
 
   revalidatePath("/chat");
   redirect("/chat?trash=1");

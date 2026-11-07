@@ -18,6 +18,8 @@ const STATUS = readFileSync(
 const SETUP = readFileSync(new URL("../app/setup/page.tsx", import.meta.url), "utf8");
 const ABOUT = readFileSync(new URL("../app/about/page.tsx", import.meta.url), "utf8");
 const WORKSPACE = readFileSync(new URL("../app/chat/page.tsx", import.meta.url), "utf8");
+const ACTIVITY = readFileSync(new URL("../app/activity/actions.ts", import.meta.url), "utf8");
+const PAY = readFileSync(new URL("../app/pay/actions.ts", import.meta.url), "utf8");
 
 test("the chat route is dynamic, bounded and unbuffered", () => {
   expect(CHAT).toContain('export const runtime = "nodejs"');
@@ -58,12 +60,33 @@ const MUTATING_ROUTES = [
   "../app/api/missions/route.ts",
   "../app/api/missions/[id]/route.ts",
   "../app/api/missions/[id]/tick/route.ts",
+  "../app/auth/signout/route.ts",
 ];
 
 test("every mutating route rejects a foreign origin", () => {
   for (const route of MUTATING_ROUTES) {
     const source = readFileSync(new URL(route, import.meta.url), "utf8");
     expect(source).toContain("isSameOrigin(request)");
+  }
+});
+
+test("receipt uploads are rate limited before storage", () => {
+  const limit = PAY.indexOf('checkRateLimit(admin, "receipt"');
+  const upload = PAY.indexOf('.from("receipts")');
+
+  expect(limit).toBeGreaterThan(-1);
+  expect(upload).toBeGreaterThan(-1);
+  expect(limit).toBeLessThan(upload);
+});
+
+test("both code redemption surfaces rate limit before the database call", () => {
+  for (const source of [ACTIVITY, PAY]) {
+    const limit = source.indexOf('checkRateLimit(admin, "redeem"');
+    const redeem = source.indexOf("redeemDewCode(");
+
+    expect(limit).toBeGreaterThan(-1);
+    expect(redeem).toBeGreaterThan(-1);
+    expect(limit).toBeLessThan(redeem);
   }
 });
 

@@ -22,26 +22,30 @@ function action(name: string, next: string): string {
   return actions.slice(at(actions, `export async function ${name}(`), at(actions, `export async function ${next}(`));
 }
 
-test("trash releases the sandbox after the chat is marked deleted", () => {
+test("trash proves ownership before releasing the sandbox", () => {
   const trash = action("trashChat", "restoreChat");
 
   expect(at(trash, "deleted_at: new Date().toISOString()")).toBeLessThan(
-    at(trash, "trashChatSandbox(chatId)")
+    at(trash, '.select("id")')
   );
+  expect(at(trash, '.select("id")')).toBeLessThan(at(trash, "trashChatSandbox(chatId)"));
+  expect(trash).toContain('if (!trashed) fail("That chat no longer exists.")');
 });
 
-test("purge wipes the environment before deleting the chat row", () => {
+test("purge proves the row is owned and trashed before touching the environment", () => {
   const purge = action("purgeChat", "emptyTrash");
 
-  expect(at(purge, "wipeChatSandbox(chatId)")).toBeLessThan(at(purge, '.from("chats")'));
-  expect(purge).toContain('.delete()');
+  expect(at(purge, '.select("id")')).toBeLessThan(at(purge, "wipeChatSandbox(chatId)"));
+  expect(at(purge, "wipeChatSandbox(chatId)")).toBeLessThan(at(purge, '.delete()'));
+  expect(purge).toContain('if (!trashed) fail("That chat is not in the trash.")');
 });
 
-test("empty trash collects ids before deleting, then wipes each", () => {
+test("empty trash deletes only the ids it wiped", () => {
   const empty = actions.slice(at(actions, "export async function emptyTrash("));
 
   expect(at(empty, '.select("id")')).toBeLessThan(at(empty, "wipeChatSandboxes("));
   expect(at(empty, "wipeChatSandboxes(")).toBeLessThan(at(empty, ".delete()"));
+  expect(empty).toContain('.in("id", ids)');
 });
 
 test("a wipe marks the row wiping before asking the provider", () => {

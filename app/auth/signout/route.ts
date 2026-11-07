@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSameOrigin } from "@/lib/http/origin";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
@@ -7,6 +8,13 @@ import { supabaseServer } from "@/lib/supabase/server";
  * The redirect is a 303 so the browser follows it with a GET.
  */
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "That request came from another origin." },
+      { status: 403 }
+    );
+  }
+
   const supabase = await supabaseServer();
   await supabase?.auth.signOut();
 

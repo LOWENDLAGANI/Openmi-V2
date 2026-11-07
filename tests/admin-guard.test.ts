@@ -74,7 +74,8 @@ test("receipts are stored privately before the request is written", () => {
   expect(insertAt).toBeGreaterThan(uploadAt);
   expect(PAY_ACTIONS).toContain(".remove([path])");
   expect(PAY_ACTIONS).toContain("MAX_BYTES");
-  expect(PAY_ACTIONS).toContain("image/png");
+  expect(PAY_ACTIONS).toContain("RECEIPT_TYPES");
+  expect(PAY_ACTIONS).toContain("receiptBytesMatchType");
 });
 
 test("the status route is uncacheable and tells the truth about the session", () => {

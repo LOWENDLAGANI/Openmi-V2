@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { safeNextPath } from "@/lib/http/next-path";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
@@ -10,10 +11,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const requested = url.searchParams.get("next") ?? "/chat";
-
-  const next =
-    requested.startsWith("/") && !requested.startsWith("//") ? requested : "/chat";
+  const next = safeNextPath(url.searchParams.get("next"), url.origin);
 
   if (code) {
     const supabase = await supabaseServer();

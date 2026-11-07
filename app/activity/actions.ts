@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 
 import { normalizeTimezone } from "@/lib/dew";
 import { redeemDewCode } from "@/lib/dew/store";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 async function acting() {
   const session = await getSession();
@@ -41,13 +43,22 @@ export async function saveTimezone(formData: FormData) {
 }
 
 export async function redeemCode(formData: FormData) {
-  const { supabase } = await acting();
+  const { user } = await acting();
   const code = field(formData, "code");
 
   if (code.length === 0) fail("Enter a code first.");
   if (code.length > 64) fail("That code is too long.");
 
-  const result = await redeemDewCode(supabase, code);
+  const admin = supabaseAdmin();
+  if (!admin) fail("Code redemption needs the server database connection.");
+
+  // A code is a bearer value, so attempts are counted before one is looked up.
+  const limited = await checkRateLimit(admin, "redeem", user.id);
+  if (!limited.allowed) {
+    fail(`Too many code attempts. Try again in ${limited.retryAfterSeconds} seconds.`);
+  }
+
+  const result = await redeemDewCode(admin, user.id, code);
 
   if (!result.ok) fail(result.error);
 

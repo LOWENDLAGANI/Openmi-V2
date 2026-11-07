@@ -79,15 +79,11 @@ beforeAll(async () => {
   ]);
 
   // The trial is paid on first use now, so the test pays it the way the app
-  // does before it measures the reservation.
-  await db.query("select set_config('request.jwt.claims', $1, false)", [
-    JSON.stringify({ sub: OWNER, role: "authenticated" }),
-  ]);
-  await db.exec("set role authenticated");
-  await db.query("select public.grant_trial_dew($1)", [
+  // does before it measures the reservation. The grant is a service-role call.
+  await db.query("select public.grant_trial_dew($1, $2)", [
+    OWNER,
     "execution-test-address-01",
   ]);
-  await db.exec("reset role");
 });
 
 afterAll(async () => {
