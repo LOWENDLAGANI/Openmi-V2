@@ -126,13 +126,13 @@ test("the egress allowlist is sent only to a restricted sandbox", () => {
     "utf8"
   );
 
-  // On a restricted sandbox the list REPLACES the platform's default, so it has
-  // to be the whole allowlist. `off` and `open` ignore the field, and sending it
-  // there would imply a policy that is not being applied.
-  expect(provider).toContain("allowDomainsOption()");
-  expect(provider).toContain("allowDomains: [...EXEC_ALLOWED_DOMAINS]");
-  expect(provider).toContain('executionNetworkMode() === "restricted"');
-  expect(provider).toContain("...allowDomainsOption()");
+  // E2B's `allowOut` accepts hostnames, so the enumerated list is the whole of
+  // what an install may reach. `off` and `open` must not send it: one has no
+  // network, and the other would imply a policy that is not being applied.
+  expect(provider).toContain("networkOption()");
+  expect(provider).toContain("allowOut: [...EXEC_ALLOWED_DOMAINS]");
+  expect(provider).toContain('mode === "restricted"');
+  expect(provider).toContain("...networkOption()");
 });
 
 test("a terminal run with nothing charged does not read as still pending", () => {

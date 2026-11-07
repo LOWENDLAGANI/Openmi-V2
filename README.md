@@ -343,14 +343,14 @@ These need a real project and token, so they are steps rather than specs:
 ## Sandbox verification
 
 A ready changeset can be installed and built on a real Linux workspace in an
-[orkestr](https://orkestr.eu) sandbox. The card starts the build on its own,
+[E2B](https://e2b.dev) sandbox. The card starts the build on its own,
 and a failing build gets up to two model repair passes before it is reported;
 **Install and build** stays available as a manual re-run. The run seeds a copy
 of the repository at the pinned commit, writes the accepted files into it, runs
 the command the runner detected from the lockfile and `package.json`, and
 records the exit code, the duration and the output tail.
 
-- With no `ORKESTR_API_KEY`, the button is disabled and the card says execution
+- With no `E2B_API_KEY`, the button is disabled and the card says execution
   is not configured. Nothing else in the product depends on it.
 - Every sentence comes from a stored row. A run that stops reporting says so; a
   timed-out run says it timed out; a build that exits non-zero says that.
@@ -359,12 +359,14 @@ records the exit code, the duration and the output tail.
   cannot write to GitHub. Approval is still the only write path, and it still
   only opens an `openmi/agent/` branch.
 - Egress is deny-by-default: `EXEC_NETWORK_MODE=restricted` (the default) sends
-  the enumerated allowlist from `lib/execution/commands.ts`, which *replaces* the
-  platform's own list — an install reaches a registry and nothing else. `open`
-  reaches any host; `off` cannot install at all.
-- The sandbox boots from `EXECUTION_TEMPLATE` (default `node-22`) at
-  `EXECUTION_SIZE` (default `medium`, 2 vCPU / 4 GiB). A repository that needs
-  bun or pnpm preinstalled wants a custom `tmpl_` template.
+  the enumerated host list from `lib/execution/commands.ts` as E2B's network
+  `allowOut`, so an install reaches a registry and nothing else. `open` reaches
+  any host; `off` takes the sandbox off the network, so no install can run.
+- The sandbox boots from `EXECUTION_TEMPLATE` (default E2B's `base`) and runs as
+  the template's `user`, whose home `/home/user` is the only writable root the
+  file API writes into. The repository lives in
+  `/home/user/openmi-workspace`; CPU and memory come from the template, so a
+  repository that needs bun or pnpm preinstalled wants a custom one.
 - A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.
@@ -392,9 +394,9 @@ message that never runs a command still creates nothing.
   UTC — the most often a Hobby-plan cron may run — `Authorization: Bearer
   $CRON_SECRET`, `?dry=1` to preview) enforces the deadlines, stops idle boxes,
   and destroys labelled containers that no row points at. Without `CRON_SECRET`
-  it returns 503 and does nothing. The provider's own idle-stop, auto-delete and
-  TTL timers keep running at their real intervals in between, and every
-  workspace open cleans up its own rows, so the daily run is reconciliation
+  it returns 503 and does nothing. The provider's own timeout still ends a box
+  between runs, and every workspace open cleans up its own rows, so the daily
+  run is reconciliation
   rather than the primary clock. Point any external scheduler at the route with
   the same bearer header if you want the tighter cadence.
 

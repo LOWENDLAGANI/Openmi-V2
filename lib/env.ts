@@ -188,11 +188,11 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Upstash Redis REST token",
   },
   {
-    key: "ORKESTR_API_KEY",
+    key: "E2B_API_KEY",
     scope: "server",
     required: false,
     unlocks: "Sandbox verification (install + build on a real Linux workspace)",
-    hint: "orkestr console → Settings → API tokens, scoped sandboxes:read + sandboxes:write; runs stay off until this is set",
+    hint: "E2B dashboard → API keys; runs stay off until this is set",
   },
   {
     key: "EXECUTION_ENABLED",
@@ -206,14 +206,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "The sandbox image runs start from",
-    hint: "Defaults to node-22; also python-3.12, debian-12, ubuntu-24.04, or a tmpl_ id with bun baked in",
-  },
-  {
-    key: "EXECUTION_SIZE",
-    scope: "server",
-    required: false,
-    unlocks: "How much machine a sandbox gets",
-    hint: "Defaults to medium (2 vCPU, 4 GiB), the shape the Dew rate was computed on; free keys are limited to small",
+    hint: "Defaults to E2B's base template; a custom image with bun or pnpm baked in is set by its name or id",
   },
   {
     key: "EXEC_NETWORK_MODE",
@@ -234,7 +227,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Chat-scoped sandboxes (set to \"off\" to fall back to one box per message)",
-    hint: "Defaults to on; only takes effect when ORKESTR_API_KEY is set",
+    hint: "Defaults to on; only takes effect when E2B_API_KEY is set",
   },
   {
     key: "CHAT_SANDBOX_IDLE_MINUTES",
@@ -338,7 +331,7 @@ export function readEnvReport(
 export function executionConfigured(
   env: Record<string, string | undefined> = process.env
 ): boolean {
-  const key = (env.ORKESTR_API_KEY ?? "").trim();
+  const key = (env.E2B_API_KEY ?? "").trim();
   if (key.length === 0) return false;
 
   const flag = (env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
@@ -355,12 +348,9 @@ export function serverEnv() {
     githubTokenKey: process.env.GITHUB_TOKEN_KEY ?? null,
     githubOauthClientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? null,
     githubOauthClientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? null,
-    orkestrApiKey: process.env.ORKESTR_API_KEY ?? null,
-    orkestrApiUrl: process.env.ORKESTR_API_URL ?? null,
-    orkestrRegion: process.env.ORKESTR_REGION ?? null,
+    e2bApiKey: process.env.E2B_API_KEY ?? null,
     executionEnabled: process.env.EXECUTION_ENABLED ?? null,
     executionTemplate: process.env.EXECUTION_TEMPLATE ?? null,
-    executionSize: process.env.EXECUTION_SIZE ?? null,
     executionNetworkMode: process.env.EXEC_NETWORK_MODE ?? null,
     execMissionMinutes: process.env.EXEC_MISSION_MINUTES ?? null,
     chatSandboxEnabled: process.env.CHAT_SANDBOX_ENABLED ?? null,

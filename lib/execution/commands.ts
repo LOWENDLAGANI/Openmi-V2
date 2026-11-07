@@ -31,20 +31,22 @@ export const EXEC_MAX_FILES = 40;
 export const EXEC_MAX_PATCH_BYTES = 400_000;
 
 /**
- * Absolute, because the file API only writes under a writable root and `/workspace`
- * is the one every template has. It is deliberately not a subdirectory of the
- * home: an image that changes its home must not move the workspace.
+ * Absolute, because the file API writes as the sandbox user and its home is the
+ * writable root. E2B runs as `user` with `/home/user` as both the home and the
+ * default working directory, so the repository lives inside that home rather
+ * than at `/workspace`, which the sandbox user cannot create.
  */
-export const EXEC_WORKDIR = "/workspace/openmi-workspace";
+export const EXEC_WORKDIR = "/home/user/openmi-workspace";
 
 /**
  * The template the runner asks for when none is configured.
  *
- * `node-22` is the JavaScript-first default, which matches what the detected
- * commands in this file install. A repository that needs bun or pnpm baked in
- * wants a custom `tmpl_` template instead of an install at boot.
+ * E2B's `base` image is the JavaScript-first default this file assumes: node,
+ * npm and git are present, which is what the lockfile-driven installs below
+ * need. A repository that needs bun or pnpm baked in wants a custom template
+ * instead of an install at boot.
  */
-export const DEFAULT_TEMPLATE = "node-22";
+export const DEFAULT_TEMPLATE = "base";
 
 /**
  * The longest lifetime the provider accepts: 24 h, on an account with a card.
@@ -53,16 +55,17 @@ export const DEFAULT_TEMPLATE = "node-22";
  */
 export const EXEC_MAX_TIMEOUT_SECONDS = 86_400;
 
-/** What a key without a card on file accepts. One retry falls back to this. */
-export const EXEC_FREE_TIER_TIMEOUT_SECONDS = 1_800;
+/** What a key on the free plan accepts. One retry falls back to this. */
+export const EXEC_FREE_TIER_TIMEOUT_SECONDS = 3_600;
 
 /**
  * Hosts an install is allowed to reach. Deny-by-default: the provider enforces
  * this at the network layer, so a `postinstall` script cannot post a token
  * anywhere even though it runs as arbitrary code.
  *
- * Sent on every restricted sandbox, where it *replaces* the platform's default
- * list rather than extending it — so anything an install needs has to be here.
+ * Sent as E2B's `allowOut` on every restricted sandbox. It accepts hostnames,
+ * so this list is the whole of what an install may reach — anything missing
+ * here fails at the network, not later in a build log.
  */
 export const EXEC_ALLOWED_DOMAINS: readonly string[] = [
   "registry.npmjs.org",

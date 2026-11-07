@@ -10,10 +10,10 @@ import { readFileSync } from "node:fs";
  * idle park, and a box that auto-resumed when it should not would outlive the run
  * that owns it.
  *
- * These moved with the provider when it went from Daytona to orkestr. The
- * product decisions are unchanged; the vocabulary they are expressed in is not.
- * Daytona had `ephemeral` and `autoStopInterval`/`autoDeleteInterval`; orkestr
- * has `onTimeout` and `autoResume`, and its own pause/resume is the stop/start.
+ * These moved with the provider when it went from Daytona to orkestr and then
+ * to E2B. The product decisions are unchanged; the vocabulary they are
+ * expressed in is not. E2B has `lifecycle.onTimeout` and `autoResume`, and its
+ * `pause`/`connect` pair is the stop/start.
  */
 
 const provider = readFileSync(
@@ -73,8 +73,8 @@ test("the provider gets the backstops a persistent box needs", () => {
   // A parked box wakes on its own next command, so a message that arrives after
   // a night of silence does not have to know it was parked.
   expect(chat).toContain("autoResume: true");
-  expect(chat).toContain("timeoutSeconds");
-  expect(chat).toContain("boundedTimeoutSeconds(ttl * 60)");
+  expect(chat).toContain("timeoutMs");
+  expect(chat).toContain("boundedTimeoutMs(ttl * 60)");
 
   // A key without a card caps a box at 30 minutes, so the create is retried once
   // at the ceiling every tier accepts rather than failing chat workspaces on a
@@ -94,9 +94,9 @@ test("the handle can start, stop, refresh TTL and read a live state", () => {
   const handle = bodyOf("function handleFor", "export async function createSandbox");
 
   expect(handle).toContain("state()");
-  expect(handle).toContain("current.refresh()");
+  expect(handle).toContain("current.getInfo()");
   expect(handle).toContain("start(");
-  expect(handle).toContain("Sandbox.resume(");
+  expect(handle).toContain("Sandbox.connect(");
   expect(handle).toContain("stop(");
   expect(handle).toContain("current.pause()");
   expect(handle).toContain("setTtl(minutes)");
@@ -110,7 +110,7 @@ test("the handle can start, stop, refresh TTL and read a live state", () => {
 test("a missing box is recoverable, and only an attach may say so", () => {
   expect(provider).toContain('SandboxStartError("missing"');
   expect(provider).toContain('context === "attach"');
-  expect(provider).toContain("SandboxNotFound");
+  expect(provider).toContain("NotFoundError");
   expect(provider).toContain('classifyStartError(caught, "attach")');
   expect(provider).toContain('classifyStartError(caught, "create")');
 });
@@ -125,10 +125,11 @@ test("unknown provider states are not mistaken for a wipeable box", () => {
 });
 
 test("a workspace-relative path reaches the file API absolute", () => {
-  // The callers above name paths the way a shell sees them; the file API only
-  // writes under /workspace. One adapter, not a rewrite of every caller.
+  // The callers above name paths the way a shell sees them; E2B writes as the
+  // sandbox user, whose home is /home/user. One adapter, not a rewrite of every
+  // caller.
   expect(provider).toContain("function absolutePath(");
-  expect(provider).toContain('const WORKSPACE_ROOT = "/workspace"');
+  expect(provider).toContain('const WORKSPACE_ROOT = "/home/user"');
   expect(provider).toContain("absolutePath(cwd ?? EXEC_WORKDIR)");
   expect(provider).toContain("absolutePath(remotePath)");
 });

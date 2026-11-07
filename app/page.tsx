@@ -13,13 +13,13 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Openmi — the repo agent that shows its work",
   description:
-    "Give the agent a goal. It runs the commands in a fresh Linux sandbox, shows every step live, and hands back a diff. Nothing reaches your default branch until you approve it.",
+    "Give the agent a goal. It runs the commands in an isolated Linux workspace, shows every step live, and hands back a diff. Nothing reaches your default branch until you approve it.",
 };
 
 const STEPS = ["Pick a repository", "Give it a goal", "Review and ship"];
 
 const SECURITY = [
-  "Ephemeral sandbox",
+  "Isolated Linux sandbox",
   "No platform keys",
   "Agent branches only",
   "Private by default",

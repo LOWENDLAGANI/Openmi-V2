@@ -27,7 +27,7 @@ const DOES = [
 ];
 
 const DOES_NOT = [
-  "It runs install and build commands in a fresh sandbox. It does not run your test suite or start a preview server.",
+  "It runs commands in a disposable Linux sandbox, including a dev server you start. It does not run your test suite as a verification step, and a background process you start stops with the box.",
   "It does not write to the default branch. The write client refuses it, and a test asserts the refusal.",
   "It does not merge pull requests, push to a protected branch or clean up branches.",
   "It does not generate a project from nothing, and there is no guest mode.",

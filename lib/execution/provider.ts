@@ -1,18 +1,13 @@
 import "server-only";
 
 import {
-  AuthError,
-  ExecTimeout,
-  FleetFull,
-  OrkestrError,
-  PlanLimitError,
+  AuthenticationError,
+  CommandExitError,
+  NotFoundError,
   RateLimitError,
   Sandbox,
-  SandboxNotFound,
-  SandboxNotReady,
-  type NetworkMode,
-  type SandboxSize,
-} from "orkestr";
+  TimeoutError,
+} from "e2b";
 
 import { executionConfigured } from "@/lib/env";
 
@@ -32,26 +27,27 @@ import { EXEC_MAX_MINUTES } from "./cost";
  *
  * Everything the product knows about the sandbox provider goes through the small
  * handle below, so the rest of the codebase is testable without the dependency
- * and a provider swap is one file. This file is that swap: Daytona in, orkestr
- * out, with every caller untouched.
+ * and a provider swap is one file. This file is that swap: Daytona, then
+ * orkestr, now E2B, with every caller untouched.
  *
- * Three callers now: a verification run (create, use, destroy inside one
- * function), a mission (create once, `attachSandbox` on every later tick), and a
- * chat environment (create once per chat, parked when idle and woken on the next
+ * Three callers: a verification run (create, use, destroy inside one function),
+ * a mission (create once, `attachSandbox` on every later tick), and a chat
+ * environment (create once per chat, parked when idle and woken on the next
  * message). The handle is identical, so the tools cannot tell which one they are
  * in; the factories are separate so a persistent box is never created by
  * forgetting a flag.
  *
- * Two vocabulary differences are worth knowing when reading this file:
+ * Two differences from the previous provider are worth knowing when reading
+ * this file:
  *
- *   - orkestr has no `stop`. `pause()` snapshots the box and releases compute,
- *     which is exactly the "stopped, disk kept" state the chat lifecycle wants,
- *     and `Sandbox.resume(id)` is the way back. So `stop`/`start` map onto
- *     pause/resume and nothing above this file changed.
- *   - orkestr has no archive tier and no "delete N minutes after stop". Its
- *     backstops are `onTimeout` (kill or park at the deadline) and the shared
- *     snapshot retention cap. The per-chat deadline is still enforced by our own
- *     sweep, which is the authority either way.
+ *   - E2B's sandbox user is `user` with `/home/user` as the home and the default
+ *     working directory, not `/workspace`. The file API writes as that user, so
+ *     `/workspace` is not writable and must not be used as the root. Everything
+ *     relative resolves against `/home/user`, and the repository lives in
+ *     `/home/user/openmi-workspace`.
+ *   - `pause()` snapshots the box and releases compute; `Sandbox.connect(id)`
+ *     resumes a paused box automatically. So `stop`/`start` map onto
+ *     pause/connect and nothing above this file changed. Deletion is `kill()`.
  */
 
 export { executionConfigured };
@@ -63,75 +59,60 @@ export function executionTemplate(): string {
 }
 
 /**
- * The machine size. `medium` is 2 vCPU / 4 GiB, the same shape the Dew rate in
- * `cost.ts` was computed on, so the default keeps the price honest.
- */
-export function executionSize(): SandboxSize {
-  const configured = (process.env.EXECUTION_SIZE ?? "").trim().toLowerCase();
-  if (configured === "small" || configured === "large") return configured;
-  return "medium";
-}
-
-/**
  * Egress.
  *
- * `restricted` is the default because an install is the whole point of a run and
- * `off` cannot reach a registry. Under `restricted`, `allowDomains` **replaces**
- * the platform's own default list, so the enumerated list in `commands.ts` is
- * sent with every create: the hosts an install may reach are the ones this
- * repository can read, not the platform's current defaults. `open` is for an
- * operator who wants arbitrary egress and understands why that is a different
- * product.
+ * `restricted` is the default because an install is the whole point of a run.
+ * E2B's `allowOut` accepts hostnames, so the enumerated list in `commands.ts`
+ * is sent as-is: an install reaches a registry and the GitHub endpoints it
+ * needs, and nothing else. `off` takes the sandbox off the network entirely,
+ * and `open` leaves E2B's default in place.
  */
-export function executionNetworkMode(): NetworkMode {
+export function executionNetworkMode(): "off" | "restricted" | "open" {
   const configured = (process.env.EXEC_NETWORK_MODE ?? "").trim().toLowerCase();
   if (configured === "off" || configured === "open") return configured;
   return "restricted";
 }
 
 /** The one place the allowlist is attached, so `off`/`open` never send it. */
-function allowDomainsOption(): { allowDomains?: string[] } {
-  return executionNetworkMode() === "restricted"
-    ? { allowDomains: [...EXEC_ALLOWED_DOMAINS] }
-    : {};
+function networkOption():
+  | { network: { allowOut: string[] } }
+  | { allowInternetAccess: false }
+  | Record<string, never> {
+  const mode = executionNetworkMode();
+
+  if (mode === "off") return { allowInternetAccess: false };
+  if (mode === "restricted") {
+    return { network: { allowOut: [...EXEC_ALLOWED_DOMAINS] } };
+  }
+
+  return {};
 }
 
 /**
  * Credentials, per call.
  *
- * Passed explicitly rather than through `setDefaultClient`, so a process that
- * also runs the orkestr CLI or an agent never inherits a different client. The
- * token is `ORKESTR_API_KEY` and should be scoped to `sandboxes:read` and
- * `sandboxes:write`: a sandbox-scoped token cannot reach the rest of the account
- * if it leaks out of a stack trace.
+ * Passed explicitly rather than relying on the process-wide default, so a
+ * process that also uses the E2B CLI or another agent never inherits a
+ * different client. The key is `E2B_API_KEY` and should be a team key scoped to
+ * sandboxes: a leaked key with no project scope cannot deploy anything.
  */
-function clientOptions(): { apiKey?: string; baseUrl?: string } {
-  const apiKey = process.env.ORKESTR_API_KEY?.trim() ?? "";
-  const baseUrl = process.env.ORKESTR_API_URL?.trim() ?? "";
-
-  return {
-    ...(apiKey.length > 0 ? { apiKey } : {}),
-    ...(baseUrl.length > 0 ? { baseUrl } : {}),
-  };
-}
-
-function regionOption(): { region?: string } {
-  const region = process.env.ORKESTR_REGION?.trim() ?? "";
-  return region.length > 0 ? { region } : {};
+function clientOptions(): { apiKey?: string } {
+  const apiKey = process.env.E2B_API_KEY?.trim() ?? "";
+  return apiKey.length > 0 ? { apiKey } : {};
 }
 
 /**
- * The workspace root every template has, and the parent of every path below.
- * Absolute because the file API writes only under a writable root and exec's
- * default directory is not ours to assume.
+ * The home directory of the sandbox user, and the only place the file API
+ * writes. E2B runs commands as `user` with this as the default cwd; a
+ * repository under `/workspace` would fail to be written at all.
  */
-const WORKSPACE_ROOT = "/workspace";
+const WORKSPACE_ROOT = "/home/user";
 
 /**
  * The callers above name workspace paths the way a shell sees them — `openmi-workspace`,
  * `.openmi/env.json`, `.` — because that is what `mkdir` and `cd` take. The file
- * API wants an absolute path under a writable root, so this is the one place the
- * two vocabularies meet. An absolute path is passed through untouched.
+ * API wants an absolute path, so this is the one place the two vocabularies
+ * meet. An absolute path is passed through untouched.
  */
 function absolutePath(path: string): string {
   const trimmed = path.trim();
@@ -145,16 +126,13 @@ function absolutePath(path: string): string {
 /**
  * A wall-clock ceiling the provider will accept.
  *
- * orkestr caps `timeoutSeconds` by plan: 30 minutes on a key without a card,
- * 24 hours with one. Sending a two-day chat TTL to a free key fails the create
- * outright, so the ceiling is clamped to the paid maximum and the free-tier
+ * E2B caps a sandbox at 24 hours on a plan with a card and one hour without
+ * one, so the ceiling is clamped to the paid maximum and the free-tier
  * constant is what a retry falls back to.
  */
-function boundedTimeoutSeconds(seconds: number): number {
-  return Math.min(
-    EXEC_MAX_TIMEOUT_SECONDS,
-    Math.max(60, Math.trunc(seconds))
-  );
+function boundedTimeoutMs(seconds: number): number {
+  const clamped = Math.min(EXEC_MAX_TIMEOUT_SECONDS, Math.max(60, Math.trunc(seconds)));
+  return clamped * 1000;
 }
 
 export type ExecResult = {
@@ -192,38 +170,33 @@ export type SandboxState =
   | "unknown";
 
 /**
- * orkestr's statuses (`starting | running | pausing | paused | resuming |
- * terminated | failed`) read into the vocabulary the rest of the codebase was
- * written against. `terminated` becomes `deleted` because that is what it means
- * here: the disk is gone, so the row cannot be resumed.
+ * E2B reports `running` or `paused`. A box that is unreachable or gone surfaces
+ * as an error from `getInfo` rather than as a state, so `unknown` is what the
+ * caller sees between the two and neither is read as "gone".
  */
 function normalizeState(value: unknown): SandboxState {
   const state = typeof value === "string" ? value.trim().toLowerCase() : "";
 
   switch (state) {
-    case "starting":
-    case "pausing":
+    case "running":
+    case "started":
+      return "started";
     case "paused":
+      return "paused";
+    case "pausing":
     case "resuming":
       return state;
-    case "running":
-      return "started";
-    case "terminated":
     case "deleted":
+    case "terminated":
       return "deleted";
-    case "failed":
     case "error":
+    case "failed":
       return "error";
-    case "creating":
+    case "starting":
     case "pending":
-    case "pending_build":
-    case "building_snapshot":
-    case "pulling_snapshot":
-    case "restoring":
-      // Not ready yet, but not broken: the caller should wait, not destroy.
+    case "creating":
       return "pending";
     default:
-      // A state this build has never heard of is never read as "gone".
       return "unknown";
   }
 }
@@ -238,11 +211,7 @@ export type SandboxHandle = {
   readBytes: (remotePath: string, maxBytes?: number) => Promise<Buffer>;
   /** The provider's current state, refreshed rather than remembered. */
   state: () => Promise<SandboxState>;
-  /**
-   * Boots a paused box; a no-op for a running one. The timeout argument is kept
-   * for the callers that pass one; orkestr's resume has no timeout knob, and the
-   * wall-clock ceiling is `setTtl`.
-   */
+  /** Boots a paused box; a no-op for a running one. */
   start: (timeoutSeconds?: number) => Promise<void>;
   /** Releases compute and keeps the filesystem. Never deletes. */
   stop: (options?: { force?: boolean }) => Promise<void>;
@@ -264,6 +233,16 @@ export class SandboxStartError extends Error {
   }
 }
 
+function statusOf(caught: unknown): number | null {
+  if (caught instanceof NotFoundError) return 404;
+  if (caught instanceof AuthenticationError) return 401;
+  if (caught instanceof RateLimitError) return 429;
+  if (caught instanceof TimeoutError) return 408;
+
+  const status = (caught as { statusCode?: unknown } | null)?.statusCode;
+  return typeof status === "number" ? status : null;
+}
+
 /**
  * A provider failure, classified once so callers do not parse English.
  *
@@ -279,19 +258,14 @@ function classifyStartError(
   const message =
     caught instanceof Error ? caught.message : "The sandbox could not be started.";
 
-  const status =
-    caught instanceof OrkestrError && typeof caught.statusCode === "number"
-      ? caught.statusCode
-      : typeof (caught as { statusCode?: unknown } | null)?.statusCode === "number"
-        ? (caught as { statusCode: number }).statusCode
-        : null;
+  const status = statusOf(caught);
 
   if (
     context === "attach" &&
-    (caught instanceof SandboxNotFound ||
+    (caught instanceof NotFoundError ||
       status === 404 ||
       status === 410 ||
-      /not found|no such sandbox|does not exist|already deleted|has been deleted|terminated/i.test(
+      /not found|no such sandbox|does not exist|already deleted|has been deleted|terminated|not running/i.test(
         message
       ))
   ) {
@@ -300,24 +274,22 @@ function classifyStartError(
 
   if (
     caught instanceof RateLimitError ||
-    caught instanceof PlanLimitError ||
-    caught instanceof FleetFull ||
     status === 429 ||
     status === 503 ||
-    /429|rate.?limit|quota|too many requests|fleet is full|plan limit/i.test(message)
+    /429|rate.?limit|quota|too many requests|plan limit|concurr/i.test(message)
   ) {
     return new SandboxStartError("quota", message);
   }
 
   if (
-    caught instanceof AuthError ||
+    caught instanceof AuthenticationError ||
     status === 401 ||
     status === 403 ||
-    /401|403|unauthor|forbidden|api.?key|missing_?scope|scope/i.test(message)
+    /401|403|unauthor|forbidden|api.?key|invalid key/i.test(message)
   ) {
     return new SandboxStartError(
       "not_configured",
-      `Orkestr rejected the configured key: ${message}`
+      `E2B rejected the configured key: ${message}`
     );
   }
 
@@ -329,55 +301,59 @@ function classifyStartError(
  * A mission reattaches on every tick; a verification run never does, and neither
  * difference is visible above this function.
  *
- * `current` is mutable on purpose: resuming may hand back a box on a different
+ * `current` is mutable on purpose: connecting may hand back a box on a different
  * host, so every later call has to go through the newest instance.
  */
 function handleFor(initial: Sandbox, id: string): SandboxHandle {
   let current = initial;
 
+  const combined = (stdout: string, stderr: string): string =>
+    stderr.length === 0
+      ? stdout
+      : stdout.length === 0 || stdout.endsWith("\n")
+        ? `${stdout}${stderr}`
+        : `${stdout}\n${stderr}`;
+
   return {
     id,
     async exec(command, cwd, timeoutMs) {
       const startedAt = Date.now();
-      const limitSeconds = Math.max(
-        5,
-        Math.ceil((timeoutMs ?? EXEC_STEP_TIMEOUT_MS) / 1000)
-      );
+      const limitMs = Math.max(5_000, timeoutMs ?? EXEC_STEP_TIMEOUT_MS);
 
-      // The provider runs the string through a shell, which is why the callers
-      // above can send `a && b` chains. No `bash -c` wrapper: the image is ours
-      // to pick and the shell is the platform's.
-      try {
-        const response = await current.exec(command, {
-          cwd: absolutePath(cwd ?? EXEC_WORKDIR),
-          timeoutSeconds: limitSeconds,
-        });
-
-        const combined =
-          response.stderr.length === 0
-            ? response.stdout
-            : response.stdout.length === 0 || response.stdout.endsWith("\n")
-              ? `${response.stdout}${response.stderr}`
-              : `${response.stdout}\n${response.stderr}`;
-
-        const tail = tailOf(combined);
+      const result = (exitCode: number, stdout: string, stderr: string): ExecResult => {
+        const tail = tailOf(combined(stdout, stderr));
 
         return {
           command,
-          exitCode: response.exitCode,
+          exitCode,
           output: tail.text,
           truncated: tail.truncated,
-          durationMs:
-            typeof response.durationMs === "number"
-              ? response.durationMs
-              : Date.now() - startedAt,
+          durationMs: Date.now() - startedAt,
           timedOut: false,
         };
+      };
+
+      // E2B runs the string through a shell, which is why the callers above can
+      // send `a && b` chains. No `bash -c` wrapper: the image is ours to pick
+      // and the shell is the platform's.
+      try {
+        const response = await current.commands.run(command, {
+          cwd: absolutePath(cwd ?? EXEC_WORKDIR),
+          timeoutMs: limitMs,
+        });
+
+        return result(response.exitCode, response.stdout ?? "", response.stderr ?? "");
       } catch (caught) {
+        // A non-zero exit is information, not a provider failure: the card and
+        // the model both need the code and the output, not an exception.
+        if (caught instanceof CommandExitError) {
+          return result(caught.exitCode, caught.stdout ?? "", caught.stderr ?? "");
+        }
+
         const message =
           caught instanceof Error ? caught.message : "The command could not run.";
         const timedOut =
-          caught instanceof ExecTimeout || /timeout|timed out|deadline/i.test(message);
+          caught instanceof TimeoutError || /timeout|timed out|deadline/i.test(message);
 
         return {
           command,
@@ -390,90 +366,76 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
       }
     },
     async upload(bytes, remotePath) {
-      await current.files.writeBytes(absolutePath(remotePath), new Uint8Array(bytes));
+      await current.files.write(absolutePath(remotePath), new Uint8Array(bytes));
     },
     async readText(remotePath, maxBytes = 200_000) {
-      // `stat` first: a 16 MiB read is a lot of base64 to throw away, and the
-      // cap is a refusal, not a truncation.
-      const stat = await current.files.stat(absolutePath(remotePath));
+      const text = await current.files.read(absolutePath(remotePath));
 
-      if (!stat.exists) {
-        throw new Error(`${remotePath} is not in the sandbox`);
+      // The read itself is already done; the cap is a refusal, not a
+      // truncation, so a caller never mistakes a cut file for a whole one.
+      if (Buffer.byteLength(text, "utf8") > maxBytes) {
+        throw new Error(`${remotePath} is over the ${maxBytes} byte cap`);
       }
 
-      if (stat.size > maxBytes) {
-        throw new Error(
-          `${remotePath} is ${stat.size} bytes, over the ${maxBytes} byte cap`
-        );
-      }
-
-      return current.files.read(absolutePath(remotePath));
+      return text;
     },
     async readBytes(remotePath, maxBytes = 200_000) {
-      const stat = await current.files.stat(absolutePath(remotePath));
+      const bytes = await current.files.read(absolutePath(remotePath), {
+        format: "bytes",
+      });
 
-      if (!stat.exists) {
-        throw new Error(`${remotePath} is not in the sandbox`);
+      if (bytes.byteLength > maxBytes) {
+        throw new Error(`${remotePath} is over the ${maxBytes} byte cap`);
       }
 
-      if (stat.size > maxBytes) {
-        throw new Error(
-          `${remotePath} is ${stat.size} bytes, over the ${maxBytes} byte cap`
-        );
-      }
-
-      return Buffer.from(await current.files.readBytes(absolutePath(remotePath)));
+      return Buffer.from(bytes);
     },
     async state() {
       try {
-        await current.refresh();
+        const info = await current.getInfo();
+        return normalizeState(info.state);
       } catch {
-        // A transient refresh failure reports the last known state. Turning it
-        // into "missing" would make a healthy box look wipeable.
+        // A transient failure reports the last known state. Turning it into
+        // "missing" would make a healthy box look wipeable.
+        return "unknown";
       }
-
-      return normalizeState(current.status);
     },
     async start() {
       try {
-        await current.refresh();
+        const info = await current.getInfo().catch(() => null);
 
-        const state = normalizeState(current.status);
-        if (state === "started" || state === "starting" || state === "resuming") {
-          return;
-        }
+        if (info && info.state === "running") return;
 
-        current = await Sandbox.resume(id, clientOptions());
+        // Connecting to a paused sandbox resumes it, so a message that arrives
+        // after a night of silence does not have to know it was parked.
+        current = await Sandbox.connect(id, clientOptions());
       } catch (caught) {
         throw classifyStartError(caught, "attach");
       }
     },
     async stop() {
       try {
-        await current.refresh();
+        const info = await current.getInfo().catch(() => null);
 
         // Parked or gone already: the disk is where it was, which is the goal.
-        const state = normalizeState(current.status);
-        if (state === "paused" || state === "deleted") return;
+        if (info && info.state === "paused") return;
 
         await current.pause();
-      } catch (caught) {
-        // A box that is mid-transition refuses the pause. The sweep retries on
-        // the next pass; turning that into a failed stop would mark a healthy
-        // row failed for no reason.
-        if (caught instanceof SandboxNotReady) return;
-        throw caught;
+      } catch {
+        // A plan that cannot snapshot refuses the pause; the wall-clock timeout
+        // is then the backstop. A failed stop must not mark a healthy row
+        // failed, and must never be turned into a delete.
       }
     },
     async setTtl(minutes) {
-      await current.setTimeout(boundedTimeoutSeconds(minutes * 60));
+      await current.setTimeout(Math.max(60_000, Math.round(minutes * 60_000)));
     },
     async destroy() {
       try {
-        await current.terminate();
+        await current.kill();
       } catch {
-        // The deadline and the snapshot retention cap are the backstop. A failed
-        // terminate must not fail the run that already has a real result
+        // The deadline and the provider's own retention are the backstop. A
+        // failed kill must not fail the run that already has a real result
         // recorded.
       }
     },
@@ -501,23 +463,18 @@ export async function createSandbox(
   try {
     sandbox = await Sandbox.create({
       template: executionTemplate(),
-      size: executionSize(),
-      network: executionNetworkMode(),
-      timeoutSeconds: boundedTimeoutSeconds(ttl * 60),
-      // One run, one box: the deadline terminates it. This is the whole of the
-      // old `ephemeral: true` contract in orkestr's vocabulary.
-      onTimeout: "kill",
-      autoResume: false,
+      timeoutMs: boundedTimeoutMs(ttl * 60),
+      // One run, one box: the deadline kills it.
+      lifecycle: { onTimeout: "kill", autoResume: false },
       metadata: { app: "openmi", run: runId, ...(options.labels ?? {}) },
-      ...regionOption(),
-      ...allowDomainsOption(),
+      ...networkOption(),
       ...clientOptions(),
     });
   } catch (caught) {
     throw classifyStartError(caught, "create");
   }
 
-  return handleFor(sandbox, sandbox.id);
+  return handleFor(sandbox, sandbox.sandboxId);
 }
 
 export type ChatSandboxOptions = {
@@ -530,9 +487,9 @@ export type ChatSandboxOptions = {
   /** Stop after this many idle minutes. */
   idleMinutes: number;
   /**
-   * Kept so the env contract does not change. orkestr has no archive tier: a
-   * parked box holds a snapshot, not a disk, so there is nothing to archive and
-   * the value is not sent.
+   * Kept so the env contract does not change. E2B has no archive tier: a parked
+   * box holds a snapshot, not a disk, so there is nothing to archive and the
+   * value is not sent.
    */
   archiveMinutes?: number;
 };
@@ -540,20 +497,20 @@ export type ChatSandboxOptions = {
 /**
  * Creates the one long-lived sandbox a chat owns.
  *
- * It must survive going quiet: the box parks at the deadline instead of dying,
- * and the next command wakes it, so every installed package and every
+ * It must survive going quiet: the box pauses at the deadline instead of dying,
+ * and the next command resumes it, so every installed package and every
  * uncommitted file is still there after a night of silence.
  *
  *   - `onTimeout: "pause"` snapshots at the wall-clock ceiling instead of
- *     terminating, which is the provider-side backstop for a crashed process;
- *   - `autoResume: true` means a message that arrives after the park does not
- *     have to know the box was parked — the first exec wakes it;
+ *     killing, which is the provider-side backstop for a crashed process;
+ *   - `autoResume: true` means a message that arrives after the park is woken
+ *     by the first command, without the caller doing anything;
  *   - the ceiling itself is refreshed on open and close, and clamped to what the
  *     plan accepts.
  *
  * Deletion is ours: `deleteAfter` in the row plus the sweep. The provider's
- * backstop for a row nobody ever looks at again is the paused-snapshot retention
- * cap (7 days free, 30 with a card), not an interval we set.
+ * backstop for a row nobody looks at again is its paused-snapshot retention,
+ * not an interval we set.
  */
 export async function createChatSandbox(
   options: ChatSandboxOptions
@@ -575,49 +532,50 @@ export async function createChatSandbox(
   const idle = Math.max(1, Math.trunc(options.idleMinutes));
   const autoDelete = Math.max(idle + 1, Math.trunc(options.autoDeleteMinutes));
   const ttl = Math.max(autoDelete, Math.trunc(options.ttlMinutes));
-  const requested = boundedTimeoutSeconds(ttl * 60);
 
-  const create = (timeoutSeconds: number) =>
+  const create = (timeoutMs: number) =>
     Sandbox.create({
       template: executionTemplate(),
-      size: executionSize(),
-      network: executionNetworkMode(),
-      timeoutSeconds,
-      onTimeout: "pause",
-      autoResume: true,
+      timeoutMs,
+      lifecycle: { onTimeout: "pause", autoResume: true },
       metadata: {
         app: "openmi",
         kind: "chat",
         chat: options.chatId,
         owner: options.owner.slice(0, 8),
       },
-      ...regionOption(),
-      ...allowDomainsOption(),
+      ...networkOption(),
       ...clientOptions(),
     });
+
+  const requested = boundedTimeoutMs(ttl * 60);
 
   let sandbox: Sandbox;
   try {
     sandbox = await create(requested);
   } catch (caught) {
     const failure = classifyStartError(caught, "create");
+    const freeCeiling = EXEC_FREE_TIER_TIMEOUT_SECONDS * 1000;
 
-    // A key without a card caps a sandbox at 30 minutes. Asking for two days is
-    // still the right default for everyone else, so a plan refusal that names the
-    // lifetime is retried once at the ceiling every tier accepts rather than
-    // leaving chat workspaces unusable on a fresh account.
-    if (failure.failure !== "quota" || requested <= EXEC_FREE_TIER_TIMEOUT_SECONDS) {
+    // A Hobby key caps a sandbox at one hour. Asking for two days is still the
+    // right default for everyone else, so a refusal that is not an auth failure
+    // is retried once at the ceiling every tier accepts rather than leaving
+    // chat workspaces unusable on a fresh account.
+    if (
+      failure.failure === "not_configured" ||
+      requested <= freeCeiling
+    ) {
       throw failure;
     }
 
     try {
-      sandbox = await create(EXEC_FREE_TIER_TIMEOUT_SECONDS);
+      sandbox = await create(freeCeiling);
     } catch (retried) {
       throw classifyStartError(retried, "create");
     }
   }
 
-  return handleFor(sandbox, sandbox.id);
+  return handleFor(sandbox, sandbox.sandboxId);
 }
 
 /**
@@ -625,8 +583,8 @@ export async function createChatSandbox(
  *
  * This is what makes a mission longer than one request: the row holds the id,
  * the workspace lives in the sandbox, and every tick gets a fresh handle to the
- * same box. A sandbox terminated by its deadline makes this throw, which the
- * caller records as `sandbox_expired` rather than retrying forever.
+ * same box. Connecting also resumes a paused box, so a resumed tick needs no
+ * special case.
  */
 export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
   if (!executionConfigured()) {
@@ -638,12 +596,12 @@ export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
 
   let sandbox: Sandbox;
   try {
-    sandbox = await Sandbox.get(sandboxId, clientOptions());
+    sandbox = await Sandbox.connect(sandboxId, clientOptions());
   } catch (caught) {
     throw classifyStartError(caught, "attach");
   }
 
-  return handleFor(sandbox, sandbox.id ?? sandboxId);
+  return handleFor(sandbox, sandbox.sandboxId ?? sandboxId);
 }
 
 /**
@@ -652,7 +610,7 @@ export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
  * The ordinary `destroy()` swallows failures because a run that already has a
  * result must not fail on teardown. The sweep needs the opposite: a row is only
  * deleted once the provider says the box is gone (or never existed), so a failed
- * terminate stays visible and is retried instead of leaking a snapshot.
+ * kill stays visible and is retried instead of leaking a snapshot.
  */
 export async function destroySandboxConfirmed(
   sandboxId: string
@@ -666,7 +624,7 @@ export async function destroySandboxConfirmed(
 
   let sandbox: Sandbox;
   try {
-    sandbox = await Sandbox.get(sandboxId, clientOptions());
+    sandbox = await Sandbox.connect(sandboxId, clientOptions());
   } catch (caught) {
     const error = classifyStartError(caught, "attach");
     if (error.failure === "missing") return "missing";
@@ -674,15 +632,15 @@ export async function destroySandboxConfirmed(
   }
 
   try {
-    await sandbox.terminate();
+    await sandbox.kill();
   } catch (caught) {
     const error = classifyStartError(caught, "attach");
     if (error.failure === "missing") return "missing";
 
-    // A refused terminate can mean "already gone" as easily as "not now". Ask
-    // the provider which one it is before failing a wipe that may have worked.
+    // A refused kill can mean "already gone" as easily as "not now". Ask the
+    // provider which one it is before failing a wipe that may have worked.
     try {
-      await Sandbox.get(sandboxId, clientOptions());
+      await Sandbox.getInfo(sandboxId, clientOptions());
     } catch (again) {
       if (classifyStartError(again, "attach").failure === "missing") {
         return "missing";
@@ -720,18 +678,20 @@ export async function listChatSandboxes(
   }
 
   try {
-    const found = await Sandbox.list({
-      metadata: { app: "openmi", kind: "chat" },
-      maxResults: limit,
+    const paginator = Sandbox.list({
+      query: { metadata: { app: "openmi", kind: "chat" } },
+      limit,
       ...clientOptions(),
     });
 
+    const found = paginator.hasNext ? await paginator.nextItems() : [];
+
     return found.slice(0, limit).map((sandbox) => ({
-      id: sandbox.id,
+      id: sandbox.sandboxId,
       labels: sandbox.metadata ?? {},
       createdAt:
-        sandbox.createdAt instanceof Date
-          ? sandbox.createdAt.toISOString()
+        sandbox.startedAt instanceof Date
+          ? sandbox.startedAt.toISOString()
           : null,
     }));
   } catch (caught) {

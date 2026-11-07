@@ -246,13 +246,13 @@ async function probeProviders(): Promise<Probe[]> {
 async function probeExecution(): Promise<Probe> {
   const base = { id: "execution", label: "Sandbox verification" } as const;
 
-  const key = process.env.ORKESTR_API_KEY?.trim() ?? "";
+  const key = process.env.E2B_API_KEY?.trim() ?? "";
   if (key.length === 0) {
     return {
       ...base,
       state: "unconfigured",
-      detail: "ORKESTR_API_KEY is not set, so runs cannot start and the card says so.",
-      fix: "Create a sandbox-scoped token in the orkestr console and add ORKESTR_API_KEY.",
+      detail: "E2B_API_KEY is not set, so runs cannot start and the card says so.",
+      fix: "Create an API key in the E2B dashboard and add E2B_API_KEY.",
     };
   }
 
@@ -270,7 +270,7 @@ async function probeExecution(): Promise<Probe> {
     ...base,
     state: "ok",
     detail:
-      "An orkestr token is present. Runs start on demand; this probe does not create one.",
+      "An E2B key is present. Runs start on demand; this probe does not create one.",
   };
 }
 
