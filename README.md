@@ -218,8 +218,10 @@ branch writes, no merges, no card payments, and no claim of verification.
 
 ## Known limits
 
-- Nothing in this app executes code. There is no sandbox and no test runner, and
-  no surface claims otherwise.
+- A chat turn is GitHub-only by default: no sandbox is provisioned, so the
+  assistant reads the repository and proposes a diff without executing
+  anything. `OPENMI_SANDBOX_TURNS=on` gives every eligible turn the Linux shell
+  back; verification runs and missions keep their own sandboxes either way.
 - Writes are one branch and one pull request per approved changeset. There is
   no merge, no push to the default branch, and no branch cleanup. A change the
   reader sends to a branch that moved becomes a new branch, never a forced

@@ -272,6 +272,13 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: 'Defaults to on; set to "off" to require the click on the review card',
   },
   {
+    key: "OPENMI_SANDBOX_TURNS",
+    scope: "server",
+    required: false,
+    unlocks: "A chat turn that may open the Linux sandbox instead of GitHub only",
+    hint: 'Off by default; set to "on" to give chat turns the shell and its tools back',
+  },
+  {
     key: "OPENMI_ALLOW_DEFAULT_BRANCH",
     scope: "server",
     required: false,
@@ -357,6 +364,24 @@ export function executionConfigured(
 
   const flag = (env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
   return flag !== "off" && flag !== "false" && flag !== "0";
+}
+
+/**
+ * Whether a chat turn may open the Linux sandbox.
+ *
+ * Off by default: a chat turn is GitHub-only, so the assistant reads the
+ * repository and answers with a proposed diff instead of provisioning a box.
+ * Nothing was removed — `OPENMI_SANDBOX_TURNS=on` gives every eligible turn the
+ * shell, the dedicated tools and the paused-continuation workspace back.
+ *
+ * Separate from `executionConfigured()`: verification runs and missions keep
+ * their sandboxes either way. This decides the chat turn only.
+ */
+export function sandboxTurnsEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const flag = (env.OPENMI_SANDBOX_TURNS ?? "off").trim().toLowerCase();
+  return flag === "on" || flag === "true" || flag === "1" || flag === "yes";
 }
 
 /** Typed access for server code. `null` means "not configured", never a throw. */

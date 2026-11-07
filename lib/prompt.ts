@@ -22,6 +22,17 @@ export const SHELL_CLAUSE =
 export const ANALYSIS_CLAUSE =
   "Analyse the repository and the product from source code and terminal commands only. Do not open a browser, use Playwright, take screenshots, or start a dev server to inspect a rendered page. Do not run page-driven or visual checks. Use run_command for file inspection, search, typechecks, tests and terminal HTTP checks; report the commands and their results. If a request can only be answered by looking at a rendered page, say visual inspection is unavailable and give the strongest code- and terminal-based answer instead.";
 
+/**
+ * A turn with no shell at all.
+ *
+ * This is the default now that the chat turn is GitHub-only: the model reads
+ * the repository through the GitHub tools and answers with a diff. The shell
+ * clause is absent on purpose, and so is any claim of execution — GitHub-only
+ * means nothing ran, not that nothing is available.
+ */
+export const GITHUB_ONLY_CLAUSE =
+  "This turn is GitHub-only: you have no terminal, no sandbox and no browser. Read code with the GitHub tools, and change code only by calling propose_edits. Never say you ran a command, a build or a test; never claim an edit was applied or verified. An accepted diff is written to its own openmi/ agent branch and reported on the review card.";
+
 export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
 
@@ -97,7 +108,13 @@ export function buildSystemPrompt({
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,
       ]
-    : [SYSTEM_PROMPT];
+    : [
+        IDENTITY,
+        GITHUB_ONLY_CLAUSE,
+        CITATION_CLAUSE,
+        "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
+        PROPOSE_CLAUSE,
+      ];
 
   const tail: string[] = [
     repo && sha

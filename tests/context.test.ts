@@ -128,11 +128,14 @@ test("analysis is code- and terminal-only, with no browser path", () => {
   const shell = buildSystemPrompt({ ...base, shell: true });
   const noShell = buildSystemPrompt({ ...base, shell: false });
 
-  for (const prompt of [shell, noShell]) {
-    expect(prompt).toContain(ANALYSIS_CLAUSE);
-    expect(prompt).toContain("Do not open a browser");
-    expect(prompt).not.toContain("headless Chromium with Playwright is available");
-  }
+  expect(shell).toContain(ANALYSIS_CLAUSE);
+  expect(shell).toContain("Do not open a browser");
+  expect(shell).not.toContain("headless Chromium with Playwright is available");
+
+  // GitHub-only means no terminal, so it is not given terminal advice either.
+  expect(noShell).not.toContain(ANALYSIS_CLAUSE);
+  expect(noShell).not.toContain("Do not open a browser");
+  expect(noShell).not.toContain("headless Chromium with Playwright is available");
 });
 
 test("the system prompt still refuses to pretend when no repository is attached", () => {

@@ -31,7 +31,7 @@ import {
   startDewSession,
   type DewGate,
 } from "@/lib/dew/store";
-import { executionConfigured, serverEnv } from "@/lib/env";
+import { executionConfigured, sandboxTurnsEnabled, serverEnv } from "@/lib/env";
 import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
 import {
   getFile,
@@ -458,8 +458,11 @@ export async function POST(request: Request) {
   // `send` once it exists rather than assuming one here.
   let sendNotice: (message: string) => void = () => {};
 
+  // GitHub-only is the default: a turn reads the repository and proposes a diff
+  // without provisioning a box. The sandbox is still whole — verification runs
+  // and missions use their own — and one switch gives it back to chat turns.
   const shellTurn =
-    executionConfigured() && repoFullName && sha && githubToken
+    sandboxTurnsEnabled() && executionConfigured() && repoFullName && sha && githubToken
       ? createShellTurn({
           token: githubToken,
           repo: repoFullName,
