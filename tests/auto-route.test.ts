@@ -206,7 +206,7 @@ test("the real pool plans a queue over the models this build can call", () => {
   expect(queue.length).toBeLessThanOrEqual(MAX_CHAIN_LENGTH);
 });
 
-test("every OpenRouter route has a registry profile, so none is dropped", () => {
+test("every UnoRouter route has a registry profile, so none is dropped", () => {
   const ids = Object.keys(AUTO_ROUTES);
   const queue = planChain({ available: ids, task: "general" });
 
@@ -214,7 +214,7 @@ test("every OpenRouter route has a registry profile, so none is dropped", () => 
   expect(new Set(queue)).toEqual(new Set(ids));
 });
 
-test("Auto's pool is the fifty OpenRouter free routes", () => {
+test("Auto's pool is the fifty UnoRouter free routes", () => {
   const routes = Object.entries(AUTO_ROUTES);
 
   expect(routes).toHaveLength(50);
@@ -237,6 +237,13 @@ test("Auto's pool is the fifty OpenRouter free routes", () => {
   expect(providers).toContain('providerById("openrouter")');
 });
 
+test("Auto calls UnoRouter's OpenAI-compatible endpoint", () => {
+  const providers = source("../lib/providers.ts");
+
+  expect(providers).toContain("https://api.unorouter.com/v1/chat/completions");
+  expect(providers).not.toContain("openrouter.ai");
+});
+
 test("Auto is a catalogue entry with a price, not a route", () => {
   const auto = MODELS.find((model) => model.id === AUTO_MODEL);
 
@@ -249,7 +256,7 @@ test("Auto is a catalogue entry with a price, not a route", () => {
   expect(profileForModel(AUTO_MODEL)).toBeUndefined();
 });
 
-test("Auto's queue is built from the OpenRouter pool, and Auto is never in it", () => {
+test("Auto's queue is built from the UnoRouter pool, and Auto is never in it", () => {
   const providers = source("../lib/providers.ts");
 
   expect(providers).toContain("export function autoChain");

@@ -37,6 +37,36 @@ test("no route or page that reads configuration is cacheable", () => {
   expect(ABOUT).not.toContain("force-dynamic");
 });
 
+test("the chat row is created only after the message and provider are valid", () => {
+  const content = CHAT.indexOf("Write something first.");
+  const provider = CHAT.indexOf("if (!providersConfigured())");
+  const create = CHAT.indexOf('.from("chats")');
+
+  expect(content).toBeGreaterThan(-1);
+  expect(provider).toBeGreaterThan(-1);
+  expect(create).toBeGreaterThan(-1);
+  expect(content).toBeLessThan(create);
+  expect(provider).toBeLessThan(create);
+});
+
+const MUTATING_ROUTES = [
+  "../app/api/chat/route.ts",
+  "../app/api/chat/stop/route.ts",
+  "../app/api/dew/end-session/route.ts",
+  "../app/api/execution/runs/route.ts",
+  "../app/api/execution/runs/[id]/route.ts",
+  "../app/api/missions/route.ts",
+  "../app/api/missions/[id]/route.ts",
+  "../app/api/missions/[id]/tick/route.ts",
+];
+
+test("every mutating route rejects a foreign origin", () => {
+  for (const route of MUTATING_ROUTES) {
+    const source = readFileSync(new URL(route, import.meta.url), "utf8");
+    expect(source).toContain("isSameOrigin(request)");
+  }
+});
+
 test("the rate limit is checked before the provider and carries Retry-After", () => {
   const limitAt = CHAT.indexOf('checkRateLimit(supabaseAdmin(), "chat"');
   const chargeAt = CHAT.indexOf("await startDewSession(");

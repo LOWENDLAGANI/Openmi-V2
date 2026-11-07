@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { endHourSession } from "@/lib/dew/store";
+import { isSameOrigin } from "@/lib/http/origin";
 import { getSession } from "@/lib/session";
 
 /**
@@ -16,6 +17,13 @@ export const dynamic = "force-dynamic";
 const NO_STORE = { "cache-control": "no-store" } as const;
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "That request came from another origin.", ended: false },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+
   const session = await getSession();
 
   if (session.state !== "signed-in") {

@@ -6,6 +6,7 @@ import { executeRun, startExecutionRun } from "@/lib/execution/run";
 import { readEvents, readRunForChangeset } from "@/lib/execution/store";
 import { describeRun } from "@/lib/execution/status";
 import { readToken } from "@/lib/github/token";
+import { isSameOrigin } from "@/lib/http/origin";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -60,6 +61,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "That request came from another origin." },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+
   const session = await getSession();
 
   if (session.state !== "signed-in") {

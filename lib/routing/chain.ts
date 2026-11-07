@@ -33,7 +33,7 @@ const TIER_FOR_TASK: Record<TaskKind, RegistryTier> = {
 /**
  * How many models a queue may hold.
  *
- * Auto's pool is fifty free OpenRouter routes, and the pipeline attempts the
+ * Auto's pool is fifty free UnoRouter routes, and the pipeline attempts the
  * queue until one answers. The cap is therefore the pool size, not a shortlist.
  */
 export const MAX_CHAIN_LENGTH = 50;

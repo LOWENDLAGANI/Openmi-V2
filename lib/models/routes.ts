@@ -11,15 +11,15 @@ export type RouteProvider = "openrouter" | "deepseek";
 export type ModelRoute = { provider: RouteProvider; upstream: string };
 
 /**
- * Auto's pool: the OpenRouter free catalogue.
+ * Auto's pool: the UnoRouter free catalogue.
  *
  * Auto has no endpoint of its own and no direct DeepSeek fallback. Every entry
  * here is a model Auto may try, ordered by the registry's fitness for the
  * request. The route id is the deployment's own slug — the `:free` suffix is a
  * price tag, not part of an id — while `upstream` is the exact string
- * OpenRouter is asked for.
+ * UnoRouter is asked for.
  *
- * A model here that OpenRouter rejects costs one attempt, not the turn: the
+ * A model here that UnoRouter rejects costs one attempt, not the turn: the
  * pipeline walks the rest of the queue until one answers.
  */
 export const AUTO_ROUTES: Record<string, ModelRoute> = {

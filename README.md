@@ -261,7 +261,7 @@ the rotation never leaves the server.
 
 Auto is a picker entry with no endpoint of its own. It reads the message, picks
 the model that fits, and keeps the rest of a queue behind it. Every model in
-that queue is served by OpenRouter — the fifty free routes in
+that queue is served by UnoRouter — the fifty free routes in
 `lib/models/routes.ts` — and the one named model keeps the single-provider path
 it had. Auto never falls back to DeepSeek.
 
@@ -270,7 +270,7 @@ vision, search, context — and carries no endpoint, upstream id or key.
 
 1. `classifyTask` reads the prompt once: code signals, reasoning signals, a URL or
    "click the page", an attached image. That names the task kind.
-2. `planChain` orders the fifty OpenRouter routes by fitness, best fit first. A
+2. `planChain` orders the fifty UnoRouter routes by fitness, best fit first. A
    route with no registry profile is skipped, and a vision request is never
    queued onto a model that cannot see.
 3. `streamRouted` walks the whole queue, up to fifty attempts. A failure before

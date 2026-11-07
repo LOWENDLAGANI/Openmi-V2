@@ -42,6 +42,7 @@ import {
 } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { hashIp, requestIp } from "@/lib/http/ip";
+import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
 import {
   AUTO_MODEL,
@@ -105,6 +106,10 @@ function messageOf(error: unknown): string {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return json({ error: "That request came from another origin." }, 403);
+  }
+
   const session = await getSession();
 
   if (session.state === "unconfigured") {
@@ -135,6 +140,28 @@ export async function POST(request: Request) {
 
   const continuationToken = typeof body.turn === "string" ? body.turn : null;
   const content = typeof body.content === "string" ? body.content.trim() : "";
+
+  // Refused before anything is written: an empty message must not create a
+  // chat row, and a deployment with no provider must not leave one behind.
+  if (!continuationToken) {
+    if (content.length === 0) return json({ error: "Write something first." }, 400);
+    if (content.length > MAX_MESSAGE_CHARS) {
+      return json(
+        { error: `A message is capped at ${MAX_MESSAGE_CHARS.toLocaleString()} characters.` },
+        413
+      );
+    }
+  }
+
+  if (!providersConfigured()) {
+    return json(
+      {
+        error: "Openmi can't answer right now. Try again in a moment.",
+        code: "no-provider",
+      },
+      409
+    );
+  }
 
   let chatId =
     typeof body.chatId === "string" && body.chatId.length > 0 ? body.chatId : "";
@@ -212,16 +239,6 @@ export async function POST(request: Request) {
     createdChat = true;
   }
 
-  if (!continuationToken) {
-    if (content.length === 0) return json({ error: "Write something first." }, 400);
-    if (content.length > MAX_MESSAGE_CHARS) {
-      return json(
-        { error: `A message is capped at ${MAX_MESSAGE_CHARS.toLocaleString()} characters.` },
-        413
-      );
-    }
-  }
-
   // An id the catalogue does not know — an old tab, a renamed custom entry, a
   // chat written before the catalogue shrank — opens the first model this
   // deployment can actually call, instead of failing the turn or opening on a
@@ -242,18 +259,6 @@ export async function POST(request: Request) {
 
   if (error) return json({ error: error.message }, 500);
   if (!chat) return json({ error: "That chat does not exist." }, 404);
-
-  // The gate is before any provider call, not after. Nothing has been spent
-  // when this returns, and the composer says so rather than failing silently.
-  if (!providersConfigured()) {
-    return json(
-      {
-        error: "Openmi can't answer right now. Try again in a moment.",
-        code: "no-provider",
-      },
-      409
-    );
-  }
 
   const sealKey = serverEnv().githubTokenKey;
 
@@ -902,7 +907,10 @@ export async function POST(request: Request) {
             ? `${result.text}\n\n_(stopped before this answer finished)_`
             : result.stopped === "paused" && shellTurn && !retainedWorkspace && result.text.length > 0
               ? `${result.text}\n\n_(this message reached its time limit in the sandbox)_`
-              : result.text;
+              : (result.stopped === "error" || result.stopped === "conflict") &&
+                  result.text.length > 0
+                ? `${result.text}\n\n_(this answer stopped before it finished)_`
+                : result.text;
 
         turnText = text;
 
@@ -912,7 +920,10 @@ export async function POST(request: Request) {
             send("done", {
               id: saved?.id ?? null,
               seq: saved ? Number(saved.seq) : null,
-              stopped: result.stopped,
+              stopped:
+                result.stopped === "error" || result.stopped === "conflict"
+                  ? "partial"
+                  : result.stopped,
               steps: result.steps,
               tokens: result.tokens,
             });
@@ -1039,10 +1050,14 @@ export async function POST(request: Request) {
 
         if (refundReason) await refundTurn(refundReason);
 
+        const incomplete = Boolean(failure) || !complete;
+
         if (produced.length > 0) {
           const text = abort.signal.aborted
             ? `${produced}\n\n_(stopped before this answer finished)_`
-            : produced;
+            : incomplete
+              ? `${produced}\n\n_(this answer stopped before it finished)_`
+              : produced;
 
           turnText = text;
 
@@ -1051,7 +1066,7 @@ export async function POST(request: Request) {
             send("done", {
               id: saved?.id ?? null,
               seq: saved ? Number(saved.seq) : null,
-              stopped: abort.signal.aborted ? "aborted" : "done",
+              stopped: abort.signal.aborted ? "aborted" : incomplete ? "partial" : "done",
               steps: 0,
               tokens: Math.ceil(text.length / 4),
             });

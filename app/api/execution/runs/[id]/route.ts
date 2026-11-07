@@ -4,6 +4,7 @@ import { settleExecutionDew } from "@/lib/dew/store";
 import { chargeForDuration } from "@/lib/execution/cost";
 import { isTerminal } from "@/lib/execution/status";
 import { readRunForOwner } from "@/lib/execution/store";
+import { isSameOrigin } from "@/lib/http/origin";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -20,9 +21,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "That request came from another origin." },
+      { status: 403 }
+    );
+  }
+
   const session = await getSession();
 
   if (session.state !== "signed-in") {

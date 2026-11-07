@@ -57,7 +57,10 @@ export type ChatMessage = {
 
 const OPENROUTER: Provider = {
   id: "openrouter",
-  endpoint: "https://openrouter.ai/api/v1/chat/completions",
+  // UnoRouter serves the OpenAI-compatible API behind the free model pool. The
+  // provider id and key name stay `openrouter` so an existing deployment does
+  // not need a new secret.
+  endpoint: "https://api.unorouter.com/v1/chat/completions",
   model: "openai/gpt-4o-mini",
   keyName: "OPENROUTER_API_KEY",
 };
@@ -135,7 +138,7 @@ export function providersFor(
   env: Record<string, string | undefined> = process.env,
   custom: readonly CustomModel[] = parseCustomModels(env.CUSTOM_MODELS).models
 ): Provider[] {
-  // Auto has no single route: it is the OpenRouter pool below. Missions and
+  // Auto has no single route: it is the UnoRouter pool below. Missions and
   // verification ask for one model and iterate the result, so handing them the
   // whole queue lets them walk it the same way the chat turn does.
   if (model === AUTO_MODEL) return autoChain("", env);
@@ -161,9 +164,9 @@ export function modelCatalogue(
 
   const callable = (id: ModelId) => providersFor(id, env, custom).length > 0;
 
-  // Auto is its own pool: the OpenRouter free catalogue. It does not borrow a
+  // Auto is its own pool: the UnoRouter free catalogue. It does not borrow a
   // concrete model's key and it does not fall back to DeepSeek, so its
-  // availability is the OpenRouter key plus at least one route to spend it on.
+  // availability is the UnoRouter key plus at least one route to spend it on.
   const autoReady = () => {
     const openrouter = providerById("openrouter");
     return (
@@ -198,11 +201,11 @@ export function modelCatalogue(
 }
 
 /**
- * Auto's queue: every OpenRouter free route, best fit first.
+ * Auto's queue: every UnoRouter free route, best fit first.
  *
  * Auto is deliberately not a queue over the picker catalogue. The pool is the
- * OpenRouter catalogue in lib/models/routes.ts, so a deployment with only the
- * DeepSeek key cannot silently spend it through Auto. Once the OpenRouter key
+ * UnoRouter catalogue in lib/models/routes.ts, so a deployment with only the
+ * DeepSeek key cannot silently spend it through Auto. Once the UnoRouter key
  * exists the whole pool is callable, and the pipeline walks it until one model
  * answers.
  *

@@ -548,7 +548,9 @@ export function ChatPanel({
           const content =
             payload.stopped === "aborted"
               ? `${assembled}\n\n_(stopped before this answer finished)_`
-              : assembled;
+              : payload.stopped === "partial"
+                ? `${assembled}\n\n_(this answer stopped before it finished)_`
+                : assembled;
 
           setMessages((current) => [
             ...current,

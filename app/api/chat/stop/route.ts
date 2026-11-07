@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSameOrigin } from "@/lib/http/origin";
 import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -20,6 +21,10 @@ function json(body: unknown, status: number) {
  * one running it. The runner polls the flag and aborts the provider call.
  */
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return json({ error: "That request came from another origin." }, 403);
+  }
+
   const session = await getSession();
 
   if (session.state === "unconfigured") {

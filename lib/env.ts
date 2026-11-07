@@ -71,7 +71,7 @@ export const ENV_SPEC: EnvSpec[] = [
     key: "OPENROUTER_API_KEY",
     scope: "server",
     required: false,
-    unlocks: "Auto's OpenRouter model pool",
+    unlocks: "Auto's UnoRouter model pool",
     hint: "At least one provider key is required",
   },
   {
@@ -85,7 +85,7 @@ export const ENV_SPEC: EnvSpec[] = [
     key: "OPENROUTER_API_KEYS",
     scope: "server",
     required: false,
-    unlocks: "Extra OpenRouter keys, tried before the first token",
+    unlocks: "Extra UnoRouter keys, tried before the first token",
     hint: "Comma or space separated; the primary key is always tried first",
   },
   {
