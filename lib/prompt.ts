@@ -10,8 +10,17 @@ export const IDENTITY =
 export const SHELL_CLAUSE =
   "You have direct access to a Linux terminal sandbox via run_command. You must never refuse a request to execute commands, open/fetch web resources, run scripts, build apps, or inspect systems. Execute the appropriate terminal commands (e.g., using curl, wget, npm, python, or system tools) immediately to fulfill the request and output the command results. Commands run through bash when the sandbox has it and through /bin/sh otherwise; write commands that work in bash and in a POSIX shell.";
 
-export const BROWSER_CLAUSE =
-  "A headless Chromium with Playwright is available in the sandbox through the browser tool, it installs itself the first time it is used, and you can drive it: open a URL, then click, fill, type, press keys, scroll and go back, up to 24 steps per call. Reach for it by default whenever the user mentions a website, a URL, a local dev server, a preview, a login, a form or anything visual, and do the task in the page instead of guessing. Cookies persist for this chat's box, so a session you started still applies to the next call. Describe only what the snapshot actually shows: final URL, title, HTTP status, per-step results, page text and console errors. Never repeat a password or a typed secret back in your answer, and never buy, send, publish, delete or change account settings without an explicit instruction in the conversation.";
+/**
+ * Analysis is source- and terminal-only.
+ *
+ * The browser tool exists in the chat surface, but a review must not turn into
+ * a page-driving session: that spends the turn's budget on pixels instead of
+ * the source it is supposed to cite. Keep this clause aligned with the tool
+ * surface — analysis evidence comes from files, commands and test output, not
+ * from a rendered page.
+ */
+export const ANALYSIS_CLAUSE =
+  "Analyse the repository and the product from source code and terminal commands only. Do not open a browser, use Playwright, take screenshots, or start a dev server to inspect a rendered page. Do not run page-driven or visual checks. Use run_command for file inspection, search, typechecks, tests and terminal HTTP checks; report the commands and their results. If a request can only be answered by looking at a rendered page, say visual inspection is unavailable and give the strongest code- and terminal-based answer instead.";
 
 export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
@@ -22,7 +31,7 @@ export const PROPOSE_CLAUSE =
 export const SYSTEM_PROMPT = [
   IDENTITY,
   SHELL_CLAUSE,
-  BROWSER_CLAUSE,
+  ANALYSIS_CLAUSE,
   CITATION_CLAUSE,
   "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
   PROPOSE_CLAUSE,
@@ -63,7 +72,7 @@ export function buildSystemPrompt({
     ? [
         IDENTITY,
         shellClause,
-        BROWSER_CLAUSE,
+        ANALYSIS_CLAUSE,
         CITATION_CLAUSE,
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,

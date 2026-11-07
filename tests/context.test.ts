@@ -6,6 +6,7 @@ import {
   assembleContext,
 } from "../lib/context";
 import {
+  ANALYSIS_CLAUSE,
   SHELL_CLAUSE,
   buildSystemPrompt,
 } from "../lib/prompt";
@@ -88,6 +89,23 @@ test("the default prompt still proposes shell execution when shell is unset", ()
   expect(prompt).toContain("run_command");
   expect(prompt).toContain("curl, wget, npm, python");
   expect(prompt).toContain("output the command results");
+});
+
+test("analysis is code- and terminal-only, with no browser path", () => {
+  const base = {
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+  };
+  const shell = buildSystemPrompt({ ...base, shell: true });
+  const noShell = buildSystemPrompt({ ...base, shell: false });
+
+  for (const prompt of [shell, noShell]) {
+    expect(prompt).toContain(ANALYSIS_CLAUSE);
+    expect(prompt).toContain("Do not open a browser");
+    expect(prompt).not.toContain("headless Chromium with Playwright is available");
+  }
 });
 
 test("the system prompt still refuses to pretend when no repository is attached", () => {
