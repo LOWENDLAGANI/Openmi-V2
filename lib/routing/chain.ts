@@ -3,7 +3,7 @@
  *
  * The queue is always built from models this deployment can actually call: a
  * profile in the registry is a candidate, and `available` is the permission.
- * That split is what stops a fifty-entry pool from becoming fifty doomed
+ * That split is what stops a large pool from becoming a long queue of doomed
  * requests — an unconfigured model is skipped, not tried and failed.
  *
  * Auto has no model of its own, so the first entry is chosen by fit. Behind it

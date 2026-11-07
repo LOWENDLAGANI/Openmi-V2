@@ -146,7 +146,7 @@ Mechanics, mirroring the existing billing rules (implemented in
 |---|---|---|
 | `GITHUB_TOKEN_KEY`, user GitHub PAT | No | The sandbox never talks to the user's repo. Tree arrives as a tarball from Openmi. |
 | `SUPABASE_SERVICE_ROLE_KEY`, any Supabase key | No | Results come back through `sandbox.fs`/`exec` responses, written by the server. |
-| `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY` | No | The agent loop runs on the server (as today). The sandbox has no model client. |
+| `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY` | No | The agent loop runs on the server (as today). The sandbox has no model client. |
 | `DAYTONA_API_KEY` | No | Only the server calls Daytona. |
 | `GITHUB_TOKEN_KEY`-derived signing keys | No | Signatures are computed server-side after the run. |
 | Anything in `.env` of the target repo | No | The repo's own `.env*` files are excluded from the seeded workspace. |

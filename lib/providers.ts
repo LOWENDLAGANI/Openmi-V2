@@ -29,18 +29,18 @@ import {
  * that answer is not useful to a user and is useful to someone probing the
  * deployment.
  *
- * All three providers speak the OpenAI chat-completions shape, so one streaming
- * parser covers them and a fallback chain is a list rather than three code
+ * Both providers speak the OpenAI chat-completions shape, so one streaming
+ * parser covers them and a fallback chain is a list rather than two code
  * paths.
  */
 
-export type ProviderId = "openrouter" | "groq" | "deepseek";
+export type ProviderId = "openrouter" | "deepseek";
 
 export type Provider = {
   id: ProviderId;
   endpoint: string;
   model: string;
-  keyName: "OPENROUTER_API_KEY" | "GROQ_API_KEY" | "DEEPSEEK_API_KEY";
+  keyName: "OPENROUTER_API_KEY" | "DEEPSEEK_API_KEY";
   /**
    * The vendor reasons before it answers unless the request says otherwise.
    *
@@ -64,15 +64,6 @@ const OPENROUTER: Provider = {
   keyName: "OPENROUTER_API_KEY",
 };
 
-const GROQ: Provider = {
-  id: "groq",
-  endpoint: "https://api.groq.com/openai/v1/chat/completions",
-  // Groq is asked for one model only. Anything else it serves is ignored, so a
-  // stray upstream id cannot become a second, unpriced path.
-  model: "openai/gpt-oss-120b",
-  keyName: "GROQ_API_KEY",
-};
-
 const DEEPSEEK: Provider = {
   id: "deepseek",
   endpoint: "https://api.deepseek.com/chat/completions",
@@ -94,9 +85,9 @@ export const MAX_PROVIDER_KEYS = 3;
  * Every usable key for one provider, in the order they should be tried.
  *
  * The primary name comes first, then a comma or space separated pool
- * (`GROQ_API_KEYS`), then numbered variants (`GROQ_API_KEY_2`, `_3`). Duplicates
- * are dropped, so a pool that repeats the primary does not make the same key
- * fail twice.
+ * (`<PROVIDER>_API_KEYS`), then numbered variants (`_2`, `_3`). Duplicates are
+ * dropped, so a pool that repeats the primary does not make the same key fail
+ * twice.
  */
 export function providerKeys(
   provider: Provider,
@@ -233,9 +224,9 @@ export function autoChain(
 ): Provider[] {
   const custom = parseCustomModels(env.CUSTOM_MODELS).models;
 
-  // A model with a key is not automatically a model Auto may spend. DeepSeek is
-  // excluded here rather than in the route table so naming it in the picker
-  // still resolves — only the queue leaves it out.
+  // A model with a key is not automatically a model Auto may spend: the
+  // eligibility rule decides. It lives outside this file so a future prepaid
+  // provider can be excluded from the queue without touching it.
   const available = modelCatalogue(env)
     .filter((entry) => {
       if (entry.id === AUTO_MODEL || entry.available !== true) return false;
@@ -282,7 +273,7 @@ export function providersConfigured(
 
 /** Every provider, for the setup page to probe each configured key. */
 export function providerCatalogue(): Provider[] {
-  return [OPENROUTER, GROQ, DEEPSEEK];
+  return [OPENROUTER, DEEPSEEK];
 }
 
 /**

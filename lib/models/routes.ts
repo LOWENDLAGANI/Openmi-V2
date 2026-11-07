@@ -6,15 +6,13 @@
  * so a display name can be public while the routing stays on the server.
  */
 
-export type RouteProvider = "openrouter" | "groq" | "deepseek";
+export type RouteProvider = "openrouter" | "deepseek";
 
 export type ModelRoute = { provider: RouteProvider; upstream: string };
 
 export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
-  "gpt-oss-120b": { provider: "groq", upstream: "openai/gpt-oss-120b" },
-  // Groq is asked for one model and DeepSeek for one model. Every other id
-  // those vendors serve is deliberately absent: an unused route is an unpriced
-  // path nobody chose.
+  // One model per vendor. Every other id those vendors serve is deliberately
+  // absent: an unused route is an unpriced path nobody chose.
   "deepseek-flash": { provider: "deepseek", upstream: "deepseek-flash" },
 };
 

@@ -19,16 +19,11 @@ const MODELS_SOURCE = readFileSync(
 // scanned.
 const MODELS_CODE = MODELS_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("the picker offers Auto and the two models this deployment serves", () => {
-  expect(MODELS.map((model) => model.id)).toEqual([
-    "auto",
-    "gpt-oss-120b",
-    "deepseek-flash",
-  ]);
-  expect(DEFAULT_MODEL).toBe("gpt-oss-120b");
+test("the picker offers Auto and the one model this deployment serves", () => {
+  expect(MODELS.map((model) => model.id)).toEqual(["auto", "deepseek-flash"]);
+  expect(DEFAULT_MODEL).toBe("deepseek-flash");
   expect(MODELS.map((model) => model.name)).toEqual([
     "Auto",
-    "GPT OSS 120B",
     "DeepSeek V4.1 flash",
   ]);
   expect(modelName("auto")).toBe("Auto");
@@ -37,7 +32,14 @@ test("the picker offers Auto and the two models this deployment serves", () => {
 
   // Auto is a real entry now; the retired concrete models are still gone.
   expect(hasModel(MODELS, "auto")).toBe(true);
-  for (const gone of ["glm-4.6", "qwen3-coder", "kimi-k2", "deepseek-chat", "deepseek-reasoner"]) {
+  for (const gone of [
+    "glm-4.6",
+    "qwen3-coder",
+    "kimi-k2",
+    "deepseek-chat",
+    "deepseek-reasoner",
+    "gpt-oss-120b",
+  ]) {
     expect(hasModel(MODELS, gone)).toBe(false);
   }
 });
@@ -71,13 +73,12 @@ test("the browser catalogue carries no endpoint, upstream id or key", () => {
   }
 });
 
-test("every model prices its own hour, and both cost the same today", () => {
+test("every model prices its own hour, and the built-ins cost the same today", () => {
   for (const model of MODELS) {
     expect(Number.isFinite(model.dewPerHour)).toBe(true);
     expect(model.dewPerHour).toBeGreaterThan(0);
   }
 
-  expect(modelHourDew("gpt-oss-120b")).toBe(2);
   expect(modelHourDew("deepseek-flash")).toBe(2);
   expect(modelHourDew("auto")).toBe(2);
 

@@ -26,19 +26,20 @@ test("every built-in model has a category the picker can group", () => {
 });
 
 test("the opening model is one the deployment can call", () => {
+  const [auto, deepseek] = MODELS;
+
   const catalogue = [
-    { ...MODELS[0]!, available: false },
-    { ...MODELS[1]!, available: true },
-    { ...MODELS[2]!, available: true },
+    { ...auto!, available: false },
+    { ...deepseek!, available: true },
   ];
 
-  expect(firstAvailableModel(catalogue)).toBe("gpt-oss-120b");
+  expect(firstAvailableModel(catalogue)).toBe("deepseek-flash");
   expect(firstAvailableModel([])).toBe(DEFAULT_MODEL);
 
   // Auto is a choice, not a silent default: a chat still opens on a concrete
   // model when one is callable.
-  expect(firstAvailableModel(MODELS)).toBe("gpt-oss-120b");
-  expect(firstAvailableModel([{ ...MODELS[0]!, available: true }])).toBe("auto");
+  expect(firstAvailableModel(MODELS)).toBe("deepseek-flash");
+  expect(firstAvailableModel([{ ...auto!, available: true }])).toBe("auto");
 });
 
 test("a custom model picks its own category and defaults to general", () => {
@@ -54,7 +55,7 @@ test("a custom model picks its own category and defaults to general", () => {
       {
         id: "plain-x",
         name: "Plain X",
-        provider: "groq",
+        provider: "deepseek",
         upstream: "vendor/plain-x",
       },
     ])
@@ -72,7 +73,7 @@ test("an unknown custom category is rejected, not guessed", () => {
         id: "odd",
         name: "Odd",
         category: "fastest",
-        provider: "groq",
+        provider: "deepseek",
         upstream: "a/b",
       },
     ])
@@ -124,12 +125,6 @@ test("DeepSeek is one model, and it is deepseek-flash", () => {
     provider: "deepseek",
     upstream: "deepseek-flash",
   });
-
-  // Groq stays on the one model it was locked to.
-  const groq = MODELS.filter(
-    (model) => BUILTIN_ROUTES[model.id]?.provider === "groq"
-  );
-  expect(groq.map((model) => model.id)).toEqual(["gpt-oss-120b"]);
 });
 
 test("a well-formed custom model parses and routes", () => {
@@ -159,7 +154,7 @@ test("a built-in id cannot be redefined by a custom entry", () => {
       {
         id: "deepseek-flash",
         name: "Impostor",
-        provider: "groq",
+        provider: "openrouter",
         upstream: "someone/else",
       },
     ])
@@ -181,7 +176,7 @@ test("bad configuration is reported, never thrown", () => {
     { id: "Bad Id", name: "X", provider: "openrouter", upstream: "a/b" },
     { id: "ok-id", name: "", provider: "openrouter", upstream: "a/b" },
     { id: "other", name: "Other", provider: "nope", upstream: "a/b" },
-    { id: "fourth", name: "Fourth", provider: "groq", upstream: "a b" },
+    { id: "fourth", name: "Fourth", provider: "deepseek", upstream: "a b" },
   ]);
 
   const result = parseCustomModels(invalid);
@@ -192,8 +187,8 @@ test("bad configuration is reported, never thrown", () => {
 test("custom entries are deduplicated and capped", () => {
   const duplicated = parseCustomModels(
     JSON.stringify([
-      { id: "same", name: "One", provider: "groq", upstream: "a/b" },
-      { id: "same", name: "Two", provider: "groq", upstream: "a/b" },
+      { id: "same", name: "One", provider: "deepseek", upstream: "a/b" },
+      { id: "same", name: "Two", provider: "deepseek", upstream: "a/b" },
     ])
   );
 
@@ -203,7 +198,7 @@ test("custom entries are deduplicated and capped", () => {
   const many = Array.from({ length: MAX_CUSTOM_MODELS + 5 }, (_, index) => ({
     id: `model-${index}`,
     name: `Model ${index}`,
-    provider: "groq",
+    provider: "deepseek",
     upstream: "a/b",
   }));
 

@@ -11,8 +11,8 @@
  * not part of an id, so it is not carried here.
  *
  * A listed model that this deployment has no route or key for is not an error —
- * the chain builder skips it. That split is what makes a fifty-entry pool safe:
- * it describes what could answer, while availability decides what may.
+ * the chain builder skips it. That split is what makes a large pool safe: it
+ * describes what could answer, while availability decides what may.
  */
 
 import type { ModelId } from "../models";
@@ -381,14 +381,6 @@ export const MODEL_REGISTRY: ModelProfile[] = [
     tier: "general",
     fits: ["vision", "general"],
     vision: true,
-    search: false,
-    contextTokens: 128_000,
-  },
-  {
-    id: "gpt-oss-120b",
-    tier: "general",
-    fits: ["general", "coding"],
-    vision: false,
     search: false,
     contextTokens: 128_000,
   },

@@ -26,7 +26,6 @@ export type EnvSpec = {
 /** Chat needs one of these. Any single provider is enough to answer. */
 export const AI_PROVIDER_KEYS = [
   "OPENROUTER_API_KEY",
-  "GROQ_API_KEY",
   "DEEPSEEK_API_KEY",
 ] as const;
 
@@ -72,21 +71,14 @@ export const ENV_SPEC: EnvSpec[] = [
     key: "OPENROUTER_API_KEY",
     scope: "server",
     required: false,
-    unlocks: "Auto mode, primary provider",
-    hint: "At least one provider key is required",
-  },
-  {
-    key: "GROQ_API_KEY",
-    scope: "server",
-    required: false,
-    unlocks: "Code mode and the Auto fallback",
+    unlocks: "Custom models served from OpenRouter",
     hint: "At least one provider key is required",
   },
   {
     key: "DEEPSEEK_API_KEY",
     scope: "server",
     required: false,
-    unlocks: "Flash mode",
+    unlocks: "The built-in model, and Auto",
     hint: "At least one provider key is required",
   },
   {
@@ -94,13 +86,6 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Extra OpenRouter keys, tried before the first token",
-    hint: "Comma or space separated; the primary key is always tried first",
-  },
-  {
-    key: "GROQ_API_KEYS",
-    scope: "server",
-    required: false,
-    unlocks: "Extra Groq keys, tried before the first token",
     hint: "Comma or space separated; the primary key is always tried first",
   },
   {

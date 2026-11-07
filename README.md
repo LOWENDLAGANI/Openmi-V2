@@ -260,12 +260,12 @@ the rotation never leaves the server.
 ## Auto
 
 Auto is a picker entry with no endpoint of its own. It reads the message, picks
-the model that fits, and keeps the rest of a queue behind it. The two concrete
-models keep the single-provider path they had; Auto is the only model that can
+the model that fits, and keeps the rest of a queue behind it. The one concrete
+model keeps the single-provider path it had; Auto is the only model that can
 move mid-answer.
 
-`lib/models/registry.ts` is a capability profile for the fifty-model pool — tier,
-task fit, vision, search, context — and carries no endpoint, upstream id or key.
+`lib/models/registry.ts` is a capability profile for the model pool — tier, task
+fit, vision, search, context — and carries no endpoint, upstream id or key.
 
 1. `classifyTask` reads the prompt once: code signals, reasoning signals, a URL or
    "click the page", an attached image. That names the task kind.
@@ -285,8 +285,8 @@ task fit, vision, search, context — and carries no endpoint, upstream id or ke
 | Trimmed overlap floor | 8 characters |
 | Lookahead before trimming | 32 characters |
 
-A model joins Auto's queue when it has a route and a key: the two built-ins today,
-plus any `CUSTOM_MODELS` entry whose id matches a registry profile. The hour still
+A model joins Auto's queue when it has a route and a key: the built-in model
+today, plus any `CUSTOM_MODELS` entry whose id matches a registry profile. The hour still
 costs 2 Dew whatever answers, because `model_hour_dew` prices the model that was
 chosen — Auto — not the one it routed to.
 

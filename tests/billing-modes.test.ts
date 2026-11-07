@@ -170,7 +170,7 @@ test("an hour is priced by its model and locked to it", async () => {
   await actAsOwner();
 
   const started = await db.query<{ price: string; started: boolean }>(
-    "select * from public.start_hour_session('gpt-oss-120b', null, $1)",
+    "select * from public.start_hour_session('deepseek-flash', null, $1)",
     [CHAT_A]
   );
   expect(started.rows[0].started).toBe(true);
@@ -178,7 +178,7 @@ test("an hour is priced by its model and locked to it", async () => {
 
   // Same chat, same model: the hour is reused and costs nothing.
   const again = await db.query<{ price: string; started: boolean }>(
-    "select * from public.start_hour_session('gpt-oss-120b', null, $1)",
+    "select * from public.start_hour_session('deepseek-flash', null, $1)",
     [CHAT_A]
   );
   expect(again.rows[0].started).toBe(false);
@@ -186,9 +186,7 @@ test("an hour is priced by its model and locked to it", async () => {
 
   // A turn for another model cannot ride an hour it did not pay for.
   await expect(
-    db.query("select * from public.start_hour_session('deepseek-flash', null, $1)", [
-      CHAT_A,
-    ])
+    db.query("select * from public.start_hour_session('auto', null, $1)", [CHAT_A])
   ).rejects.toThrow(/hour on model/);
 
   expect((await balances()).balance).toBe(8);

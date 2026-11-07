@@ -1,8 +1,8 @@
 /**
  * The model catalogue the browser is allowed to see.
  *
- * Display names are public on purpose: the picker shows a model name ("GPT OSS
- * 120B", "DeepSeek V4.1 flash"), not a capability alias. What stays server-only is the
+ * Display names are public on purpose: the picker shows a model name ("DeepSeek
+ * V4.1 flash"), not a capability alias. What stays server-only is the
  * vendor, the upstream id, the endpoint and the key — those live in
  * lib/models/routes.ts and lib/providers.ts, which no client component imports.
  *
@@ -69,15 +69,6 @@ export const MODELS: ModelCapability[] = [
     dewPerHour: 2,
   },
   {
-    id: "gpt-oss-120b",
-    name: "GPT OSS 120B",
-    category: "general",
-    blurb: "Open-weight model with quick tool use, good for repository browsing.",
-    images: false,
-    documents: false,
-    dewPerHour: 2,
-  },
-  {
     id: "deepseek-flash",
     name: "DeepSeek V4.1 flash",
     category: "general",
@@ -90,7 +81,7 @@ export const MODELS: ModelCapability[] = [
   },
 ];
 
-export const DEFAULT_MODEL: ModelId = "gpt-oss-120b";
+export const DEFAULT_MODEL: ModelId = "deepseek-flash";
 
 const SLUG = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
@@ -132,9 +123,9 @@ export function modelHourDew(
 /**
  * The model to open with when the requested one is gone.
  *
- * The first usable entry beats a fixed id: a deployment that set only the
- * DeepSeek key should not open on a Groq model it cannot call. A catalogue with
- * no availability probe yet treats every entry as usable.
+ * The first usable entry beats a fixed id: a deployment whose only callable
+ * model is a custom entry should not open on a built-in whose key is missing. A
+ * catalogue with no availability probe yet treats every entry as usable.
  *
  * Auto is skipped while a concrete model is usable. Routing is a deliberate
  * choice, so an existing chat keeps opening on the same kind of model it opened

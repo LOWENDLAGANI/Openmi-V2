@@ -98,11 +98,11 @@ test("a request is classified before Auto chooses a model", () => {
   expect(classifyTask("hello there")).toBe("general");
 });
 
-test("the pool holds fifty models, and nothing secret", () => {
-  expect(MODEL_REGISTRY).toHaveLength(50);
+test("the pool holds capability profiles, and nothing secret", () => {
+  expect(MODEL_REGISTRY).toHaveLength(49);
 
   const ids = MODEL_REGISTRY.map((profile) => profile.id);
-  expect(new Set(ids).size).toBe(50);
+  expect(new Set(ids).size).toBe(49);
 
   for (const id of ids) {
     expect(isModelId(id)).toBe(true);
@@ -114,7 +114,7 @@ test("the pool holds fifty models, and nothing secret", () => {
   expect(count("coding")).toBe(5);
   expect(count("agent")).toBe(4);
   expect(count("reasoning")).toBe(18);
-  expect(count("general")).toBe(23);
+  expect(count("general")).toBe(22);
 
   expect(MODEL_REGISTRY.some((profile) => profile.vision)).toBe(true);
   expect(MODEL_REGISTRY.some((profile) => profile.search)).toBe(true);
@@ -130,8 +130,11 @@ test("the pool holds fifty models, and nothing secret", () => {
 });
 
 test("an alias finds the registry entry the catalogue already serves", () => {
-  expect(profileForModel("gpt-oss-120b")?.tier).toBe("general");
   expect(profileForModel("deepseek-flash")?.id).toBe("deepseek-v4.1-flash-1017");
+
+  // Retired models have no profile either, so Auto cannot queue them even if a
+  // stale CUSTOM_MODELS entry names one.
+  expect(profileForModel("gpt-oss-120b")).toBeUndefined();
   expect(profileForModel("not-a-model")).toBeUndefined();
 });
 
@@ -202,23 +205,23 @@ test("a vision request never falls back to a model that cannot see", () => {
 
 test("the real pool plans a queue over the models this build can call", () => {
   const queue = planChain({
-    available: ["gpt-oss-120b", "deepseek-flash"],
+    available: ["deepseek-flash"],
     task: "general",
   });
 
-  expect(queue[0]).toBe("gpt-oss-120b");
-  expect(queue).toContain("deepseek-flash");
+  expect(queue[0]).toBe("deepseek-flash");
   expect(queue.length).toBeLessThanOrEqual(MAX_CHAIN_LENGTH);
 });
 
-test("Auto never queues a model billed to the owner's own balance", () => {
-  // DeepSeek is prepaid against the owner's account. Auto used to queue every
-  // model that had a key, so a request nobody aimed at DeepSeek still spent it.
-  expect(autoMaySpend(BUILTIN_ROUTES["deepseek-flash"]!.provider)).toBe(false);
+test("Auto may spend every provider this build can route", () => {
+  // DeepSeek is the only built-in provider left, so excluding it would leave
+  // Auto with no model at all; the exclusion set is empty and the seam stays for
+  // a future prepaid provider.
+  expect(autoMaySpend(BUILTIN_ROUTES["deepseek-flash"]!.provider)).toBe(true);
   expect(autoMaySpend("openrouter")).toBe(true);
-  expect(AUTO_EXCLUDED_PROVIDERS.has("deepseek")).toBe(true);
+  expect(AUTO_EXCLUDED_PROVIDERS.size).toBe(0);
 
-  // The exclusion is the queue, not the route: naming the model still works.
+  // Eligibility is the queue, not the route: naming the model still works.
   expect(BUILTIN_ROUTES["deepseek-flash"]).toEqual({
     provider: "deepseek",
     upstream: "deepseek-flash",
