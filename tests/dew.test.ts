@@ -44,8 +44,10 @@ test("the documented Dew numbers are the exported constants", () => {
 });
 
 test("an hour is priced per model, and the database agrees with the catalogue", () => {
+  // 026 redefines `model_hour_dew` after teaching it Auto, so it is the current
+  // definition; 025 is the migration that introduced the function.
   const migration = readFileSync(
-    new URL("../supabase/migrations/025_model_hour_pricing.sql", import.meta.url),
+    new URL("../supabase/migrations/026_auto_model_pricing.sql", import.meta.url),
     "utf8"
   );
 

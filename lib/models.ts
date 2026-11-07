@@ -53,7 +53,21 @@ export type ModelCapability = {
   available?: boolean;
 };
 
+/** The router's own picker entry: a model with a queue behind it, not a route. */
+export const AUTO_MODEL: ModelId = "auto";
+
 export const MODELS: ModelCapability[] = [
+  {
+    id: AUTO_MODEL,
+    name: "Auto",
+    category: "general",
+    blurb: "Reads each message, picks the model that fits it, and moves on if one drops.",
+    images: false,
+    documents: false,
+    // An Auto hour costs one price whatever answers it: the picker sells the
+    // hour, and `model_hour_dew('auto')` in the database agrees.
+    dewPerHour: 2,
+  },
   {
     id: "gpt-oss-120b",
     name: "GPT OSS 120B",
@@ -121,10 +135,21 @@ export function modelHourDew(
  * The first usable entry beats a fixed id: a deployment that set only the
  * DeepSeek key should not open on a Groq model it cannot call. A catalogue with
  * no availability probe yet treats every entry as usable.
+ *
+ * Auto is skipped while a concrete model is usable. Routing is a deliberate
+ * choice, so an existing chat keeps opening on the same kind of model it opened
+ * on before; when Auto is all that is left it is still better than an id whose
+ * key is missing.
  */
 export function firstAvailableModel(
   catalogue: readonly ModelCapability[],
   fallback: ModelId = DEFAULT_MODEL
 ): ModelId {
-  return catalogue.find((model) => model.available !== false)?.id ?? fallback;
+  const usable = catalogue.filter((model) => model.available !== false);
+
+  return (
+    usable.find((model) => model.id !== AUTO_MODEL)?.id ??
+    usable[0]?.id ??
+    fallback
+  );
 }

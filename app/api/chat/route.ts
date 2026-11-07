@@ -41,9 +41,15 @@ import {
 } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
-import { firstAvailableModel, hasModel, type ModelId } from "@/lib/models";
+import {
+  AUTO_MODEL,
+  firstAvailableModel,
+  hasModel,
+  type ModelId,
+} from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/prompt";
 import {
+  autoChain,
   modelCatalogue,
   providerKeys,
   providersConfigured,
@@ -52,6 +58,7 @@ import {
   type ChatMessage,
 } from "@/lib/providers";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { streamRouted } from "@/lib/routing/pipeline";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -923,35 +930,86 @@ export async function POST(request: Request) {
       } else {
         let produced = "";
         let failure: Error | null = null;
+        // Only Auto can settle incomplete: a named model has one endpoint, so
+        // exhausting a queue is not a state it has.
+        let complete = true;
 
-        const chain = providersFor(model);
+        const auto = model === AUTO_MODEL;
+
+        const prompt =
+          content.length > 0
+            ? content
+            : [...history].reverse().find((message) => message.role === "user")?.content ?? "";
+
+        const chain = auto ? autoChain(prompt) : providersFor(model);
 
         // A named model has exactly one provider. If its key is absent the loop
         // below would run zero times and the old path would report an empty
         // answer, which blames the model for a configuration gap.
         if (chain.length === 0) {
           failure = new Error(
-            "That model isn't available right now. Pick another one."
+            auto
+              ? "No model is available to answer right now. Try again in a moment."
+              : "That model isn't available right now. Pick another one."
           );
-        }
+        } else if (auto) {
+          // Auto is a queue, not an endpoint: the classifier picks the model
+          // that fits, and a drop hands the partial answer to the next one. The
+          // reader sees one answer either way, because a handover is not their
+          // problem.
+          const targets = chain.map((provider) => ({
+            id: provider.model,
+            stream: ({
+              messages: next,
+              signal,
+            }: {
+              messages: ChatMessage[];
+              signal: AbortSignal;
+            }) =>
+              streamCompletion({
+                provider,
+                apiKeys: providerKeys(provider),
+                messages: next,
+                signal,
+                onReasoning: (text) => send("reasoning", { text }),
+              }),
+          }));
 
-        for (const provider of chain) {
           try {
-            for await (const delta of streamCompletion({
-              provider,
-              apiKeys: providerKeys(provider),
+            for await (const event of streamRouted({
+              targets,
               messages: plainMessages,
               signal: abort.signal,
-              onReasoning: (text) => send("reasoning", { text }),
             })) {
-              produced += delta;
-              send("delta", { text: delta });
+              if (event.type === "delta") {
+                produced += event.text;
+                send("delta", { text: event.text });
+              } else {
+                complete = event.complete;
+              }
             }
-            failure = null;
-            break;
           } catch (caught) {
             failure = caught instanceof Error ? caught : new Error("The provider failed.");
-            if (abort.signal.aborted) break;
+          }
+        } else {
+          for (const provider of chain) {
+            try {
+              for await (const delta of streamCompletion({
+                provider,
+                apiKeys: providerKeys(provider),
+                messages: plainMessages,
+                signal: abort.signal,
+                onReasoning: (text) => send("reasoning", { text }),
+              })) {
+                produced += delta;
+                send("delta", { text: delta });
+              }
+              failure = null;
+              break;
+            } catch (caught) {
+              failure = caught instanceof Error ? caught : new Error("The provider failed.");
+              if (abort.signal.aborted) break;
+            }
           }
         }
 
@@ -959,7 +1017,11 @@ export async function POST(request: Request) {
         // thrown provider errors.
         const refundReason = refundReasonFor({
           textLength: produced.length,
-          stopped: abort.signal.aborted ? "aborted" : failure ? "error" : "done",
+          stopped: abort.signal.aborted
+            ? "aborted"
+            : failure || !complete
+              ? "error"
+              : "done",
         });
 
         if (refundReason) await refundTurn(refundReason);

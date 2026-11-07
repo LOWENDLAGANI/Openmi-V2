@@ -1,7 +1,8 @@
 import "server-only";
 
-import type { ModelId } from "@/lib/models";
+import { AUTO_MODEL, type ModelId } from "@/lib/models";
 import {
+  autoChain,
   providerKeys,
   providersFor,
   streamChat,
@@ -95,7 +96,15 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
     })),
   ];
 
-  const chain = providersFor(options.model);
+  // Auto has no endpoint of its own: it is the queue. A named model keeps
+  // exactly one provider, so only Auto can move to another model mid-turn.
+  const chain =
+    options.model === AUTO_MODEL
+      ? autoChain(
+          [...options.history].reverse().find((message) => message.role === "user")
+            ?.content ?? ""
+        )
+      : providersFor(options.model);
 
   // A shell supersedes the GitHub reads it can do itself. Two tools with the
   // same name would be one too many: the provider would see `list_files` twice
@@ -197,9 +206,11 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
         break;
       } catch (caught) {
         failure = caught instanceof Error ? caught : new Error("The provider failed.");
-        // Mid-answer failure is not retried with another provider: two
-        // half-answers spliced together read as one confident wrong one.
-        if (text.length > 0 || options.signal.aborted) break;
+        // A step that already wrote text, or already asked for a tool, is not
+        // retried on another model: two half-answers spliced together read as
+        // one confident wrong one, and half a tool call is no call at all. A
+        // step that failed before either may move down Auto's queue.
+        if (providerText.length > 0 || fragments.size > 0 || options.signal.aborted) break;
       }
     }
 

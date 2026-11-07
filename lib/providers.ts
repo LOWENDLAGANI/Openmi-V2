@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  AUTO_MODEL,
   DEFAULT_MODEL,
   MODELS,
   type ModelCapability,
@@ -8,6 +9,8 @@ import {
 } from "@/lib/models";
 import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
 import { routeForModel } from "@/lib/models/routes";
+import { MAX_CHAIN_LENGTH, planChain } from "@/lib/routing/chain";
+import { classifyTask } from "@/lib/routing/classify";
 import { DEW_PER_HOUR } from "@/lib/dew";
 import {
   EmptyCompletionError,
@@ -142,10 +145,11 @@ export function providersFor(
   env: Record<string, string | undefined> = process.env,
   custom: readonly CustomModel[] = parseCustomModels(env.CUSTOM_MODELS).models
 ): Provider[] {
-  // "auto" is no longer a picker entry, but rows written before the catalogue
-  // shrank still name it. It means "the default model", not a second routing
-  // rule, so an old chat answers instead of failing.
-  const id = model === "auto" ? DEFAULT_MODEL : model;
+  // Auto is served by `autoChain` below, which is a queue rather than a single
+  // route. The paths that predate it — missions and verification read a chat's
+  // model and ask for one provider — still mean "the default model" by it, so an
+  // old row answers instead of failing.
+  const id = model === AUTO_MODEL ? DEFAULT_MODEL : model;
 
   const route = routeForModel(id, custom);
   if (!route) return [];
@@ -166,9 +170,21 @@ export function modelCatalogue(
 ): ModelCapability[] {
   const custom = parseCustomModels(env.CUSTOM_MODELS).models;
 
+  const callable = (id: ModelId) => providersFor(id, env, custom).length > 0;
+
+  // Auto is available when at least one model behind it is. It has no route of
+  // its own, so asking `providersFor("auto")` would answer with the default
+  // model's key and advertise Auto on a deployment that cannot route.
+  const anyConcrete =
+    MODELS.some((model) => model.id !== AUTO_MODEL && callable(model.id)) ||
+    custom.some(
+      (model) =>
+        !MODELS.some((builtin) => builtin.id === model.id) && callable(model.id)
+    );
+
   const catalogue: ModelCapability[] = MODELS.map((model) => ({
     ...model,
-    available: providersFor(model.id, env, custom).length > 0,
+    available: model.id === AUTO_MODEL ? anyConcrete : callable(model.id),
   }));
 
   for (const model of custom) {
@@ -188,6 +204,53 @@ export function modelCatalogue(
   }
 
   return catalogue;
+}
+
+/**
+ * Auto's queue: the models this deployment can call, best fit first.
+ *
+ * The message is classified once, then the queue is ordered by the registry's
+ * fitness. A model with no route or no key is not in the queue at all, so an
+ * attempt is never spent discovering a configuration gap that could be read.
+ *
+ * The vendors behind the queue stay server-side; the reader is never told which
+ * one answered, and never told that one failed to.
+ */
+export function autoChain(
+  prompt = "",
+  env: Record<string, string | undefined> = process.env
+): Provider[] {
+  const available = modelCatalogue(env)
+    .filter((entry) => entry.id !== AUTO_MODEL && entry.available === true)
+    .map((entry) => entry.id);
+
+  if (available.length === 0) return [];
+
+  const queue = planChain({
+    available,
+    task: classifyTask(prompt),
+    limit: MAX_CHAIN_LENGTH,
+  });
+
+  const custom = parseCustomModels(env.CUSTOM_MODELS).models;
+  const targets: Provider[] = [];
+  const seen = new Set<string>();
+
+  for (const candidate of queue) {
+    const provider = providersFor(candidate, env, custom)[0];
+    if (!provider) continue;
+
+    // Two ids can name the same upstream model (an alias, a custom entry that
+    // repeats a built-in route). Asking it twice would spend an attempt on the
+    // same failure.
+    const key = `${provider.id}:${provider.model}`;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    targets.push(provider);
+  }
+
+  return targets;
 }
 
 export function providersConfigured(

@@ -255,6 +255,44 @@ text has reached the reader nothing is retried, because a second attempt would
 replay the answer from the top. The setup probes still check the first key, and
 the rotation never leaves the server.
 
+## Auto
+
+Auto is a picker entry with no endpoint of its own. It reads the message, picks
+the model that fits, and keeps the rest of a queue behind it. The two concrete
+models keep the single-provider path they had; Auto is the only model that can
+move mid-answer.
+
+`lib/models/registry.ts` is a capability profile for the fifty-model pool — tier,
+task fit, vision, search, context — and carries no endpoint, upstream id or key.
+
+1. `classifyTask` reads the prompt once: code signals, reasoning signals, a URL or
+   "click the page", an attached image. That names the task kind.
+2. `planChain` orders Auto's queue over the models this deployment can actually
+   call, best fit first. A model with no route or key is skipped rather than
+   tried, and a vision request is never queued onto a model that cannot see.
+3. `streamRouted` walks the queue. A failure before the first character retries
+   the same request on the next model; a failure after it sends the text already
+   written as an assistant turn plus one instruction to continue from that exact
+   character. The rest streams into the same answer, and a leading replay of the
+   tail — or of the whole partial answer — is trimmed as it arrives.
+
+| Constant | Value |
+|---|---|
+| Queue length | 6 (`MAX_CHAIN_LENGTH`) |
+| Attempts per turn | 3 (`MAX_ROUTED_ATTEMPTS`) |
+| Trimmed overlap floor | 8 characters |
+| Lookahead before trimming | 32 characters |
+
+A model joins Auto's queue when it has a route and a key: the two built-ins today,
+plus any `CUSTOM_MODELS` entry whose id matches a registry profile. The hour still
+costs 2 Dew whatever answers, because `model_hour_dew` prices the model that was
+chosen — Auto — not the one it routed to.
+
+Nothing about a handover reaches the reader: no notice, no vendor name, no
+"continuing". Stop is not a handover — an aborted turn stops. If every endpoint
+fails after text was written, the partial answer is kept and reported as partial;
+if none wrote anything, the last error is the turn's one failure.
+
 ## Accessibility
 
 Semantic tokens only, and three appearances: paper (the default), carbon and ink.

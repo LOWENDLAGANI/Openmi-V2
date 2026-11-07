@@ -19,21 +19,25 @@ const MODELS_SOURCE = readFileSync(
 // scanned.
 const MODELS_CODE = MODELS_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "");
 
-test("the picker offers exactly the two models this deployment serves", () => {
+test("the picker offers Auto and the two models this deployment serves", () => {
   expect(MODELS.map((model) => model.id)).toEqual([
+    "auto",
     "gpt-oss-120b",
     "deepseek-flash",
   ]);
   expect(DEFAULT_MODEL).toBe("gpt-oss-120b");
   expect(MODELS.map((model) => model.name)).toEqual([
+    "Auto",
     "GPT OSS 120B",
     "DeepSeek V4.1 flash",
   ]);
+  expect(modelName("auto")).toBe("Auto");
   expect(modelName("deepseek-flash")).toBe("DeepSeek V4.1 flash");
   expect(modelName("unknown-model")).toBe("unknown-model");
 
-  // The retired entries are gone, not hidden behind an alias.
-  for (const gone of ["auto", "glm-4.6", "qwen3-coder", "kimi-k2", "deepseek-chat", "deepseek-reasoner"]) {
+  // Auto is a real entry now; the retired concrete models are still gone.
+  expect(hasModel(MODELS, "auto")).toBe(true);
+  for (const gone of ["glm-4.6", "qwen3-coder", "kimi-k2", "deepseek-chat", "deepseek-reasoner"]) {
     expect(hasModel(MODELS, gone)).toBe(false);
   }
 });
@@ -75,6 +79,7 @@ test("every model prices its own hour, and both cost the same today", () => {
 
   expect(modelHourDew("gpt-oss-120b")).toBe(2);
   expect(modelHourDew("deepseek-flash")).toBe(2);
+  expect(modelHourDew("auto")).toBe(2);
 
   // A model the catalogue does not know is charged the default, never nothing:
   // a missing price must not become a free hour.

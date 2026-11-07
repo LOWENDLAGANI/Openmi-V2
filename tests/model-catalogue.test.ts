@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import {
+  AUTO_MODEL,
   DEFAULT_MODEL,
   MODELS,
   MODEL_CATEGORIES,
@@ -28,13 +29,16 @@ test("the opening model is one the deployment can call", () => {
   const catalogue = [
     { ...MODELS[0]!, available: false },
     { ...MODELS[1]!, available: true },
+    { ...MODELS[2]!, available: true },
   ];
 
-  expect(firstAvailableModel(catalogue)).toBe("deepseek-flash");
+  expect(firstAvailableModel(catalogue)).toBe("gpt-oss-120b");
   expect(firstAvailableModel([])).toBe(DEFAULT_MODEL);
 
-  // Without a probe yet, the first entry is as good as any.
-  expect(firstAvailableModel(MODELS)).toBe(MODELS[0]?.id ?? DEFAULT_MODEL);
+  // Auto is a choice, not a silent default: a chat still opens on a concrete
+  // model when one is callable.
+  expect(firstAvailableModel(MODELS)).toBe("gpt-oss-120b");
+  expect(firstAvailableModel([{ ...MODELS[0]!, available: true }])).toBe("auto");
 });
 
 test("a custom model picks its own category and defaults to general", () => {
@@ -92,14 +96,20 @@ test("the picker renders one group per category", () => {
   expect(menu).toContain("{group.label}");
 });
 
-test("every built-in model has a provider route", () => {
+test("every built-in model has a provider route, and Auto has a queue", () => {
   for (const model of MODELS) {
+    if (model.id === AUTO_MODEL) {
+      // Auto is not one endpoint, so it has no single route to point at; its
+      // queue is built in lib/providers.ts.
+      expect(routeForModel(model.id)).toBeNull();
+      continue;
+    }
+
     expect(BUILTIN_ROUTES[model.id]).toBeDefined();
   }
 
   // Retired ids have no route and are not silently remapped by the router; the
   // chat route is the one place that maps an unknown id to the default model.
-  expect(routeForModel("auto")).toBeNull();
   expect(routeForModel("glm-4.6")).toBeNull();
   expect(routeForModel("nope")).toBeNull();
 });
