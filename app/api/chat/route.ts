@@ -488,6 +488,10 @@ export async function POST(request: Request) {
     // A persistent workspace may be described as such; a per-message box may
     // not, because its files are gone when the answer ends.
     persistentShell,
+    // A paused turn hands back an empty message. The clause is what makes the
+    // model continue its own work — in the sandbox it still has — instead of
+    // answering like a fresh chat.
+    continuation: Boolean(continuation),
   });
 
   const plainMessages: ChatMessage[] = [

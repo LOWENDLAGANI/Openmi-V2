@@ -19,6 +19,7 @@ import {
   dailyAllowance,
   formatDew,
   formatHourRemaining,
+  hourRemainingMs,
   isLowBalance,
   normalizeTimezone,
   roundDew,
@@ -156,6 +157,35 @@ test("the hour countdown reads as time left, and never goes negative", () => {
   // A session that outlives its hour still reads as a time, not as 62:03.
   expect(formatHourRemaining(3_723_000)).toBe("1:02:03");
   expect(formatHourRemaining(-5_000)).toBe("00:00");
+});
+
+test("the hour clock measures from the server and never promises more than an hour", () => {
+  const endsAt = "2026-11-07T11:00:00.000Z";
+
+  expect(hourRemainingMs({ endsAt, serverNow: "2026-11-07T10:00:00.000Z" })).toBe(
+    HOUR_SESSION_MS
+  );
+
+  // A device seven hours behind cannot turn a one-hour row into eight hours.
+  expect(
+    hourRemainingMs({
+      endsAt: "2026-11-07T18:00:00.000Z",
+      serverNow: "2026-11-07T10:00:00.000Z",
+    })
+  ).toBe(HOUR_SESSION_MS);
+
+  expect(
+    hourRemainingMs({
+      endsAt,
+      serverNow: "2026-11-07T10:30:00.000Z",
+      elapsedMs: 60_000,
+    })
+  ).toBe(1_740_000);
+
+  expect(hourRemainingMs({ endsAt, serverNow: "2026-11-07T11:30:00.000Z" })).toBe(0);
+  expect(
+    hourRemainingMs({ endsAt: "not a date", serverNow: "2026-11-07T10:00:00.000Z" })
+  ).toBeNull();
 });
 
 test("the charge gate runs before any provider request", () => {

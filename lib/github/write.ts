@@ -16,9 +16,10 @@ export { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
  * that path goes through `assertAgentBranch` first. A change the reader sends to
  * a named branch keeps that name only when it passes git's own rules and is not
  * the repository's default branch: the default branch is never written, so
- * naming it means "give this change its own branch". A named branch that has
- * moved since the diff was computed is not a dead end either — the change goes
- * to a new branch on top of the live head. Nothing is ever forced.
+ * naming it means "give this change its own branch" (an operator can opt into
+ * direct default-branch writes with `OPENMI_ALLOW_DEFAULT_BRANCH`). A named
+ * branch that has moved since the diff was computed is not a dead end either —
+ * the change goes to a new branch on top of the live head. Nothing is forced.
  * tests/github-read.test.ts keeps read-only modules GET-only and
  * tests/github-write.test.ts pins these rules and the request shapes.
  *
@@ -245,6 +246,7 @@ export async function commitProposal({
   changesetId,
   existingCommitSha,
   targetBranch,
+  allowDefaultBranch = false,
   onProgress,
 }: {
   token: string;
@@ -257,6 +259,11 @@ export async function commitProposal({
   existingCommitSha?: string;
   /** When set, commit straight to this branch instead of opening a PR. */
   targetBranch?: string;
+  /**
+   * When true, naming the repository's default branch writes to it instead of
+   * creating a new one. Off unless `OPENMI_ALLOW_DEFAULT_BRANCH` is set.
+   */
+  allowDefaultBranch?: boolean;
   onProgress?: (progress: { branch: string; commitSha?: string }) => Promise<void> | void;
 }): Promise<CommitOutcome> {
   if (!isRepoFullName(repo)) {
@@ -290,16 +297,17 @@ export async function commitProposal({
 
   // Policy before the first request. A pull request can only use the branch
   // derived from this changeset, based on the repository default. A change may
-  // name a branch instead, but the default branch is never written: Openmi edits
-  // on a branch of its own, so naming the default branch means "make a new
-  // one". A named agent branch is a pull-request path too, because a branch
-  // with no PR would be a half-finished approval.
+  // name a branch instead. The default branch is normally not written — Openmi
+  // edits on a branch of its own, so naming it means "make a new one" — unless
+  // the operator has allowed default-branch writes and this change named it. A
+  // named agent branch is a pull-request path either way, because a branch with
+  // no PR would be a half-finished approval.
   let direct = targetBranch !== undefined;
   let branch = direct
     ? (targetBranch ?? "").trim()
     : agentBranchName(changesetId);
 
-  if (direct && branch === defaultBranch) {
+  if (direct && branch === defaultBranch && !allowDefaultBranch) {
     direct = false;
     branch = agentBranchName(changesetId);
   } else if (direct && branch.startsWith(AGENT_BRANCH_PREFIX)) {

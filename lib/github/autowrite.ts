@@ -21,3 +21,19 @@ export function autoWriteEnabled(
   const flag = (env.OPENMI_AUTO_WRITE ?? "on").trim().toLowerCase();
   return flag !== "off" && flag !== "false" && flag !== "0" && flag !== "no";
 }
+
+/**
+ * Whether a reader who names the default branch may write straight to it.
+ *
+ * Off by default, and deliberately a separate switch from auto-write: skipping
+ * the click and rewriting the branch everyone deploys from are different
+ * decisions. Even when this is on, the assistant only uses the default branch
+ * when the change was sent to it by name — the derived destination is still a
+ * new `openmi/agent/` branch.
+ */
+export function defaultBranchWritesAllowed(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const flag = (env.OPENMI_ALLOW_DEFAULT_BRANCH ?? "off").trim().toLowerCase();
+  return flag === "on" || flag === "true" || flag === "1" || flag === "yes";
+}

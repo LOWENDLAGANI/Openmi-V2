@@ -13,6 +13,33 @@ import {
 
 const paths = Array.from({ length: 50 }, (_, index) => `src/module-${index}.ts`);
 
+test("a continued turn is told it still has its sandbox", () => {
+  const withShell = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc123",
+    context: "",
+    notes: [],
+    shell: true,
+    continuation: true,
+  });
+
+  expect(withShell).toContain("continues a turn");
+  expect(withShell).toContain("still have this chat's Linux sandbox");
+
+  const withoutShell = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc123",
+    context: "",
+    notes: [],
+    shell: false,
+    continuation: true,
+  });
+
+  expect(withoutShell).toContain("no sandbox in this turn");
+  // The environment is stated once, and only the true one.
+  expect(withShell).not.toContain("no sandbox in this turn");
+});
+
 test("the open file is kept and the tree is added", () => {
   const budget = assembleContext({
     paths,

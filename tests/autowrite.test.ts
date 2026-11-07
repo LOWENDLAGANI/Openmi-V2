@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { autoWriteEnabled } from "../lib/github/autowrite";
+import {
+  autoWriteEnabled,
+  defaultBranchWritesAllowed,
+} from "../lib/github/autowrite";
 
 const ROUTE = readFileSync(
   new URL("../app/api/chat/route.ts", import.meta.url),
@@ -19,6 +22,18 @@ test("auto-write is on unless an operator turns it off", () => {
 
   for (const off of ["off", "OFF", "false", "0", "no"]) {
     expect(autoWriteEnabled({ OPENMI_AUTO_WRITE: off })).toBe(false);
+  }
+});
+
+test("direct default-branch writes are a separate, off-by-default choice", () => {
+  expect(defaultBranchWritesAllowed({})).toBe(false);
+
+  for (const on of ["on", "TRUE", "1", "yes"]) {
+    expect(defaultBranchWritesAllowed({ OPENMI_ALLOW_DEFAULT_BRANCH: on })).toBe(true);
+  }
+
+  for (const off of ["off", "0", "no", ""]) {
+    expect(defaultBranchWritesAllowed({ OPENMI_ALLOW_DEFAULT_BRANCH: off })).toBe(false);
   }
 });
 

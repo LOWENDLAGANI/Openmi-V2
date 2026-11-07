@@ -153,8 +153,8 @@ clock, not stored as a hopeful flag.
 
 **Approval opens one branch and one pull request.** The default head is
 `openmi/agent/<changeset-id>`, and the default branch is refused by the write
-client before any request, so naming it means "give this change its own
-branch". A branch the reader names instead is used as-is; a named branch that
+client before any request unless `OPENMI_ALLOW_DEFAULT_BRANCH=on`, so naming it
+means "give this change its own branch". A branch the reader names instead is used as-is; a named branch that
 has moved since the diff was computed is not a dead end — the change goes to a
 new `openmi/agent/` branch on top of the live head, unforced. The PR base is the
 repository's default branch, read live from GitHub. Retrying after a failure
@@ -444,8 +444,8 @@ change goes straight to its own `openmi/agent/` branch and pull request, so the
 card reports what was written instead of asking. `OPENMI_AUTO_WRITE=off` brings
 the approval step back. With it off the card offers two choices: approve once,
 or **Approve and don't ask again for this branch**, which remembers the account,
-the repository and the chat's pinned branch. Either way the default branch is
-never written.
+the repository and the chat's pinned branch. The default branch is not written
+unless `OPENMI_ALLOW_DEFAULT_BRANCH=on` and the change names it.
 
 That is the whole change: it moves who approves from you to the build result. It
 still writes one `openmi/agent/` branch, still never the default branch, and the

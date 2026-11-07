@@ -602,6 +602,9 @@ export default async function ChatPage({
 
   const hourEndsAt =
     (hourResult.data as { expires_at?: string } | null)?.expires_at ?? null;
+  // The countdown measures against this, not against the device clock: a phone
+  // hours behind used to read an eight-hour session out of a one-hour row.
+  const hourServerNow = new Date().toISOString();
 
   const folders = (foldersResult.data ?? []) as Folder[];
   const allChats = (chatsResult.data ?? []) as Array<
@@ -735,6 +738,7 @@ export default async function ChatPage({
           trashedCount={trashedChats.length}
           repo={currentRepo}
           hourEndsAt={hourEndsAt}
+          hourServerNow={hourServerNow}
         />
       }
       eyebrow={eyebrow}

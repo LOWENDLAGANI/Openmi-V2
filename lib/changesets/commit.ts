@@ -6,6 +6,7 @@ import {
   verifyChangesetSignature,
   type ChangesetStatus,
 } from "@/lib/changesets";
+import { defaultBranchWritesAllowed } from "@/lib/github/autowrite";
 import { getRepo } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
@@ -334,6 +335,7 @@ export async function approveChangesetAndOpenPullRequest(
       changesetId: row.id,
       existingCommitSha: row.commit_sha ?? undefined,
       targetBranch: input.target?.branch.trim(),
+      allowDefaultBranch: defaultBranchWritesAllowed(),
       onProgress: async (progress) => {
         // Persisted before the next request so a partial write is resumable.
         await supabase

@@ -262,6 +262,37 @@ test("naming the default branch gives the change its own branch and a PR", async
   expect(calls.some((call) => call.method === "PATCH")).toBe(false);
 });
 
+test("the default branch is written only when an operator allows it", async () => {
+  const calls = stubFetch((method, path) => {
+    if (method === "GET" && path.endsWith("/git/ref/heads/main")) {
+      return { body: { object: { sha: "base-1" } } };
+    }
+    if (method === "PATCH" && path.endsWith("/git/refs/heads/main")) {
+      return { body: { object: { sha: "commit-1" } } };
+    }
+    return happyPath(method, path);
+  });
+
+  const outcome = await commitProposal({
+    ...BASE,
+    targetBranch: "main",
+    allowDefaultBranch: true,
+  });
+
+  expect(outcome).toEqual({
+    branch: "main",
+    baseBranch: "main",
+    commitSha: "commit-1",
+    prUrl: null,
+    prNumber: null,
+  });
+
+  const patch = calls.find((call) => call.method === "PATCH");
+  expect(patch?.path).toBe("/repos/octocat/hello/git/refs/heads/main");
+  expect(patch?.body).toEqual({ sha: "commit-1", force: false });
+  expect(calls.some((call) => call.path.endsWith("/pulls"))).toBe(false);
+});
+
 test("an existing branch at the pinned base is fast-forwarded, never forced", async () => {
   const calls = stubFetch((method, path) => {
     if (method === "GET" && path.endsWith("/git/ref/heads/release")) {

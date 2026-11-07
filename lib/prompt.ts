@@ -37,6 +37,23 @@ export const SYSTEM_PROMPT = [
   PROPOSE_CLAUSE,
 ].join("\n\n");
 
+/**
+ * The handover instruction for a turn that was continued, not started.
+ *
+ * A paused turn comes back with an empty message: the history ends in the
+ * answer that was cut off. Without this clause the model reads that as a
+ * finished turn and starts again — greeting the reader, or describing the
+ * command it could run instead of running it in the sandbox it still has.
+ */
+export function continuationClause(shell: boolean): string {
+  return [
+    "This message continues a turn whose answer was cut off by its time limit. Continue from the exact point where the answer stopped; do not restart it, do not greet the user, and do not summarise what is already above.",
+    shell
+      ? "You still have this chat's Linux sandbox and its tools: if the next step is a command, run it now instead of describing it."
+      : "You have no sandbox in this turn; say so if the next step needs one.",
+  ].join(" ");
+}
+
 export function buildSystemPrompt({
   repo,
   sha,
@@ -46,6 +63,7 @@ export function buildSystemPrompt({
   sandbox = false,
   shell = true,
   persistentShell = false,
+  continuation = false,
 }: {
   repo: string | null;
   sha: string | null;
@@ -58,6 +76,8 @@ export function buildSystemPrompt({
   shell?: boolean;
   /** True when the workspace survives between messages in this chat. */
   persistentShell?: boolean;
+  /** True when this message continues a turn that hit its time limit. */
+  continuation?: boolean;
 }): string {
   // A persistent workspace changes what the model may promise: files and a
   // background process both stay until they are stopped or the box is swept.
@@ -91,6 +111,10 @@ export function buildSystemPrompt({
         ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The user reviews each file and may approve it, which opens a pull request; only an approval writes to GitHub, and the default branch is never touched."
         : "Editing is unavailable in this turn. Answer with citations only, and say so if the user asks for a change."
     );
+  }
+
+  if (continuation) {
+    tail.push(continuationClause(shell));
   }
 
   if (notes.length > 0) {

@@ -272,6 +272,13 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: 'Defaults to on; set to "off" to require the click on the review card',
   },
   {
+    key: "OPENMI_ALLOW_DEFAULT_BRANCH",
+    scope: "server",
+    required: false,
+    unlocks: "Writing straight to the default branch when a change names it",
+    hint: 'Off by default; set to "on" only if you want main written without a pull request',
+  },
+  {
     key: "CRON_SECRET",
     scope: "server",
     required: false,

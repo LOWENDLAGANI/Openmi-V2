@@ -105,6 +105,36 @@ export function formatHourRemaining(ms: number): string {
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+/**
+ * How long the paid hour has left, measured from the server's clock.
+ *
+ * The subscription this fixes is a real one: a device whose clock is seven
+ * hours behind turns "one hour left" into "eight hours left", because the old
+ * countdown compared a server timestamp with `Date.now()` on the phone. The
+ * server's own `now` is the reference here, and `elapsedMs` is a monotonic
+ * client tick, so wall-clock skew cannot stretch the hour.
+ *
+ * The result is also capped at the hour the product sells. An expiry further
+ * out than `HOUR_SESSION_MS` is a data or clock anomaly, not a second paid
+ * hour, and the clock must not promise one.
+ */
+export function hourRemainingMs(input: {
+  endsAt: string;
+  serverNow: string;
+  elapsedMs?: number;
+  limitMs?: number;
+}): number | null {
+  const ends = Date.parse(input.endsAt);
+  const base = Date.parse(input.serverNow);
+
+  if (!Number.isFinite(ends) || !Number.isFinite(base)) return null;
+
+  const elapsed = Number.isFinite(input.elapsedMs) ? Math.max(0, input.elapsedMs ?? 0) : 0;
+  const limit = input.limitMs ?? HOUR_SESSION_MS;
+
+  return Math.min(Math.max(0, limit), Math.max(0, ends - base - elapsed));
+}
+
 /** The daily allowance for an account, in Dew. */
 export function dailyAllowance(hasPaid: boolean): number {
   return hasPaid ? PAID_DAILY_FREE_DEW : DAILY_FREE_DEW;

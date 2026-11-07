@@ -203,6 +203,7 @@ export function Sidebar({
   trashedCount,
   repo,
   hourEndsAt,
+  hourServerNow,
 }: {
   email: string;
   folders: Folder[];
@@ -213,6 +214,8 @@ export function Sidebar({
   repo?: { fullName: string; branch: string; sha: string } | null;
   /** ISO end of the running paid hour, or null when nothing is running. */
   hourEndsAt?: string | null;
+  /** The server's clock at render, so the countdown cannot be skewed by a device. */
+  hourServerNow?: string | null;
 }) {
   // A new chat should start where the reader already is. Without the repo in
   // this link, picking a repository and pressing "New chat" dropped the
@@ -260,7 +263,9 @@ export function Sidebar({
 
       {/* The hour is the unit that was paid for, so its clock belongs where the
           reader already looks, not on a page they have to remember to open. */}
-      {hourEndsAt ? <HourCountdown endsAt={hourEndsAt} /> : null}
+      {hourEndsAt && hourServerNow ? (
+        <HourCountdown endsAt={hourEndsAt} serverNow={hourServerNow} />
+      ) : null}
 
       {/* Five tools, five icons: search, the repository picker, spending, plans
           and trash. Named rows would eat the height the conversation list needs
