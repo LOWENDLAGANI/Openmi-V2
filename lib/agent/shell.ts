@@ -17,6 +17,12 @@ export const CHAT_SHELL_TOOL_NAMES = [
   "write_file",
   "list_files",
   "search_files",
+  // A terminal is not only commands that exit. A dev server or a watcher is
+  // started, read and stopped, the same way a person uses one, and the three
+  // calls are separate because each one returns before the next is decided.
+  "start_process",
+  "read_process",
+  "kill_process",
   // The headless browser is part of the same box, so it is part of the same
   // surface: a question about a page is answered by looking at the page.
   "browser",
@@ -32,6 +38,22 @@ export const CHAT_SHELL_BUDGET_MS = 200_000;
 
 /** One command's ceiling, inside the turn's own budget. */
 export const CHAT_SHELL_COMMAND_MS = 120_000;
+
+/** Background processes one message may start before it has to stop one. */
+export const CHAT_SHELL_MAX_PROCESSES = 4;
+
+/** Lines one read of a process log returns. */
+export const CHAT_SHELL_PROCESS_LINES = 200;
+
+/**
+ * Where a chat's background processes keep their log and pid file.
+ *
+ * Deliberately outside the workspace: the same files inside the repository
+ * would show up as an untracked change in the diff the user is asked to
+ * review. `/tmp` is one of the sandbox's writable roots and is gone with the
+ * box, so a process that outlives its message cannot outlive its disk.
+ */
+export const CHAT_PROCESS_DIR = "/tmp/openmi-chat";
 
 export const CHAT_SHELL_READ_LINES = 200;
 export const CHAT_SHELL_LIST_MAX = 300;
@@ -78,6 +100,19 @@ export function describeShellCall(
     return `Search for ${JSON.stringify(args.query)}`;
   }
 
+  if (name === "start_process") {
+    const purpose = typeof args.purpose === "string" ? args.purpose.trim() : "";
+    if (purpose.length > 0) return purpose;
+    const command = typeof args.command === "string" ? args.command.trim() : "";
+    return command.length > 0 ? `Start ${command}` : "Start a process";
+  }
+
+  if (name === "read_process" || name === "kill_process") {
+    const id = typeof args.id === "string" ? args.id : "";
+    const verb = name === "read_process" ? "Read" : "Stop";
+    return id.length > 0 ? `${verb} process ${id}` : verb;
+  }
+
   if (name === "browser") {
     const purpose = typeof args.purpose === "string" ? args.purpose.trim() : "";
     if (purpose.length > 0) return purpose;
@@ -113,6 +148,74 @@ export function shellSearchCommand(query: string, path: string): string {
     `grep -rnIF --exclude-dir=node_modules --exclude-dir=.git -- ${shellQuote(query)} ${root}`,
     `head -n ${CHAT_SHELL_SEARCH_MAX}`,
   ].join(" | ");
+}
+
+/**
+ * The id of one background process.
+ *
+ * The start time, not a counter: a persistent workspace keeps processes across
+ * messages, so a counter that restarts at `p1` would collide with the log of
+ * the process the previous message started.
+ */
+export function chatProcessId(now: number = Date.now()): string {
+  return `p${Math.trunc(now)}`;
+}
+
+/** A process id, shaped by `chatProcessId` and nothing else. */
+export function isChatProcessId(value: unknown): value is string {
+  return typeof value === "string" && /^p[1-9][0-9]{0,14}$/.test(value);
+}
+
+export function chatProcessLogPath(id: string): string {
+  return `${CHAT_PROCESS_DIR}/${id}.log`;
+}
+
+export function chatProcessPidPath(id: string): string {
+  return `${CHAT_PROCESS_DIR}/${id}.pid`;
+}
+
+/**
+ * Starts one command detached, with its output going to a file.
+ *
+ * `setsid` puts the command in its own process group, so stopping it stops
+ * everything it spawns — a dev server's worker is part of the terminal it was
+ * started from, not a leftover. The pid is written after the fork, so the next
+ * call can find the group again; nothing here waits for the command, which is
+ * what makes it background.
+ */
+export function startProcessCommand(command: string, id: string): string {
+  return [
+    `mkdir -p ${CHAT_PROCESS_DIR}`,
+    `nohup setsid bash -c ${shellQuote(command)} > ${chatProcessLogPath(id)} 2>&1 &`,
+    `echo $! > ${chatProcessPidPath(id)}`,
+  ].join("\n");
+}
+
+export function readProcessCommand(id: string, lines: number): string {
+  return `tail -n ${lines} ${chatProcessLogPath(id)} 2>/dev/null || echo "(no output yet)"`;
+}
+
+/**
+ * Stops the process group, then removes the pid file.
+ *
+ * A server that ignores SIGTERM is why the SIGKILL is there: "stopped" has to
+ * mean the port is free, not that a signal was delivered. Both are sent to the
+ * group first and to the pid alone when the group is already gone.
+ */
+export function killProcessCommand(id: string): string {
+  const pid = chatProcessPidPath(id);
+
+  return [
+    `if [ -f ${pid} ]; then`,
+    `  p=$(cat ${pid})`,
+    `  kill -TERM -"$p" 2>/dev/null || kill -TERM "$p" 2>/dev/null`,
+    `  sleep 0.2`,
+    `  kill -KILL -"$p" 2>/dev/null || kill -KILL "$p" 2>/dev/null`,
+    `  rm -f ${pid}`,
+    `  echo "stopped ${id}"`,
+    `else echo "no such process"`,
+    `fi`,
+  ].join("\n");
 }
 
 /** The line-numbered form of a read, so a citation from the sandbox is checkable. */

@@ -38,14 +38,22 @@ import {
 import {
   CHAT_SHELL_COMMAND_MS,
   CHAT_SHELL_LIST_MAX,
+  CHAT_SHELL_MAX_COMMANDS,
+  CHAT_SHELL_MAX_PROCESSES,
+  CHAT_SHELL_PROCESS_LINES,
   CHAT_SHELL_READ_LINES,
   CHAT_SHELL_SEARCH_MAX,
   CHAT_SHELL_TOOL_NAMES,
+  chatProcessId,
   describeShellCall,
+  isChatProcessId,
   isShellTool,
+  killProcessCommand,
+  readProcessCommand,
   shellListCommand,
   shellReadCommand,
   shellSearchCommand,
+  startProcessCommand,
   withLineNumbers,
 } from "./shell";
 import type { ToolResult } from "./tools";
@@ -117,7 +125,31 @@ function specs(): MissionToolDefinition[] {
       return {
         ...tool,
         description:
-          "Run one shell command in the workspace and wait for it. Returns the exit code and the tail of stdout/stderr. A command that does not exit is stopped at the timeout; this message cannot leave a process running in the background.",
+          "Run one shell command in the workspace and wait for it. Returns the exit code and the tail of stdout/stderr. A command that does not exit is stopped at the timeout; use start_process for anything that should keep running.",
+      };
+    }
+
+    if (tool.name === "start_process") {
+      return {
+        ...tool,
+        description:
+          "Start a command in the background (a dev server, a watcher, a build you want to inspect while it runs) and get an id. It keeps running after this call. Read its output with read_process and stop it with kill_process. A workspace that survives this message keeps the process too; a per-message sandbox stops it when the answer ends.",
+      };
+    }
+
+    if (tool.name === "read_process") {
+      return {
+        ...tool,
+        description:
+          "Read the tail of a background process started with start_process, including anything it printed since the last read.",
+      };
+    }
+
+    if (tool.name === "kill_process") {
+      return {
+        ...tool,
+        description:
+          "Stop a background process started with start_process, and everything it spawned, so its port is free.",
       };
     }
 
@@ -158,6 +190,8 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
   let starting: Promise<ToolResult | null> | null = null;
   let commands = 0;
   let closed = false;
+  /** Processes this message started, for the cap and for the stop on close. */
+  const processes = new Set<string>();
 
   async function ensure(): Promise<ToolResult | null> {
     if (sandbox) return null;
@@ -487,6 +521,89 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
         ok: true,
         text: `${path} written (${args.content.length} characters). Nothing has been committed or pushed.`,
       };
+    }
+
+    if (name === "start_process") {
+      const validated = validateCommandArguments(args);
+      if (!validated.ok) return failure(`bad-input: ${validated.error}`);
+
+      if (commands >= CHAT_SHELL_MAX_COMMANDS) {
+        return failure(
+          `This message has used its ${CHAT_SHELL_MAX_COMMANDS}-command budget.`
+        );
+      }
+
+      if (processes.size >= CHAT_SHELL_MAX_PROCESSES) {
+        return failure(
+          `This message can start ${CHAT_SHELL_MAX_PROCESSES} background processes at a time; stop one with kill_process first.`
+        );
+      }
+
+      const id = chatProcessId();
+      const cwd = validated.cwd
+        ? `${MISSION_WORKDIR}/${validated.cwd}`
+        : MISSION_WORKDIR;
+
+      const started = await execDetailed(
+        startProcessCommand(validated.command, id),
+        cwd,
+        30_000
+      );
+
+      if (!started.ok) return started;
+      if (started.failed) {
+        return failure(`The process could not be started.\n${started.text}`);
+      }
+
+      processes.add(id);
+
+      return {
+        ok: true,
+        text: `Started ${id} (${validated.purpose}). It runs in the background; read it with read_process and stop it with kill_process.`,
+      };
+    }
+
+    if (name === "read_process") {
+      if (!isChatProcessId(args.id)) {
+        return failure("bad-input: id must be the value start_process returned");
+      }
+
+      const lines =
+        typeof args.lines === "number"
+          ? Math.min(CHAT_SHELL_PROCESS_LINES, Math.max(1, Math.trunc(args.lines)))
+          : 80;
+
+      const read = await execDetailed(
+        readProcessCommand(args.id, lines),
+        MISSION_WORKDIR,
+        30_000
+      );
+
+      if (!read.ok) return read;
+
+      return {
+        ok: true,
+        text: `${args.id}, last ${lines} line(s)\n\n${read.tail.length > 0 ? read.tail : "(no output yet)"}`,
+        tail: read.tail,
+      };
+    }
+
+    if (name === "kill_process") {
+      if (!isChatProcessId(args.id)) {
+        return failure("bad-input: id must be the value start_process returned");
+      }
+
+      const killed = await execDetailed(
+        killProcessCommand(args.id),
+        MISSION_WORKDIR,
+        30_000
+      );
+
+      if (!killed.ok) return killed;
+
+      processes.delete(args.id);
+
+      return { ok: true, text: killed.text, tail: killed.tail };
     }
 
     if (name === "list_files") {

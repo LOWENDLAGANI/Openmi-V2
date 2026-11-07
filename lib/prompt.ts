@@ -50,11 +50,13 @@ export function buildSystemPrompt({
   /** True when the workspace survives between messages in this chat. */
   persistentShell?: boolean;
 }): string {
-  // A persistent workspace changes what the model may promise: files stay, but
-  // a command that never exits still does not outlive its timeout.
+  // A persistent workspace changes what the model may promise: files and a
+  // background process both stay until they are stopped or the box is swept.
+  // A per-message box is the opposite, and the prompt says which one this is
+  // rather than letting the model assume it has a terminal that outlives it.
   const shellClause = persistentShell
-    ? `${SHELL_CLAUSE} This chat's workspace persists between messages: files you create or change stay for the next message in this chat. Background processes do not; every command must finish within its timeout.`
-    : SHELL_CLAUSE;
+    ? `${SHELL_CLAUSE} This chat's workspace persists between messages: files you create or change stay for the next message in this chat, and a background process you start with start_process keeps running too. Read it with read_process and stop it with kill_process when it is no longer needed.`
+    : `${SHELL_CLAUSE} The sandbox for this message is destroyed when the answer ends, so a background process you start is stopped then.`;
 
   // Default to shell execution for standard runs.
   const head = shell

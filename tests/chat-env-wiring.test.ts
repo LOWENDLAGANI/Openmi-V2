@@ -61,6 +61,10 @@ test("only a persistent workspace is described to the model as persistent", () =
   const perMessage = buildSystemPrompt({ ...base, shell: true });
 
   expect(persistent).toContain("persists between messages");
-  expect(persistent).toContain("Background processes do not");
+  // A background process is part of what persists now, so the prompt promises
+  // exactly that and tells the model how to stop it.
+  expect(persistent).toContain("keeps running too");
+  expect(persistent).toContain("kill_process");
   expect(perMessage).not.toContain("persists between messages");
+  expect(perMessage).toContain("destroyed when the answer ends");
 });
