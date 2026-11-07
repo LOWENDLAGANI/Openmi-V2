@@ -7,6 +7,11 @@ import {
   profileForModel,
   type ModelProfile,
 } from "../lib/models/registry";
+import { BUILTIN_ROUTES } from "../lib/models/routes";
+import {
+  AUTO_EXCLUDED_PROVIDERS,
+  autoMaySpend,
+} from "../lib/routing/auto-eligibility";
 import { fitness, MAX_CHAIN_LENGTH, planChain } from "../lib/routing/chain";
 import { classifyTask } from "../lib/routing/classify";
 import {
@@ -206,6 +211,26 @@ test("the real pool plans a queue over the models this build can call", () => {
   expect(queue.length).toBeLessThanOrEqual(MAX_CHAIN_LENGTH);
 });
 
+test("Auto never queues a model billed to the owner's own balance", () => {
+  // DeepSeek is prepaid against the owner's account. Auto used to queue every
+  // model that had a key, so a request nobody aimed at DeepSeek still spent it.
+  expect(autoMaySpend(BUILTIN_ROUTES["deepseek-flash"]!.provider)).toBe(false);
+  expect(autoMaySpend("openrouter")).toBe(true);
+  expect(AUTO_EXCLUDED_PROVIDERS.has("deepseek")).toBe(true);
+
+  // The exclusion is the queue, not the route: naming the model still works.
+  expect(BUILTIN_ROUTES["deepseek-flash"]).toEqual({
+    provider: "deepseek",
+    upstream: "deepseek-flash",
+  });
+
+  // Both the pool Auto builds and the availability the picker reads apply it,
+  // or Auto would be offered on a deployment where every request fails.
+  const providers = source("../lib/providers.ts");
+  expect(providers.match(/autoMaySpend\(route\.provider\)/g)?.length).toBe(2);
+  expect(providers).toContain("const autoEligible");
+});
+
 test("Auto is a catalogue entry with a price, not a route", () => {
   const auto = MODELS.find((model) => model.id === AUTO_MODEL);
 
@@ -222,7 +247,9 @@ test("Auto's queue is built from callable models, and Auto is never in it", () =
   const providers = source("../lib/providers.ts");
 
   expect(providers).toContain("export function autoChain");
-  expect(providers).toContain("entry.id !== AUTO_MODEL");
+  // Auto is filtered out at the top of the queue's filter, so it can never be
+  // one of its own targets.
+  expect(providers).toContain("entry.id === AUTO_MODEL || entry.available !== true");
   expect(providers).toContain("classifyTask(prompt)");
   expect(providers).toContain("planChain(");
 

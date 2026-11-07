@@ -48,21 +48,21 @@ export const PLANS: readonly Plan[] = [
     name: "Starter",
     price: 15,
     dew: 20,
-    blurb: "Roughly six chat hours, and the paid daily allowance.",
+    blurb: "Roughly ten chat hours, and the paid daily allowance.",
   },
   {
     id: "pro",
     name: "Pro",
     price: 35,
     dew: 50,
-    blurb: "Roughly sixteen chat hours, for a project week.",
+    blurb: "Roughly twenty-five chat hours, for a project week.",
   },
   {
     id: "studio",
     name: "Studio",
     price: 60,
     dew: 100,
-    blurb: "Roughly thirty-three hours, for a long sprint.",
+    blurb: "Roughly fifty hours, for a long sprint.",
   },
 ];
 

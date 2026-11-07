@@ -146,6 +146,27 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to the Sociabuzz page in lib/billing/plans.ts",
   },
   {
+    key: "RESEND_API_KEY",
+    scope: "server",
+    required: false,
+    unlocks: "Emails you the receipt when a member uploads one",
+    hint: "resend.com → API keys; without it the upload still waits in /admin",
+  },
+  {
+    key: "RECEIPT_NOTIFY_EMAIL",
+    scope: "server",
+    required: false,
+    unlocks: "Which inbox receives uploaded receipts",
+    hint: "Defaults to the first address in ADMIN_EMAILS",
+  },
+  {
+    key: "RECEIPT_FROM_EMAIL",
+    scope: "server",
+    required: false,
+    unlocks: "The sender line on receipt notifications",
+    hint: "Defaults to the Resend test sender, which only reaches the account owner",
+  },
+  {
     key: "NEXT_PUBLIC_ADSTERRA_LEADERBOARD_KEY",
     scope: "public",
     required: false,

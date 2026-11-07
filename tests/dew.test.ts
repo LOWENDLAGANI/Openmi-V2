@@ -18,6 +18,7 @@ import {
   TRIAL_GRANT_WINDOW_HOURS,
   dailyAllowance,
   formatDew,
+  formatHourRemaining,
   isLowBalance,
   normalizeTimezone,
   roundDew,
@@ -145,6 +146,16 @@ test("the paid benefits are the ones advertised", () => {
   expect(plans).toContain("Bumped up to 15 Dew a day");
   expect(plans).toContain("Priority support");
   expect(plans).toContain("Everything in free");
+});
+
+test("the hour countdown reads as time left, and never goes negative", () => {
+  expect(formatHourRemaining(0)).toBe("00:00");
+  expect(formatHourRemaining(1_000)).toBe("00:01");
+  expect(formatHourRemaining(59_000)).toBe("00:59");
+  expect(formatHourRemaining(61_000)).toBe("01:01");
+  // A session that outlives its hour still reads as a time, not as 62:03.
+  expect(formatHourRemaining(3_723_000)).toBe("1:02:03");
+  expect(formatHourRemaining(-5_000)).toBe("00:00");
 });
 
 test("the charge gate runs before any provider request", () => {

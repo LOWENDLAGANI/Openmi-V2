@@ -9,6 +9,7 @@ import {
 } from "@/lib/models";
 import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
 import { routeForModel } from "@/lib/models/routes";
+import { autoMaySpend } from "@/lib/routing/auto-eligibility";
 import { MAX_CHAIN_LENGTH, planChain } from "@/lib/routing/chain";
 import { classifyTask } from "@/lib/routing/classify";
 import { DEW_PER_HOUR } from "@/lib/dew";
@@ -175,11 +176,21 @@ export function modelCatalogue(
   // Auto is available when at least one model behind it is. It has no route of
   // its own, so asking `providersFor("auto")` would answer with the default
   // model's key and advertise Auto on a deployment that cannot route.
+  //
+  // "Behind it" means the models Auto is allowed to queue: a deployment whose
+  // only key is excluded (see AUTO_EXCLUDED_PROVIDERS) must not advertise Auto,
+  // because every Auto request would end in "no model is available".
+  const autoEligible = (id: ModelId) => {
+    const route = routeForModel(id, custom);
+    if (!route || !autoMaySpend(route.provider)) return false;
+    return callable(id);
+  };
+
   const anyConcrete =
-    MODELS.some((model) => model.id !== AUTO_MODEL && callable(model.id)) ||
+    MODELS.some((model) => model.id !== AUTO_MODEL && autoEligible(model.id)) ||
     custom.some(
       (model) =>
-        !MODELS.some((builtin) => builtin.id === model.id) && callable(model.id)
+        !MODELS.some((builtin) => builtin.id === model.id) && autoEligible(model.id)
     );
 
   const catalogue: ModelCapability[] = MODELS.map((model) => ({
@@ -220,8 +231,18 @@ export function autoChain(
   prompt = "",
   env: Record<string, string | undefined> = process.env
 ): Provider[] {
+  const custom = parseCustomModels(env.CUSTOM_MODELS).models;
+
+  // A model with a key is not automatically a model Auto may spend. DeepSeek is
+  // excluded here rather than in the route table so naming it in the picker
+  // still resolves — only the queue leaves it out.
   const available = modelCatalogue(env)
-    .filter((entry) => entry.id !== AUTO_MODEL && entry.available === true)
+    .filter((entry) => {
+      if (entry.id === AUTO_MODEL || entry.available !== true) return false;
+      const route = routeForModel(entry.id, custom);
+      if (!route) return false;
+      return autoMaySpend(route.provider);
+    })
     .map((entry) => entry.id);
 
   if (available.length === 0) return [];
@@ -231,8 +252,6 @@ export function autoChain(
     task: classifyTask(prompt),
     limit: MAX_CHAIN_LENGTH,
   });
-
-  const custom = parseCustomModels(env.CUSTOM_MODELS).models;
   const targets: Provider[] = [];
   const seen = new Set<string>();
 

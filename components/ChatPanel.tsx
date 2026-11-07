@@ -11,6 +11,7 @@ import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
 import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
+import { PendingButton } from "@/components/PendingButton";
 import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
@@ -302,6 +303,9 @@ export function ChatPanel({
     let assembled = "";
     let thinkingText = "";
     let sawDone = false;
+    // True once a transcript message owns this turn's steps, so the live console
+    // below can be cleared without losing them.
+    let stepsCarried = false;
     let optimisticId: string | null = null;
 
     // Steps belong to the answer they produced, so they are collected here and
@@ -561,7 +565,8 @@ export function ChatPanel({
           ]);
           setPending("");
           sawDone = true;
-          setSteps([]);
+          // The finished message carries the steps now.
+          stepsCarried = true;
           setShots([]);
           if (stopTimerRef.current) {
             window.clearTimeout(stopTimerRef.current);
@@ -586,7 +591,8 @@ export function ChatPanel({
           setError(typeof payload.message === "string" ? payload.message : "The turn failed.");
           setPending("");
           sawDone = true;
-          setSteps([]);
+          // The steps stay: a failed turn has no message to carry them, and
+          // the command output is the only evidence of what went wrong.
         }
       };
 
@@ -625,6 +631,7 @@ export function ChatPanel({
       // server's final "done", the part already on screen becomes a message
       // instead of vanishing with the composer state.
       if (!sawDone && assembled.trim().length > 0) {
+        stepsCarried = true;
         setMessages((current) => [
           ...current,
           {
@@ -634,13 +641,17 @@ export function ChatPanel({
             seq: null,
             model,
             thinking: thinkingText,
+            steps: [...stepLog],
           },
         ]);
       }
 
-      // Steps are live progress, not transcript. Leaving them set is what kept
-      // the "thinking" pill on screen after a turn had already ended.
-      setSteps([]);
+      // A finished or stopped answer carries its console on the message card, so
+      // the live copy can go. A turn that failed, or stopped before any text,
+      // keeps the console on screen: that output is the only record of what the
+      // sandbox did, and clearing it is what made a failed run impossible to
+      // diagnose.
+      setSteps(stepsCarried ? [] : [...stepLog]);
       setPending("");
       setThinking("");
     }
@@ -691,7 +702,9 @@ export function ChatPanel({
   }
 
   function retry() {
-    if (lastSent.length > 0) void send(lastSent);
+    // Return the promise so the button holds its pending state until the turn
+    // it started actually settles.
+    if (lastSent.length > 0) return send(lastSent);
   }
 
   return (
@@ -824,16 +837,22 @@ export function ChatPanel({
 
                 {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
-                {steps.length > 0 && <StepList steps={steps} live />}
+                {/* `live` follows the turn, not the panel: a console kept after
+                    a failure must not still claim to be running. */}
+                {steps.length > 0 && <StepList steps={steps} live={streaming} />}
 
                 {shots.length > 0 && <ShotStrip shots={shots} />}
 
                 {pending.length === 0 ? (
-                  <AiThinking
-                    steps={steps}
-                    streaming={streaming}
-                    backgroundRunning={backgroundRunning}
-                  />
+                  // Only while a turn is in flight. A console kept from a failed
+                  // turn must not put a "thinking" pill back on screen.
+                  (streaming || backgroundRunning) && (
+                    <AiThinking
+                      steps={steps}
+                      streaming={streaming}
+                      backgroundRunning={backgroundRunning}
+                    />
+                  )
                 ) : (
                   <MessageBody
                     content={pending}
@@ -873,14 +892,14 @@ export function ChatPanel({
                 Open that chat
               </a>
             )}
-            <button
-              type="button"
-              onClick={() => void endAndRetry(conflict)}
+            <PendingButton
+              onAction={() => endAndRetry(conflict)}
               disabled={streaming}
-              className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90 disabled:opacity-50"
+              pendingText="Ending…"
+              className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
             >
               End session &amp; retry
-            </button>
+            </PendingButton>
             <button
               type="button"
               onClick={() => setConflict(null)}
@@ -899,14 +918,14 @@ export function ChatPanel({
         >
           <span className="min-w-0">{error}</span>
           {lastSent.length > 0 && (
-            <button
-              type="button"
-              onClick={retry}
+            <PendingButton
+              onAction={retry}
               disabled={streaming}
-              className="rounded-full border border-danger/40 px-2.5 py-0.5 text-[11px] hover:opacity-90 disabled:opacity-50"
+              pendingText="Retrying…"
+              className="rounded-full border border-danger/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
             >
               Retry
-            </button>
+            </PendingButton>
           )}
         </div>
       )}
@@ -1079,33 +1098,51 @@ function ThinkingBlock({ text, live = false }: { text: string; live?: boolean })
   );
 }
 
+/**
+ * One step, with its terminal.
+ *
+ * A step that ran a command opens with that command and its output in view.
+ * The transcript is the only place the sandbox's work survives the turn, and a
+ * row that folds itself shut the moment it completes is why a finished run
+ * looked like it had done nothing. Collapsing stays the reader's call, and the
+ * open state is local so a re-render does not force it back open.
+ */
+function StepRow({ step }: { step: StepLine }) {
+  const hasConsole = Boolean(step.command || step.output);
+  const [open, setOpen] = useState(hasConsole);
+
+  return (
+    <li className="agent-step" data-state={step.state}>
+      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+        <summary>
+          <span aria-hidden="true" className="agent-step-icon">
+            {step.state === "start"
+              ? "…"
+              : step.state === "error"
+                ? "✕"
+                : hasConsole
+                  ? "›_"
+                  : "·"}
+          </span>
+          <span className="agent-step-title">{step.detail}</span>
+          <span aria-hidden="true" className="agent-step-chevron">
+            ›
+          </span>
+        </summary>
+        {step.command && <pre className="agent-step-command">{step.command}</pre>}
+        {step.output && step.output.trim().length > 0 && (
+          <pre className="agent-step-output">{step.output}</pre>
+        )}
+      </details>
+    </li>
+  );
+}
+
 function StepList({ steps, live = false }: { steps: StepLine[]; live?: boolean }) {
   return (
     <ol className="agent-steps" data-live={live ? "true" : "false"}>
       {steps.map((step, index) => (
-        <li key={`${step.detail}-${index}`} className="agent-step" data-state={step.state}>
-          <details>
-            <summary>
-              <span aria-hidden="true" className="agent-step-icon">
-                {step.state === "start"
-                  ? "…"
-                  : step.state === "error"
-                    ? "✕"
-                    : step.command || step.output
-                      ? "›_"
-                      : "·"}
-              </span>
-              <span className="agent-step-title">{step.detail}</span>
-              <span aria-hidden="true" className="agent-step-chevron">
-                ›
-              </span>
-            </summary>
-            {step.command && <pre className="agent-step-command">{step.command}</pre>}
-            {step.output && step.output.trim().length > 0 && (
-              <pre className="agent-step-output">{step.output}</pre>
-            )}
-          </details>
-        </li>
+        <StepRow key={`${step.detail}-${index}`} step={step} />
       ))}
     </ol>
   );

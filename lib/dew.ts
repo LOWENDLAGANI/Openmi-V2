@@ -86,6 +86,25 @@ export function isLowBalance(balance: number): boolean {
   return balance < LOW_BALANCE_DEW;
 }
 
+/**
+ * Time left in a paid hour, as a clock rather than a count of seconds.
+ *
+ * `mm:ss` inside the hour and `h:mm:ss` past it, so a long session still reads
+ * as a time. Negative input is the end of the hour, not an error: a countdown
+ * that has run out says `00:00`.
+ */
+export function formatHourRemaining(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 /** The daily allowance for an account, in Dew. */
 export function dailyAllowance(hasPaid: boolean): number {
   return hasPaid ? PAID_DAILY_FREE_DEW : DAILY_FREE_DEW;

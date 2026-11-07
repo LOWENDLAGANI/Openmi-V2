@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 
 import { planById } from "@/lib/billing/plans";
 import { redeemDewCode } from "@/lib/dew/store";
+import { sendReceiptNotification } from "@/lib/email/receipt";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -87,9 +88,11 @@ export async function submitReceipt(formData: FormData) {
     fail(`The receipt could not be stored: ${uploadError.message}`);
   }
 
+  const charged = Math.round(amount * 100) / 100;
+
   const { error } = await session.supabase.rpc("submit_payment_request", {
     p_plan: plan.id,
-    p_amount: Math.round(amount * 100) / 100,
+    p_amount: charged,
     p_reference: reference,
     p_note: note.length > 0 ? note : null,
     p_receipt_path: path,
@@ -101,6 +104,26 @@ export async function submitReceipt(formData: FormData) {
     await admin.storage.from("receipts").remove([path]);
     fail(error.message.replace(/^payment:\s*/, ""));
   }
+
+  // Announce the receipt to the operator, with the file attached and Reply-To
+  // set to the payer. This runs only after the row exists, and the sender
+  // returns instead of throwing, so a mail outage can never lose a submission
+  // the member has already made — it stays in the admin queue regardless.
+  await sendReceiptNotification({
+    submitterEmail: session.user.email ?? null,
+    submitterId: session.user.id,
+    planName: plan.name,
+    amount: charged,
+    reference,
+    note,
+    receiptName: upload.name.slice(0, 200),
+    receiptType: upload.type,
+    attachment: {
+      filename: upload.name.slice(0, 200),
+      contentType: upload.type,
+      bytes,
+    },
+  });
 
   revalidatePath("/pay");
   revalidatePath("/admin");

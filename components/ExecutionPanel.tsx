@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { PendingButton } from "@/components/PendingButton";
 import {
   describeRun,
   isTerminal,
@@ -163,21 +164,21 @@ export function ExecutionPanel({
 
         <div className="flex items-center gap-2">
           {live && (
-            <button
-              type="button"
-              onClick={() => void cancel()}
+            <PendingButton
+              onAction={cancel}
               disabled={cancelling}
+              pendingText="Stopping…"
               className="btn px-3 py-0.5 text-[10.5px]"
             >
-              {cancelling ? "Stopping…" : "Stop run"}
-            </button>
+              Stop run
+            </PendingButton>
           )}
 
           {status === "ready" && !live && (
-            <button
-              type="button"
-              onClick={() => void start()}
+            <PendingButton
+              onAction={start}
               disabled={starting || payload?.configured === false}
+              pendingText="Starting…"
               title={
                 payload?.configured === false
                   ? "Execution isn't available right now."
@@ -185,8 +186,8 @@ export function ExecutionPanel({
               }
               className="btn px-3 py-0.5 text-[10.5px] disabled:opacity-50"
             >
-              {starting ? "Starting…" : run ? "Run again" : "Install and build"}
-            </button>
+              {run ? "Run again" : "Install and build"}
+            </PendingButton>
           )}
         </div>
       </div>

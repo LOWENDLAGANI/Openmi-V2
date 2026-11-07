@@ -567,7 +567,7 @@ export default async function ChatPage({
   // shows the balance the next turn will actually use.
   await refillDailyDew(supabase);
 
-  const [foldersResult, chatsResult, connection, profileResult] = await Promise.all([
+  const [foldersResult, chatsResult, connection, profileResult, hourResult] = await Promise.all([
     supabase.from("folders").select("id, name, created_at").order("name"),
     supabase
       .from("chats")
@@ -581,6 +581,14 @@ export default async function ChatPage({
       .select("dew_balance, wallet_dew")
       .eq("id", user.id)
       .maybeSingle(),
+    // The running hour, read with the same predicate `start_hour_session` uses
+    // to reuse one: a session is live while `expires_at` is still ahead.
+    supabase
+      .from("hour_sessions")
+      .select("expires_at")
+      .eq("owner", user.id)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle(),
   ]);
 
   const dewBalance = Number(
@@ -589,6 +597,9 @@ export default async function ChatPage({
   const dewWallet = Number(
     (profileResult.data as { wallet_dew?: number | string } | null)?.wallet_dew ?? 0
   );
+
+  const hourEndsAt =
+    (hourResult.data as { expires_at?: string } | null)?.expires_at ?? null;
 
   const folders = (foldersResult.data ?? []) as Folder[];
   const allChats = (chatsResult.data ?? []) as Array<
@@ -721,6 +732,7 @@ export default async function ChatPage({
           trashView={trashView}
           trashedCount={trashedChats.length}
           repo={currentRepo}
+          hourEndsAt={hourEndsAt}
         />
       }
       eyebrow={eyebrow}
