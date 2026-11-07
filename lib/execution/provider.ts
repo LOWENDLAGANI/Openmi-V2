@@ -59,13 +59,13 @@ export function executionTemplate(): string {
 }
 
 /**
- * Egress.
+ * E2B sandbox egress.
  *
  * `restricted` is the default because an install is the whole point of a run.
- * E2B's `allowOut` accepts hostnames, so the enumerated list in `commands.ts`
- * is sent as-is: an install reaches a registry and the GitHub endpoints it
- * needs, and nothing else. `off` takes the sandbox off the network entirely,
- * and `open` leaves E2B's default in place.
+ * The current provider SDK requires the restrict+deny pairing below, so
+ * `restricted` sends an allowAllOut policy rather than the old hostname allowlist.
+ * `off` takes the sandbox off the network entirely, and `open` leaves the
+ * provider's defaults in place.
  */
 export function executionNetworkMode(): "off" | "restricted" | "open" {
   const configured = (process.env.EXEC_NETWORK_MODE ?? "").trim().toLowerCase();
@@ -74,15 +74,21 @@ export function executionNetworkMode(): "off" | "restricted" | "open" {
 }
 
 /** The one place the allowlist is attached, so `off`/`open` never send it. */
+type RestrictedNetwork = {
+  network: { allowOut: string[]; denyOut: string[] };
+};
+
 function networkOption():
-  | { network: { allowOut: string[] } }
+  | RestrictedNetwork
   | { allowInternetAccess: false }
   | Record<string, never> {
   const mode = executionNetworkMode();
 
   if (mode === "off") return { allowInternetAccess: false };
   if (mode === "restricted") {
-    return { network: { allowOut: [...EXEC_ALLOWED_DOMAINS] } };
+    const allow: string[] = [...EXEC_ALLOWED_DOMAINS];
+    const deny: string[] = ["ALL_TRAFFIC"];
+    return { network: { allowOut: allow, denyOut: deny } };
   }
 
   return {};

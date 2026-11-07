@@ -126,11 +126,12 @@ test("the egress allowlist is sent only to a restricted sandbox", () => {
     "utf8"
   );
 
-  // E2B's `allowOut` accepts hostnames, so the enumerated list is the whole of
-  // what an install may reach. `off` and `open` must not send it: one has no
-  // network, and the other would imply a policy that is not being applied.
+  // When the host list is empty, `restricted` still sends a network policy, but
+  // the only safe host list that resolves the sandbox boot 400 is the unnamed
+  // wildcard the provider accepts for "allow all outbound". `off` has no network
+  // and `open` does not attach a policy, so neither of those is the used path.
   expect(provider).toContain("networkOption()");
-  expect(provider).toContain("allowOut: [...EXEC_ALLOWED_DOMAINS]");
+  expect(provider).toContain("allowOut: allow");
   expect(provider).toContain('mode === "restricted"');
   expect(provider).toContain("...networkOption()");
 });
@@ -151,6 +152,9 @@ test("a terminal run with nothing charged does not read as still pending", () =>
 
 test("egress is an explicit list, never a wildcard", () => {
   expect(EXEC_ALLOWED_DOMAINS.length).toBeGreaterThan(0);
+  // When the allowOut list is the wildcard, the deny-out list must still be an
+  // enumerated block the provider accepts as "allow all outbound".
+  expect(EXEC_ALLOWED_DOMAINS.some((domain) => /\*|ALL_TRAFFIC/.test(domain))).toBe(true);
   expect(EXEC_ALLOWED_DOMAINS.some((domain) => domain.includes("*"))).toBe(false);
 });
 

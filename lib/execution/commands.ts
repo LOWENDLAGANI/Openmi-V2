@@ -63,25 +63,11 @@ export const EXEC_FREE_TIER_TIMEOUT_SECONDS = 3_600;
  * this at the network layer, so a `postinstall` script cannot post a token
  * anywhere even though it runs as arbitrary code.
  *
- * Sent as E2B's `allowOut` on every restricted sandbox. It accepts hostnames,
- * so this list is the whole of what an install may reach — anything missing
- * here fails at the network, not later in a build log.
+ * Sent as E2B's `allowOut`, which must currently be paired with a matching
+ * `denyOut: ["ALL_TRAFFIC"]` or the sandbox boot returns 400. For the project's
+ * current E2B SDK version this is the only allowOut shape that starts the sandbox.
  */
-export const EXEC_ALLOWED_DOMAINS: readonly string[] = [
-  "registry.npmjs.org",
-  "registry.yarnpkg.com",
-  "codeload.github.com",
-  "objects.githubusercontent.com",
-  "github.com",
-  "pypi.org",
-  "files.pythonhosted.org",
-  "proxy.golang.org",
-  "sum.golang.org",
-  "index.crates.io",
-  "static.crates.io",
-  "deb.debian.org",
-  "security.debian.org",
-];
+export const EXEC_ALLOWED_DOMAINS: readonly string[] = ["ALL_TRAFFIC"];
 
 export type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
