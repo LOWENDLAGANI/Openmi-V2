@@ -385,6 +385,14 @@ export const MODEL_REGISTRY: ModelProfile[] = [
     contextTokens: 128_000,
   },
   {
+    id: "gpt-oss-120b",
+    tier: "general",
+    fits: ["general", "coding"],
+    vision: false,
+    search: false,
+    contextTokens: 128_000,
+  },
+  {
     id: "gpt-oss-20b",
     tier: "general",
     fits: ["general"],

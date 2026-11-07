@@ -2,14 +2,12 @@ import "server-only";
 
 import {
   AUTO_MODEL,
-  DEFAULT_MODEL,
   MODELS,
   type ModelCapability,
   type ModelId,
 } from "@/lib/models";
 import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
-import { routeForModel } from "@/lib/models/routes";
-import { autoMaySpend } from "@/lib/routing/auto-eligibility";
+import { AUTO_ROUTES, routeForModel } from "@/lib/models/routes";
 import { MAX_CHAIN_LENGTH, planChain } from "@/lib/routing/chain";
 import { classifyTask } from "@/lib/routing/classify";
 import { DEW_PER_HOUR } from "@/lib/dew";
@@ -137,13 +135,12 @@ export function providersFor(
   env: Record<string, string | undefined> = process.env,
   custom: readonly CustomModel[] = parseCustomModels(env.CUSTOM_MODELS).models
 ): Provider[] {
-  // Auto is served by `autoChain` below, which is a queue rather than a single
-  // route. The paths that predate it — missions and verification read a chat's
-  // model and ask for one provider — still mean "the default model" by it, so an
-  // old row answers instead of failing.
-  const id = model === AUTO_MODEL ? DEFAULT_MODEL : model;
+  // Auto has no single route: it is the OpenRouter pool below. Missions and
+  // verification ask for one model and iterate the result, so handing them the
+  // whole queue lets them walk it the same way the chat turn does.
+  if (model === AUTO_MODEL) return autoChain("", env);
 
-  const route = routeForModel(id, custom);
+  const route = routeForModel(model, custom);
   if (!route) return [];
 
   const provider = providerById(route.provider);
@@ -164,29 +161,21 @@ export function modelCatalogue(
 
   const callable = (id: ModelId) => providersFor(id, env, custom).length > 0;
 
-  // Auto is available when at least one model behind it is. It has no route of
-  // its own, so asking `providersFor("auto")` would answer with the default
-  // model's key and advertise Auto on a deployment that cannot route.
-  //
-  // "Behind it" means the models Auto is allowed to queue: a deployment whose
-  // only key is excluded (see AUTO_EXCLUDED_PROVIDERS) must not advertise Auto,
-  // because every Auto request would end in "no model is available".
-  const autoEligible = (id: ModelId) => {
-    const route = routeForModel(id, custom);
-    if (!route || !autoMaySpend(route.provider)) return false;
-    return callable(id);
-  };
-
-  const anyConcrete =
-    MODELS.some((model) => model.id !== AUTO_MODEL && autoEligible(model.id)) ||
-    custom.some(
-      (model) =>
-        !MODELS.some((builtin) => builtin.id === model.id) && autoEligible(model.id)
+  // Auto is its own pool: the OpenRouter free catalogue. It does not borrow a
+  // concrete model's key and it does not fall back to DeepSeek, so its
+  // availability is the OpenRouter key plus at least one route to spend it on.
+  const autoReady = () => {
+    const openrouter = providerById("openrouter");
+    return (
+      openrouter !== undefined &&
+      providerKeys(openrouter, env).length > 0 &&
+      Object.keys(AUTO_ROUTES).length > 0
     );
+  };
 
   const catalogue: ModelCapability[] = MODELS.map((model) => ({
     ...model,
-    available: model.id === AUTO_MODEL ? anyConcrete : callable(model.id),
+    available: model.id === AUTO_MODEL ? autoReady() : callable(model.id),
   }));
 
   for (const model of custom) {
@@ -209,33 +198,26 @@ export function modelCatalogue(
 }
 
 /**
- * Auto's queue: the models this deployment can call, best fit first.
+ * Auto's queue: every OpenRouter free route, best fit first.
+ *
+ * Auto is deliberately not a queue over the picker catalogue. The pool is the
+ * OpenRouter catalogue in lib/models/routes.ts, so a deployment with only the
+ * DeepSeek key cannot silently spend it through Auto. Once the OpenRouter key
+ * exists the whole pool is callable, and the pipeline walks it until one model
+ * answers.
  *
  * The message is classified once, then the queue is ordered by the registry's
- * fitness. A model with no route or no key is not in the queue at all, so an
- * attempt is never spent discovering a configuration gap that could be read.
- *
- * The vendors behind the queue stay server-side; the reader is never told which
- * one answered, and never told that one failed to.
+ * fitness. Vendor, upstream id and key stay server-side; the reader is never
+ * told which model answered, or that earlier ones failed.
  */
 export function autoChain(
   prompt = "",
   env: Record<string, string | undefined> = process.env
 ): Provider[] {
-  const custom = parseCustomModels(env.CUSTOM_MODELS).models;
+  const openrouter = providerById("openrouter");
+  if (!openrouter || providerKeys(openrouter, env).length === 0) return [];
 
-  // A model with a key is not automatically a model Auto may spend: the
-  // eligibility rule decides. It lives outside this file so a future prepaid
-  // provider can be excluded from the queue without touching it.
-  const available = modelCatalogue(env)
-    .filter((entry) => {
-      if (entry.id === AUTO_MODEL || entry.available !== true) return false;
-      const route = routeForModel(entry.id, custom);
-      if (!route) return false;
-      return autoMaySpend(route.provider);
-    })
-    .map((entry) => entry.id);
-
+  const available = Object.keys(AUTO_ROUTES);
   if (available.length === 0) return [];
 
   const queue = planChain({
@@ -243,21 +225,21 @@ export function autoChain(
     task: classifyTask(prompt),
     limit: MAX_CHAIN_LENGTH,
   });
+
   const targets: Provider[] = [];
   const seen = new Set<string>();
 
-  for (const candidate of queue) {
-    const provider = providersFor(candidate, env, custom)[0];
-    if (!provider) continue;
+  for (const id of queue) {
+    const route = AUTO_ROUTES[id];
+    if (!route) continue;
 
-    // Two ids can name the same upstream model (an alias, a custom entry that
-    // repeats a built-in route). Asking it twice would spend an attempt on the
-    // same failure.
-    const key = `${provider.id}:${provider.model}`;
+    // Two ids can name the same upstream model; asking it twice would spend an
+    // attempt on the same failure.
+    const key = `${openrouter.id}:${route.upstream}`;
     if (seen.has(key)) continue;
 
     seen.add(key);
-    targets.push(provider);
+    targets.push({ ...openrouter, model: route.upstream });
   }
 
   return targets;

@@ -260,35 +260,39 @@ the rotation never leaves the server.
 ## Auto
 
 Auto is a picker entry with no endpoint of its own. It reads the message, picks
-the model that fits, and keeps the rest of a queue behind it. The one concrete
-model keeps the single-provider path it had; Auto is the only model that can
-move mid-answer.
+the model that fits, and keeps the rest of a queue behind it. Every model in
+that queue is served by OpenRouter — the fifty free routes in
+`lib/models/routes.ts` — and the one named model keeps the single-provider path
+it had. Auto never falls back to DeepSeek.
 
-`lib/models/registry.ts` is a capability profile for the model pool — tier, task
-fit, vision, search, context — and carries no endpoint, upstream id or key.
+`lib/models/registry.ts` is a capability profile for that pool — tier, task fit,
+vision, search, context — and carries no endpoint, upstream id or key.
 
 1. `classifyTask` reads the prompt once: code signals, reasoning signals, a URL or
    "click the page", an attached image. That names the task kind.
-2. `planChain` orders Auto's queue over the models this deployment can actually
-   call, best fit first. A model with no route or key is skipped rather than
-   tried, and a vision request is never queued onto a model that cannot see.
-3. `streamRouted` walks the queue. A failure before the first character retries
-   the same request on the next model; a failure after it sends the text already
-   written as an assistant turn plus one instruction to continue from that exact
-   character. The rest streams into the same answer, and a leading replay of the
-   tail — or of the whole partial answer — is trimmed as it arrives.
+2. `planChain` orders the fifty OpenRouter routes by fitness, best fit first. A
+   route with no registry profile is skipped, and a vision request is never
+   queued onto a model that cannot see.
+3. `streamRouted` walks the whole queue, up to fifty attempts. A failure before
+   the first character retries the same request on the next model; a failure
+   after it sends the text already written as an assistant turn plus one
+   instruction to continue from that exact character. The rest streams into the
+   same answer, and a leading replay of the tail — or of the whole partial
+   answer — is trimmed as it arrives.
 
 | Constant | Value |
 |---|---|
-| Queue length | 6 (`MAX_CHAIN_LENGTH`) |
-| Attempts per turn | 3 (`MAX_ROUTED_ATTEMPTS`) |
+| Queue length | 50 (`MAX_CHAIN_LENGTH`) |
+| Attempts per turn | 50 (`MAX_ROUTED_ATTEMPTS`) |
 | Trimmed overlap floor | 8 characters |
 | Lookahead before trimming | 32 characters |
 
-A model joins Auto's queue when it has a route and a key: the built-in model
-today, plus any `CUSTOM_MODELS` entry whose id matches a registry profile. The hour still
-costs 2 Dew whatever answers, because `model_hour_dew` prices the model that was
-chosen — Auto — not the one it routed to.
+Auto's pool is `AUTO_ROUTES`, and it is available when `OPENROUTER_API_KEY` is
+set: all fifty free models are attempted in fitness order until one answers. A
+deployment without that key shows Auto as unavailable instead of spending a
+different provider through it. The hour still costs 2 Dew whatever answers,
+because `model_hour_dew` prices the model that was chosen — Auto — not the one it
+routed to.
 
 Nothing about a handover reaches the reader: no notice, no vendor name, no
 "continuing". Stop is not a handover — an aborted turn stops. If every endpoint

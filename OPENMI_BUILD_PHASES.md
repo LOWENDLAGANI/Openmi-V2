@@ -127,8 +127,8 @@ Everything tracked was deleted before this plan was written. Nothing was migrate
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | migrations, health probe | yes |
 | `NEXT_PUBLIC_SITE_URL` | Browser + server | auth redirects, PR links | yes |
 | `GITHUB_TOKEN_KEY` | **server only** | sealing connected GitHub tokens (32-byte base64) | yes |
-| `OPENROUTER_API_KEY` | **server only** | custom models served from OpenRouter | one provider |
-| `DEEPSEEK_API_KEY` | **server only** | the built-in model, and Auto | one provider |
+| `OPENROUTER_API_KEY` | **server only** | Auto's fifty free OpenRouter models | one provider |
+| `DEEPSEEK_API_KEY` | **server only** | the named DeepSeek model | one provider |
 | `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | server | optional OAuth connect (P2-T6) | no |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | server | optional shared rate limiter | no |
 

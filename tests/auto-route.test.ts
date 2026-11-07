@@ -7,11 +7,7 @@ import {
   profileForModel,
   type ModelProfile,
 } from "../lib/models/registry";
-import { BUILTIN_ROUTES } from "../lib/models/routes";
-import {
-  AUTO_EXCLUDED_PROVIDERS,
-  autoMaySpend,
-} from "../lib/routing/auto-eligibility";
+import { AUTO_ROUTES, BUILTIN_ROUTES } from "../lib/models/routes";
 import { fitness, MAX_CHAIN_LENGTH, planChain } from "../lib/routing/chain";
 import { classifyTask } from "../lib/routing/classify";
 import {
@@ -99,10 +95,10 @@ test("a request is classified before Auto chooses a model", () => {
 });
 
 test("the pool holds capability profiles, and nothing secret", () => {
-  expect(MODEL_REGISTRY).toHaveLength(49);
+  expect(MODEL_REGISTRY).toHaveLength(50);
 
   const ids = MODEL_REGISTRY.map((profile) => profile.id);
-  expect(new Set(ids).size).toBe(49);
+  expect(new Set(ids).size).toBe(50);
 
   for (const id of ids) {
     expect(isModelId(id)).toBe(true);
@@ -114,7 +110,7 @@ test("the pool holds capability profiles, and nothing secret", () => {
   expect(count("coding")).toBe(5);
   expect(count("agent")).toBe(4);
   expect(count("reasoning")).toBe(18);
-  expect(count("general")).toBe(22);
+  expect(count("general")).toBe(23);
 
   expect(MODEL_REGISTRY.some((profile) => profile.vision)).toBe(true);
   expect(MODEL_REGISTRY.some((profile) => profile.search)).toBe(true);
@@ -131,10 +127,7 @@ test("the pool holds capability profiles, and nothing secret", () => {
 
 test("an alias finds the registry entry the catalogue already serves", () => {
   expect(profileForModel("deepseek-flash")?.id).toBe("deepseek-v4.1-flash-1017");
-
-  // Retired models have no profile either, so Auto cannot queue them even if a
-  // stale CUSTOM_MODELS entry names one.
-  expect(profileForModel("gpt-oss-120b")).toBeUndefined();
+  expect(profileForModel("gpt-oss-120b")?.tier).toBe("general");
   expect(profileForModel("not-a-model")).toBeUndefined();
 });
 
@@ -205,33 +198,43 @@ test("a vision request never falls back to a model that cannot see", () => {
 
 test("the real pool plans a queue over the models this build can call", () => {
   const queue = planChain({
-    available: ["deepseek-flash"],
-    task: "general",
+    available: ["codestral-latest", "gpt-4o"],
+    task: "coding",
   });
 
-  expect(queue[0]).toBe("deepseek-flash");
+  expect(queue[0]).toBe("codestral-latest");
   expect(queue.length).toBeLessThanOrEqual(MAX_CHAIN_LENGTH);
 });
 
-test("Auto may spend every provider this build can route", () => {
-  // DeepSeek is the only built-in provider left, so excluding it would leave
-  // Auto with no model at all; the exclusion set is empty and the seam stays for
-  // a future prepaid provider.
-  expect(autoMaySpend(BUILTIN_ROUTES["deepseek-flash"]!.provider)).toBe(true);
-  expect(autoMaySpend("openrouter")).toBe(true);
-  expect(AUTO_EXCLUDED_PROVIDERS.size).toBe(0);
+test("every OpenRouter route has a registry profile, so none is dropped", () => {
+  const ids = Object.keys(AUTO_ROUTES);
+  const queue = planChain({ available: ids, task: "general" });
 
-  // Eligibility is the queue, not the route: naming the model still works.
+  expect(queue).toHaveLength(ids.length);
+  expect(new Set(queue)).toEqual(new Set(ids));
+});
+
+test("Auto's pool is the fifty OpenRouter free routes", () => {
+  const routes = Object.entries(AUTO_ROUTES);
+
+  expect(routes).toHaveLength(50);
+  for (const [id, route] of routes) {
+    expect(route.provider).toBe("openrouter");
+    expect(route.upstream).toBe(`${id}:free`);
+  }
+
+  // The named DeepSeek model is a route of its own and is not in Auto's pool.
+  expect(AUTO_ROUTES["deepseek-flash"]).toBeUndefined();
   expect(BUILTIN_ROUTES["deepseek-flash"]).toEqual({
     provider: "deepseek",
     upstream: "deepseek-flash",
   });
 
-  // Both the pool Auto builds and the availability the picker reads apply it,
-  // or Auto would be offered on a deployment where every request fails.
+  // The pool never falls back to the direct DeepSeek provider.
   const providers = source("../lib/providers.ts");
-  expect(providers.match(/autoMaySpend\(route\.provider\)/g)?.length).toBe(2);
-  expect(providers).toContain("const autoEligible");
+  expect(providers).not.toContain("autoMaySpend");
+  expect(providers).toContain("Object.keys(AUTO_ROUTES)");
+  expect(providers).toContain('providerById("openrouter")');
 });
 
 test("Auto is a catalogue entry with a price, not a route", () => {
@@ -246,17 +249,15 @@ test("Auto is a catalogue entry with a price, not a route", () => {
   expect(profileForModel(AUTO_MODEL)).toBeUndefined();
 });
 
-test("Auto's queue is built from callable models, and Auto is never in it", () => {
+test("Auto's queue is built from the OpenRouter pool, and Auto is never in it", () => {
   const providers = source("../lib/providers.ts");
 
   expect(providers).toContain("export function autoChain");
-  // Auto is filtered out at the top of the queue's filter, so it can never be
-  // one of its own targets.
-  expect(providers).toContain("entry.id === AUTO_MODEL || entry.available !== true");
+  expect(providers).toContain("Object.keys(AUTO_ROUTES)");
   expect(providers).toContain("classifyTask(prompt)");
   expect(providers).toContain("planChain(");
 
-  // The existing models keep the single-provider path they had.
+  // The named model keeps the single-provider path it had.
   expect(providers).toContain("export function providersFor");
 });
 
@@ -428,7 +429,7 @@ test("the queue is attempted at most MAX_ROUTED_ATTEMPTS times", async () => {
     thrown = caught;
   }
 
-  expect(opened).toBe(MAX_ROUTED_ATTEMPTS);
+  expect(opened).toBe(Math.min(MAX_ROUTED_ATTEMPTS, many.length));
   expect((thrown as Error).message).toBe("boom");
 });
 

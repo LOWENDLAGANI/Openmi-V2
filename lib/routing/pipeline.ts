@@ -53,11 +53,12 @@ export type RoutedEvent =
 /**
  * How many endpoints one turn may ask.
  *
- * Each attempt costs the deployment a request and the reader time inside a
- * function that has a wall clock. Three is enough to survive a rate limit and a
- * dropped stream; more turns a slow provider into a slow turn.
+ * Auto's pool is fifty free models, and a free model may be rate limited,
+ * unavailable, or drop mid-stream. The turn walks the queue until one answers,
+ * so the cap is the pool size. The function's wall clock and the abort signal
+ * remain the real bound on a slow pool.
  */
-export const MAX_ROUTED_ATTEMPTS = 3;
+export const MAX_ROUTED_ATTEMPTS = 50;
 
 export type StreamRoutedOptions = {
   targets: readonly RoutedTarget[];

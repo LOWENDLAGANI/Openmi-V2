@@ -71,14 +71,14 @@ export const ENV_SPEC: EnvSpec[] = [
     key: "OPENROUTER_API_KEY",
     scope: "server",
     required: false,
-    unlocks: "Custom models served from OpenRouter",
+    unlocks: "Auto's OpenRouter model pool",
     hint: "At least one provider key is required",
   },
   {
     key: "DEEPSEEK_API_KEY",
     scope: "server",
     required: false,
-    unlocks: "The built-in model, and Auto",
+    unlocks: "The named DeepSeek model",
     hint: "At least one provider key is required",
   },
   {
