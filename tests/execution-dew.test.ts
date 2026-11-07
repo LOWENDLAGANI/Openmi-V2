@@ -77,6 +77,17 @@ beforeAll(async () => {
     OWNER,
     "run@example.test",
   ]);
+
+  // The trial is paid on first use now, so the test pays it the way the app
+  // does before it measures the reservation.
+  await db.query("select set_config('request.jwt.claims', $1, false)", [
+    JSON.stringify({ sub: OWNER, role: "authenticated" }),
+  ]);
+  await db.exec("set role authenticated");
+  await db.query("select public.grant_trial_dew($1)", [
+    "execution-test-address-01",
+  ]);
+  await db.exec("reset role");
 });
 
 afterAll(async () => {
@@ -119,7 +130,7 @@ test("a run reserves its cap before anything is created", async () => {
     [OWNER, RUN_A]
   );
 
-  // Signup gives five Dew; the reservation takes half of one.
+  // The first request granted five Dew; the reservation takes half of one.
   expect(Number(rows[0].balance)).toBe(4.5);
   expect(await ledgerCount("execution", RUN_A)).toBe(1);
   expect(await ledgerSum()).toBe(4.5);

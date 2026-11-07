@@ -22,6 +22,18 @@ export const HOUR_SESSION_MS = 3_600_000;
 export const DAILY_FREE_DEW = 6;
 export const PAID_DAILY_FREE_DEW = 15;
 export const TRIAL_DEW = 5;
+
+/**
+ * The trial grant: 5 Dew, once per account, and at most one paid trial per
+ * address per day.
+ *
+ * It is paid on the first chat request rather than at signup, because the signup
+ * trigger has no address to count — auth.users stores none. `grant_trial_dew`
+ * in the database is the only place it is paid, and tests/dew.test.ts reads
+ * both so the constant and the function cannot drift apart.
+ */
+export const TRIAL_GRANT_MAX_PER_IP = 1;
+export const TRIAL_GRANT_WINDOW_HOURS = 24;
 export const DEW_PRECISION = 3;
 export const DEW_DUST_FLOOR = 0.05;
 export const LOW_BALANCE_DEW = 10;

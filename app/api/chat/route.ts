@@ -25,6 +25,7 @@ import { assembleContext } from "@/lib/context";
 import { formatDew } from "@/lib/dew";
 import { refundReasonFor } from "@/lib/dew/refund";
 import {
+  grantTrialDew,
   refundDewSession,
   startDewSession,
   type DewGate,
@@ -40,6 +41,7 @@ import {
   resolveBranchSha,
 } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
+import { hashIp, requestIp } from "@/lib/http/ip";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
 import {
   AUTO_MODEL,
@@ -314,6 +316,17 @@ export async function POST(request: Request) {
       steps: Number(row.steps),
       exp: verified.payload.exp,
     };
+  }
+
+  // Trial Dew is granted here, not at signup: this is the first point in the
+  // flow where the request has an address, and the grant is capped per address
+  // per day. An account farm still gets accounts; it no longer gets paid for
+  // them. A grant that fails is not a turn failure — the daily allowance still
+  // applies, and nothing in the answer depends on it.
+  const callerIp = continuationToken ? null : requestIp(request.headers);
+
+  if (callerIp && sealKey) {
+    await grantTrialDew(session.supabase, hashIp(callerIp, sealKey));
   }
 
   // Charged only after the deployment can answer and after a continuation has

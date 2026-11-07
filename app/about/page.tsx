@@ -134,7 +134,8 @@ export default function AboutPage() {
           One hour of chat costs {DEW_PER_HOUR} Dew, charged once before the
           provider call. More turns inside the hour are free. The daily allowance
           is {DAILY_FREE_DEW} Dew, or {PAID_DAILY_FREE_DEW} once a top-up has been
-          redeemed; new accounts start with a {TRIAL_DEW} Dew trial credit. The
+          redeemed; the first message grants a {TRIAL_DEW} Dew trial credit, once
+          per address per day. The
           balance turns amber below {LOW_BALANCE_DEW} Dew. An invite rewards both
           sides {INVITE_REWARD_DEW} Dew, up to {MAX_INVITES_PER_ACCOUNT} rewarded
           accounts per inviter.

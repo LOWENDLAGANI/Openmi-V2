@@ -182,7 +182,9 @@ On the first day the daily allowance is added to the trial credit; after that it
 tops the balance up to 6 Dew (15 once a top-up has been redeemed) at local
 midnight in the account's timezone. It never refills on a day that is ahead of
 the local date, so a clock that steps backwards mints nothing. The trial credit
-is a ledger row at signup, not an unrecorded default.
+is a ledger row written on the first message, not an unrecorded default: 5 Dew
+once per account, and at most one paid trial per address per day, so bulk
+signups mint accounts but not Dew.
 
 An invite rewards both sides 5 Dew, once per invitee, up to 10 rewarded
 accounts. Refunds are one per session at the original price and are written for

@@ -18,7 +18,12 @@ const MIGRATION_SOURCE = readFileSync(join(MIGRATIONS, "008_dew.sql"), "utf8");
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
+const C = "77777777-7777-4777-8777-777777777777";
 const D = "44444444-4444-4444-8444-444444444444";
+
+// Keyed hashes, as the server sends them: never an address.
+const IP_ONE = "1111111111111111aaaaaaaaaaaaaaaa";
+const IP_TWO = "2222222222222222bbbbbbbbbbbbbbbb";
 
 const SHIM = `
   create schema if not exists auth;
@@ -128,11 +133,11 @@ test("the hourly session function takes no price parameter", () => {
   expect(MIGRATION_SOURCE).not.toMatch(/start_hour_session\([^)]*p_amount/i);
 });
 
-test("signup writes a trial row, a balance and an invite code", async () => {
+test("signup writes a profile and an invite code, and no Dew yet", async () => {
   await signUp(A, "a@example.test");
 
-  const profile = await balance(A);
-  expect(profile).toBe(5);
+  // The account exists; the trial is not paid until it is used.
+  expect(await balance(A)).toBe(0);
 
   await reset();
   const { rows } = await db.query<{ invite_code: string }>(
@@ -142,12 +147,48 @@ test("signup writes a trial row, a balance and an invite code", async () => {
   inviteA = String(rows[0].invite_code);
   expect(inviteA).toHaveLength(8);
 
+  expect(await ledgerCount(A, "trial")).toBe(0);
+  expect(await ledgerSum(A)).toBe(0);
+});
+
+test("the first request grants the trial once, and once per address", async () => {
+  await actAs("authenticated", A);
+
+  const granted = await db.query<{ amount: string }>(
+    "select public.grant_trial_dew($1) as amount",
+    [IP_ONE]
+  );
+  expect(Number(granted.rows[0].amount)).toBe(5);
+  expect(await balance(A)).toBe(5);
   expect(await ledgerCount(A, "trial")).toBe(1);
-  expect(await ledgerSum(A)).toBe(profile);
+  expect(await ledgerSum(A)).toBe(5);
+
+  // Asking twice from the same account pays nothing.
+  const again = await db.query<{ amount: string }>(
+    "select public.grant_trial_dew($1) as amount",
+    [IP_ONE]
+  );
+  expect(Number(again.rows[0].amount)).toBe(0);
+  expect(await ledgerCount(A, "trial")).toBe(1);
+
+  // A second account on the same address is not paid either.
+  await signUp(C, "c@example.test");
+  await actAs("authenticated", C);
+
+  const refused = await db.query<{ amount: string }>(
+    "select public.grant_trial_dew($1) as amount",
+    [IP_ONE]
+  );
+  expect(Number(refused.rows[0].amount)).toBe(0);
+  expect(await balance(C)).toBe(0);
+  expect(await ledgerCount(C, "trial")).toBe(0);
 });
 
 test("the daily allowance refills once, at the local day", async () => {
   await actAs("authenticated", A);
+
+  // The trial is paid on first use; asking again here is a no-op.
+  await db.query("select public.grant_trial_dew($1)", [IP_ONE]);
 
   const first = await db.query<{ balance: string }>(
     "select public.refill_daily_dew() as balance"
@@ -300,11 +341,22 @@ test("both sides of an invite are rewarded once", async () => {
     invite_rewarded: boolean;
   }>("select dew_balance, invited_by, invite_rewarded from public.profiles where id = $1", [B]);
 
-  expect(Number(invitee.rows[0].dew_balance)).toBe(10);
+  expect(Number(invitee.rows[0].dew_balance)).toBe(5);
   expect(String(invitee.rows[0].invited_by)).toBe(A);
   expect(invitee.rows[0].invite_rewarded).toBe(true);
 
   expect(await ledgerCount(B, "invite")).toBe(1);
+  expect(await ledgerSum(B)).toBe(5);
+
+  // A different address still gets its own trial, so the invitee is paid on
+  // first use exactly like anyone else who is not farming accounts.
+  await actAs("authenticated", B);
+  const trial = await db.query<{ amount: string }>(
+    "select public.grant_trial_dew($1) as amount",
+    [IP_TWO]
+  );
+  expect(Number(trial.rows[0].amount)).toBe(5);
+  expect(await balance(B)).toBe(10);
   expect(await ledgerSum(B)).toBe(10);
 });
 
@@ -356,7 +408,7 @@ test("a day ahead of the local date never refills", async () => {
 
   await reset();
   await db.query(
-    "update public.profiles set dew_balance = 5, dew_day = null where id = $1",
+    "update public.profiles set dew_balance = 0, dew_day = null where id = $1",
     [D]
   );
 });

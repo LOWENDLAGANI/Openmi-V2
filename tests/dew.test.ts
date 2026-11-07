@@ -14,6 +14,8 @@ import {
   TIMEZONES,
   TOPUP_PACKS,
   TRIAL_DEW,
+  TRIAL_GRANT_MAX_PER_IP,
+  TRIAL_GRANT_WINDOW_HOURS,
   dailyAllowance,
   formatDew,
   isLowBalance,
@@ -57,6 +59,29 @@ test("an hour is priced per model, and the database agrees with the catalogue", 
     expect(migration).toContain(`when '${model.id}' then ${model.dewPerHour}::numeric`);
     expect(model.dewPerHour).toBe(DEW_PER_HOUR);
   }
+});
+
+test("the trial grant is one address per day, and the database agrees", () => {
+  expect(TRIAL_GRANT_MAX_PER_IP).toBe(1);
+  expect(TRIAL_GRANT_WINDOW_HOURS).toBe(24);
+
+  const migration = readFileSync(
+    new URL("../supabase/migrations/027_lazy_trial_dew.sql", import.meta.url),
+    "utf8"
+  );
+
+  expect(migration).toContain(`v_amount numeric := ${TRIAL_DEW}`);
+  expect(migration).toContain(`if v_recent >= ${TRIAL_GRANT_MAX_PER_IP} then`);
+  expect(migration).toContain(`interval '${TRIAL_GRANT_WINDOW_HOURS} hours'`);
+
+  // Signup no longer writes the trial row; only the first request does.
+  const trigger = migration.slice(
+    migration.indexOf("create or replace function public.handle_new_user"),
+    migration.indexOf("create or replace function public.grant_trial_dew")
+  );
+
+  expect(trigger.length).toBeGreaterThan(0);
+  expect(trigger).not.toContain("'trial'");
 });
 
 test("the deployed refill allowance matches the constants", () => {

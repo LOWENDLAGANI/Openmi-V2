@@ -71,6 +71,26 @@ export async function refillDailyDew(supabase: Client): Promise<number | null> {
 }
 
 /**
+ * Asks for the account's trial Dew, once.
+ *
+ * Returns what was granted: 5 the first time from an address that has not been
+ * paid today, 0 otherwise. A refusal is not an error — the account can still
+ * chat on its daily allowance — so a failed call returns 0 and the turn goes on.
+ * The address arrives as a keyed hash; the server never stores the address.
+ */
+export async function grantTrialDew(
+  supabase: Client,
+  ipHash: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc("grant_trial_dew", {
+    p_ip_hash: ipHash,
+  });
+
+  if (error || data === null || data === undefined) return 0;
+  return Number(data);
+}
+
+/**
  * The gate.
  *
  * Every turn is paid for by an hour: the first message in a chat starts one, and

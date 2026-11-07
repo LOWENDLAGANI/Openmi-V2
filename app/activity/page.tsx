@@ -267,8 +267,8 @@ export default async function ActivityPage({
 
         {ledger.length === 0 ? (
           <p className="px-5 pb-5 text-[12px] text-mid">
-            No Dew activity yet. The trial credit appears here the moment the
-            account exists.
+            No Dew activity yet. The trial credit appears here the first time
+            this account sends a message.
           </p>
         ) : (
           <div className="overflow-x-auto">
