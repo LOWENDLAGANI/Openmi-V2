@@ -59,15 +59,18 @@ export const EXEC_MAX_TIMEOUT_SECONDS = 86_400;
 export const EXEC_FREE_TIER_TIMEOUT_SECONDS = 3_600;
 
 /**
- * Hosts an install is allowed to reach. Deny-by-default: the provider enforces
- * this at the network layer, so a `postinstall` script cannot post a token
- * anywhere even though it runs as arbitrary code.
+ * What an install is allowed to reach, sent as E2B's `allowOut`.
  *
- * Sent as E2B's `allowOut`, which must currently be paired with a matching
- * `denyOut: ["ALL_TRAFFIC"]` or the sandbox boot returns 400. For the project's
- * current E2B SDK version this is the only allowOut shape that starts the sandbox.
+ * Entries are CIDR blocks, bare IPs or hostnames; `"*"` is E2B's catch-all
+ * wildcard, matching the HTTP Host header on port 80 and TLS SNI on 443. A
+ * domain or wildcard allow list only boots when `denyOut` also names the whole
+ * IPv4 space (`0.0.0.0/0`), and `allowOut` wins over `denyOut`, so the pair
+ * means "any outbound host" — which is what an install needs.
+ *
+ * `"ALL_TRAFFIC"` is the SDK's constant for `0.0.0.0/0`, not a value the API
+ * accepts as an entry: sending that string is a 400 at sandbox creation.
  */
-export const EXEC_ALLOWED_DOMAINS: readonly string[] = ["ALL_TRAFFIC"];
+export const EXEC_ALLOWED_DOMAINS: readonly string[] = ["*"];
 
 export type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 

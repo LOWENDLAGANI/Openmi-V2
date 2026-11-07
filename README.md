@@ -358,10 +358,12 @@ records the exit code, the duration and the output tail.
 - The sandbox holds no tokens, no provider keys and no push credential. It
   cannot write to GitHub. Approval is still the only write path, and it still
   only opens an `openmi/agent/` branch.
-- Egress is deny-by-default: `EXEC_NETWORK_MODE=restricted` (the default) sends
-  the enumerated host list from `lib/execution/commands.ts` as E2B's network
-  `allowOut`, so an install reaches a registry and nothing else. `open` reaches
-  any host; `off` takes the sandbox off the network, so no install can run.
+- Egress goes through E2B's `network` option: `EXEC_NETWORK_MODE=restricted`
+  (the default) sends `allowOut: ['*']` with `denyOut: ['0.0.0.0/0']`, the
+  provider's catch-all pair from `lib/execution/commands.ts`. A domain or
+  wildcard `allowOut` only boots when the whole IPv4 space is also denied, and
+  `allowOut` wins, so an install can reach any host by name. `open` sends no
+  policy; `off` takes the sandbox off the network, so no install can run.
 - The sandbox boots from `EXECUTION_TEMPLATE` (default E2B's `base`) and runs as
   the template's `user`, whose home `/home/user` is the only writable root the
   file API writes into. The repository lives in

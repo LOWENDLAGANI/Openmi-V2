@@ -87,7 +87,9 @@ function networkOption():
   if (mode === "off") return { allowInternetAccess: false };
   if (mode === "restricted") {
     const allow: string[] = [...EXEC_ALLOWED_DOMAINS];
-    const deny: string[] = ["ALL_TRAFFIC"];
+    // The CIDR itself, not the SDK's `ALL_TRAFFIC` name: a deny list takes
+    // CIDRs and bare IPs only, and the literal name is rejected with a 400.
+    const deny: string[] = ["0.0.0.0/0"];
     return { network: { allowOut: allow, denyOut: deny } };
   }
 

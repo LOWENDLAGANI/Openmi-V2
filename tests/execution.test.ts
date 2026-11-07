@@ -150,12 +150,18 @@ test("a terminal run with nothing charged does not read as still pending", () =>
   expect(running.charge).toContain("nothing charged yet");
 });
 
-test("egress is an explicit list, never a wildcard", () => {
-  expect(EXEC_ALLOWED_DOMAINS.length).toBeGreaterThan(0);
-  // When the allowOut list is the wildcard, the deny-out list must still be an
-  // enumerated block the provider accepts as "allow all outbound".
-  expect(EXEC_ALLOWED_DOMAINS.some((domain) => /\*|ALL_TRAFFIC/.test(domain))).toBe(true);
-  expect(EXEC_ALLOWED_DOMAINS.some((domain) => domain.includes("*"))).toBe(false);
+test("egress uses the provider's wildcard pair, never the literal ALL_TRAFFIC", () => {
+  // E2B's catch-all is `allowOut: ['*']` paired with `denyOut: ['0.0.0.0/0']`.
+  // "ALL_TRAFFIC" is the SDK's constant for that CIDR, not a value the API
+  // accepts as an entry, so sending it as a string fails sandbox creation.
+  expect(EXEC_ALLOWED_DOMAINS).toEqual(["*"]);
+
+  const provider = readFileSync(
+    new URL("../lib/execution/provider.ts", import.meta.url),
+    "utf8"
+  );
+  expect(provider).toContain('deny: string[] = ["0.0.0.0/0"]');
+  expect(provider).not.toContain('"ALL_TRAFFIC"');
 });
 
 test("a run is charged per started minute, capped at the reserve", () => {
