@@ -302,7 +302,9 @@ export async function approveProposal(formData: FormData) {
     changesetId,
     owner: user.id,
     sealKey: serverEnv().githubTokenKey,
-    target: target === "branch" ? { branch } : undefined,
+    // Naming the branch on the card is the reader asking for it, so this
+    // includes the default branch without the operator opt-in.
+    target: target === "branch" ? { branch, explicit: true } : undefined,
   });
 
   revalidatePath("/chat");

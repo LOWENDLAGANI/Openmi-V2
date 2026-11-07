@@ -39,6 +39,17 @@ export const CITATION_CLAUSE =
 export const PROPOSE_CLAUSE =
   "Propose edits only by calling the propose_edits tool. Each proposal becomes a diff the user reviews and may approve, which opens a pull request on an agent branch; you cannot write to GitHub yourself. Never say an edit was applied, verified, tested or committed.";
 
+/**
+ * The destination is the reader's decision, not the model's.
+ *
+ * "Push it to main" is a request for a branch, and the app honours it: a branch
+ * the reader names is written directly, the default branch included. The model
+ * is told this so it neither promises a pull request that will not be opened
+ * nor claims the write already happened.
+ */
+export const DESTINATION_CLAUSE =
+  "A change goes to a new openmi/ agent branch and a pull request by default. When the user names a branch — \"push it to main\", \"commit to the develop branch\" — that branch is the destination and is written directly, with no pull request. Say which branch you are targeting, and never say it was written, pushed or merged until the review card reports it.";
+
 export const SYSTEM_PROMPT = [
   IDENTITY,
   SHELL_CLAUSE,
@@ -107,6 +118,7 @@ export function buildSystemPrompt({
         CITATION_CLAUSE,
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,
+        DESTINATION_CLAUSE,
       ]
     : [
         IDENTITY,
@@ -114,6 +126,7 @@ export function buildSystemPrompt({
         CITATION_CLAUSE,
         "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,
+        DESTINATION_CLAUSE,
       ];
 
   const tail: string[] = [
@@ -125,7 +138,7 @@ export function buildSystemPrompt({
   if (repo && sha) {
     tail.push(
       edits
-        ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The user reviews each file and may approve it, which opens a pull request; only an approval writes to GitHub, and the default branch is never touched."
+        ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The user reviews each file and may approve it, which opens a pull request; only an approval writes to GitHub. The default branch is written only when the user asks for it by name."
         : "Editing is unavailable in this turn. Answer with citations only, and say so if the user asks for a change."
     );
   }

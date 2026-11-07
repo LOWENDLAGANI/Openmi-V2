@@ -30,6 +30,11 @@ export function autoWriteEnabled(
  * decisions. Even when this is on, the assistant only uses the default branch
  * when the change was sent to it by name — the derived destination is still a
  * new `openmi/agent/` branch.
+ *
+ * This is the switch for writes nobody asked about by name. A reader who asks
+ * for a branch ("push it to main", or typing one on the review card) has
+ * already authorized that branch, so `lib/changesets/commit.ts` does not consult
+ * this flag for those writes.
  */
 export function defaultBranchWritesAllowed(
   env: Record<string, string | undefined> = process.env

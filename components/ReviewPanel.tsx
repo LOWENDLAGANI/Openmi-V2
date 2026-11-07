@@ -259,9 +259,9 @@ export function ReviewPanel({
                   <p className="text-[11px] leading-relaxed text-low">
                     This change is written to its own{" "}
                     <span className="font-mono">{agentBranchName(changeset.id)}</span>{" "}
-                    branch, never to the default branch. A named branch is used
-                    as-is; if it has moved since this diff was computed, the
-                    change goes to a new branch instead of failing.
+                    branch by default. Name a branch to write it directly — the
+                    default branch included; if it has moved since this diff was
+                    computed, the change goes to a new branch instead of failing.
                   </p>
 
                   <div className="flex flex-wrap items-center justify-between gap-2">

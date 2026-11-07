@@ -106,10 +106,15 @@ export async function approveChangesetAndOpenPullRequest(
     owner: string;
     sealKey: string | null;
     /**
-     * When set, write to this branch instead of the derived one. The default
-     * branch still becomes a new branch; `lib/github/write.ts` decides that.
+     * When set, write to this branch instead of the derived one.
+     *
+     * `explicit` means the reader named this branch themselves — typed it on the
+     * review card, or asked for it in the chat. That is the permission to write
+     * the default branch directly: the derived destination is still a new
+     * branch and a pull request, and the env flag only matters for a write that
+     * nobody asked about by name.
      */
-    target?: { branch: string };
+    target?: { branch: string; explicit?: boolean };
   }
 ): Promise<ApprovalResult> {
   if (!input.sealKey) {
@@ -335,7 +340,8 @@ export async function approveChangesetAndOpenPullRequest(
       changesetId: row.id,
       existingCommitSha: row.commit_sha ?? undefined,
       targetBranch: input.target?.branch.trim(),
-      allowDefaultBranch: defaultBranchWritesAllowed(),
+      allowDefaultBranch:
+        defaultBranchWritesAllowed() || input.target?.explicit === true,
       onProgress: async (progress) => {
         // Persisted before the next request so a partial write is resumable.
         await supabase

@@ -15,6 +15,7 @@ import { CHAT_SHELL_BUDGET_MS } from "@/lib/agent/shell";
 import type { EditRequest } from "@/lib/changesets";
 import { readAutoApproval } from "@/lib/changesets/autoapproval";
 import { autoWriteEnabled } from "@/lib/github/autowrite";
+import { requestedBranch } from "@/lib/github/branch-request";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import {
   addEdits,
@@ -767,12 +768,24 @@ export async function POST(request: Request) {
               });
 
               if (autoWrite || remembered) {
+                // "Push it to main" is a destination, not a preference. The
+                // reader naming a branch is the permission to write it, so the
+                // auto-write goes where they asked instead of demoting it to a
+                // pull request on an agent branch.
+                const askedBranch = requestedBranch(
+                  content,
+                  chatRowValue?.repo_branch ?? "main"
+                );
+
                 const approved = await approveChangesetAndOpenPullRequest(
                   session.supabase,
                   {
                     changesetId: changesetId as string,
                     owner: session.user.id,
                     sealKey,
+                    target: askedBranch
+                      ? { branch: askedBranch, explicit: true }
+                      : undefined,
                   }
                 );
 

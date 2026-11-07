@@ -282,8 +282,9 @@ export const ENV_SPEC: EnvSpec[] = [
     key: "OPENMI_ALLOW_DEFAULT_BRANCH",
     scope: "server",
     required: false,
-    unlocks: "Writing straight to the default branch when a change names it",
-    hint: 'Off by default; set to "on" only if you want main written without a pull request',
+    unlocks:
+      "Default-branch writes that nobody asked for by name (normally the reader naming a branch is enough)",
+    hint: 'Off by default; a user who asks for a branch in the chat or names one on the card already authorizes it',
   },
   {
     key: "CRON_SECRET",
