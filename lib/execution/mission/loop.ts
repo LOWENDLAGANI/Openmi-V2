@@ -1,5 +1,6 @@
 import "server-only";
 
+import { workBranchName } from "@/lib/branch";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import { getFile } from "@/lib/github/read";
 import { settleExecutionDew } from "@/lib/dew/store";
@@ -163,6 +164,9 @@ async function provision(
       "git config user.email openmi@users.noreply.github.com",
       "git add -A",
       "git -c commit.gpgsign=false commit -qm base",
+      // The mission works on a branch of its own, so an edit is a change on a
+      // branch rather than a change on a detached copy of the default branch.
+      `git branch -m ${workBranchName(mission.id)}`,
     ].join(" && "),
     MISSION_WORKDIR,
     120_000

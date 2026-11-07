@@ -8,6 +8,15 @@
 
 export const AGENT_BRANCH_PREFIX = "openmi/agent/";
 
+/**
+ * The branch a chat's sandbox clone is checked out on.
+ *
+ * Only the copy inside the sandbox carries this name: nothing is pushed from
+ * there. It exists so an edit is a change on a branch of its own rather than a
+ * change on top of a detached copy of the default branch.
+ */
+export const WORK_BRANCH_PREFIX = "openmi/work/";
+
 export const AGENT_BRANCH_PATTERN = /^openmi\/agent\/[a-z0-9][a-z0-9-]{0,63}$/;
 
 /** Git's own ceiling for a branch name. */
@@ -37,11 +46,22 @@ export function isSafeBranchName(branch: string): boolean {
 
 /** The branch for one changeset. Lower case, within GitHub's branch rules. */
 export function agentBranchName(changesetId: string): string {
-  const slug = changesetId
+  return `${AGENT_BRANCH_PREFIX}${branchSlug(changesetId)}`;
+}
+
+/** The branch one chat's sandbox clone is checked out on. */
+export function workBranchName(chatId: string): string {
+  return `${WORK_BRANCH_PREFIX}${branchSlug(chatId)}`;
+}
+
+/** Lower case, no separators git dislikes, short enough for GitHub. */
+function branchSlug(value: string): string {
+  const slug = value
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-+/, "")
     .slice(0, 48);
 
-  return `${AGENT_BRANCH_PREFIX}${slug}`;
+  return slug.length > 0 ? slug : "chat";
 }

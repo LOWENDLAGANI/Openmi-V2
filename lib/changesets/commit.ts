@@ -26,10 +26,10 @@ import { supabaseServer } from "@/lib/supabase/server";
  * checked before a token is opened or a request is made. Only then is the
  * changeset claimed with a compare-and-set, so two clicks cannot both write.
  *
- * The write itself is one branch and one PR. Nothing here can name a branch;
- * `agentBranchName` derives it from the changeset id and `lib/github/write.ts`
- * refuses anything else. A retry reuses the stored branch, commit and PR rather
- * than creating a second one.
+ * The write itself is one branch and one PR. The head is derived from the
+ * changeset id unless the reader names a branch, and `lib/github/write.ts`
+ * refuses the default branch and anything git would not accept. A retry reuses
+ * the stored branch, commit and PR rather than creating a second one.
  */
 
 type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
@@ -104,7 +104,10 @@ export async function approveChangesetAndOpenPullRequest(
     changesetId: string;
     owner: string;
     sealKey: string | null;
-    /** When set, commit straight to this branch instead of opening a PR. */
+    /**
+     * When set, write to this branch instead of the derived one. The default
+     * branch still becomes a new branch; `lib/github/write.ts` decides that.
+     */
     target?: { branch: string };
   }
 ): Promise<ApprovalResult> {
@@ -366,7 +369,9 @@ export async function approveChangesetAndOpenPullRequest(
 
     return {
       ok: true,
-      target: input.target ? "branch" : "pull-request",
+      // The destination the write actually used, not the one the form asked
+      // for: a default or moved branch becomes a new branch and a PR.
+      target: outcome.prUrl ? "pull-request" : "branch",
       prUrl: outcome.prUrl,
       prNumber: outcome.prNumber,
       commitSha: outcome.commitSha,

@@ -151,13 +151,15 @@ the signature, so moving from ready to approved does not invalidate it. A
 changeset expires six hours after it is proposed, and expiry is read from the
 clock, not stored as a hopeful flag.
 
-**Approval opens one branch and one pull request.** The head is always
-`openmi/agent/<changeset-id>`; there is no parameter that accepts a branch
-name, and the default branch is refused by the write client before any request.
-The PR base is the repository's default branch, read live from GitHub, and the
-commit's parent is the chat's pinned sha — a pin that has moved refuses instead
-of guessing. Retrying after a failure reuses the recorded branch, commit and
-pull request, so one approval cannot produce two PRs.
+**Approval opens one branch and one pull request.** The default head is
+`openmi/agent/<changeset-id>`, and the default branch is refused by the write
+client before any request, so naming it means "give this change its own
+branch". A branch the reader names instead is used as-is; a named branch that
+has moved since the diff was computed is not a dead end — the change goes to a
+new `openmi/agent/` branch on top of the live head, unforced. The PR base is the
+repository's default branch, read live from GitHub. Retrying after a failure
+reuses the recorded branch, commit and pull request, so one approval cannot
+produce two PRs.
 
 ## Dew
 
@@ -219,7 +221,9 @@ branch writes, no merges, no card payments, and no claim of verification.
 - Nothing in this app executes code. There is no sandbox and no test runner, and
   no surface claims otherwise.
 - Writes are one branch and one pull request per approved changeset. There is
-  no merge, no push to the default branch, and no branch cleanup.
+  no merge, no push to the default branch, and no branch cleanup. A change the
+  reader sends to a branch that moved becomes a new branch, never a forced
+  update.
 - Dew is charged per hour, not per answer. Only a provider failure or an abort
   before the first token is refunded automatically; any other correction is an
   operator adjustment.
@@ -426,20 +430,22 @@ neither the idle sweep nor the wipe may touch a leased box.
 The contract, state machine and failure matrix are in
 [docs/SANDBOX_LIFECYCLE_PLAN.md](docs/SANDBOX_LIFECYCLE_PLAN.md).
 
-### Automatic verification and standing approval
+### Automatic verification and automatic approval
 
 A turn that proposes a changeset keeps going on its own: the run seeds a
 workspace, applies the diff, builds, and lets the model repair what failed — up
-to two passes, each bounded by the run's wall-clock cap. A pull request opens
-**only if the build really exits 0**. If it still fails, the diff stays on the
-card and nothing is written to GitHub. There is no switch to turn this on: it is
-the default for every ready diff.
+to two passes, each bounded by the run's wall-clock cap. In a verified run a
+pull request opens **only if the build really exits 0**; if it still fails, the
+diff stays on the card and nothing is written to GitHub. There is no switch to
+turn the run on: it is the default for every ready diff.
 
-The approval form has a second option: **Approve and don't ask again for this
-branch**. It writes the diff now, then remembers the account, the repository and
-the chat's pinned branch. A later ready diff on that branch is written without
-waiting for the approval step. The review card names the branch and offers
-**Turn off** in one click.
+A ready diff is written **without a click** by default: the turn ends and the
+change goes straight to its own `openmi/agent/` branch and pull request, so the
+card reports what was written instead of asking. `OPENMI_AUTO_WRITE=off` brings
+the approval step back. With it off the card offers two choices: approve once,
+or **Approve and don't ask again for this branch**, which remembers the account,
+the repository and the chat's pinned branch. Either way the default branch is
+never written.
 
 That is the whole change: it moves who approves from you to the build result. It
 still writes one `openmi/agent/` branch, still never the default branch, and the

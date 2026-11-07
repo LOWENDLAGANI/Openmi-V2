@@ -14,6 +14,7 @@ import { createShellTurn } from "@/lib/agent/sandbox";
 import { CHAT_SHELL_BUDGET_MS } from "@/lib/agent/shell";
 import type { EditRequest } from "@/lib/changesets";
 import { readAutoApproval } from "@/lib/changesets/autoapproval";
+import { autoWriteEnabled } from "@/lib/github/autowrite";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import {
   addEdits,
@@ -741,20 +742,24 @@ export async function POST(request: Request) {
               .maybeSingle();
 
             const chatRowValue = chatRow as { repo_branch?: string | null } | null;
+            const autoWrite = autoWriteEnabled();
 
             send("notice", {
-              message:
-                "This diff is built in a sandbox; a failing build is repaired, and a pull request opens only if it exits 0.",
+              message: autoWrite
+                ? "This diff is written to its own branch and its pull request opens without an approval click."
+                : "This diff is built in a sandbox; a failing build is repaired, and a pull request opens only if it exits 0.",
             });
 
             if (sealKey && repoFullName) {
+              // A ready diff is written without a click by default; a standing
+              // approval is the fallback when an operator turns that off.
               const remembered = await readAutoApproval(session.supabase, {
                 owner: session.user.id,
                 repo: repoFullName,
                 branch: chatRowValue?.repo_branch ?? "main",
               });
 
-              if (remembered) {
+              if (autoWrite || remembered) {
                 const approved = await approveChangesetAndOpenPullRequest(
                   session.supabase,
                   {

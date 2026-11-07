@@ -41,7 +41,8 @@ test("remembering is a choice on the approval card, and it can be turned off", (
   expect(MODULE).toContain("readAutoApproval");
 });
 
-test("the chat route writes without asking only when the branch is remembered", () => {
+test("the chat route writes without asking by default, and falls back to a standing approval", () => {
+  expect(ROUTE).toContain("autoWriteEnabled");
   expect(ROUTE).toContain("readAutoApproval(session.supabase");
   expect(ROUTE).toContain("approveChangesetAndOpenPullRequest");
   expect(ROUTE).not.toContain("autopilot");

@@ -1,5 +1,6 @@
 import {
   AGENT_BRANCH_PATTERN,
+  AGENT_BRANCH_PREFIX,
   agentBranchName,
   isSafeBranchName,
 } from "@/lib/branch";
@@ -12,12 +13,14 @@ export { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
  *
  * The safety property is structural, not a prompt instruction. A pull request
  * always goes to a branch derived from the changeset id, and every write on
- * that path goes through `assertAgentBranch` first. A direct commit, which the
- * reader asks for explicitly, names its branch instead: the name must pass
- * git's own rules, the branch head must still be the pinned base, and the ref
- * is updated without force. A branch that has moved is refused, never
- * overwritten. tests/github-read.test.ts keeps read-only modules GET-only and
- * tests/github-write.test.ts pins both refusals and the request shapes.
+ * that path goes through `assertAgentBranch` first. A change the reader sends to
+ * a named branch keeps that name only when it passes git's own rules and is not
+ * the repository's default branch: the default branch is never written, so
+ * naming it means "give this change its own branch". A named branch that has
+ * moved since the diff was computed is not a dead end either — the change goes
+ * to a new branch on top of the live head. Nothing is ever forced.
+ * tests/github-read.test.ts keeps read-only modules GET-only and
+ * tests/github-write.test.ts pins these rules and the request shapes.
  *
  * One approval means one commit and either one agent branch with a pull request
  * or one direct branch update. The changeset id is the idempotency key: the
@@ -286,11 +289,22 @@ export async function commitProposal({
   }
 
   // Policy before the first request. A pull request can only use the branch
-  // derived from this changeset, based on the repository default. A direct
-  // commit may name any valid branch, and its base is checked against the live
-  // head below rather than assumed.
-  const direct = targetBranch !== undefined;
-  const branch = direct ? targetBranch.trim() : agentBranchName(changesetId);
+  // derived from this changeset, based on the repository default. A change may
+  // name a branch instead, but the default branch is never written: Openmi edits
+  // on a branch of its own, so naming the default branch means "make a new
+  // one". A named agent branch is a pull-request path too, because a branch
+  // with no PR would be a half-finished approval.
+  let direct = targetBranch !== undefined;
+  let branch = direct
+    ? (targetBranch ?? "").trim()
+    : agentBranchName(changesetId);
+
+  if (direct && branch === defaultBranch) {
+    direct = false;
+    branch = agentBranchName(changesetId);
+  } else if (direct && branch.startsWith(AGENT_BRANCH_PREFIX)) {
+    direct = false;
+  }
 
   if (direct) {
     assertSafeBranch(branch);
@@ -304,10 +318,12 @@ export async function commitProposal({
 
   await onProgress?.({ branch });
 
-  // Direct commits read the branch before writing anything. A branch that is
-  // not at the pinned base is refused rather than overwritten, and a missing
-  // branch is created once the commit exists.
+  // The named branch is read before anything is written. A branch that is no
+  // longer at the pinned base has moved, so the change is given its own branch
+  // on top of the live head instead of failing the approval or overwriting it.
+  // The reviewed content still lands, and the ref is never forced.
   let branchHead: string | null = null;
+  let writeBase = baseSha;
 
   if (direct) {
     branchHead = await readBranchHead(token, repoPath, branch);
@@ -317,11 +333,12 @@ export async function commitProposal({
       branchHead !== baseSha &&
       branchHead !== existingCommitSha
     ) {
-      throw new GithubWriteError(
-        "conflict",
-        `The branch ${branch} has moved to ${branchHead.slice(0, 7)}; this diff was computed at ${baseSha.slice(0, 7)}. Nothing was committed.`,
-        409
-      );
+      direct = false;
+      branch = agentBranchName(changesetId);
+      writeBase = branchHead;
+      branchHead = null;
+
+      await onProgress?.({ branch });
     }
   }
 
@@ -331,7 +348,7 @@ export async function commitProposal({
     const baseCommit = await request<{ tree: { sha: string } }>(
       token,
       "GET",
-      `${repoPath}/git/commits/${encodeURIComponent(baseSha)}`
+      `${repoPath}/git/commits/${encodeURIComponent(writeBase)}`
     );
 
     const tree = await request<{ sha: string }>(token, "POST", `${repoPath}/git/trees`, {
@@ -347,7 +364,7 @@ export async function commitProposal({
     const commit = await request<{ sha: string }>(token, "POST", `${repoPath}/git/commits`, {
       message: `Openmi: propose ${files.length} file(s)\n\nChangeset ${changesetId}, approved in the app. The default branch was not modified.`,
       tree: tree.sha,
-      parents: [baseSha],
+      parents: [writeBase],
     });
 
     commitSha = commit.sha;

@@ -264,6 +264,14 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to 3, clamped to 1..10; the least-recently-active is evicted first",
   },
   {
+    key: "OPENMI_AUTO_WRITE",
+    scope: "server",
+    required: false,
+    unlocks:
+      "Writing a ready diff to its own branch and pull request without an approval click",
+    hint: 'Defaults to on; set to "off" to require the click on the review card',
+  },
+  {
     key: "CRON_SECRET",
     scope: "server",
     required: false,

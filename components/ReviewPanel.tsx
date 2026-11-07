@@ -1,7 +1,7 @@
 import { acceptChange, approveProposal, forgetAutoApproval, rejectChange } from "@/app/chat/actions";
 import { ExecutionPanel } from "@/components/ExecutionPanel";
 import { SubmitButton } from "@/components/SubmitButton";
-import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
+import { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
 import {
   changesetDisplayStatus,
   type ChangesetStatus,
@@ -59,6 +59,7 @@ export function ReviewPanel({
   chatSha,
   chatBranch,
   autoApproveBranch,
+  autoWrite,
 }: {
   changesets: ReviewChangeset[];
   chatId: string;
@@ -67,6 +68,8 @@ export function ReviewPanel({
   chatBranch: string | null;
   /** Set when this branch is already approved without asking. */
   autoApproveBranch: string | null;
+  /** True when a ready diff is written without an approval click. */
+  autoWrite: boolean;
 }) {
   if (changesets.length === 0) return null;
 
@@ -121,7 +124,7 @@ export function ReviewPanel({
                 </p>
               )}
 
-              {autoApproveBranch && (
+              {autoApproveBranch && !autoWrite && (
                 <div className="rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5">
                   <p className="text-[11px] leading-relaxed text-accent-text">
                     Auto-approve is on for{" "}
@@ -196,7 +199,7 @@ export function ReviewPanel({
 
               <ExecutionPanel changesetId={changeset.id} status={status} />
 
-              {status === "ready" && (
+              {status === "ready" && !autoWrite && (
                 <form
                   action={approveProposal}
                   className="space-y-3 border-t border-line pt-3"
@@ -229,7 +232,7 @@ export function ReviewPanel({
                         defaultChecked
                         className="size-3 accent-current"
                       />
-                      Open a pull request
+                      New branch + pull request
                     </label>
 
                     <label className="flex items-center gap-1.5 text-[11px] text-body">
@@ -244,14 +247,22 @@ export function ReviewPanel({
 
                     <input
                       name="branch"
-                      defaultValue="main"
+                      defaultValue=""
                       maxLength={100}
                       spellCheck={false}
                       aria-label="Branch to commit to"
-                      placeholder="main"
+                      placeholder="branch name"
                       className="field w-32 py-1 text-[11px]"
                     />
                   </fieldset>
+
+                  <p className="text-[11px] leading-relaxed text-low">
+                    This change is written to its own{" "}
+                    <span className="font-mono">{agentBranchName(changeset.id)}</span>{" "}
+                    branch, never to the default branch. A named branch is used
+                    as-is; if it has moved since this diff was computed, the
+                    change goes to a new branch instead of failing.
+                  </p>
 
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="max-w-md text-[11px] leading-relaxed text-low">
@@ -270,6 +281,17 @@ export function ReviewPanel({
                     )}
                   </div>
                 </form>
+              )}
+
+              {status === "ready" && autoWrite && (
+                <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
+                  This diff is written automatically to{" "}
+                  <span className="font-mono text-body">
+                    {agentBranchName(changeset.id)}
+                  </span>{" "}
+                  and its pull request opens without an approval click. The
+                  default branch is not modified.
+                </p>
               )}
 
               {status === "draft" && (

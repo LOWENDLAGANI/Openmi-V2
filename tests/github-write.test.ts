@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { workBranchName } from "../lib/branch";
 import {
   GithubWriteError,
   agentBranchName,
@@ -89,6 +90,7 @@ function happyPath(method: string, path: string): StubResult {
 
 test("only agent branches can be written, and the default branch is refused", () => {
   expect(agentBranchName("Changeset-ABC_1")).toBe("openmi/agent/changeset-abc-1");
+  expect(workBranchName("Chat-ABC_1")).toBe("openmi/work/chat-abc-1");
   expect(() => assertAgentBranch(agentBranchName("anything"), "main")).not.toThrow();
 
   for (const branch of [
@@ -223,28 +225,41 @@ test("a permission failure names the scopes the token needs", async () => {
   await expect(commitProposal(BASE)).rejects.toThrow(/Contents: read and write/);
 });
 
-test("a direct commit moves the named branch and opens no pull request", async () => {
+test("a named branch is committed to without opening a pull request", async () => {
   const calls = stubFetch((method, path) => {
-    if (method === "GET" && path.endsWith("/git/ref/heads/main")) {
+    if (method === "GET" && path.endsWith("/git/ref/heads/release")) {
       return { status: 404, body: { message: "Not Found" } };
     }
     return happyPath(method, path);
   });
 
-  const outcome = await commitProposal({ ...BASE, targetBranch: "main" });
+  const outcome = await commitProposal({ ...BASE, targetBranch: "release" });
 
   expect(outcome).toEqual({
-    branch: "main",
-    baseBranch: "main",
+    branch: "release",
+    baseBranch: "release",
     commitSha: "commit-1",
     prUrl: null,
     prNumber: null,
   });
 
   const ref = calls.find((call) => call.method === "POST" && call.path.endsWith("/git/refs"));
-  expect(ref?.body?.ref).toBe("refs/heads/main");
+  expect(ref?.body?.ref).toBe("refs/heads/release");
   expect(ref?.body?.sha).toBe("commit-1");
   expect(calls.some((call) => call.path.endsWith("/pulls"))).toBe(false);
+});
+
+test("naming the default branch gives the change its own branch and a PR", async () => {
+  const calls = stubFetch(happyPath);
+
+  const outcome = await commitProposal({ ...BASE, targetBranch: "main" });
+
+  expect(outcome.branch).toBe("openmi/agent/changeset-1");
+  expect(outcome.prNumber).toBe(7);
+
+  const ref = calls.find((call) => call.method === "POST" && call.path.endsWith("/git/refs"));
+  expect(ref?.body?.ref).toBe("refs/heads/openmi/agent/changeset-1");
+  expect(calls.some((call) => call.method === "PATCH")).toBe(false);
 });
 
 test("an existing branch at the pinned base is fast-forwarded, never forced", async () => {
@@ -268,21 +283,33 @@ test("an existing branch at the pinned base is fast-forwarded, never forced", as
   );
 });
 
-test("a branch that has moved is refused before a commit is written", async () => {
+test("a named branch that has moved gets a new branch on the live head", async () => {
   const calls = stubFetch((method, path) => {
-    if (method === "GET" && path.endsWith("/git/ref/heads/main")) {
+    if (method === "GET" && path.endsWith("/git/ref/heads/release")) {
       return { body: { object: { sha: "newer-commit" } } };
+    }
+    if (method === "GET" && path.endsWith("/git/commits/newer-commit")) {
+      return { body: { tree: { sha: "tree-newer" } } };
     }
     return happyPath(method, path);
   });
 
-  await expect(commitProposal({ ...BASE, targetBranch: "main" })).rejects.toThrow(
-    /has moved/
-  );
+  const outcome = await commitProposal({ ...BASE, targetBranch: "release" });
 
-  expect(
-    calls.some((call) => call.method === "POST" && call.path.endsWith("/git/commits"))
-  ).toBe(false);
+  expect(outcome.branch).toBe("openmi/agent/changeset-1");
+  expect(outcome.prNumber).toBe(7);
+
+  const tree = calls.find(
+    (call) => call.method === "POST" && call.path.endsWith("/git/trees")
+  );
+  expect(tree?.body?.base_tree).toBe("tree-newer");
+
+  const commit = calls.find(
+    (call) => call.method === "POST" && call.path.endsWith("/git/commits")
+  );
+  expect(commit?.body?.parents).toEqual(["newer-commit"]);
+
+  expect(calls.some((call) => call.method === "PATCH")).toBe(false);
 });
 
 test("a branch name git would refuse is refused before any request", async () => {
