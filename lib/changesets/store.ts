@@ -38,6 +38,8 @@ export type ChangesetRow = {
   created_at: string;
   branch_name: string | null;
   commit_sha: string | null;
+  merge_commit_sha: string | null;
+  reverted_commit_sha: string | null;
   pr_url: string | null;
   pr_number: number | null;
   failure: string | null;
@@ -399,7 +401,7 @@ export async function loadChangesets(
   const { data: rows } = await supabase
     .from("changesets")
     .select(
-      "id, status, base_sha, repo_full_name, expires_at, created_at, branch_name, commit_sha, pr_url, pr_number, failure"
+      "id, status, base_sha, repo_full_name, expires_at, created_at, branch_name, commit_sha, merge_commit_sha, reverted_commit_sha, pr_url, pr_number, failure"
     )
     .eq("chat_id", chatId)
     .order("created_at", { ascending: false })

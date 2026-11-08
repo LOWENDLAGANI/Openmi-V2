@@ -136,6 +136,8 @@ const REQUIRED_COLUMNS = [
   ["agent_turns", "cancel_requested"],
   ["agent_turns", "partial"],
   ["changesets", "pr_url"],
+  ["changesets", "merge_commit_sha"],
+  ["changesets", "reverted_commit_sha"],
   ["profiles", "dew_balance"],
   ["payment_requests", "status"],
   ["payment_requests", "receipt_path"],

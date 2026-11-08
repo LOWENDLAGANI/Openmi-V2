@@ -1,11 +1,13 @@
-import { acceptChange, approveProposal, forgetAutoApproval, rejectChange } from "@/app/chat/actions";
+import {
+  acceptChange,
+  approveProposal,
+  forgetAutoApproval,
+  rejectChange,
+  undoChangeset,
+} from "@/app/chat/actions";
 import { ExecutionPanel } from "@/components/ExecutionPanel";
 import { SubmitButton } from "@/components/SubmitButton";
-import { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
-import {
-  changesetDisplayStatus,
-  type ChangesetStatus,
-} from "@/lib/changesets";
+import { changesetDisplayStatus, type ChangesetStatus } from "@/lib/changesets";
 import type { ReviewChangeset } from "@/lib/changesets/store";
 
 /**
@@ -13,21 +15,29 @@ import type { ReviewChangeset } from "@/lib/changesets/store";
  *
  * It renders what is stored, not what a request hoped: an edit that failed to
  * apply has no diff and says why, an expired changeset says it expired, and an
- * approved one says that nothing has been written to GitHub. No state here is
- * optimistic, and no label claims a build, test or commit happened.
+ * applied one links to the commit GitHub created. No state here is optimistic,
+ * and no label claims a build, test or commit happened.
  *
- * The panel is a server component; the only interactivity is a form per file
- * that posts to a server action, so the row is the single source of truth.
+ * Applying is one button. The old approve-then-merge-on-GitHub pair is gone, so
+ * the copy talks about the change rather than the machinery behind it. The panel
+ * is a server component; the only interactivity is a form per file that posts to
+ * a server action, so the row is the single source of truth.
  */
 
 const STATUS_LABEL: Record<ChangesetStatus, string> = {
   draft: "Draft — not signed yet",
   ready: "Ready for review",
-  approved: "Approved",
-  committed: "Committed",
-  failed: "Failed — no file could be proposed",
+  approved: "Applying",
+  committed: "Applied",
+  failed: "Not applied",
   expired: "Expired",
+  reverted: "Undone",
 };
+
+function commitHref(repo: string, sha: string | null): string | null {
+  if (!sha) return null;
+  return `https://github.com/${repo}/commit/${sha}`;
+}
 
 function DiffBlock({ text }: { text: string }) {
   if (text.length === 0) return null;
@@ -84,9 +94,14 @@ export function ReviewPanel({
         const deletions = accepted.reduce((total, file) => total + file.deletions, 0);
         const stale = chatSha !== null && chatSha !== changeset.base_sha;
         const reviewable = status === "ready";
-        const directCommit =
-          changeset.branch_name !== null &&
-          !changeset.branch_name.startsWith(AGENT_BRANCH_PREFIX);
+        const appliedHref = commitHref(
+          changeset.repo_full_name,
+          changeset.merge_commit_sha ?? changeset.commit_sha
+        );
+        const revertedHref = commitHref(
+          changeset.repo_full_name,
+          changeset.reverted_commit_sha
+        );
 
         return (
           <details
@@ -109,7 +124,7 @@ export function ReviewPanel({
 
             <div className="space-y-3 border-t border-line px-4 py-3">
               <p className="eyebrow">
-                base {changeset.base_sha.slice(0, 7)} · expires{" "}
+                suggested against {changeset.base_sha.slice(0, 7)} · expires{" "}
                 {changeset.expires_at.slice(0, 16).replace("T", " ")} UTC
               </p>
 
@@ -118,18 +133,18 @@ export function ReviewPanel({
                   role="status"
                   className="rounded-2xl border border-warn/25 bg-warn/8 px-4 py-2.5 text-[11px] leading-relaxed text-warn"
                 >
-                  This diff was computed at {changeset.base_sha.slice(0, 7)}, but
-                  the chat is pinned at {chatSha.slice(0, 7)} now. Re-ask before
-                  approving it.
+                  This suggestion was made against {changeset.base_sha.slice(0, 7)},
+                  but the chat has moved to {chatSha.slice(0, 7)}. Ask for a fresh
+                  suggestion before applying it.
                 </p>
               )}
 
               {autoApproveBranch && !autoWrite && (
                 <div className="rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5">
                   <p className="text-[11px] leading-relaxed text-accent-text">
-                    Auto-approve is on for{" "}
+                    Auto-apply is on for{" "}
                     <span className="font-mono">{autoApproveBranch}</span>: a ready
-                    diff on this branch is written without asking.
+                    suggestion here is applied without asking.
                   </p>
                   <form action={forgetAutoApproval} className="mt-2">
                     <input type="hidden" name="chatId" value={chatId} />
@@ -215,54 +230,11 @@ export function ReviewPanel({
                       className="mt-0.5 size-3 accent-current"
                     />
                     <span>
-                      Approve and don&apos;t ask again for{" "}
+                      Apply and don&apos;t ask again for{" "}
                       <span className="font-mono">{chatBranch ?? "main"}</span>.
-                      Future diffs on this branch are written without this step.
+                      Future suggestions here are applied without this step.
                     </span>
                   </label>
-
-                  <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <legend className="eyebrow mb-1 w-full">Destination</legend>
-
-                    <label className="flex items-center gap-1.5 text-[11px] text-body">
-                      <input
-                        type="radio"
-                        name="target"
-                        value="pr"
-                        defaultChecked
-                        className="size-3 accent-current"
-                      />
-                      New branch + pull request
-                    </label>
-
-                    <label className="flex items-center gap-1.5 text-[11px] text-body">
-                      <input
-                        type="radio"
-                        name="target"
-                        value="branch"
-                        className="size-3 accent-current"
-                      />
-                      Commit to
-                    </label>
-
-                    <input
-                      name="branch"
-                      defaultValue=""
-                      maxLength={100}
-                      spellCheck={false}
-                      aria-label="Branch to commit to"
-                      placeholder="branch name"
-                      className="field w-32 py-1 text-[11px]"
-                    />
-                  </fieldset>
-
-                  <p className="text-[11px] leading-relaxed text-low">
-                    This change is written to its own{" "}
-                    <span className="font-mono">{agentBranchName(changeset.id)}</span>{" "}
-                    branch by default. Name a branch to write it directly — the
-                    default branch included; if it has moved since this diff was
-                    computed, the change goes to a new branch instead of failing.
-                  </p>
 
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="max-w-md text-[11px] leading-relaxed text-low">
@@ -274,9 +246,9 @@ export function ReviewPanel({
                     {accepted.length > 0 && (
                       <SubmitButton
                         className="btn btn-primary px-4 py-1.5 text-[11.5px]"
-                        pendingText="Writing…"
+                        pendingText="Applying…"
                       >
-                        Approve changes
+                        Apply changes
                       </SubmitButton>
                     )}
                   </div>
@@ -285,12 +257,7 @@ export function ReviewPanel({
 
               {status === "ready" && autoWrite && (
                 <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
-                  This diff is written automatically to{" "}
-                  <span className="font-mono text-body">
-                    {agentBranchName(changeset.id)}
-                  </span>{" "}
-                  and its pull request opens without an approval click. The
-                  default branch is not modified.
+                  This suggestion is applied automatically without an approval click.
                 </p>
               )}
 
@@ -302,36 +269,18 @@ export function ReviewPanel({
 
               {status === "approved" && (
                 <div className="space-y-2 border-t border-line pt-3">
-                  {changeset.pr_url && typeof changeset.pr_number === "number" ? (
-                    <p className="text-[11px] leading-relaxed text-mid">
-                      Committed on{" "}
-                      <span className="font-mono text-body">{changeset.branch_name}</span>.{" "}
-                      <a
-                        href={changeset.pr_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-accent-text underline-offset-2 hover:underline"
-                      >
-                        Pull request #{changeset.pr_number}
-                      </a>{" "}
-                      The default branch was not modified.
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-[11px] leading-relaxed text-mid">
-                        {directCommit
-                          ? "Approved, but GitHub has not confirmed the commit yet."
-                          : "Approved, but GitHub has not confirmed a pull request yet."}
-                      </p>
+                  <p className="text-[11px] leading-relaxed text-mid">
+                    Applying this change to the repository…
+                  </p>
 
-                      {changeset.failure && (
-                        <p
-                          role="alert"
-                          className="rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[11px] leading-relaxed text-danger"
-                        >
-                          {changeset.failure}
-                        </p>
-                      )}
+                  {changeset.failure && (
+                    <>
+                      <p
+                        role="alert"
+                        className="rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[11px] leading-relaxed text-danger"
+                      >
+                        {changeset.failure}
+                      </p>
 
                       <form
                         action={approveProposal}
@@ -339,24 +288,12 @@ export function ReviewPanel({
                       >
                         <input type="hidden" name="changesetId" value={changeset.id} />
                         <input type="hidden" name="chatId" value={chatId} />
-                        <input
-                          type="hidden"
-                          name="target"
-                          value={directCommit ? "branch" : "pr"}
-                        />
-                        {directCommit && changeset.branch_name && (
-                          <input
-                            type="hidden"
-                            name="branch"
-                            value={changeset.branch_name}
-                          />
-                        )}
 
                         <SubmitButton
                           className="btn px-4 py-1.5 text-[11.5px]"
-                          pendingText="Retrying…"
+                          pendingText="Trying again…"
                         >
-                          Retry approval
+                          Try again
                         </SubmitButton>
                       </form>
                     </>
@@ -371,39 +308,57 @@ export function ReviewPanel({
               )}
 
               {status === "failed" && (
-                <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-danger">
-                  No file could be proposed.
+                <p
+                  role="alert"
+                  className="border-t border-line pt-3 text-[11px] leading-relaxed text-danger"
+                >
+                  {changeset.failure ?? "This change was not applied."}
                 </p>
               )}
 
               {status === "committed" && (
-                <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
-                  Committed on{" "}
-                  <span className="font-mono text-body">
-                    {changeset.branch_name ?? "an agent branch"}
-                  </span>
-                  {changeset.commit_sha ? (
-                    <>
-                      {" "}at{" "}
-                      <span className="font-mono text-body">
-                        {changeset.commit_sha.slice(0, 7)}
-                      </span>
-                    </>
-                  ) : null}
-                  .{" "}
-                  {changeset.pr_url && typeof changeset.pr_number === "number" ? (
-                    <>
+                <div className="space-y-2 border-t border-line pt-3">
+                  <p className="flex flex-wrap items-center gap-2 text-[11px] leading-relaxed text-mid">
+                    <span className="font-medium text-hi">Changes applied</span>
+                    {appliedHref && (
                       <a
-                        href={changeset.pr_url}
+                        href={appliedHref}
                         target="_blank"
                         rel="noreferrer"
                         className="text-accent-text underline-offset-2 hover:underline"
                       >
-                        Pull request #{changeset.pr_number}
+                        View the change
                       </a>
-                    </>
-                  ) : (
-                    "Direct commit."
+                    )}
+                  </p>
+
+                  {changeset.merge_commit_sha && (
+                    <form action={undoChangeset}>
+                      <input type="hidden" name="changesetId" value={changeset.id} />
+                      <input type="hidden" name="chatId" value={chatId} />
+                      <SubmitButton
+                        className="btn px-3 py-1 text-[10.5px]"
+                        pendingText="Undoing…"
+                      >
+                        Undo
+                      </SubmitButton>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {status === "reverted" && (
+                <p className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
+                  <span className="font-medium text-hi">Changes undone</span>
+                  {revertedHref && (
+                    <a
+                      href={revertedHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent-text underline-offset-2 hover:underline"
+                    >
+                      View the undo
+                    </a>
                   )}
                 </p>
               )}

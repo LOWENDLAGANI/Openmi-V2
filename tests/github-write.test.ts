@@ -377,7 +377,9 @@ test("only the approval path imports the GitHub write client", () => {
     );
 
   const offenders = files.filter((file) => {
-    if (file === "lib/changesets/commit.ts") return false;
+    if (file === "lib/changesets/commit.ts" || file === "lib/changesets/undo.ts") {
+      return false;
+    }
     const text = readFileSync(join(ROOT, file), "utf8");
     return /from\s+"@\/lib\/github\/write"/.test(text);
   });

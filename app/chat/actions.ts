@@ -9,6 +9,7 @@ import {
   rememberAutoApproval,
 } from "@/lib/changesets/autoapproval";
 import { reviewChangesetFile } from "@/lib/changesets/store";
+import { undoAppliedChangeset } from "@/lib/changesets/undo";
 import {
   trashChatSandbox,
   wipeChatSandbox,
@@ -340,6 +341,33 @@ export async function approveProposal(formData: FormData) {
         branch: rememberedBranch,
       });
     }
+  }
+
+  redirect(chatHref(chatId));
+}
+
+/**
+ * Undo: restore every changed file to its content at the changeset's base.
+ *
+ * Ownership, the applied merge commit and the not-already-undone check live in
+ * `lib/changesets/undo.ts`; the Write itself stays in `lib/github/write.ts`.
+ */
+export async function undoChangeset(formData: FormData) {
+  const { supabase, user } = await acting();
+  const changesetId = field(formData, "changesetId");
+  const chatId = field(formData, "chatId");
+
+  if (!changesetId) fail("That change no longer exists.");
+
+  const result = await undoAppliedChangeset(supabase, {
+    changesetId,
+    owner: user.id,
+  });
+
+  revalidatePath("/chat");
+
+  if (!result.ok) {
+    redirect(`${chatHref(chatId)}${chatId ? "&" : "?"}error=${encodeURIComponent(result.error)}`);
   }
 
   redirect(chatHref(chatId));

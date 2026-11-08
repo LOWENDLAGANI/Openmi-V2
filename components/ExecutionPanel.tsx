@@ -244,7 +244,7 @@ export function ExecutionPanel({
 
       {status === "ready" && (
         <p className="text-[10.5px] leading-relaxed text-low">
-          A pull request opens only if the build exits 0.
+          A change is applied only if the build exits 0.
         </p>
       )}
     </section>

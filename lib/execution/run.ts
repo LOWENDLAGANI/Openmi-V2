@@ -815,15 +815,15 @@ async function autoApproveRun(input: {
   if (!approved.ok) {
     await input.event(
       "observation",
-      `the automatic approval could not open a pull request: ${approved.error}`
+      `the automatic approval could not apply the change: ${approved.error}`
     );
     return;
   }
 
   await input.event(
     "observation",
-    approved.prUrl
-      ? `the automatic approval opened ${approved.prUrl} on ${approved.branch}`
-      : `the automatic approval committed ${approved.branch}`
+    approved.mergeCommitSha
+      ? `the automatic approval applied ${approved.mergeCommitSha}`
+      : `the automatic approval wrote ${approved.commitSha}`
   );
 }

@@ -41,11 +41,14 @@ test("every read request under lib/github is a GET", () => {
   }
 });
 
-test("the write client uses only the verbs an approval needs", () => {
+test("the write client uses only the verbs an approval and an undo need", () => {
   const text = source("write.ts");
 
-  expect(text).toContain('type WriteMethod = "GET" | "POST" | "PATCH"');
-  expect(text).not.toMatch(/"(PUT|DELETE)"/);
+  expect(text).toContain(
+    'type WriteMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE"'
+  );
+  expect(text).toContain("/pulls/");
+  expect(text).toContain("merge_method: \"squash\"");
   expect(text).toContain("Openmi only commits to agent/ branches.");
   expect(text).not.toMatch(/\baxios\b/);
 });

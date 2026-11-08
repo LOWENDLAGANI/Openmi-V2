@@ -16,6 +16,8 @@ import {
   assertAgentBranch,
   assertSafeBranch,
   commitProposal,
+  mergeProposal,
+  type ChangedFile,
   type ProposedFile,
 } from "@/lib/github/write";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -31,6 +33,11 @@ import { supabaseServer } from "@/lib/supabase/server";
  * changeset id unless the reader names a branch, and `lib/github/write.ts`
  * refuses the default branch and anything git would not accept. A retry reuses
  * the stored branch, commit and PR rather than creating a second one.
+ *
+ * An approval no longer leaves the PR for the reader to merge on GitHub. The
+ * same call waits for mergeability, re-applies the edits when the default branch
+ * moved, squash-merges, and stores the merge commit. A merge that cannot finish
+ * marks the changeset failed and leaves the PR for inspection.
  */
 
 type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
@@ -42,6 +49,8 @@ export type ApprovalResult =
       prUrl: string | null;
       prNumber: number | null;
       commitSha: string;
+      /** The squash commit GitHub created, once the change was applied. */
+      mergeCommitSha: string | null;
       branch: string;
       target: "pull-request" | "branch";
       alreadyCommitted: boolean;
@@ -59,17 +68,17 @@ type ChangesetRow = {
   signature: string | null;
   branch_name: string | null;
   commit_sha: string | null;
+  merge_commit_sha: string | null;
   pr_url: string | null;
   pr_number: number | null;
   failure: string | null;
 };
 
 function existingResult(row: ChangesetRow): ApprovalResult | null {
-  if (!row.commit_sha || !row.branch_name) return null;
+  // Only an applied row is done. A failed merge keeps its pull request and
+  // commit, and must not be mistaken for an approval that succeeded.
+  if (row.status !== "committed" || !row.commit_sha || !row.branch_name) return null;
 
-  // A committed row is done. Without a PR url it is only done when the branch
-  // is not an agent branch; an agent branch with no PR is a half-finished
-  // pull request that a retry should still complete.
   const direct = !row.branch_name.startsWith(AGENT_BRANCH_PREFIX);
 
   if (row.pr_url && typeof row.pr_number === "number") {
@@ -79,18 +88,20 @@ function existingResult(row: ChangesetRow): ApprovalResult | null {
       prUrl: row.pr_url,
       prNumber: row.pr_number,
       commitSha: row.commit_sha,
+      mergeCommitSha: row.merge_commit_sha,
       branch: row.branch_name,
       alreadyCommitted: true,
     };
   }
 
-  if (row.status === "committed" && direct) {
+  if (direct) {
     return {
       ok: true,
       target: "branch",
       prUrl: null,
       prNumber: null,
       commitSha: row.commit_sha,
+      mergeCommitSha: row.merge_commit_sha,
       branch: row.branch_name,
       alreadyCommitted: true,
     };
@@ -141,7 +152,7 @@ export async function approveChangesetAndOpenPullRequest(
   const { data, error } = await supabase
     .from("changesets")
     .select(
-      "id, chat_id, status, repo_full_name, base_sha, expires_at, content_hash, signature, branch_name, commit_sha, pr_url, pr_number, failure"
+      "id, chat_id, status, repo_full_name, base_sha, expires_at, content_hash, signature, branch_name, commit_sha, merge_commit_sha, pr_url, pr_number, failure"
     )
     .eq("id", input.changesetId)
     .maybeSingle();
@@ -157,6 +168,11 @@ export async function approveChangesetAndOpenPullRequest(
   if (existing) return existing;
 
   const status = changesetDisplayStatus(row);
+
+  // A merge that could not finish is a recorded outcome, not a retry prompt.
+  if (status === "failed" && row.failure) {
+    return { ok: false, error: row.failure };
+  }
 
   if (status === "expired") {
     return {
@@ -174,19 +190,31 @@ export async function approveChangesetAndOpenPullRequest(
 
   const { data: fileRows, error: fileError } = await supabase
     .from("changeset_files")
-    .select("path, proposed_content, error")
+    .select("path, mode, original_content, proposed_content, error")
     .eq("changeset_id", row.id)
     .eq("accepted", true);
 
   if (fileError) return { ok: false, error: fileError.message };
 
-  const files: ProposedFile[] = ((fileRows ?? []) as Array<{
+  const changedFiles: ChangedFile[] = ((fileRows ?? []) as Array<{
     path: string;
+    mode: string;
+    original_content: string | null;
     proposed_content: string;
     error: string | null;
   }>)
     .filter((file) => file.error === null)
-    .map((file) => ({ path: String(file.path), content: String(file.proposed_content) }));
+    .map((file) => ({
+      path: String(file.path),
+      mode: file.mode === "replace" ? "replace" : "write",
+      original: file.original_content === null ? null : String(file.original_content),
+      proposed: String(file.proposed_content),
+    }));
+
+  const files: ProposedFile[] = changedFiles.map((file) => ({
+    path: file.path,
+    content: file.proposed,
+  }));
 
   if (files.length === 0) {
     return { ok: false, error: "No files are accepted, so there is nothing to approve." };
@@ -315,7 +343,7 @@ export async function approveChangesetAndOpenPullRequest(
   if (!claimed) {
     const { data: latest } = await supabase
       .from("changesets")
-      .select("branch_name, commit_sha, pr_url, pr_number, status")
+      .select("branch_name, commit_sha, merge_commit_sha, pr_url, pr_number, status")
       .eq("id", row.id)
       .maybeSingle();
 
@@ -355,12 +383,49 @@ export async function approveChangesetAndOpenPullRequest(
       },
     });
 
+    let mergeCommitSha: string | null = null;
+
+    // The PR exists; applying it is the rest of the approval. A suggestion that
+    // can no longer be re-applied is closed by `mergeProposal` itself.
+    if (outcome.prUrl && typeof outcome.prNumber === "number") {
+      const merged = await mergeProposal({
+        token: github.token,
+        repo: row.repo_full_name,
+        defaultBranch,
+        branch: outcome.branch,
+        prNumber: outcome.prNumber,
+        changesetId: row.id,
+        files: changedFiles,
+      });
+
+      if (!merged.ok) {
+        await supabase
+          .from("changesets")
+          .update({
+            status: "failed",
+            branch_name: outcome.branch,
+            commit_sha: outcome.commitSha,
+            merge_commit_sha: null,
+            pr_url: outcome.prUrl,
+            pr_number: outcome.prNumber,
+            failure: merged.error,
+          })
+          .eq("id", row.id)
+          .eq("owner", input.owner);
+
+        return { ok: false, error: merged.error };
+      }
+
+      mergeCommitSha = merged.mergeCommitSha;
+    }
+
     const { error: saveError } = await supabase
       .from("changesets")
       .update({
         status: "committed",
         branch_name: outcome.branch,
         commit_sha: outcome.commitSha,
+        merge_commit_sha: mergeCommitSha,
         pr_url: outcome.prUrl,
         pr_number: outcome.prNumber,
         failure: null,
@@ -371,7 +436,7 @@ export async function approveChangesetAndOpenPullRequest(
     if (saveError) {
       return {
         ok: false,
-        error: `The pull request ${outcome.prUrl} exists, but the changeset could not be updated: ${saveError.message}`,
+        error: `The change was applied, but the changeset could not be updated: ${saveError.message}`,
       };
     }
 
@@ -383,6 +448,7 @@ export async function approveChangesetAndOpenPullRequest(
       prUrl: outcome.prUrl,
       prNumber: outcome.prNumber,
       commitSha: outcome.commitSha,
+      mergeCommitSha,
       branch: outcome.branch,
       alreadyCommitted: false,
     };
