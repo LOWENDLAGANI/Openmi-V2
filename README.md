@@ -468,3 +468,34 @@ cannot start (D6.4) — are answered in
 - A new table gets RLS enabled in the migration that creates it.
 - A new limit is a named constant with a test that reads it.
 - Do not claim verification the product does not perform.
+
+---
+
+## Summary
+
+**Openmi** is a chat client welded to a GitHub repository. It reads code at a pinned commit, answers with `path:line` citations, and proposes edits as a diff you can review. Nothing is written to GitHub until you approve it, and an approval opens a pull request on a new `openmi/agent/` branch — never on the default branch.
+
+**Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) · Tailwind v4 tokens · Bun.
+
+**What's built (Phases 0–10):**
+- Phase 0: Env contract, Supabase clients, migration harness, `/setup`, CI
+- Phase 1: Sign-in/out, cookie session, middleware gate, sidebar, folders, trash, history
+- Phase 2: GitHub connect with sealed tokens, repo picker, pinned tree + file viewer, code search
+- Phase 3: Streaming chat, capability modes, per-chat sequence, context budget, citation links
+- Phase 4: Read-only agent tools, step budget with compare-and-set, signed continuation
+- Phase 5: Proposed edits, unified diff, per-file review, signed changesets
+- Phase 6: Approval → agent branch → one commit → pull request, default-branch refusal
+- Phase 7: Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes
+- Phase 8: Setup env, migration drift and live probes; `/about` truth surface
+- Phase 9: RLS audit, contrast gate, shared rate limiter, Vercel route config
+- Phase 10: Sandbox verification — install + build recorded from real exit codes (gated)
+
+**The agent:** A turn may call three read tools (`list_files`, `read_file`, `search_code`) with caps at 24 steps, 120K token budget, and 40s wall clock. It can also propose edits via `propose_edits` (max 6 edits, 24 files per changeset).
+
+**Dew billing:** 3 Dew/hour, 6 Dew daily free (15 after top-up), 5 Dew trial credit. Charged before provider call; refunds only for provider failure or abort before first token.
+
+**Sandbox verification (Phase 10):** Ready changesets can be installed and built in a Daytona sandbox. Build runs up to 2 model repair passes. PR opens only if build exits 0. Optional "Approve and don't ask again for this branch" for standing approval.
+
+**Known limits:** No code execution, no sandbox/test runner, no default branch writes, no merges, no card payments, no offline mode. Execution is gated (Phase 10).
+
+**Deploy:** Create Supabase project → generate `GITHUB_TOKEN_KEY` → configure auth redirects → import to Vercel with all env vars → apply migrations (`supabase db push`) → deploy → connect GitHub → test flow.
