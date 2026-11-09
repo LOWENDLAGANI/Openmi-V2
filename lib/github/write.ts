@@ -4,6 +4,7 @@ import {
   agentBranchName,
   isSafeBranchName,
 } from "@/lib/branch";
+import { deriveReplacement, replaceOnce } from "@/lib/changesets/replacement";
 import { GITHUB_API, GITHUB_TIMEOUT_MS, isRepoFullName } from "./read";
 
 export { AGENT_BRANCH_PREFIX, agentBranchName } from "@/lib/branch";
@@ -571,45 +572,11 @@ function repoPathOf(repo: string): string {
 }
 
 /**
- * The longest unchanged prefix and suffix are removed, leaving the exact text a
- * replacement edit swapped. A pure insertion has no anchor and is not re-applied;
- * the approval stores replacement edits only when the anchor was non-empty.
+ * The anchor derivation and the once-only substitution live in a pure module so
+ * the approval, the re-apply and the sandbox rebase share one definition.
+ * Re-exported here because this is where the write path has always imported it.
  */
-export function deriveReplacement(
-  original: string,
-  proposed: string
-): { find: string; replace: string } | null {
-  if (original === proposed) return null;
-
-  const shortest = Math.min(original.length, proposed.length);
-  let start = 0;
-
-  while (start < shortest && original[start] === proposed[start]) start += 1;
-
-  let oldEnd = original.length;
-  let newEnd = proposed.length;
-
-  while (
-    oldEnd > start &&
-    newEnd > start &&
-    original[oldEnd - 1] === proposed[newEnd - 1]
-  ) {
-    oldEnd -= 1;
-    newEnd -= 1;
-  }
-
-  const find = original.slice(start, oldEnd);
-  const replace = proposed.slice(start, newEnd);
-
-  return find.length === 0 ? null : { find, replace };
-}
-
-/** Applies an exact-string replacement only when it matches exactly once. */
-function replaceOnce(text: string, find: string, replace: string): string | null {
-  if (find.length === 0) return null;
-  if (text.split(find).length - 1 !== 1) return null;
-  return text.replace(find, replace);
-}
+export { deriveReplacement };
 
 /** One text file at a commit, or null when it does not exist there. */
 async function readFileAt(

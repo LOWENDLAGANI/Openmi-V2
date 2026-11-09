@@ -37,15 +37,26 @@ test("direct default-branch writes are a separate, off-by-default choice", () =>
   }
 });
 
-test("the chat route writes a ready diff without asking when auto-write is on", () => {
+test("the chat route asks before an automatic write when the change needs it", () => {
   expect(ROUTE).toContain("autoWriteEnabled");
   expect(ROUTE).toContain("if (autoWrite || remembered)");
+  expect(ROUTE).toContain("loadConfirmationFacts");
+  expect(ROUTE).toContain("needsConfirmation(");
+  expect(ROUTE).toContain("withStandingApproval");
+
+  // The question is decided before the write, not after it.
+  expect(ROUTE.indexOf("needsConfirmation(")).toBeLessThan(
+    ROUTE.indexOf("await approveChangesetAndOpenPullRequest(")
+  );
+
   // The standing approval is still read, so turning auto-write off keeps it.
   expect(ROUTE).toContain("readAutoApproval(session.supabase");
 });
 
-test("the card reports the write instead of asking when auto-write is on", () => {
-  expect(PANEL).toContain("autoWrite");
-  expect(PANEL).toContain('{status === "ready" && !autoWrite && (');
-  expect(PANEL).toContain("without an approval click");
+test("the card always offers the apply decision", () => {
+  // A ready diff the route declined to write is the card's to resolve, so the
+  // panel no longer branches on the auto-write switch.
+  expect(PANEL).toContain("<ApplyControl");
+  expect(PANEL).not.toContain("autoWrite");
+  expect(PANEL).not.toContain("without an approval click");
 });

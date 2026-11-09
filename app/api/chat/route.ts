@@ -14,6 +14,10 @@ import { createShellTurn } from "@/lib/agent/sandbox";
 import { CHAT_SHELL_BUDGET_MS } from "@/lib/agent/shell";
 import type { EditRequest } from "@/lib/changesets";
 import { readAutoApproval } from "@/lib/changesets/autoapproval";
+import {
+  needsConfirmation,
+  withStandingApproval,
+} from "@/lib/changesets/confirmation";
 import { autoWriteEnabled } from "@/lib/github/autowrite";
 import { requestedBranch } from "@/lib/github/branch-request";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
@@ -22,6 +26,7 @@ import {
   createChangeset,
   finalizeChangeset,
   findDraftChangeset,
+  loadConfirmationFacts,
 } from "@/lib/changesets/store";
 import { assembleContext } from "@/lib/context";
 import { formatDew } from "@/lib/dew";
@@ -738,10 +743,10 @@ export async function POST(request: Request) {
             files: finalized.files,
           });
 
-          // The build itself starts from the card, because it needs more time
-          // than this function's 60 s ceiling allows. A ready diff is verified
-          // automatically; a branch with a standing approval is written now
-          // instead of waiting for that build.
+          // A ready diff is written automatically unless it is one the reader
+          // should decide on: the code moved, it is large, it touches
+          // configuration, credentials or the schema, or nobody has reviewed
+          // it. Those stay on the card, where the apply dialog asks first.
           if (finalized.status === "ready" && githubToken) {
             const { data: chatRow } = await session.supabase
               .from("chats")
@@ -751,12 +756,7 @@ export async function POST(request: Request) {
 
             const chatRowValue = chatRow as { repo_branch?: string | null } | null;
             const autoWrite = autoWriteEnabled();
-
-            send("notice", {
-              message: autoWrite
-                ? "This diff is written to its own branch and its pull request opens without an approval click."
-                : "This diff is built in a sandbox; a failing build is repaired, and a pull request opens only if it exits 0.",
-            });
+            const branch = chatRowValue?.repo_branch ?? "main";
 
             if (sealKey && repoFullName) {
               // A ready diff is written without a click by default; a standing
@@ -764,45 +764,67 @@ export async function POST(request: Request) {
               const remembered = await readAutoApproval(session.supabase, {
                 owner: session.user.id,
                 repo: repoFullName,
-                branch: chatRowValue?.repo_branch ?? "main",
+                branch,
               });
 
               if (autoWrite || remembered) {
-                // "Push it to main" is a destination, not a preference. The
-                // reader naming a branch is the permission to write it, so the
-                // auto-write goes where they asked instead of demoting it to a
-                // pull request on an agent branch.
-                const askedBranch = requestedBranch(
-                  content,
-                  chatRowValue?.repo_branch ?? "main"
-                );
+                const facts = changesetId
+                  ? await loadConfirmationFacts(session.supabase, changesetId)
+                  : null;
 
-                const approved = await approveChangesetAndOpenPullRequest(
-                  session.supabase,
-                  {
-                    changesetId: changesetId as string,
-                    owner: session.user.id,
-                    sealKey,
-                    target: askedBranch
-                      ? { branch: askedBranch, explicit: true }
-                      : undefined,
-                  }
-                );
+                let head: string | null = null;
 
-                send("notice", {
-                  message: approved.ok
-                    ? approved.prUrl
-                      ? `Auto-approved on ${approved.branch}: ${approved.prUrl}`
-                      : `Auto-approved on ${approved.branch}.`
-                    : `The standing approval could not write this diff: ${approved.error}`,
-                });
+                try {
+                  head = await resolveBranchSha(githubToken, repoFullName, branch);
+                } catch {
+                  // A head that cannot be read is a reason to ask, not a reason
+                  // to assume nothing moved since the suggestion.
+                  head = null;
+                }
 
-                if (approved.ok) {
-                  send("changeset", {
-                    id: changesetId,
-                    status: "approved",
-                    files: finalized.files,
+                const mustAsk =
+                  facts === null ||
+                  needsConfirmation(withStandingApproval(facts, remembered), head);
+
+                if (mustAsk) {
+                  send("notice", {
+                    message:
+                      "This change needs your go-ahead. Use the card to apply it, look it over first, or discard it.",
                   });
+                } else {
+                  // "Push it to main" is a destination, not a preference. The
+                  // reader naming a branch is the permission to write it, so the
+                  // auto-write goes where they asked instead of demoting it to a
+                  // pull request on an agent branch.
+                  const askedBranch = requestedBranch(content, branch);
+
+                  const approved = await approveChangesetAndOpenPullRequest(
+                    session.supabase,
+                    {
+                      changesetId: changesetId as string,
+                      owner: session.user.id,
+                      sealKey,
+                      target: askedBranch
+                        ? { branch: askedBranch, explicit: true }
+                        : undefined,
+                    }
+                  );
+
+                  send("notice", {
+                    message: approved.ok
+                      ? approved.prUrl
+                        ? `Auto-approved on ${approved.branch}: ${approved.prUrl}`
+                        : `Auto-approved on ${approved.branch}.`
+                      : `The standing approval could not write this diff: ${approved.error}`,
+                  });
+
+                  if (approved.ok) {
+                    send("changeset", {
+                      id: changesetId,
+                      status: "approved",
+                      files: finalized.files,
+                    });
+                  }
                 }
               }
             }

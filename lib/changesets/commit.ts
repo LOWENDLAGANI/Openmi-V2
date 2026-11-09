@@ -6,8 +6,10 @@ import {
   verifyChangesetSignature,
   type ChangesetStatus,
 } from "@/lib/changesets";
+import { runApply, type ApplyFile } from "@/lib/changesets/apply";
 import { defaultBranchWritesAllowed } from "@/lib/github/autowrite";
-import { getRepo } from "@/lib/github/read";
+import { getRepo, resolveBranchSha } from "@/lib/github/read";
+import { rebaseChangeset } from "@/lib/sandbox/rebase";
 import { readToken } from "@/lib/github/token";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
@@ -105,6 +107,45 @@ function existingResult(row: ChangesetRow): ApprovalResult | null {
       branch: row.branch_name,
       alreadyCommitted: true,
     };
+  }
+
+  return null;
+}
+
+type SignedRow = {
+  id: string;
+  base_sha: string;
+  content_hash: string | null;
+  signature: string | null;
+};
+
+/**
+ * The signature check every apply path shares: the stored hash must match the
+ * accepted files, and the seal must prove that hash was signed for this
+ * changeset at this base commit. Returns the sentence to show, or null.
+ */
+function verifySignedFiles(
+  row: SignedRow,
+  files: Array<{ path: string; content: string }>,
+  sealKey: string
+): string | null {
+  const contentHash = changesetContentHash(
+    files.map((file) => ({ path: file.path, proposed: file.content }))
+  );
+
+  if (!row.content_hash || row.content_hash !== contentHash) {
+    return "The stored content hash does not match these files. Nothing was changed; ask for a fresh changeset.";
+  }
+
+  if (
+    !row.signature ||
+    !verifyChangesetSignature(
+      { changesetId: row.id, baseSha: row.base_sha, contentHash },
+      row.signature,
+      sealKey
+    )
+  ) {
+    return "The signature does not match this content. Nothing was changed; ask for a fresh changeset.";
   }
 
   return null;
@@ -220,30 +261,13 @@ export async function approveChangesetAndOpenPullRequest(
     return { ok: false, error: "No files are accepted, so there is nothing to approve." };
   }
 
-  const contentHash = changesetContentHash(
-    files.map((file) => ({ path: file.path, proposed: file.content }))
+  const signatureError = verifySignedFiles(
+    row,
+    files.map((file) => ({ path: file.path, content: file.content })),
+    input.sealKey
   );
 
-  if (!row.content_hash || row.content_hash !== contentHash) {
-    return {
-      ok: false,
-      error: "The stored content hash does not match these files. Nothing was opened; ask for a fresh changeset.",
-    };
-  }
-
-  if (
-    !row.signature ||
-    !verifyChangesetSignature(
-      { changesetId: row.id, baseSha: row.base_sha, contentHash },
-      row.signature,
-      input.sealKey
-    )
-  ) {
-    return {
-      ok: false,
-      error: "The signature does not match this content. Nothing was opened; ask for a fresh changeset.",
-    };
-  }
+  if (signatureError) return { ok: false, error: signatureError };
 
   const { data: chat, error: chatError } = await supabase
     .from("chats")
@@ -468,4 +492,275 @@ export async function approveChangesetAndOpenPullRequest(
 
     return { ok: false, error: message };
   }
+}
+
+// ── Apply now ────────────────────────────────────────────────────────────────
+//
+// "Apply now" runs the same signed content through the same owner, status, TTL,
+// hash and signature checks. The difference is the destination: it writes the
+// repository's default branch instead of opening a pull request on an agent
+// branch. When the default branch has moved, the change is re-applied in a
+// sandbox first; a re-apply that cannot reproduce the reviewed text fails the
+// changeset and never reaches GitHub.
+//
+// The default-branch safety check is not bypassed. Without the operator's
+// `OPENMI_ALLOW_DEFAULT_BRANCH`, `commitProposal` gives the change its own agent
+// branch and a pull request, exactly as the approval path does.
+
+export type ApplyNowResult =
+  | {
+      ok: true;
+      commitSha: string;
+      branch: string;
+      prUrl: string | null;
+      message: string;
+    }
+  | { ok: false; error: string };
+
+export async function applyChangesetNow(
+  supabase: Client,
+  input: { changesetId: string; owner: string; sealKey: string | null }
+): Promise<ApplyNowResult> {
+  if (!input.sealKey) {
+    return {
+      ok: false,
+      error: "GITHUB_TOKEN_KEY is not configured, so a change cannot be verified.",
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("changesets")
+    .select(
+      "id, status, repo_full_name, base_sha, expires_at, content_hash, signature, branch_name, commit_sha, merge_commit_sha, pr_url, pr_number, failure"
+    )
+    .eq("id", input.changesetId)
+    .eq("owner", input.owner)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "That change no longer exists." };
+
+  const row = data as ChangesetRow;
+
+  // Idempotency first: a change that already landed is done, even if its TTL
+  // has since passed and even if this is the second click.
+  if (row.status === "committed" && row.commit_sha) {
+    return {
+      ok: true,
+      commitSha: row.commit_sha,
+      branch: row.branch_name ?? "",
+      prUrl: row.pr_url,
+      message: "Changes applied.",
+    };
+  }
+
+  const status = changesetDisplayStatus(row);
+
+  if (status === "expired") {
+    return {
+      ok: false,
+      error:
+        "That suggestion expired after six hours. Nothing was applied; ask for a fresh one.",
+    };
+  }
+
+  if (status === "rejected") {
+    return {
+      ok: false,
+      error: "That suggestion was discarded. Ask the AI to propose it again.",
+    };
+  }
+
+  // A write that failed after claiming is resumable; anything else is not an
+  // apply this app can honour.
+  const resuming = status === "approved" && Boolean(row.failure);
+
+  if (status !== "ready" && !resuming) {
+    return {
+      ok: false,
+      error: `That change is ${status}; only a ready suggestion can be applied.`,
+    };
+  }
+
+  const { data: fileRows, error: fileError } = await supabase
+    .from("changeset_files")
+    .select("path, mode, original_content, proposed_content, error")
+    .eq("changeset_id", row.id)
+    .eq("accepted", true);
+
+  if (fileError) return { ok: false, error: fileError.message };
+
+  const files: ApplyFile[] = ((fileRows ?? []) as Array<{
+    path: string;
+    mode: string;
+    original_content: string | null;
+    proposed_content: string;
+    error: string | null;
+  }>)
+    .filter((file) => file.error === null)
+    .map((file) => ({
+      path: String(file.path),
+      mode: file.mode === "replace" ? "replace" : "write",
+      original: file.original_content === null ? null : String(file.original_content),
+      proposed: String(file.proposed_content),
+    }));
+
+  if (files.length === 0) {
+    return { ok: false, error: "No files are accepted, so there is nothing to apply." };
+  }
+
+  const signatureError = verifySignedFiles(
+    row,
+    files.map((file) => ({ path: file.path, content: file.proposed })),
+    input.sealKey
+  );
+
+  if (signatureError) return { ok: false, error: signatureError };
+
+  let opened: Awaited<ReturnType<typeof readToken>> = null;
+
+  try {
+    opened = await readToken(supabase, input.owner);
+  } catch (caught) {
+    return {
+      ok: false,
+      error:
+        caught instanceof Error
+          ? caught.message
+          : "The GitHub token could not be opened.",
+    };
+  }
+
+  if (!opened) return { ok: false, error: "Connect GitHub before applying a change." };
+
+  const token = opened.token;
+
+  let live: { defaultBranch: string; head: string };
+
+  try {
+    const repo = await getRepo(token, row.repo_full_name);
+    live = {
+      defaultBranch: repo.defaultBranch,
+      head: await resolveBranchSha(token, row.repo_full_name, repo.defaultBranch),
+    };
+  } catch (caught) {
+    return {
+      ok: false,
+      error:
+        caught instanceof Error
+          ? caught.message
+          : "GitHub could not read that repository.",
+    };
+  }
+
+  const { defaultBranch, head } = live;
+
+  // Claim with compare-and-set. A re-apply can take a while; a second click
+  // while it runs must not start a second apply.
+  let claimed = false;
+
+  if (row.status === "ready") {
+    const { data: claimedRow } = await supabase
+      .from("changesets")
+      .update({
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        failure: null,
+        branch_name: defaultBranch,
+      })
+      .eq("id", row.id)
+      .eq("owner", input.owner)
+      .eq("status", "ready")
+      .select("id")
+      .maybeSingle();
+
+    claimed = Boolean(claimedRow);
+  } else if (row.status === "approved" && row.failure) {
+    const { data: resumed } = await supabase
+      .from("changesets")
+      .update({ failure: null, branch_name: defaultBranch })
+      .eq("id", row.id)
+      .eq("owner", input.owner)
+      .eq("status", "approved")
+      .not("failure", "is", null)
+      .select("id")
+      .maybeSingle();
+
+    claimed = Boolean(resumed);
+  }
+
+  if (!claimed) {
+    return {
+      ok: false,
+      error: "This change is already being applied. Retry in a moment.",
+    };
+  }
+
+  const outcome = await runApply({
+    repo: row.repo_full_name,
+    baseSha: row.base_sha,
+    head,
+    files,
+    steps: {
+      // Read-only: two archives and a disk of its own. The sandbox never holds
+      // the token, and this path never updates a ref.
+      rebase: (attempt) =>
+        rebaseChangeset({
+          token,
+          repo: attempt.repo,
+          baseSha: attempt.baseSha,
+          newHead: attempt.newHead,
+          files: attempt.files,
+        }),
+      write: (write) =>
+        commitProposal({
+          token,
+          repo: row.repo_full_name,
+          defaultBranch,
+          baseBranch: defaultBranch,
+          baseSha: write.baseSha,
+          files: write.files,
+          changesetId: row.id,
+          existingCommitSha: row.commit_sha ?? undefined,
+          targetBranch: defaultBranch,
+          // The default branch is written only when the operator allows it;
+          // otherwise `commitProposal` gives the change its own branch and a
+          // pull request, exactly as the approval path does.
+          allowDefaultBranch: defaultBranchWritesAllowed(),
+          onProgress: async (progress) => {
+            await supabase
+              .from("changesets")
+              .update({
+                branch_name: progress.branch,
+                commit_sha: progress.commitSha ?? row.commit_sha ?? null,
+              })
+              .eq("id", row.id)
+              .eq("owner", input.owner);
+          },
+        }),
+    },
+    record: async (patch) => {
+      const { error: recordError } = await supabase
+        .from("changesets")
+        .update(patch)
+        .eq("id", row.id)
+        .eq("owner", input.owner);
+
+      return recordError
+        ? { ok: false as const, error: recordError.message }
+        : { ok: true as const };
+    },
+  });
+
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+
+  return {
+    ok: true,
+    commitSha: outcome.commitSha,
+    branch: outcome.branch,
+    prUrl: outcome.prUrl,
+    message: outcome.prUrl
+      ? "The change is saved and waiting for you on GitHub."
+      : "Changes applied.",
+  };
 }

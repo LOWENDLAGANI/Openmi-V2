@@ -36,6 +36,8 @@ export type ChangesetRow = {
   repo_full_name: string;
   expires_at: string;
   created_at: string;
+  /** Set when the reader chose "Review first"; null means nobody looked yet. */
+  reviewed_at: string | null;
   branch_name: string | null;
   commit_sha: string | null;
   merge_commit_sha: string | null;
@@ -394,6 +396,50 @@ export async function reviewChangesetFile(
   return { ok: true };
 }
 
+export type ConfirmationFacts = {
+  base_sha: string;
+  reviewed_at: string | null;
+  files: Array<{ path: string }>;
+};
+
+/**
+ * The facts the apply-confirmation rule needs, from the rows themselves.
+ *
+ * Read only from the changeset and its accepted files, so the card and the chat
+ * route decide from the same data. A read failure returns null, which the caller
+ * treats as "ask": a rule that cannot be evaluated is not permission to write.
+ */
+export async function loadConfirmationFacts(
+  supabase: Client,
+  changesetId: string
+): Promise<ConfirmationFacts | null> {
+  const { data, error } = await supabase
+    .from("changesets")
+    .select("base_sha, reviewed_at")
+    .eq("id", changesetId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as { base_sha: string; reviewed_at: string | null };
+
+  const { data: fileRows, error: fileError } = await supabase
+    .from("changeset_files")
+    .select("path")
+    .eq("changeset_id", changesetId)
+    .eq("accepted", true);
+
+  if (fileError) return null;
+
+  return {
+    base_sha: String(row.base_sha),
+    reviewed_at: row.reviewed_at,
+    files: ((fileRows ?? []) as Array<{ path: string }>).map((file) => ({
+      path: String(file.path),
+    })),
+  };
+}
+
 export async function loadChangesets(
   supabase: Client,
   chatId: string
@@ -401,7 +447,7 @@ export async function loadChangesets(
   const { data: rows } = await supabase
     .from("changesets")
     .select(
-      "id, status, base_sha, repo_full_name, expires_at, created_at, branch_name, commit_sha, merge_commit_sha, reverted_commit_sha, pr_url, pr_number, failure"
+      "id, status, base_sha, repo_full_name, expires_at, created_at, reviewed_at, branch_name, commit_sha, merge_commit_sha, reverted_commit_sha, pr_url, pr_number, failure"
     )
     .eq("chat_id", chatId)
     .order("created_at", { ascending: false })

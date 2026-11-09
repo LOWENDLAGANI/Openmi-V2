@@ -5,9 +5,11 @@ import {
   rejectChange,
   undoChangeset,
 } from "@/app/chat/actions";
+import { ApplyControl } from "@/components/ApplyDialog";
 import { ExecutionPanel } from "@/components/ExecutionPanel";
 import { SubmitButton } from "@/components/SubmitButton";
 import { changesetDisplayStatus, type ChangesetStatus } from "@/lib/changesets";
+import { needsConfirmation } from "@/lib/changesets/confirmation";
 import type { ReviewChangeset } from "@/lib/changesets/store";
 
 /**
@@ -32,6 +34,7 @@ const STATUS_LABEL: Record<ChangesetStatus, string> = {
   failed: "Not applied",
   expired: "Expired",
   reverted: "Undone",
+  rejected: "Discarded",
 };
 
 function commitHref(repo: string, sha: string | null): string | null {
@@ -69,7 +72,6 @@ export function ReviewPanel({
   chatSha,
   chatBranch,
   autoApproveBranch,
-  autoWrite,
 }: {
   changesets: ReviewChangeset[];
   chatId: string;
@@ -78,8 +80,6 @@ export function ReviewPanel({
   chatBranch: string | null;
   /** Set when this branch is already approved without asking. */
   autoApproveBranch: string | null;
-  /** True when a ready diff is written without an approval click. */
-  autoWrite: boolean;
 }) {
   if (changesets.length === 0) return null;
 
@@ -134,12 +134,12 @@ export function ReviewPanel({
                   className="rounded-2xl border border-warn/25 bg-warn/8 px-4 py-2.5 text-[11px] leading-relaxed text-warn"
                 >
                   This suggestion was made against {changeset.base_sha.slice(0, 7)},
-                  but the chat has moved to {chatSha.slice(0, 7)}. Ask for a fresh
-                  suggestion before applying it.
+                  but the chat has moved to {chatSha.slice(0, 7)}. Applying it
+                  updates the change to the newer code first.
                 </p>
               )}
 
-              {autoApproveBranch && !autoWrite && (
+              {autoApproveBranch && (
                 <div className="rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5">
                   <p className="text-[11px] leading-relaxed text-accent-text">
                     Auto-apply is on for{" "}
@@ -214,51 +214,13 @@ export function ReviewPanel({
 
               <ExecutionPanel changesetId={changeset.id} status={status} />
 
-              {status === "ready" && !autoWrite && (
-                <form
-                  action={approveProposal}
-                  className="space-y-3 border-t border-line pt-3"
-                >
-                  <input type="hidden" name="changesetId" value={changeset.id} />
-                  <input type="hidden" name="chatId" value={chatId} />
-
-                  <label className="flex items-start gap-2 text-[11px] leading-relaxed text-body">
-                    <input
-                      type="checkbox"
-                      name="remember"
-                      value="1"
-                      className="mt-0.5 size-3 accent-current"
-                    />
-                    <span>
-                      Apply and don&apos;t ask again for{" "}
-                      <span className="font-mono">{chatBranch ?? "main"}</span>.
-                      Future suggestions here are applied without this step.
-                    </span>
-                  </label>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="max-w-md text-[11px] leading-relaxed text-low">
-                      {accepted.length === 0
-                        ? "No files accepted."
-                        : `${accepted.length} file(s) accepted.`}
-                    </p>
-
-                    {accepted.length > 0 && (
-                      <SubmitButton
-                        className="btn btn-primary px-4 py-1.5 text-[11.5px]"
-                        pendingText="Applying…"
-                      >
-                        Apply changes
-                      </SubmitButton>
-                    )}
-                  </div>
-                </form>
-              )}
-
-              {status === "ready" && autoWrite && (
-                <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-mid">
-                  This suggestion is applied automatically without an approval click.
-                </p>
+              {status === "ready" && (
+                <ApplyControl
+                  changesetId={changeset.id}
+                  acceptedCount={accepted.length}
+                  chatBranch={chatBranch}
+                  confirmFirst={needsConfirmation(changeset, chatSha)}
+                />
               )}
 
               {status === "draft" && (
@@ -313,6 +275,12 @@ export function ReviewPanel({
                   className="border-t border-line pt-3 text-[11px] leading-relaxed text-danger"
                 >
                   {changeset.failure ?? "This change was not applied."}
+                </p>
+              )}
+
+              {status === "rejected" && (
+                <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-low">
+                  This suggestion was discarded. The AI can propose again.
                 </p>
               )}
 

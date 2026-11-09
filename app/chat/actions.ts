@@ -3,11 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
+import {
+  applyChangesetNow,
+  approveChangesetAndOpenPullRequest,
+} from "@/lib/changesets/commit";
 import {
   forgetAutoApproval as forgetBranchAutoApproval,
   rememberAutoApproval,
 } from "@/lib/changesets/autoapproval";
+import {
+  markChangesetReviewed,
+  rejectChangeset as discardChangeset,
+} from "@/lib/changesets/decide";
 import { reviewChangesetFile } from "@/lib/changesets/store";
 import { undoAppliedChangeset } from "@/lib/changesets/undo";
 import {
@@ -344,6 +351,116 @@ export async function approveProposal(formData: FormData) {
   }
 
   redirect(chatHref(chatId));
+}
+
+// ── Apply, review, discard ───────────────────────────────────────────────────
+//
+// The three answers to "Apply this change?". They return a result instead of
+// redirecting, because the dialog shows the refusal beside the buttons. None of
+// them is optimistic: a success is only reported after the row says so.
+
+function changesetIdOf(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Writes the reviewed change. The owner, TTL, signature and content hash are
+ * checked in `lib/changesets/commit.ts`; a moved default branch is re-applied in
+ * a sandbox first, and a failure there is reported as a failure.
+ */
+export async function applyNow(changesetId: string, remember = false) {
+  const { supabase, user } = await acting();
+  const id = changesetIdOf(changesetId);
+
+  if (!id) return { ok: false as const, error: "That change no longer exists." };
+
+  const limited = await checkRateLimit(supabaseAdmin(), "approval", user.id);
+  if (!limited.allowed) {
+    return {
+      ok: false as const,
+      error: `Too many approvals. Try again in ${limited.retryAfterSeconds} seconds.`,
+    };
+  }
+
+  const result = await applyChangesetNow(supabase, {
+    changesetId: id,
+    owner: user.id,
+    sealKey: serverEnv().githubTokenKey,
+  });
+
+  revalidatePath("/chat");
+
+  if (!result.ok) return { ok: false as const, error: result.error };
+
+  // "Never ask again" is remembered only after a write succeeded, exactly as
+  // the approval card does.
+  if (remember) {
+    const { data } = await supabase
+      .from("changesets")
+      .select("chat_id, repo_full_name")
+      .eq("id", id)
+      .eq("owner", user.id)
+      .maybeSingle();
+
+    const record = data as { chat_id?: string; repo_full_name?: string } | null;
+
+    if (record?.chat_id && record.repo_full_name) {
+      const { data: chatRow } = await supabase
+        .from("chats")
+        .select("repo_branch")
+        .eq("id", record.chat_id)
+        .maybeSingle();
+
+      const rememberedBranch =
+        (chatRow as { repo_branch?: string | null } | null)?.repo_branch ?? "main";
+
+      await rememberAutoApproval(supabase, {
+        owner: user.id,
+        repo: record.repo_full_name,
+        branch: rememberedBranch,
+      });
+    }
+  }
+
+  return { ok: true as const, message: result.message, prUrl: result.prUrl };
+}
+
+/** Records that the reader looked the change over. Nothing is written to GitHub. */
+export async function markReviewed(changesetId: string) {
+  const { supabase, user } = await acting();
+  const id = changesetIdOf(changesetId);
+
+  if (!id) return { ok: false as const, error: "That suggestion no longer exists." };
+
+  const result = await markChangesetReviewed(supabase, {
+    changesetId: id,
+    owner: user.id,
+  });
+
+  revalidatePath("/chat");
+
+  return result.ok
+    ? { ok: true as const, message: "The change is ready when you are." }
+    : { ok: false as const, error: result.error };
+}
+
+/** Discards one suggestion. Nothing is written to GitHub. */
+export async function rejectChangeset(changesetId: string) {
+  const { supabase, user } = await acting();
+  const id = changesetIdOf(changesetId);
+
+  if (!id) return { ok: false as const, error: "That suggestion no longer exists." };
+
+  const result = await discardChangeset(supabase, {
+    changesetId: id,
+    owner: user.id,
+  });
+
+  revalidatePath("/chat");
+
+  return result.ok
+    ? { ok: true as const, message: "This suggestion was discarded." }
+    : { ok: false as const, error: result.error };
 }
 
 /**

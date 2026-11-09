@@ -21,8 +21,11 @@ const SWITCH_MIGRATION = readFileSync(
   new URL("../supabase/migrations/021_drop_autopilot.sql", import.meta.url),
   "utf8"
 );
+// The remember control moved into the client apply card when the dialog arrived,
+// so this reads the component that now owns it rather than the panel that hosts
+// that component. The assertions below are unchanged.
 const PANEL = readFileSync(
-  new URL("../components/ReviewPanel.tsx", import.meta.url),
+  new URL("../components/ApplyDialog.tsx", import.meta.url),
   "utf8"
 );
 

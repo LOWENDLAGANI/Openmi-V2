@@ -31,7 +31,8 @@ export type ChangesetStatus =
   | "committed"
   | "failed"
   | "expired"
-  | "reverted";
+  | "reverted"
+  | "rejected";
 
 export type EditRequest = {
   path: string;

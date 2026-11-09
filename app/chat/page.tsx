@@ -26,7 +26,6 @@ import {
   searchCode,
 } from "@/lib/github/read";
 import { loadChangesets } from "@/lib/changesets/store";
-import { autoWriteEnabled } from "@/lib/github/autowrite";
 import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
@@ -461,7 +460,6 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             chatSha={chat.repo_base_sha}
             chatBranch={chat.repo_branch ?? null}
             autoApproveBranch={autoApproveBranch}
-            autoWrite={autoWriteEnabled()}
           />
         </div>
       )}

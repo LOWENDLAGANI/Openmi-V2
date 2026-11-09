@@ -138,6 +138,7 @@ const REQUIRED_COLUMNS = [
   ["changesets", "pr_url"],
   ["changesets", "merge_commit_sha"],
   ["changesets", "reverted_commit_sha"],
+  ["changesets", "reviewed_at"],
   ["profiles", "dew_balance"],
   ["payment_requests", "status"],
   ["payment_requests", "receipt_path"],
