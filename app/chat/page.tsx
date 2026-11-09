@@ -370,7 +370,7 @@ async function RepoSurface({
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const models = modelCatalogue();
 
-  const [messages, changesets, runningTurn, profileResult, autoApproval] =
+  const [messages, proposals, runningTurn, profileResult, autoApproval] =
     await Promise.all([
     listMessages(session.supabase, chat.id),
     loadChangesets(session.supabase, chat.id),
@@ -452,17 +452,32 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
         </p>
       )}
 
-      {changesets.length > 0 && (
+      {proposals.error ? (
+        <div
+          role="alert"
+          className="mb-3 shrink-0 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[11.5px] leading-relaxed text-danger"
+        >
+          <p className="font-medium">Your proposals could not be loaded.</p>
+          <p className="mt-1 text-[11px]">
+            The change is stored; this page could not read it. Reloading is
+            safe. If this deployment was just updated, a database migration may
+            still be pending — an operator can check the setup report.
+          </p>
+          <p className="mt-1 font-mono text-[10.5px] opacity-80">
+            {proposals.error}
+          </p>
+        </div>
+      ) : proposals.changesets.length > 0 ? (
         <div className="mb-3 max-h-[46vh] shrink-0 overflow-y-auto">
           <ReviewPanel
-            changesets={changesets}
+            changesets={proposals.changesets}
             chatId={chat.id}
             chatSha={chat.repo_base_sha}
             chatBranch={chat.repo_branch ?? null}
             autoApproveBranch={autoApproveBranch}
           />
         </div>
-      )}
+      ) : null}
 
       <div className="min-h-0 flex-1">
         <ChatPanel

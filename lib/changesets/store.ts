@@ -440,11 +440,20 @@ export async function loadConfirmationFacts(
   };
 }
 
+export type ChangesetLoad = {
+  changesets: ReviewChangeset[];
+  /**
+   * Set when the read failed. The rows may well be there, so the panel says so
+   * instead of rendering the same nothing as a chat with no proposals.
+   */
+  error: string | null;
+};
+
 export async function loadChangesets(
   supabase: Client,
   chatId: string
-): Promise<ReviewChangeset[]> {
-  const { data: rows } = await supabase
+): Promise<ChangesetLoad> {
+  const { data: rows, error } = await supabase
     .from("changesets")
     .select(
       "id, status, base_sha, repo_full_name, expires_at, created_at, reviewed_at, branch_name, commit_sha, merge_commit_sha, reverted_commit_sha, pr_url, pr_number, failure"
@@ -453,10 +462,15 @@ export async function loadChangesets(
     .order("created_at", { ascending: false })
     .limit(MAX_REVIEW_CARDS);
 
-  const changesets = (rows ?? []) as ChangesetRow[];
-  if (changesets.length === 0) return [];
+  // A rejected select is not "this chat has no proposals". Until now that
+  // failure was discarded, so a pending column made the review card vanish and
+  // the assistant look like it had claimed a change it never made.
+  if (error) return { changesets: [], error: error.message };
 
-  const { data: files } = await supabase
+  const changesets = (rows ?? []) as ChangesetRow[];
+  if (changesets.length === 0) return { changesets: [], error: null };
+
+  const { data: files, error: filesError } = await supabase
     .from("changeset_files")
     .select(
       "id, changeset_id, path, mode, diff, additions, deletions, diff_truncated, accepted, error"
@@ -467,16 +481,23 @@ export async function loadChangesets(
     )
     .order("path");
 
+  // A proposal without its files would render as a diff-less card; say the
+  // read failed instead of showing a card that cannot be reviewed.
+  if (filesError) return { changesets: [], error: filesError.message };
+
   const fileRows = (files ?? []) as ChangesetFileRow[];
 
-  return changesets.map((changeset) => ({
-    ...changeset,
-    files: fileRows
-      .filter((file) => file.changeset_id === changeset.id)
-      .map((file) => ({
-        ...file,
-        additions: Number(file.additions),
-        deletions: Number(file.deletions),
-      })),
-  }));
+  return {
+    changesets: changesets.map((changeset) => ({
+      ...changeset,
+      files: fileRows
+        .filter((file) => file.changeset_id === changeset.id)
+        .map((file) => ({
+          ...file,
+          additions: Number(file.additions),
+          deletions: Number(file.deletions),
+        })),
+    })),
+    error: null,
+  };
 }
