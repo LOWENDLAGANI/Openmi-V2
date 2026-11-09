@@ -60,6 +60,16 @@ function utc(value: string | null): string {
   return value.slice(0, 16).replace("T", " ");
 }
 
+/**
+ * What a member can buy here.
+ *
+ * The one-off packs stay in `PLANS` because older receipts and the operator's
+ * manual grants still name them, but this page sells the paid passes only: a
+ * top-up is no longer an option on the public pricing page. The admin panel is
+ * untouched, so an operator can still add Dew by hand.
+ */
+const OFFERED_PLANS = PLANS.filter((plan) => plan.days !== undefined);
+
 export default async function PayPage({
   searchParams,
 }: {
@@ -266,7 +276,7 @@ export default async function PayPage({
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {PLANS.map((plan) => (
+          {OFFERED_PLANS.map((plan) => (
             <div
               key={plan.id}
               className="rounded-3xl border border-line bg-raised px-4 py-4"
@@ -325,10 +335,10 @@ export default async function PayPage({
             <span className="eyebrow block px-1 pb-1.5">Plan</span>
             <select
               name="plan"
-              defaultValue={PLANS[0]?.id}
+              defaultValue={OFFERED_PLANS[0]?.id}
               className="field py-2 text-[12px]"
             >
-              {PLANS.map((plan) => (
+              {OFFERED_PLANS.map((plan) => (
                 <option key={plan.id} value={plan.id}>
                   {plan.name} — {plan.dew} Dew
                 </option>
@@ -346,7 +356,7 @@ export default async function PayPage({
               min="0"
               step="0.01"
               inputMode="decimal"
-              placeholder={String(PLANS[0]?.price ?? "")}
+              placeholder={String(OFFERED_PLANS[0]?.price ?? "")}
               className="field py-2 font-mono text-[12px]"
             />
           </label>
