@@ -180,6 +180,28 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: 'JSON array: [{"id":"my-model","name":"My Model","provider":"openrouter","upstream":"vendor/model-id","category":"coding"}] (category optional)',
   },
   {
+    key: "OPENMI_TEST_LOGIN",
+    scope: "server",
+    required: false,
+    unlocks:
+      "A one-click test sign-in at /test-login, for reviewers and AI testers",
+    hint: 'Off unless set to "on"; the route answers 404 otherwise. Never set it on a public deployment',
+  },
+  {
+    key: "OPENMI_TEST_LOGIN_EMAIL",
+    scope: "server",
+    required: false,
+    unlocks: "The confirmed account /test-login signs in as",
+    hint: "Create one Supabase Auth user for testing; nothing else depends on it",
+  },
+  {
+    key: "OPENMI_TEST_LOGIN_PASSWORD",
+    scope: "server",
+    required: false,
+    unlocks: "The password /test-login uses for that account",
+    hint: "Server only; it is sent to Supabase Auth and never to the browser",
+  },
+  {
     key: "UPSTASH_REDIS_REST_URL",
     scope: "server",
     required: false,
