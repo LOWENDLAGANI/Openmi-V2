@@ -80,9 +80,6 @@ Vercel does not run migrations. The order is always **migrate, then deploy**.
 
 ## Checks
 
-To hand the whole app to a reviewer or an AI tester — including how to enter it
-without typing the sign-in form — start with [TESTING.md](TESTING.md).
-
 ```bash
 bun run typecheck
 bun run test
