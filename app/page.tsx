@@ -13,16 +13,16 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Openmi — the repo agent that shows its work",
   description:
-    "Give the agent a goal. It runs the commands in an isolated Linux workspace, shows every step live, and hands back a diff. Nothing reaches your default branch until you approve it.",
+    "Connect GitHub, pick a repository, and work with a model that reads the code at a pinned commit and proposes edits as a reviewable diff. A change lands on its own branch, and every run reports only the exit code it observed.",
 };
 
-const STEPS = ["Pick a repository", "Give it a goal", "Review and ship"];
+const STEPS = ["Pick a repository", "Give it a goal", "Review the diff"];
 
 const SECURITY = [
-  "Isolated Linux sandbox",
-  "No platform keys",
-  "Agent branches only",
-  "Private by default",
+  "Reads pinned to one commit",
+  "GitHub token sealed on the server",
+  "One branch per changeset, never a forced update",
+  "No platform keys inside the sandbox",
 ];
 
 const SESSION = [
@@ -227,6 +227,13 @@ export default async function HomePage() {
               </li>
             ))}
           </ul>
+
+          <p className="mt-4 max-w-xl text-[11px] leading-relaxed text-low">
+            Execution is deployment-dependent. A chat turn reads GitHub only
+            unless sandbox turns are enabled, and verification runs and missions
+            need an execution key. Without one the interface says a command did
+            not run instead of implying it did.
+          </p>
         </div>
       </section>
 

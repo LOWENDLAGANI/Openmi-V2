@@ -4,16 +4,18 @@ edit after countless failing
 
 A chat client welded to a GitHub repository. It reads code at a pinned commit,
 answers with `path:line` citations, and proposes edits as a diff you can review.
-Nothing is written to GitHub until you approve it, and an approval opens a pull
-request on a new branch — never on the default branch. It does not run your
-tests, and it says so.
+A ready change is written to its own branch and applied as one pull request; the
+default branch is only ever the base unless you name it as the destination. It
+does not run your tests, and it says so.
 
 **Stack:** Next.js 15 (App Router) on Vercel · Supabase (Postgres, Auth, RLS) ·
 Tailwind v4 tokens · Bun.
 
 **Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–9 are
-built. Phase 10 (execution) is gated, not built — four decisions are missing and
-inventing them would ship a sandbox nobody priced.
+built. Phase 10 (execution) is built as **verification only**: an install and a
+build run in a sandbox and the card reports the exit code it observed. The chat
+agent's own turn still proposes a diff instead of executing one unless
+`OPENMI_SANDBOX_TURNS=on`, and nothing in the product runs your test suite.
 
 ---
 
@@ -115,7 +117,8 @@ detection, probe classification, and the tool surface.
 
 ## The agent, and its limits
 
-A turn may call three tools, all of them reads: `list_files` (≤200 paths),
+On a GitHub-only turn the agent may call three tools, all of them reads:
+`list_files` (≤200 paths),
 `read_file` (≤200KB, text only), and `search_code` (≤10 candidates). No tool
 accepts a URL; every request is built from the token plus a path in the
 repository the chat is pinned to.
@@ -124,7 +127,7 @@ The turn stops at one of three caps, and the transcript says which:
 
 | Cap | Value |
 |---|---|
-| Steps | 24 |
+| Steps | 40 |
 | Budget | 120,000 tokens (estimated from characters) |
 | Wall clock | 40s inside a 60s function, then a signed continuation |
 
@@ -151,15 +154,17 @@ the signature, so moving from ready to approved does not invalidate it. A
 changeset expires six hours after it is proposed, and expiry is read from the
 clock, not stored as a hopeful flag.
 
-**Approval opens one branch and one pull request.** The default head is
-`openmi/agent/<changeset-id>`, and the default branch is refused by the write
-client before any request unless `OPENMI_ALLOW_DEFAULT_BRANCH=on`, so naming it
-means "give this change its own branch". A branch the reader names instead is used as-is; a named branch that
-has moved since the diff was computed is not a dead end — the change goes to a
-new `openmi/agent/` branch on top of the live head, unforced. The PR base is the
-repository's default branch, read live from GitHub. Retrying after a failure
-reuses the recorded branch, commit and pull request, so one approval cannot
-produce two PRs.
+**Approval opens one branch and one pull request, then applies it.** The default
+head is `openmi/agent/<changeset-id>`, and the PR is opened against the
+repository's default branch, read live from GitHub. Approval then squash-merges
+that pull request and stores the merge commit; a merge that cannot finish is
+recorded as failed with its pull request left in place. The default branch is
+never the head unless the reader names it as the destination (an explicit branch
+request is written directly) or an operator sets
+`OPENMI_ALLOW_DEFAULT_BRANCH=on`. A named branch that has moved since the diff
+was computed is not a dead end — the change goes to a new `openmi/agent/` branch
+on top of the live head, unforced. Retrying after a failure reuses the recorded
+branch, commit and pull request, so one approval cannot produce two PRs.
 
 ## Dew
 
@@ -213,8 +218,9 @@ test where the anon key must read zero profile rows, GitHub token decryption and
 acceptance, and a model-list request for each configured provider. Each probe
 reports its own failure with its own fix; none prints a key.
 
-`/about` states what the product does and does not do: no execution, no default
-branch writes, no merges, no card payments, and no claim of verification.
+`/about` states what the product does and does not do: what a verification run
+observed, which branch a change is written to, that no card payment happens in
+this app, and that nothing claims a test it did not run.
 
 ## Known limits
 
@@ -222,10 +228,11 @@ branch writes, no merges, no card payments, and no claim of verification.
   assistant reads the repository and proposes a diff without executing
   anything. `OPENMI_SANDBOX_TURNS=on` gives every eligible turn the Linux shell
   back; verification runs and missions keep their own sandboxes either way.
-- Writes are one branch and one pull request per approved changeset. There is
-  no merge, no push to the default branch, and no branch cleanup. A change the
-  reader sends to a branch that moved becomes a new branch, never a forced
-  update.
+- Writes are one branch and one pull request per approved changeset, and the
+  approval path squash-merges that pull request. A branch the reader names is
+  written directly. The default branch is written directly only when the reader
+  names it or an operator allows it. Branches are not cleaned up, and a change
+  sent to a branch that moved becomes a new branch, never a forced update.
 - Dew is charged per hour, not per answer. Only a provider failure or an abort
   before the first token is refunded automatically; any other correction is an
   operator adjustment.
@@ -239,8 +246,10 @@ branch writes, no merges, no card payments, and no claim of verification.
   and no offline mode.
 - The rate limiter degrades to allowing a request when neither Upstash nor the
   Postgres function is reachable. The setup page shows which backend is live.
-- Execution is gated (phase 10). There is no sandbox, no test runner and no
-  preview server, and no card may imply one exists.
+- Execution runs only when it is configured. Verification runs and missions
+  need an execution key; with none set the card says execution is not
+  configured instead of implying one exists. There is no test runner and no
+  preview server on the review card.
 
 ## Rate limits
 
@@ -366,8 +375,8 @@ records the exit code, the duration and the output tail.
   timed-out run says it timed out; a build that exits non-zero says that.
 - Tests are not run. The card never claims a test, a check or a deployment ran.
 - The sandbox holds no tokens, no provider keys and no push credential. It
-  cannot write to GitHub. Approval is still the only write path, and it still
-  only opens an `openmi/agent/` branch.
+  cannot write to GitHub. Approval is still the only write path, and the derived
+  destination is still an `openmi/agent/` branch.
 - Egress goes through E2B's `network` option: `EXEC_NETWORK_MODE=restricted`
   (the default) sends `allowOut: ['*']` with `denyOut: ['0.0.0.0/0']`, the
   provider's catch-all pair from `lib/execution/commands.ts`. A domain or
@@ -382,6 +391,25 @@ records the exit code, the duration and the output tail.
 - A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.
+
+### Bringing the sandbox back
+
+The E2B path is implemented and switched off by configuration, not removed.
+Three variables decide it:
+
+- `E2B_API_KEY` — no key, no sandbox anywhere; the card and the setup probe say
+  execution is not configured.
+- `EXECUTION_ENABLED` — omit it, or set `off` to stop every box without removing
+  the key.
+- `OPENMI_SANDBOX_TURNS=on` — gives an eligible chat turn the Linux shell, the
+  shell tools and the browser tool. Off is GitHub-only. Verification runs and
+  missions read the key only, so they work either way.
+
+This repository installs with `bun install --frozen-lockfile`, and E2B's default
+`base` template carries node, npm and git but **not bun**. Point
+`EXECUTION_TEMPLATE` at a template that has bun before expecting an install to
+succeed. The activation checklist, template Dockerfile, ceilings, cost and
+rollback are in [docs/E2B_SANDBOX_READINESS.md](docs/E2B_SANDBOX_READINESS.md).
 
 ### Chat environments
 
@@ -450,8 +478,9 @@ the repository and the chat's pinned branch. The default branch is not written
 unless `OPENMI_ALLOW_DEFAULT_BRANCH=on` and the change names it.
 
 That is the whole change: it moves who approves from you to the build result. It
-still writes one `openmi/agent/` branch, still never the default branch, and the
-card still reports what was observed rather than what was hoped.
+still writes one `openmi/agent/` branch and applies it as one pull request; the
+default branch is only ever the base unless you name it as the destination, and
+the card still reports what was observed rather than what was hoped.
 
 The four decisions this depends on — what may run (D6.1), what a minute costs
 (D6.2), which secrets are absent (D6.3), and what the card says when a sandbox

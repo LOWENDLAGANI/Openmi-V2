@@ -22,17 +22,17 @@ const DOES = [
   "Reads repository files at a pinned commit through a GET-only GitHub client.",
   "Answers with path:line citations that are checked against the tree at that commit.",
   "Proposes edits as per-file unified diffs; you accept or reject each file.",
-  `Approval opens one branch named ${AGENT_BRANCH_PREFIX}<changeset-id> and one pull request.`,
+  `By default, writes a ready changeset to one branch named ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
+  "Runs commands in a disposable Linux sandbox when the deployment has an execution key, and reports the exit code it observed.",
   `Charges ${DEW_PER_HOUR} Dew for an hour of chat before the provider is called, and records every change in a ledger.`,
 ];
 
 const DOES_NOT = [
-  "It runs commands in a disposable Linux sandbox, including a dev server you start. It does not run your test suite as a verification step, and a background process you start stops with the box.",
-  "It does not write to the default branch. The write client refuses it, and a test asserts the refusal.",
-  "It does not merge pull requests, push to a protected branch or clean up branches.",
+  "It does not run your test suite as a verification step. A verification run records an install or build and its exit code, and no card claims a test that did not run.",
+  "It does not write to the default branch unless you name it as the destination, or an operator enables default-branch writes for unattended runs.",
+  "It does not force a branch update, merge a pull request it did not open, or clean up branches.",
   "It does not generate a project from nothing, and there is no guest mode.",
-  "It does not take card payments; top-ups arrive as one-time redeem codes.",
-  "It does not run tests. A card says what a build did, and only from an exit code it observed.",
+  "It does not take card payments in this app; payment happens on the hosted page, and top-ups arrive as redeem codes.",
 ];
 
 export default function AboutPage() {
@@ -64,7 +64,9 @@ export default function AboutPage() {
       <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-mid">
         Openmi is a chat client welded to one GitHub repository. It reads the
         code, answers with real paths and line numbers, and proposes edits for
-        you to review. Nothing reaches GitHub until you approve it.
+        you to review. A ready change is written to its own branch and applied
+        as a pull request; the default branch is only ever the base unless you
+        name it as the destination.
       </p>
 
       <section className="mt-12 border-t border-line pt-6">
@@ -72,7 +74,9 @@ export default function AboutPage() {
           <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
             What it does
           </h2>
-          <span className="eyebrow">05 things</span>
+          <span className="eyebrow">
+            {String(DOES.length).padStart(2, "0")} things
+          </span>
         </div>
         <ul className="mt-4 divide-y divide-line">
           {DOES.map((item) => (
@@ -117,12 +121,12 @@ export default function AboutPage() {
           <span className="font-mono text-[12px] text-body">
             {AGENT_BRANCH_PREFIX}&lt;changeset-id&gt;
           </span>
-          . A default branch or any other name is refused with{" "}
-          <span className="font-mono text-[12px] text-body">
-            Openmi only commits to agent/ branches.
-          </span>{" "}
-          The pull request is opened against the repository&apos;s default
-          branch, which is only ever the base — never the head.
+          . The pull request targets the repository&apos;s default branch, and
+          approval squash-merges it. A branch you name is written directly, with
+          no pull request; naming the default branch is how you ask for it to be
+          written, and an operator can allow that for unattended runs. Any other
+          name is checked against git&apos;s own branch rules before a request is
+          made.
         </p>
       </section>
 
@@ -158,8 +162,9 @@ export default function AboutPage() {
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           The review card states what the model proposed and what you approved.
           If a sandbox run recorded an exit code, the card says what that
-          command did and nothing more. It never claims a test ran, because no
-          test is run, and a deployment it did not observe is never mentioned.
+          command did and nothing more. It never claims a test ran as a
+          verification step, because verification runs install and build only,
+          and a deployment it did not observe is never mentioned.
           The admin panel names the configuration that is missing instead of
           failing silently.
         </p>

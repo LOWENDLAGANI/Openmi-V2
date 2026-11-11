@@ -73,10 +73,10 @@ export const PLAN_IDS = PLANS.map((plan) => plan.id);
  * list the daily refill implements: fifteen Dew a day instead of six.
  */
 export const PAID_BENEFITS = [
-  "Bumped up to 15 Dew a day",
-  "Priority support",
-  "More usage",
-  "Everything in free",
+  "15 Dew a day instead of 6",
+  "Approval switches the account to the paid allowance",
+  "The same branch, review and approval rules as free",
+  "Everything the free tier includes",
 ] as const;
 
 /**

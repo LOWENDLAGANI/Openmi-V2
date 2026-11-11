@@ -221,9 +221,9 @@ export default async function PayPage({
         </div>
 
         <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-mid">
-          Payment happens on Sociabuzz, not here. Pay, keep the receipt, then
-          upload it below. Approval adds the Dew and switches the account to the
-          paid daily allowance.
+          {TOPUP_PAUSED
+            ? "Checkout is paused while the payment path is tested, so no new payment is accepted and receipt upload is disabled. The plans below are the ones that exist; a redeem code still adds Dew."
+            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, then upload it below. Approval adds the Dew and switches the account to the paid daily allowance."}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-raised px-4 py-3">
@@ -265,14 +265,20 @@ export default async function PayPage({
           >
             Plans
           </h2>
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-primary px-3.5 py-1.5 text-[12px]"
-          >
-            Pay on Sociabuzz ↗
-          </a>
+          {TOPUP_PAUSED ? (
+            <span className="rounded-full border border-line-strong px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-low">
+              checkout paused
+            </span>
+          ) : (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary px-3.5 py-1.5 text-[12px]"
+            >
+              Pay on Sociabuzz ↗
+            </a>
+          )}
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

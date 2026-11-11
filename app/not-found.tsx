@@ -47,7 +47,7 @@ export default function NotFound() {
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line py-5">
         <p className="eyebrow">openmi · review before push</p>
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-low">
-          no build · no test · no merge
+          one branch · observed exit codes
         </p>
       </footer>
     </main>
