@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 
+import { AdBlockGate } from "@/components/AdBlockGate";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NavProgress } from "@/components/NavProgress";
 import "./globals.css";
@@ -59,6 +60,7 @@ export default function RootLayout({
           <NavProgress />
         </Suspense>
         <CommandPalette />
+        <AdBlockGate />
         {children}
       </body>
     </html>
