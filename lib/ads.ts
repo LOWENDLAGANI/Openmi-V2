@@ -57,6 +57,18 @@ export function buildAdConfig(
 }
 
 /**
+ * The unit above the composer belongs to a conversation, not to a page.
+ *
+ * Only a stored chat has one: the new-chat screen has no conversation to sit
+ * above, and a temporary chat — if one is ever added — is never written to the
+ * database, so it can never satisfy this. Sign-in is a separate page that
+ * mounts no ad at all.
+ */
+export function showComposerAd(chatId: string | null): boolean {
+  return typeof chatId === "string" && chatId.trim().length > 0;
+}
+
+/**
  * Reads the key for a slot. Each branch names its variable literally so the
  * Next compiler can inline it into the client bundle; a computed `env[name]`
  * would arrive as `undefined` in the browser.

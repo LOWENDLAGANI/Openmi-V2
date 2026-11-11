@@ -12,6 +12,7 @@ import { ContextCircle } from "@/components/ContextCircle";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
 import { PendingButton } from "@/components/PendingButton";
+import { showComposerAd } from "@/lib/ads";
 import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
 import type { Message } from "@/lib/types";
 
@@ -934,9 +935,14 @@ export function ChatPanel({
 
       <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2 md:-mx-7 md:px-7">
         <div className="mx-auto w-full max-w-3xl">
-          <div className="mb-1.5 flex justify-center">
-            <AdSlot slot="mobile" className="w-full max-w-[320px] opacity-80" />
-          </div>
+          {showComposerAd(activeChatId) && (
+            <div className="mb-1.5 flex justify-center">
+              <AdSlot
+                slot="mobile"
+                className="w-full max-w-[320px] opacity-80"
+              />
+            </div>
+          )}
 
           <form
             onSubmit={(event) => {
