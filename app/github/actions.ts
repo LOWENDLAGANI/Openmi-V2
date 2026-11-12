@@ -11,7 +11,18 @@ import {
   resolveBranchSha,
 } from "@/lib/github/read";
 import { readToken, saveConnection } from "@/lib/github/token";
+import {
+  GithubWriteError,
+  createRepositoryWithFiles,
+  describeWriteError,
+} from "@/lib/github/write";
 import { getSession } from "@/lib/session";
+import { templateById } from "@/lib/templates/catalogue";
+import {
+  isTemplateId,
+  isTemplateRepoName,
+  templateFilesValid,
+} from "@/lib/templates/plan";
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -30,6 +41,7 @@ function fail(message: string): never {
 
 function describe(error: unknown): string {
   if (error instanceof GithubError) return error.message;
+  if (error instanceof GithubWriteError) return describeWriteError(error);
   return describeGithubError(error);
 }
 
@@ -64,6 +76,73 @@ export async function disconnectGithub() {
 
   revalidatePath("/chat");
   redirect("/chat");
+}
+
+/**
+ * Starts a chat from a template: one private repository, one commit, one pin.
+ *
+ * The repository is created by the server with the caller's own token, and the
+ * chat is pinned to the commit that creation returned. Nothing here writes to an
+ * existing repository: after this click the chat behaves exactly like one
+ * attached to any other repo, and changes still need approval.
+ */
+export async function startFromTemplate(formData: FormData) {
+  const { supabase, user } = await acting();
+  const templateId = field(formData, "templateId");
+  const name = field(formData, "name");
+
+  if (!isTemplateId(templateId)) fail("Pick a template first.");
+
+  const template = templateById(templateId);
+  if (!template) fail("That template is not available on this deployment.");
+
+  if (!isTemplateRepoName(name)) {
+    fail(
+      "Repository names use letters, numbers, dots, dashes and underscores, and start with a letter or number."
+    );
+  }
+
+  if (!templateFilesValid(template.files)) {
+    fail("That template is not valid on this deployment, so nothing was created.");
+  }
+
+  const github = await readToken(supabase, user.id);
+  if (!github) fail("Connect GitHub before starting from a template.");
+
+  let created: { fullName: string; branch: string; commitSha: string };
+  try {
+    created = await createRepositoryWithFiles({
+      token: github.token,
+      name,
+      description: template.description,
+      files: template.files,
+    });
+  } catch (error) {
+    fail(describe(error));
+  }
+
+  const { data, error } = await supabase
+    .from("chats")
+    .insert({
+      owner: user.id,
+      title: template.name,
+      charge_mode: "hour",
+      repo_full_name: created.fullName,
+      repo_branch: created.branch,
+      repo_base_sha: created.commitSha,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    fail(
+      error?.message ??
+        "The repository was created, but the chat could not be recorded. Pick it from your repositories."
+    );
+  }
+
+  revalidatePath("/chat");
+  redirect(`/chat?chat=${(data as { id: string }).id}`);
 }
 
 /**

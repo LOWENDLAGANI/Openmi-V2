@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
+import { PreviewPanel } from "@/components/PreviewPanel";
+import { VersionPanel } from "@/components/VersionPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { DewChip } from "@/components/DewChip";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -32,6 +34,8 @@ import { listMessages } from "@/lib/messages";
 import { oauthConfigured } from "@/lib/oauth/github";
 import { firstAvailableModel, hasModel } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
+import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
+import { previewEnabled } from "@/lib/execution/preview/plan";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
 import { emptyTrash, purgeChat, restoreChat } from "./actions";
@@ -479,9 +483,20 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1">
-        <ChatPanel
-          chatId={chat.id}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* The preview sits above the transcript rather than beside it: the
+            chat column is the page's one column at every width, and a second
+            pane would have to compete with it on a phone. */}
+        {repo ? (
+          <>
+            <VersionPanel chatId={chat.id} enabled={checkpointsEnabled()} />
+            <PreviewPanel chatId={chat.id} enabled={previewEnabled()} />
+          </>
+        ) : null}
+
+        <div className="min-h-0 flex-1">
+          <ChatPanel
+            chatId={chat.id}
           repo={repo}
           models={models}
           initialModel={
@@ -491,9 +506,10 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           validPaths={validPaths}
           pinnedPath={null}
           providerReady={providersConfigured()}
-          initialRunning={Boolean(runningTurn.data)}
-          dew={dew}
-        />
+            initialRunning={Boolean(runningTurn.data)}
+            dew={dew}
+          />
+        </div>
       </div>
     </div>
   );

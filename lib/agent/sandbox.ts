@@ -1,5 +1,7 @@
 import "server-only";
 
+import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
+import { recordCheckpoint } from "@/lib/execution/checkpoints/session";
 import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
 import { openChatSandbox, releaseChatSandbox } from "@/lib/execution/chat-env/open";
 import { seedChatWorkspace } from "@/lib/execution/chat-env/seed";
@@ -685,6 +687,24 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
       if (!handle) return;
 
       if (persistent && chatRow) {
+        // A turn that changed files leaves a version behind before its lease
+        // ends. It is best effort on purpose: the answer is already written, and
+        // a checkpoint that fails must not turn a finished turn into an error.
+        try {
+          if (checkpointsEnabled()) {
+            await recordCheckpoint({
+              admin: chatRow.admin,
+              chatId: options.chatId as string,
+              owner: options.owner as string,
+              sandboxId: handle.id,
+              handle,
+            });
+          }
+        } catch {
+          // The next turn makes its own version; GitHub remains the record that
+          // survives the box.
+        }
+
         // The disk is the chat's; only this turn's claim on it ends. The sweep
         // stops it after the idle window and wipes it at the 48-hour deadline.
         await releaseChatSandbox({

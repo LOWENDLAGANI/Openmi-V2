@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import { attachRepo } from "@/app/github/actions";
+import { attachRepo, startFromTemplate } from "@/app/github/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { RepoSummary } from "@/lib/github/types";
+import { TEMPLATE_OPTIONS } from "@/lib/templates/options";
 
 const MAX_RENDERED = 100;
 
@@ -33,6 +34,45 @@ export function RepoPicker({
 
   return (
     <div>
+      <section className="panel mb-4 p-4">
+        <p className="eyebrow">start from a template</p>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-mid">
+          Creates a private repository in your account with one commit, then
+          opens a chat pinned to it. Nothing is published.
+        </p>
+
+        <form
+          action={startFromTemplate}
+          className="mt-3 flex flex-wrap items-end gap-2"
+        >
+          <label className="min-w-0 flex-1 text-[11px] text-mid">
+            Repository name
+            <input
+              name="name"
+              required
+              placeholder="my-openmi-app"
+              pattern="[A-Za-z0-9][A-Za-z0-9._-]*"
+              className="field mt-1"
+            />
+          </label>
+
+          <label className="text-[11px] text-mid">
+            Template
+            <select name="templateId" className="field mt-1" defaultValue={TEMPLATE_OPTIONS[0]?.id}>
+              {TEMPLATE_OPTIONS.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name} · {template.files} files
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <SubmitButton className="btn px-4 py-1.5 text-[12px]" pendingText="Creating…">
+            Create
+          </SubmitButton>
+        </form>
+      </section>
+
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={filter}

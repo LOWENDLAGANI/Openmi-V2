@@ -75,7 +75,11 @@ export function executionNetworkMode(): "off" | "restricted" | "open" {
 
 /** The one place the allowlist is attached, so `off`/`open` never send it. */
 type RestrictedNetwork = {
-  network: { allowOut: string[]; denyOut: string[] };
+  network: {
+    allowOut: string[];
+    denyOut: string[];
+    allowPublicTraffic: boolean;
+  };
 };
 
 function networkOption():
@@ -90,7 +94,19 @@ function networkOption():
     // The CIDR itself, not the SDK's `ALL_TRAFFIC` name: a deny list takes
     // CIDRs and bare IPs only, and the literal name is rejected with a 400.
     const deny: string[] = ["0.0.0.0/0"];
-    return { network: { allowOut: allow, denyOut: deny } };
+    return {
+      network: {
+        allowOut: allow,
+        denyOut: deny,
+        // Inbound to a sandbox port, not egress. A preview is served from the
+        // sandbox's own host, and a browser cannot attach the private-traffic
+        // header inside an iframe. Set explicitly so a project-level default
+        // cannot change what a preview does; the panel states the consequence
+        // (anyone with the link reaches it while it runs). A private preview
+        // proxy flips this to false and attaches `trafficToken` server-side.
+        allowPublicTraffic: true,
+      },
+    };
   }
 
   return {};
@@ -225,6 +241,21 @@ export type SandboxHandle = {
   stop: (options?: { force?: boolean }) => Promise<void>;
   /** Refreshes the wall-clock ceiling. Persistent boxes only. */
   setTtl: (minutes: number) => Promise<void>;
+  /**
+   * The public hostname for one port, without a scheme.
+   *
+   * Built by the provider rather than by a caller: the hostname shape is the
+   * provider's to change, and every caller should get the same answer for the
+   * same port.
+   */
+  host: (port: number) => string;
+  /**
+   * The header a private box needs on every request to a sandbox URL.
+   *
+   * Never returned to a browser. It exists on the handle so a same-origin
+   * proxy can attach it server-side when public traffic is turned off.
+   */
+  trafficToken: string | null;
   destroy: () => Promise<void>;
 };
 
@@ -324,6 +355,12 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
 
   return {
     id,
+    host(port) {
+      return current.getHost(port);
+    },
+    get trafficToken() {
+      return current.trafficAccessToken ?? null;
+    },
     async exec(command, cwd, timeoutMs) {
       const startedAt = Date.now();
       const limitMs = Math.max(5_000, timeoutMs ?? EXEC_STEP_TIMEOUT_MS);

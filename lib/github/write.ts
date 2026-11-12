@@ -1058,3 +1058,134 @@ export async function revertChangeset({
     ? lastError
     : new GithubWriteError("unavailable", "The change could not be undone.", 0);
 }
+
+function isRepositoryName(value: string): boolean {
+  const name = value.trim();
+
+  if (name.length === 0 || name.length > 100) return false;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) return false;
+
+  return name !== "." && name !== ".." && !name.toLowerCase().endsWith(".git");
+}
+
+/**
+ * Creates a private repository with exactly one commit.
+ *
+ * This is the only place Openmi creates a repository instead of writing to one,
+ * and it is deliberately narrow: the files are a template's, written once, and
+ * every later change still travels through changeset → branch → pull request.
+ * The alternative — a second general write path — is what the product refuses.
+ *
+ * The repository is private by default: a half-built app is the reader's work
+ * before it is anything else, and publishing is a separate, explicit action.
+ */
+export async function createRepositoryWithFiles(input: {
+  token: string;
+  name: string;
+  description: string;
+  files: ProposedFile[];
+  isPrivate?: boolean;
+}): Promise<{ fullName: string; branch: string; commitSha: string }> {
+  const name = input.name.trim();
+
+  if (!isRepositoryName(name)) {
+    throw new GithubWriteError(
+      "refused",
+      "Repository names use letters, numbers, dots, dashes and underscores, and start with a letter or number.",
+      400
+    );
+  }
+
+  if (input.files.length === 0 || input.files.length > MAX_COMMIT_FILES) {
+    throw new GithubWriteError(
+      "refused",
+      `A template must have between 1 and ${MAX_COMMIT_FILES} files.`,
+      400
+    );
+  }
+
+  for (const file of input.files) {
+    if (!safeCommitPath(file.path)) {
+      throw new GithubWriteError("refused", `The template path ${file.path} is not allowed.`, 400);
+    }
+
+    if (Buffer.byteLength(file.content, "utf8") > MAX_COMMIT_FILE_BYTES) {
+      throw new GithubWriteError(
+        "refused",
+        `${file.path} is larger than the ${MAX_COMMIT_FILE_BYTES} byte template cap.`,
+        400
+      );
+    }
+  }
+
+  let created: { full_name: string };
+  try {
+    created = await request<{ full_name: string }>(input.token, "POST", "/user/repos", {
+      name,
+      description: input.description.slice(0, 200),
+      private: input.isPrivate ?? true,
+      // No initial commit of GitHub's own: the first commit is the template, so
+      // the chat is pinned to something that actually contains the app.
+      auto_init: false,
+      default_branch: "main",
+    });
+  } catch (caught) {
+    if (
+      caught instanceof GithubWriteError &&
+      (caught.status === 422 || caught.status === 409)
+    ) {
+      throw new GithubWriteError(
+        "conflict",
+        `A repository named "${name}" already exists, or GitHub refused that name.`,
+        422
+      );
+    }
+
+    if (caught instanceof GithubWriteError && caught.status === 403) {
+      throw new GithubWriteError(
+        "forbidden",
+        "The connected token cannot create repositories. Reconnect GitHub with a token that has repo scope.",
+        403
+      );
+    }
+
+    throw caught;
+  }
+
+  const [owner, repoName] = created.full_name.split("/");
+  const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`;
+
+  const blobs: Array<{ path: string; sha: string }> = [];
+
+  for (const file of input.files) {
+    const blob = await request<{ sha: string }>(input.token, "POST", `${repoPath}/git/blobs`, {
+      content: file.content,
+      encoding: "utf-8",
+    });
+
+    blobs.push({ path: file.path, sha: blob.sha });
+  }
+
+  const tree = await request<{ sha: string }>(input.token, "POST", `${repoPath}/git/trees`, {
+    tree: blobs.map((blob) => ({
+      path: blob.path,
+      mode: "100644",
+      type: "blob",
+      sha: blob.sha,
+    })),
+  });
+
+  const commit = await request<{ sha: string }>(input.token, "POST", `${repoPath}/git/commits`, {
+    message:
+      "Openmi: start from a template\n\nOne commit, written once. Every later change goes through a changeset and a pull request.",
+    tree: tree.sha,
+    parents: [],
+  });
+
+  await request(input.token, "POST", `${repoPath}/git/refs`, {
+    ref: "refs/heads/main",
+    sha: commit.sha,
+  });
+
+  return { fullName: created.full_name, branch: "main", commitSha: commit.sha };
+}

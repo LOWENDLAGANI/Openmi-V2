@@ -264,6 +264,20 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to 3, clamped to 1..10; the least-recently-active is evicted first",
   },
   {
+    key: "OPENMI_PREVIEW",
+    scope: "server",
+    required: false,
+    unlocks: "The live preview panel in a chat (set to \"off\" to remove it)",
+    hint: 'On only when E2B_API_KEY is set; "off" makes the preview routes 404',
+  },
+  {
+    key: "OPENMI_CHECKPOINTS",
+    scope: "server",
+    required: false,
+    unlocks: "Versions of a chat workspace, restorable inside the sandbox",
+    hint: 'On only when E2B_API_KEY is set; "off" hides the versions panel',
+  },
+  {
     key: "OPENMI_AUTO_WRITE",
     scope: "server",
     required: false,
@@ -405,6 +419,8 @@ export function serverEnv() {
     chatSandboxTtlHours: process.env.CHAT_SANDBOX_TTL_HOURS ?? null,
     chatSandboxArchiveHours: process.env.CHAT_SANDBOX_ARCHIVE_HOURS ?? null,
     chatSandboxMaxPerOwner: process.env.CHAT_SANDBOX_MAX_PER_OWNER ?? null,
+    preview: process.env.OPENMI_PREVIEW ?? null,
+    checkpoints: process.env.OPENMI_CHECKPOINTS ?? null,
     cronSecret: process.env.CRON_SECRET ?? null,
   };
 }
