@@ -278,6 +278,20 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: 'On only when E2B_API_KEY is set; "off" hides the versions panel',
   },
   {
+    key: "VERCEL_TOKEN",
+    scope: "server",
+    required: false,
+    unlocks: "Publishing a chat's app to the hosting provider",
+    hint: "Vercel → Account settings → Tokens; without it Publish is unavailable",
+  },
+  {
+    key: "VERCEL_TEAM_ID",
+    scope: "server",
+    required: false,
+    unlocks: "Deploying under a Vercel team instead of a personal account",
+    hint: "Vercel → Team settings → General → Team ID (optional)",
+  },
+  {
     key: "OPENMI_AUTO_WRITE",
     scope: "server",
     required: false,
@@ -421,6 +435,8 @@ export function serverEnv() {
     chatSandboxMaxPerOwner: process.env.CHAT_SANDBOX_MAX_PER_OWNER ?? null,
     preview: process.env.OPENMI_PREVIEW ?? null,
     checkpoints: process.env.OPENMI_CHECKPOINTS ?? null,
+    vercelToken: process.env.VERCEL_TOKEN ?? null,
+    vercelTeamId: process.env.VERCEL_TEAM_ID ?? null,
     cronSecret: process.env.CRON_SECRET ?? null,
   };
 }

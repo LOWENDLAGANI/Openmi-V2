@@ -1,6 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+
+import { PublishButton } from "@/components/PublishButton";
+import { PULL_CONFIRMATION } from "@/lib/execution/sync/plan";
 
 /**
  * The versions of a chat's workspace.
@@ -29,8 +33,10 @@ export function VersionPanel({
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<Checkpoint[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pulling, setPulling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const router = useRouter();
 
   const refresh = useCallback(async () => {
     try {
@@ -129,6 +135,36 @@ export function VersionPanel({
     }
   }
 
+  async function pull() {
+    if (!window.confirm(PULL_CONFIRMATION)) return;
+
+    setPulling(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/sync/${chatId}`, { method: "POST" });
+      const body = (await response.json().catch(() => null)) as
+        | { verdict?: string; head?: string; error?: string }
+        | null;
+
+      if (!response.ok) {
+        setError(body?.error ?? "The branch could not be pulled.");
+      } else if (body?.verdict === "up-to-date") {
+        setNotice("This workspace is already at the branch head.");
+      } else {
+        setNotice(
+          `The pin moved to ${body?.head?.slice(0, 7) ?? "the branch head"}. The next turn reseeds the workspace.`
+        );
+        router.refresh();
+      }
+    } catch {
+      setError("The pull request did not reach the server.");
+    } finally {
+      setPulling(false);
+    }
+  }
+
   return (
     <div className="mb-2 shrink-0 overflow-hidden rounded-2xl border border-line bg-card">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
@@ -148,12 +184,24 @@ export function VersionPanel({
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
+            onClick={pull}
+            disabled={pulling}
+            title="Move this chat's pin to the branch head. The workspace is reseeded on the next turn."
+            className="btn px-2.5 py-1 text-[11px]"
+          >
+            {pulling ? "Pulling…" : "Pull latest"}
+          </button>
+
+          <button
+            type="button"
             onClick={save}
             disabled={busy}
             className="btn px-2.5 py-1 text-[11px]"
           >
             Save version
           </button>
+
+          <PublishButton chatId={chatId} />
         </div>
       </div>
 

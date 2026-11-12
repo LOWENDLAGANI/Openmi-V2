@@ -209,6 +209,23 @@ export async function getRepo(token: string, fullName: string): Promise<RepoSumm
   return toSummary(data);
 }
 
+/**
+ * GitHub's numeric id for a repository.
+ *
+ * The hosting provider names a repository by this id, not by `owner/name`, so
+ * the value is read here rather than guessed from the string. It is a GET like
+ * every other read in this module.
+ */
+export async function getRepoId(token: string, fullName: string): Promise<number> {
+  const { data } = await request<{ id: number }>(token, repoBase(fullName));
+
+  if (typeof data.id !== "number") {
+    throw new GithubError("unavailable", "GitHub did not return a repository id.");
+  }
+
+  return data.id;
+}
+
 export async function listBranches(token: string, fullName: string): Promise<string[]> {
   const { data } = await request<Array<{ name: string }>>(
     token,

@@ -218,6 +218,12 @@ Gate on D4.
 - **Acceptance:** a mocked provider test asserts no URL is rendered without a
   ready state; a failed deploy renders the provider message and no link.
 - **Est:** M.
+- **Status:** shipped against Vercel. `POST /v13/deployments` with
+  `gitSource: {type: "github", repoId, ref, sha}`; the repository id comes from
+  GitHub rather than being guessed. `deployments` stores the provider's own
+  state, hostname and error, and `deploymentUrl` returns a link only for
+  `READY`. Without `VERCEL_TOKEN` the button reports that publishing is not
+  configured and deploys nothing.
 
 ---
 
@@ -233,6 +239,11 @@ Gate on D5.
 - **Acceptance:** a test covers three cases — clean fast-forward, dirty refusal,
   lease refusal — and each message is distinct.
 - **Est:** M.
+- **Status:** shipped as a pin move rather than a second reset path: the pull
+  writes `chats.repo_base_sha`, and the next turn reseeds through the resolver
+  that already handles a changed pin. Refused while a lease is live and while
+  the workspace has uncommitted files; the confirmation says the old sandbox's
+  versions do not survive the reseed.
 
 ---
 
