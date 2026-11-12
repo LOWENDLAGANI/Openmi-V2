@@ -50,8 +50,8 @@ export const DEFAULT_TEMPLATE = "base";
 
 /**
  * The longest lifetime the provider accepts: 24 h, on an account with a card.
- * A chat's own deadline is 48 h and is enforced by the sweep; this is only the
- * ceiling handed to the sandbox itself.
+ * A chat's own deadline is `CHAT_SANDBOX_TTL_HOURS` (2 days by default) and is
+ * enforced by the sweep; this is only the ceiling handed to the sandbox itself.
  */
 export const EXEC_MAX_TIMEOUT_SECONDS = 86_400;
 

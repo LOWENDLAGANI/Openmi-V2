@@ -545,7 +545,7 @@ export async function createSandbox(
 export type ChatSandboxOptions = {
   chatId: string;
   owner: string;
-  /** Wall-clock ceiling, refreshed on activity. 48 h plus slack. */
+  /** Wall-clock ceiling, refreshed on activity: the chat TTL plus slack. */
   ttlMinutes: number;
   /** The chat's own inactivity deadline. Enforced by the sweep, not the provider. */
   autoDeleteMinutes: number;

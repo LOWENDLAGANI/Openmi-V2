@@ -82,6 +82,14 @@ export async function pullChatBranch(input: {
   supabase: SessionClient;
   chatId: string;
   token: string;
+  /**
+   * Set only for a pull the agent starts inside its own turn.
+   *
+   * The turn holds the workspace lease, so the ordinary refusal would make the
+   * tool unusable by construction. The uncommitted check still runs: that is
+   * the condition a reseed would actually destroy.
+   */
+  allowDuringTurn?: boolean;
 }): Promise<SyncResult> {
   const pin = await readPin(input.supabase, input.chatId);
 
@@ -135,7 +143,7 @@ export async function pullChatBranch(input: {
     return { ok: true, verdict: "up-to-date", head, previous: pin.repo_base_sha };
   }
 
-  if (quick === "busy") {
+  if (quick === "busy" && !input.allowDuringTurn) {
     return {
       ok: false,
       verdict: "busy",
@@ -144,7 +152,7 @@ export async function pullChatBranch(input: {
     };
   }
 
-  if (quick === "pull") {
+  if (quick === "pull" || quick === "busy") {
     const dirtyFiles = await countDirty(input.admin, input.chatId);
 
     if (dirtyFiles > 0) {
@@ -173,5 +181,65 @@ export async function pullChatBranch(input: {
   }
 
   return { ok: true, verdict: "pull", head, previous: pin.repo_base_sha };
+}
+
+export type GitState =
+  | {
+      ok: true;
+      branch: string;
+      pinned: string;
+      head: string;
+      behind: boolean;
+      dirtyFiles: number;
+    }
+  | { ok: false; message: string };
+
+/**
+ * The chat's git state, for the agent's `git status`.
+ *
+ * One branch read against the pin, plus the workspace's uncommitted count. It
+ * writes nothing, so it is safe to call in the middle of a turn: the answer is
+ * the same shape the Versions panel shows, and nothing is reseeded by looking.
+ */
+export async function readGitStatus(input: {
+  admin: Admin;
+  supabase: SessionClient;
+  chatId: string;
+  token: string;
+}): Promise<GitState> {
+  const pin = await readPin(input.supabase, input.chatId);
+
+  if (!pin?.repo_full_name || !pin.repo_branch || !pin.repo_base_sha) {
+    return {
+      ok: false,
+      message: "Attach a repository to this chat before asking about git.",
+    };
+  }
+
+  let head: string;
+  try {
+    head = await resolveBranchSha(
+      input.token,
+      pin.repo_full_name,
+      pin.repo_branch
+    );
+  } catch (caught) {
+    return {
+      ok: false,
+      message:
+        caught instanceof Error && caught.message.length > 0
+          ? caught.message
+          : "GitHub could not read that branch.",
+    };
+  }
+
+  return {
+    ok: true,
+    branch: pin.repo_branch,
+    pinned: pin.repo_base_sha,
+    head,
+    behind: pin.repo_base_sha !== head,
+    dirtyFiles: await countDirty(input.admin, input.chatId),
+  };
 }
 

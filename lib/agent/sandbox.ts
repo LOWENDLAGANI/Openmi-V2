@@ -706,7 +706,7 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
         }
 
         // The disk is the chat's; only this turn's claim on it ends. The sweep
-        // stops it after the idle window and wipes it at the 48-hour deadline.
+        // stops it after the idle window and wipes it at the chat TTL deadline.
         await releaseChatSandbox({
           admin: chatRow.admin,
           rowId: chatRow.rowId,

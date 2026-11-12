@@ -91,6 +91,7 @@ Propose a reviewable change. **Nothing is written to GitHub by this call.**
 
 | Argument | Type | Required | Notes |
 |---|---|---|---|
+| `destination` | string | no | The branch the reader asked for, read by the model, not by a keyword. Checked by `safeBranchName` (`lib/github/branch-request.ts`): no spaces, traversal, flag or leading `/`. Omitted means a new `openmi/agent/` branch and a pull request. |
 | `edits` | array | yes | 1–6 entries per call. |
 | `edits[].path` | string | yes | Repository-relative. |
 | `edits[].mode` | `"write" \| "replace"` | yes | `write` replaces the file, `replace` swaps one exact string. |
@@ -113,8 +114,37 @@ Propose a reviewable change. **Nothing is written to GitHub by this call.**
 - **Unavailable** without a pinned repository and `GITHUB_TOKEN_KEY`
   (`unavailable: proposing edits needs a pinned repository and GITHUB_TOKEN_KEY`).
 - **After the call** the user sees a unified diff per file and accepts or
-  rejects each one. Approval writes one `openmi/agent/<changeset-id>` branch and
-  one pull request. The model cannot write to GitHub, merge, or force a branch.
+  rejects each one. A ready change is written by the app, and the automatic
+  write counts as the review (`AUTO_WRITE_REVIEW`): one `openmi/agent/
+  <changeset-id>` branch and one pull request, or the branch given as
+  `destination`. A moved head, a change over `CONFIRM_FILE_LIMIT` files, and one
+  touching configuration, credentials or the schema still ask first. The model
+  cannot write to GitHub, merge, or force a branch.
+
+### `git`
+
+The one tool that talks about the chat's branch rather than its files. Both
+actions are served by the app with the sealed token; no sandbox in this product
+holds a remote or a credential.
+
+| Argument | Type | Required | Notes |
+|---|---|---|---|
+| `action` | `"status" \| "pull"` | yes | Anything else is `bad-input: action must be status or pull`. |
+
+- **`status`** returns `branch <name>`, `head <sha7>`,
+  `pinned <sha7> (at the head | behind the head)` and the number of uncommitted
+  files in the workspace. It writes nothing, so it is safe in the middle of a
+  turn.
+- **`pull`** moves the pin to the branch head — the same pin change the Versions
+  panel's **Pull latest** makes, and the next turn reseeds from it. It is
+  refused with its reason rather than forced: a dirty workspace, a branch GitHub
+  will not read, a chat with no pin.
+- **Unavailable** on a turn with no pinned repository or no sealed token
+  (`unavailable: git needs a pinned repository and a connected GitHub token`).
+- **Not a write.** Pushing is the review card's job: an accepted change becomes
+  one commit on an `openmi/agent/` branch and one pull request, and a branch that
+  moved is re-applied on the live head rather than force-pushed. The model is
+  told to claim a push or a re-apply only when the card reports it.
 
 ---
 

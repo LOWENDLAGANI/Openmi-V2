@@ -92,6 +92,26 @@ export function needsConfirmation(
  */
 export const STANDING_APPROVAL_REVIEW = "standing-approval";
 
+/**
+ * The review an automatic write stands in for.
+ *
+ * `OPENMI_AUTO_WRITE` is on by default, and its whole point is that the click
+ * was a second confirmation of a decision the write client already enforces.
+ * Without this stamp every fresh suggestion read as "nobody has reviewed it" and
+ * asked anyway, which made the automatic path never actually automatic. The
+ * other questions still apply: a moved head, a large change, and one touching
+ * configuration, credentials or the schema.
+ */
+export const AUTO_WRITE_REVIEW = "auto-write";
+
+export function withAutoWriteReview(
+  changeset: ConfirmableChangeset
+): ConfirmableChangeset {
+  if (changeset.reviewed_at !== null) return changeset;
+
+  return { ...changeset, reviewed_at: AUTO_WRITE_REVIEW };
+}
+
 export function withStandingApproval(
   changeset: ConfirmableChangeset,
   remembered: boolean

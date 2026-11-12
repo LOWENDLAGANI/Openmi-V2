@@ -44,7 +44,7 @@ export const PREVIEW_MAX_COMMAND_CHARS = 160;
  *
  * A preview holds compute on a box that is otherwise idle, and there is no
  * per-minute charge behind it yet. The cap is what keeps a forgotten tab from
- * holding a sandbox open until the 48-hour wipe; restarting costs two clicks.
+ * holding a sandbox open until the TTL wipe; restarting costs two clicks.
  */
 export const PREVIEW_MAX_MINUTES_PER_CHAT = 60;
 

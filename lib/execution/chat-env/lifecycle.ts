@@ -33,6 +33,14 @@ export const CHAT_SANDBOX_DEFAULT_IDLE_MINUTES = 5;
 export const CHAT_SANDBOX_MIN_IDLE_MINUTES = 1;
 export const CHAT_SANDBOX_MAX_IDLE_MINUTES = 60;
 
+/**
+ * How long a chat keeps its workspace.
+ *
+ * Two days of inactivity: long enough that a reader can close the tab, sleep and
+ * come back to the same files and versions, short enough that an abandoned
+ * workspace is not billed forever. `CHAT_SANDBOX_TTL_HOURS=4` gives a tighter
+ * window when an operator wants one.
+ */
 export const CHAT_SANDBOX_DEFAULT_TTL_HOURS = 48;
 export const CHAT_SANDBOX_MIN_TTL_HOURS = 1;
 export const CHAT_SANDBOX_MAX_TTL_HOURS = 168;

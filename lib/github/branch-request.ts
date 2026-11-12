@@ -65,6 +65,27 @@ function isBranchish(token: string): boolean {
  * `defaultBranch` is the repository's own default, so "push to main" is
  * recognised even when the phrase says nothing about branches.
  */
+/**
+ * A branch name a tool argument may carry.
+ *
+ * The model reads the reader's sentence, not a regex, so the value is checked
+ * structurally here before it reaches a ref: no spaces, no traversal, no leading
+ * dash (a flag, not a branch), and bounded length. Null means "not a branch",
+ * and the caller falls back to the ordinary pull-request destination.
+ */
+export function safeBranchName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const branch = value.trim();
+  if (branch.length === 0 || branch.length > 100) return null;
+  if (/[\s~^:?*\[\]\\]/.test(branch)) return null;
+  if (branch.startsWith("/") || branch.startsWith("-") || branch.startsWith(".")) return null;
+  if (branch.endsWith("/") || branch.endsWith(".") || branch.endsWith(".lock")) return null;
+  if (branch.includes("..") || branch.includes("@{")) return null;
+
+  return branch;
+}
+
 export function requestedBranch(
   message: string,
   defaultBranch: string | null

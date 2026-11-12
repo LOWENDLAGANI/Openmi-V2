@@ -2,7 +2,13 @@
 
 **Status: implemented (P12-T1 … P12-T7).** This document planned the change from
 "one sandbox per message, destroyed at the end" to "one sandbox per chat,
-stopped when idle and wiped after 48 hours of inactivity". It now also records
+stopped when idle and wiped after `CHAT_SANDBOX_TTL_HOURS` of inactivity".
+
+> **Update.** `OPENMI_SANDBOX_TURNS` now defaults to **on**, so a chat turn works
+> inside the persistent workspace. `CHAT_SANDBOX_TTL_HOURS` stays **48** — two
+> days of inactivity, then the container, its disk and that chat's versions are
+> destroyed — and it is the only number to change for a shorter window. The
+> mechanism below is as shipped. It now also records
 what shipped and how to operate it; see §15 for the runbook. The code it touches
 is `lib/agent/sandbox.ts`, `app/api/chat/route.ts`,
 `lib/execution/provider.ts`, `app/chat/actions.ts`, migration 023, and
@@ -15,8 +21,9 @@ The three requirements, restated as the invariants the implementation must hold:
 2. **Idle stops preserve disk.** When the chat goes quiet the container stops
    (compute released) and is started again on the next message, with the
    workspace exactly as it was left. Processes do not survive; files do.
-3. **48 hours of inactivity wipes it.** Container, disk and environment row are
-   destroyed, and the chat itself is untouched.
+3. **`CHAT_SANDBOX_TTL_HOURS` of inactivity wipes it (2 days by default).**
+   Container, disk and environment row are destroyed, and the chat itself is
+   untouched.
 
 ---
 
@@ -116,7 +123,7 @@ the start latency eats the benefit; above ~15 minutes an abandoned chat is
 paying for nothing. Five is the balance, and it is configurable because the
 right number is a cost observation, not a principle.
 
-### D12.5 — The 48-hour wipe is sliding, and only deleted after the provider agrees
+### D12.5 — The TTL wipe is sliding, and only deleted after the provider agrees
 
 `delete_after = last_active_at + CHAT_SANDBOX_TTL_HOURS` (default **48**),
 recomputed on every open and on every turn close. The wipe path is:

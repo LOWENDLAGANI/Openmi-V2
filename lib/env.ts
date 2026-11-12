@@ -304,7 +304,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "A chat turn that may open the Linux sandbox instead of GitHub only",
-    hint: 'Off by default; set to "on" to give chat turns the shell and its tools back',
+    hint: 'On by default; set to "off" for GitHub-only turns that never provision a box',
   },
   {
     key: "OPENMI_ALLOW_DEFAULT_BRANCH",
@@ -318,7 +318,7 @@ export const ENV_SPEC: EnvSpec[] = [
     key: "CRON_SECRET",
     scope: "server",
     required: false,
-    unlocks: "The chat sandbox sweep (idle stops and the 48-hour wipe)",
+    unlocks: "The chat sandbox sweep (idle stops and the TTL wipe)",
     hint: "Without it the sweep returns 503 and the provider timers are the only backstop",
   },
 ];
@@ -398,19 +398,22 @@ export function executionConfigured(
 /**
  * Whether a chat turn may open the Linux sandbox.
  *
- * Off by default: a chat turn is GitHub-only, so the assistant reads the
- * repository and answers with a proposed diff instead of provisioning a box.
- * Nothing was removed — `OPENMI_SANDBOX_TURNS=on` gives every eligible turn the
- * shell, the dedicated tools and the paused-continuation workspace back.
+ * On by default: a turn gets the persistent workspace, so the agent can run what
+ * it writes, and the files it changed are still there on the next message. The
+ * handle is lazy, so a turn that never calls a tool provisions nothing.
+ * `OPENMI_SANDBOX_TURNS=off` restores GitHub-only turns — reads plus a proposed
+ * diff, no box, no shell, no browser.
  *
  * Separate from `executionConfigured()`: verification runs and missions keep
- * their sandboxes either way. This decides the chat turn only.
+ * their sandboxes either way. This decides the chat turn only, and an empty
+ * value means the default rather than "off" — a blank line in an env file is not
+ * an instruction.
  */
 export function sandboxTurnsEnabled(
   env: Record<string, string | undefined> = process.env
 ): boolean {
-  const flag = (env.OPENMI_SANDBOX_TURNS ?? "off").trim().toLowerCase();
-  return flag === "on" || flag === "true" || flag === "1" || flag === "yes";
+  const flag = (env.OPENMI_SANDBOX_TURNS ?? "on").trim().toLowerCase();
+  return flag !== "off" && flag !== "false" && flag !== "0" && flag !== "no";
 }
 
 /** Typed access for server code. `null` means "not configured", never a throw. */

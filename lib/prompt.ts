@@ -60,6 +60,28 @@ export const PROPOSE_CLAUSE =
  * is told this so it neither promises a pull request that will not be opened
  * nor claims the write already happened.
  */
+/**
+ * Git is the app's, not the model's.
+ *
+ * Every write to GitHub already goes through the server's sealed token — a
+ * commit on an `openmi/agent/` branch, a pull request, a re-apply on a moved
+ * head — so the model is told the one thing it can start itself (looking, and
+ * following the branch) and is forbidden from claiming the rest happened.
+ */
+/**
+ * Act, do not interview.
+ *
+ * A reader who writes "add a favicon and push it to main" has given the request
+ * and the destination in one sentence. A turn that replies with a plan, a menu
+ * of options, or "shall I proceed?" has answered a different one. The clause
+ * says so, and names the two cases where a question is still the right move.
+ */
+export const AUTONOMY_CLAUSE =
+  "Carry the request out in this turn: decide the approach, make the change, and say what you did. Do not ask permission, do not offer a menu of options, and do not stop at a plan when the request can be answered by editing the repository. Ask only when a value is genuinely missing or two instructions contradict each other. Read what the reader means, not the words they happened to use: when the request asks for a particular branch to be updated — in any phrasing — pass that branch as destination on propose_edits, and the app writes it without another click.";
+
+export const GIT_CLAUSE =
+  "GitHub is written only through this app's own GitHub client, never from a command line. The git tool is how you look before proposing: action status reports this chat's pinned commit against the branch head and how many workspace files are uncommitted; action pull moves the pin to the head, and is refused while the workspace is dirty. Pushing and re-applying are done by the review card on the server; say one happened only when a tool result or the card reports it.";
+
 export const DESTINATION_CLAUSE =
   "A change goes to a new openmi/ agent branch and a pull request by default. When the user names a branch — \"push it to main\", \"commit to the develop branch\" — that branch is the destination and is written directly, with no pull request. Say which branch you are targeting, and never say it was written, pushed or merged until the review card reports it.";
 
@@ -71,6 +93,8 @@ export const SYSTEM_PROMPT = [
   CITATION_CLAUSE,
   "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
   PROPOSE_CLAUSE,
+  AUTONOMY_CLAUSE,
+  GIT_CLAUSE,
 ].join("\n\n");
 
 /**
@@ -133,6 +157,8 @@ export function buildSystemPrompt({
         CITATION_CLAUSE,
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,
+        AUTONOMY_CLAUSE,
+        GIT_CLAUSE,
         DESTINATION_CLAUSE,
       ]
     : [
@@ -141,6 +167,8 @@ export function buildSystemPrompt({
         CITATION_CLAUSE,
         "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,
+        AUTONOMY_CLAUSE,
+        GIT_CLAUSE,
         DESTINATION_CLAUSE,
       ];
 
@@ -153,7 +181,7 @@ export function buildSystemPrompt({
   if (repo && sha) {
     tail.push(
       edits
-        ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The user reviews each file and may approve it, which opens a pull request; only an approval writes to GitHub. The default branch is written only when the user asks for it by name."
+        ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The app writes a ready change itself: to a new openmi/ agent branch with a pull request, or straight to the branch you pass as destination when the reader asked for one. Never say a change was written, pushed or merged until the review card or a notice reports it."
         : "Editing is unavailable in this turn. Answer with citations only, and say so if the user asks for a change."
     );
   }

@@ -1,4 +1,5 @@
 import { MAX_EDITS_PER_CALL, validateEdits, type EditRequest } from "../changesets";
+import { safeBranchName } from "../github/branch-request";
 import { getFile, searchCode } from "../github/read";
 
 /**
@@ -17,7 +18,12 @@ export const MAX_LIST_FILES = 200;
 export const MAX_READ_FILE_BYTES = 200_000;
 export const MAX_SEARCH_CANDIDATES = 10;
 
-export type ToolName = "list_files" | "read_file" | "search_code" | "propose_edits";
+export type ToolName =
+  | "list_files"
+  | "read_file"
+  | "search_code"
+  | "propose_edits"
+  | "git";
 
 export type ToolDefinition = {
   name: ToolName;
@@ -74,10 +80,15 @@ export const TOOL_SPECS: ToolDefinition[] = [
   {
     name: "propose_edits",
     description:
-      "Propose edits for the user to review. Nothing is written to GitHub. A call carries one to six edits; each is a whole-file write or an exact string replacement at the pinned commit.",
+      "Propose edits. A call carries one to six edits; each is a whole-file write or an exact string replacement at the pinned commit. Pass destination when the reader named a branch to write; omit it to land on a new openmi/ agent branch and a pull request.",
     parameters: {
       type: "object",
       properties: {
+        destination: {
+          type: "string",
+          description:
+            "The branch the reader asked for, in their words, without a leading origin/ or refs/heads/. Only when they named one; the app writes it directly. Omit it otherwise.",
+        },
         edits: {
           type: "array",
           maxItems: MAX_EDITS_PER_CALL,
@@ -117,7 +128,38 @@ export const TOOL_SPECS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "git",
+    description:
+      "Read this chat's git state or move its pin to the branch head. Nothing on GitHub is changed by either action, and a pull is refused while the workspace holds uncommitted files.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["status", "pull"],
+          description:
+            "status reports the pinned commit against the branch head; pull moves the pin to that head, which reseeds the workspace on the next turn.",
+        },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+  },
 ];
+
+/**
+ * Git, served by the app rather than by a terminal.
+ *
+ * The sandbox has no remote and no token, so the only way a turn can ask about
+ * the branch or follow it is through these callbacks, which run with the sealed
+ * token the request already opened. They are absent on a turn with no pinned
+ * repository, and the tool then says `unavailable:` instead of guessing.
+ */
+export type GitActions = {
+  status: () => Promise<ToolResult>;
+  pull: () => Promise<ToolResult>;
+};
 
 export type ToolContext = {
   token: string;
@@ -125,7 +167,9 @@ export type ToolContext = {
   sha: string;
   paths: string[];
   /** Absent when this turn cannot persist a proposal (no pin or no signing key). */
-  propose?: (edits: EditRequest[]) => Promise<ToolResult>;
+  propose?: (edits: EditRequest[], destination: string | null) => Promise<ToolResult>;
+  /** Absent when this turn has no repository or no sealed GitHub token. */
+  git?: GitActions;
 };
 
 export type ToolResult =
@@ -171,10 +215,12 @@ export function parseArguments(raw: string): Record<string, unknown> | null {
 export function describeToolCall(name: string, args: Record<string, unknown>): string {
   if (name === "read_file" && typeof args.path === "string") return `read ${args.path}`;
   if (name === "propose_edits" && Array.isArray(args.edits)) {
-    return `propose ${args.edits.length} file(s)`;
+    const target = typeof args.destination === "string" ? ` to ${args.destination}` : "";
+    return `propose ${args.edits.length} file(s)${target}`;
   }
   if (name === "search_code" && typeof args.query === "string") return `search ${JSON.stringify(args.query)}`;
   if (name === "list_files" && typeof args.prefix === "string") return `list ${args.prefix}`;
+  if (name === "git" && typeof args.action === "string") return `git ${args.action}`;
   return name;
 }
 
@@ -270,7 +316,15 @@ export async function runTool(
   }
 
   if (name === "propose_edits") {
-    if (!onlyKeys(args, ["edits"])) return badInput("unexpected argument");
+    if (!onlyKeys(args, ["edits", "destination"])) return badInput("unexpected argument");
+
+    let destination: string | null = null;
+    if (args.destination !== undefined) {
+      destination = safeBranchName(args.destination);
+      if (destination === null) {
+        return badInput("destination must be a branch name, not a path or a sentence");
+      }
+    }
 
     const validated = validateEdits(args.edits);
     if (!validated.ok) return badInput(validated.error);
@@ -283,7 +337,23 @@ export async function runTool(
       };
     }
 
-    return context.propose(validated.edits);
+    return context.propose(validated.edits, destination);
+  }
+
+  if (name === "git") {
+    if (!onlyKeys(args, ["action"])) return badInput("unexpected argument");
+    if (args.action !== "status" && args.action !== "pull") {
+      return badInput("action must be status or pull");
+    }
+
+    if (!context.git) {
+      return {
+        ok: false,
+        error: "unavailable: git needs a pinned repository and a connected GitHub token",
+      };
+    }
+
+    return args.action === "status" ? context.git.status() : context.git.pull();
   }
 
   return badInput(`unknown tool: ${name}`);

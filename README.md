@@ -13,9 +13,13 @@ Tailwind v4 tokens · Bun.
 
 **Build order:** [OPENMI_BUILD_PHASES.md](OPENMI_BUILD_PHASES.md). Phases 0–9 are
 built. Phase 10 (execution) is built as **verification only**: an install and a
-build run in a sandbox and the card reports the exit code it observed. The chat
-agent's own turn still proposes a diff instead of executing one unless
-`OPENMI_SANDBOX_TURNS=on`, and nothing in the product runs your test suite.
+build run in a sandbox and the card reports the exit code it observed. A chat
+turn now runs inside that chat's own persistent workspace by default, so it can
+execute what it writes and the files are still there on the next message; the
+workspace is kept for `CHAT_SANDBOX_TTL_HOURS` (2 days) of inactivity, then
+destroyed.
+`OPENMI_SANDBOX_TURNS=off` restores GitHub-only turns. Nothing in the product
+runs your test suite on its own.
 
 ---
 
@@ -117,11 +121,14 @@ detection, probe classification, and the tool surface.
 
 ## The agent, and its limits
 
-On a GitHub-only turn the agent may call three tools, all of them reads:
+On a GitHub-only turn (`OPENMI_SANDBOX_TURNS=off`) the agent may call four tools:
 `list_files` (≤200 paths),
-`read_file` (≤200KB, text only), and `search_code` (≤10 candidates). No tool
-accepts a URL; every request is built from the token plus a path in the
-repository the chat is pinned to.
+`read_file` (≤200KB, text only), `search_code` (≤10 candidates) and `git`
+(`status`, and a `pull` that moves the pin). No tool accepts a URL; every request
+is built from the token plus a path in the repository the chat is pinned to.
+Every write to GitHub stays server-side: the review card commits to an
+`openmi/agent/` branch and opens the pull request with the sealed token, and a
+branch that moved is re-applied on the live head rather than force-pushed.
 
 The turn stops at one of three caps, and the transcript says which:
 
@@ -161,7 +168,17 @@ that pull request and stores the merge commit; a merge that cannot finish is
 recorded as failed with its pull request left in place. The default branch is
 never the head unless the reader names it as the destination (an explicit branch
 request is written directly) or an operator sets
-`OPENMI_ALLOW_DEFAULT_BRANCH=on`. A named branch that has moved since the diff
+`OPENMI_ALLOW_DEFAULT_BRANCH=on`. The destination is the model's read of the
+request, not a keyword: `propose_edits` takes a `destination` branch argument, and
+naming one also answers the confirmation question, because asking for that branch
+was the decision. The write is still one commit, never forced, and re-applied if
+the branch moved under it.
+
+The automatic write now counts as the review (`AUTO_WRITE_REVIEW`). Before that,
+every fresh suggestion read as "nobody has reviewed it" and asked for a click, so
+the automatic path never actually ran. Two questions survive: a head that moved
+since the diff, and a change over five files or touching configuration,
+credentials or the schema. A named branch that has moved since the diff
 was computed is not a dead end — the change goes to a new `openmi/agent/` branch
 on top of the live head, unforced. Retrying after a failure reuses the recorded
 branch, commit and pull request, so one approval cannot produce two PRs.
@@ -224,10 +241,12 @@ this app, and that nothing claims a test it did not run.
 
 ## Known limits
 
-- A chat turn is GitHub-only by default: no sandbox is provisioned, so the
-  assistant reads the repository and proposes a diff without executing
-  anything. `OPENMI_SANDBOX_TURNS=on` gives every eligible turn the Linux shell
-  back; verification runs and missions keep their own sandboxes either way.
+- A chat turn gets its chat's persistent workspace by default, so the assistant
+  can run what it writes. The handle is lazy: a turn that never calls a tool
+  provisions nothing. The box stops after 5 idle minutes (its disk is kept) and
+  is destroyed `CHAT_SANDBOX_TTL_HOURS` (2 days) after the last activity, which
+  also takes that chat's versions with it. `OPENMI_SANDBOX_TURNS=off` is the
+  GitHub-only turn: reads plus a proposed diff, no shell, no browser.
 - Writes are one branch and one pull request per approved changeset, and the
   approval path squash-merges that pull request. A branch the reader names is
   written directly. The default branch is written directly only when the reader
@@ -401,9 +420,10 @@ Three variables decide it:
   execution is not configured.
 - `EXECUTION_ENABLED` — omit it, or set `off` to stop every box without removing
   the key.
-- `OPENMI_SANDBOX_TURNS=on` — gives an eligible chat turn the Linux shell, the
-  shell tools and the browser tool. Off is GitHub-only. Verification runs and
-  missions read the key only, so they work either way.
+- `OPENMI_SANDBOX_TURNS` — on by default: an eligible chat turn gets the Linux
+  shell, the shell tools and the browser tool in its own persistent workspace.
+  Set `off` for GitHub-only turns. Verification runs and missions read the key
+  only, so they work either way.
 
 This repository installs with `bun install --frozen-lockfile`, and E2B's default
 `base` template carries node, npm and git but **not bun**. Point

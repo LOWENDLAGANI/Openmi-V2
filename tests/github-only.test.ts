@@ -13,14 +13,16 @@ const ROUTE = readFileSync(
   "utf8"
 );
 
-test("a chat turn is GitHub-only unless the operator gives the sandbox back", () => {
-  expect(sandboxTurnsEnabled({})).toBe(false);
+test("a chat turn gets the sandbox unless the operator turns it off", () => {
+  expect(sandboxTurnsEnabled({})).toBe(true);
+  // A blank line in an env file is not an instruction.
+  expect(sandboxTurnsEnabled({ OPENMI_SANDBOX_TURNS: "" })).toBe(true);
 
   for (const on of ["on", "TRUE", "1", "yes"]) {
     expect(sandboxTurnsEnabled({ OPENMI_SANDBOX_TURNS: on })).toBe(true);
   }
 
-  for (const off of ["off", "0", "no", ""]) {
+  for (const off of ["off", "0", "no", "false"]) {
     expect(sandboxTurnsEnabled({ OPENMI_SANDBOX_TURNS: off })).toBe(false);
   }
 });

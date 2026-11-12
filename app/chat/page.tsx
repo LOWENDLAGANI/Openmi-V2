@@ -4,9 +4,7 @@ import { redirect } from "next/navigation";
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
-import { FileEditor } from "@/components/FileEditor";
-import { PreviewPanel } from "@/components/PreviewPanel";
-import { VersionPanel } from "@/components/VersionPanel";
+import { SandboxDock } from "@/components/SandboxDock";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { DewChip } from "@/components/DewChip";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -486,15 +484,17 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* The preview sits above the transcript rather than beside it: the
+        {/* The sandbox sits above the transcript rather than beside it: the
             chat column is the page's one column at every width, and a second
-            pane would have to compete with it on a phone. */}
+            pane would have to compete with it on a phone. Its three panels
+            share one dock so they read as one control, not three cards. */}
         {repo ? (
-          <>
-            <FileEditor chatId={chat.id} enabled={filesEnabled()} />
-            <VersionPanel chatId={chat.id} enabled={checkpointsEnabled()} />
-            <PreviewPanel chatId={chat.id} enabled={previewEnabled()} />
-          </>
+          <SandboxDock
+            chatId={chat.id}
+            files={filesEnabled()}
+            versions={checkpointsEnabled()}
+            preview={previewEnabled()}
+          />
         ) : null}
 
         <div className="min-h-0 flex-1">

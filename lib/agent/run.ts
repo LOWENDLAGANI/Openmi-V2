@@ -62,6 +62,8 @@ type RunOptions = {
   emitReasoning: (text: string) => void;
   emitStep: (event: AgentStepEvent) => void;
   propose?: ToolContext["propose"];
+  /** Git against the pinned branch, when this chat has one. */
+  git?: ToolContext["git"];
   /**
    * A Linux sandbox this turn may use.
    *
@@ -285,6 +287,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
             sha: options.sha,
             paths: options.paths,
             propose: options.propose,
+            git: options.git,
           });
 
       messages.push({

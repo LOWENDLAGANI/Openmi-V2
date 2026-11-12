@@ -26,9 +26,12 @@ type Checkpoint = {
 export function VersionPanel({
   chatId,
   enabled,
+  active = true,
 }: {
   chatId: string;
   enabled: boolean;
+  /** False while another tab of the dock is on screen. Hidden, never unmounted. */
+  active?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<Checkpoint[] | null>(null);
@@ -166,28 +169,30 @@ export function VersionPanel({
   }
 
   return (
-    <div className="mb-2 shrink-0 overflow-hidden rounded-2xl border border-line bg-card">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+    <div className={active ? "" : "hidden"}>
+      <div className="flex items-center gap-2 px-3 py-1.5">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="text-[11.5px] font-medium text-hi"
+          className="flex min-w-0 items-center gap-1.5 text-[11px] text-mid hover:text-hi"
         >
-          Versions {count > 0 ? `· ${count}` : ""}
+          <span aria-hidden="true" className="text-low">
+            {open ? "▾" : "▸"}
+          </span>
+          <span className="truncate">
+            {count === 0 ? "none yet" : `${count} version${count === 1 ? "" : "s"}`}
+            <span className="text-low"> · in this sandbox</span>
+          </span>
         </button>
 
-        <span className="text-[11px] text-mid">
-          {count === 0 ? "none yet" : "inside this chat's sandbox"}
-        </span>
-
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={pull}
             disabled={pulling}
             title="Move this chat's pin to the branch head. The workspace is reseeded on the next turn."
-            className="btn px-2.5 py-1 text-[11px]"
+            className="btn px-2 py-0.5 text-[10.5px]"
           >
             {pulling ? "Pulling…" : "Pull latest"}
           </button>
@@ -196,7 +201,7 @@ export function VersionPanel({
             type="button"
             onClick={save}
             disabled={busy}
-            className="btn px-2.5 py-1 text-[11px]"
+            className="btn px-2 py-0.5 text-[10.5px]"
           >
             Save version
           </button>
@@ -233,7 +238,7 @@ export function VersionPanel({
                     type="button"
                     onClick={() => restore(version.sha)}
                     disabled={busy}
-                    className="btn ml-auto px-2.5 py-1 text-[11px]"
+                    className="btn ml-auto px-2 py-0.5 text-[10.5px]"
                   >
                     Restore
                   </button>

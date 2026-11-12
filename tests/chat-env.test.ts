@@ -49,7 +49,7 @@ function env(overrides: Record<string, string> = {}) {
   return { ...overrides };
 }
 
-test("the defaults are the product promise: 5 minutes idle, 48 hours to live", () => {
+test("the defaults are the product promise: 5 minutes idle, two days to live", () => {
   expect(CHAT_SANDBOX_DEFAULT_IDLE_MINUTES).toBe(5);
   expect(CHAT_SANDBOX_DEFAULT_TTL_HOURS).toBe(48);
   expect(CHAT_SANDBOX_DEFAULT_MAX_PER_OWNER).toBe(3);
@@ -132,7 +132,7 @@ test("stop happens after the idle window, and only for a running, unleased box",
   expect(shouldStop(row({ lastActiveAt: "not a date" }), T0 + 30 * MINUTE, idle)).toBe(false);
 });
 
-test("the wipe lands at 48 hours and is blocked by a live turn", () => {
+test("the wipe lands at the deadline and is blocked by a live turn", () => {
   const due = T0 + 48 * HOUR;
 
   expect(shouldWipe(row({ deleteAfter: iso(due) }), due - 1)).toBe(false);

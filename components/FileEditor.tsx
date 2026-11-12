@@ -17,9 +17,12 @@ import { useCallback, useEffect, useState } from "react";
 export function FileEditor({
   chatId,
   enabled,
+  active = true,
 }: {
   chatId: string;
   enabled: boolean;
+  /** False while another tab of the dock is on screen. Hidden, never unmounted. */
+  active?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<string[] | null>(null);
@@ -128,22 +131,24 @@ export function FileEditor({
   const dirty = selected !== null && text !== original;
 
   return (
-    <div className="mb-2 shrink-0 overflow-hidden rounded-2xl border border-line bg-card">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+    <div className={active ? "" : "hidden"}>
+      <div className="flex items-center gap-2 px-3 py-1.5">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="text-[11.5px] font-medium text-hi"
+          className="flex min-w-0 items-center gap-1.5 text-[11px] text-mid hover:text-hi"
         >
-          Files {files ? `· ${files.length}` : ""}
+          <span aria-hidden="true" className="text-low">
+            {open ? "▾" : "▸"}
+          </span>
+          <span className="truncate font-mono">
+            {selected ?? "workspace copy"}
+            {files ? ` · ${files.length} file${files.length === 1 ? "" : "s"}` : ""}
+          </span>
         </button>
 
-        <span className="text-[11px] text-mid">
-          {selected ?? "the sandbox's copy of this repository"}
-        </span>
-
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {open ? (
             <button
               type="button"
@@ -151,7 +156,7 @@ export function FileEditor({
                 setFiles(null);
               }}
               disabled={busy}
-              className="btn px-2.5 py-1 text-[11px]"
+              className="btn px-2 py-0.5 text-[10.5px]"
             >
               Refresh
             </button>
@@ -161,7 +166,7 @@ export function FileEditor({
             type="button"
             onClick={save}
             disabled={!dirty || saving}
-            className="btn px-2.5 py-1 text-[11px]"
+            className="btn px-2 py-0.5 text-[10.5px]"
           >
             {saving ? "Saving…" : "Save"}
           </button>

@@ -10,16 +10,18 @@ import {
   verifyEnvelope,
 } from "@/lib/agent/envelope";
 import { runAgent } from "@/lib/agent/run";
+import type { ToolContext } from "@/lib/agent/tools";
 import { createShellTurn } from "@/lib/agent/sandbox";
 import { CHAT_SHELL_BUDGET_MS } from "@/lib/agent/shell";
 import type { EditRequest } from "@/lib/changesets";
 import { readAutoApproval } from "@/lib/changesets/autoapproval";
 import {
   needsConfirmation,
+  withAutoWriteReview,
   withStandingApproval,
 } from "@/lib/changesets/confirmation";
 import { autoWriteEnabled } from "@/lib/github/autowrite";
-import { requestedBranch } from "@/lib/github/branch-request";
+import { requestedBranch, safeBranchName } from "@/lib/github/branch-request";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import {
   addEdits,
@@ -39,6 +41,7 @@ import {
 } from "@/lib/dew/store";
 import { executionConfigured, sandboxTurnsEnabled, serverEnv } from "@/lib/env";
 import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
+import { pullChatBranch, readGitStatus } from "@/lib/execution/sync/session";
 import {
   getFile,
   getRepo,
@@ -745,9 +748,15 @@ export async function POST(request: Request) {
       let changesetId: string | null = null;
       let changesetFiles = 0;
       let changesetSettled = false;
+      // The destination the model read out of the reader's own sentence. It is
+      // a decision, not a keyword: "get this live on the main site" and "push it
+      // to main" both land here, and the phrasing is the model's problem, not a
+      // regex's.
+      let askedDestination: string | null = null;
 
       const propose = async (
-        edits: EditRequest[]
+        edits: EditRequest[],
+        destination: string | null
       ): Promise<{ ok: true; text: string } | { ok: false; error: string }> => {
         if (!repoFullName || !sha || !githubToken) {
           return {
@@ -761,6 +770,14 @@ export async function POST(request: Request) {
             ok: false,
             error: "this deployment cannot sign a changeset without GITHUB_TOKEN_KEY",
           };
+        }
+
+        if (destination !== null) {
+          const safe = safeBranchName(destination);
+          if (safe === null) {
+            return { ok: false, error: `"${destination}" is not a branch name` };
+          }
+          askedDestination = safe;
         }
 
         if (!changesetId) {
@@ -851,9 +868,32 @@ export async function POST(request: Request) {
                   head = null;
                 }
 
+                // "Push it to main" is a destination, not a preference. The
+                // reader naming a branch is the permission to write it, so the
+                // auto-write goes where they asked instead of demoting it to a
+                // pull request on an agent branch.
+                //
+                // It is also the answer to the confirmation question: that gate
+                // exists for writes nobody asked about by name, and a reader who
+                // typed the branch has already made the decision. The write
+                // client stays bounded regardless — one commit, never forced,
+                // and a head that moved is re-applied rather than overwritten.
+                const askedBranch =
+                  askedDestination ?? requestedBranch(content, branch);
+
+                // An automatic write is the review. The old rule counted a fresh
+                // suggestion as "nobody has reviewed it" and asked every time,
+                // which is why the automatic path never actually ran.
+                const reviewed =
+                  facts === null
+                    ? null
+                    : autoWrite
+                      ? withAutoWriteReview(facts)
+                      : withStandingApproval(facts, remembered);
+
                 const mustAsk =
-                  facts === null ||
-                  needsConfirmation(withStandingApproval(facts, remembered), head);
+                  reviewed === null ||
+                  (askedBranch === null && needsConfirmation(reviewed, head));
 
                 if (mustAsk) {
                   send("notice", {
@@ -861,12 +901,6 @@ export async function POST(request: Request) {
                       "This change needs your go-ahead. Use the card to apply it, look it over first, or discard it.",
                   });
                 } else {
-                  // "Push it to main" is a destination, not a preference. The
-                  // reader naming a branch is the permission to write it, so the
-                  // auto-write goes where they asked instead of demoting it to a
-                  // pull request on an agent branch.
-                  const askedBranch = requestedBranch(content, branch);
-
                   const approved = await approveChangesetAndOpenPullRequest(
                     session.supabase,
                     {
@@ -905,6 +939,63 @@ export async function POST(request: Request) {
         }
       };
 
+      // Git, served by this request rather than by a terminal. The sandbox has
+      // no remote and no token; these two actions use the sealed token the turn
+      // already opened, so "look at the branch" and "follow it" need no second
+      // credential and no second path to GitHub.
+      const gitActions = ((): ToolContext["git"] => {
+        const token = githubToken;
+        const pinnedRepo = repoFullName;
+
+        if (!token || !pinnedRepo) return undefined;
+
+        const admin = supabaseAdmin();
+        if (!admin) return undefined;
+
+        return {
+          status: async () => {
+            const state = await readGitStatus({
+              admin,
+              supabase: session.supabase,
+              chatId,
+              token,
+            });
+
+            if (!state.ok) return { ok: false, error: state.message };
+
+            return {
+              ok: true,
+              text: [
+                `branch ${state.branch}`,
+                `head ${state.head.slice(0, 7)}`,
+                `pinned ${state.pinned.slice(0, 7)}${state.behind ? " (behind the head)" : " (at the head)"}`,
+                `${state.dirtyFiles} uncommitted file(s) in the workspace`,
+              ].join("\n"),
+            };
+          },
+
+          pull: async () => {
+            const pulled = await pullChatBranch({
+              admin,
+              supabase: session.supabase,
+              chatId,
+              token,
+              allowDuringTurn: true,
+            });
+
+            if (!pulled.ok) return { ok: false, error: pulled.message };
+
+            return {
+              ok: true,
+              text:
+                pulled.verdict === "up-to-date"
+                  ? `Already at ${pulled.head.slice(0, 7)}; nothing moved.`
+                  : `Pin moved to ${pulled.head.slice(0, 7)}. The workspace is reseeded on the next turn; GitHub is unchanged.`,
+            };
+          },
+        };
+      })();
+
       if (repoFullName && sha && githubToken) {
         // The sandbox is released before anything else runs, so a failure in
         // the answer path cannot leave a box billing behind the chat.
@@ -937,6 +1028,7 @@ export async function POST(request: Request) {
               emitReasoning: recordReasoning,
               emitStep: recordStep,
               propose,
+              git: gitActions,
               shell: shellTurn,
               deadlineMs: shellTurn ? CHAT_SHELL_BUDGET_MS : CONTINUE_AT_MS,
               signal: abort.signal,

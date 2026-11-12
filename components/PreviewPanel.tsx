@@ -37,9 +37,12 @@ const LABEL: Record<PreviewState, string> = {
 export function PreviewPanel({
   chatId,
   enabled,
+  active = true,
 }: {
   chatId: string;
   enabled: boolean;
+  /** False while another tab of the dock is on screen. Hidden, never unmounted. */
+  active?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
@@ -129,30 +132,31 @@ export function PreviewPanel({
           : "bg-line-strong";
 
   return (
-    <div className="mb-2 shrink-0 overflow-hidden rounded-2xl border border-line bg-card">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+    <div className={active ? "" : "hidden"}>
+      <div className="flex items-center gap-2 px-3 py-1.5">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="flex items-center gap-2 text-[11.5px] font-medium text-hi"
+          className="flex min-w-0 items-center gap-1.5 text-[11px] text-mid hover:text-hi"
         >
-          <span aria-hidden="true" className={`size-1.5 rounded-full ${dot}`} />
-          Preview
+          <span aria-hidden="true" className="text-low">
+            {open ? "▾" : "▸"}
+          </span>
+          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dot}`} />
+          <span className="truncate">
+            {LABEL[state]}
+            {status?.port ? ` · port ${status.port}` : ""}
+          </span>
         </button>
 
-        <span className="text-[11px] text-mid">
-          {LABEL[state]}
-          {status?.port ? ` · port ${status.port}` : ""}
-        </span>
-
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {url ? (
             <a
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="btn px-2.5 py-1 text-[11px]"
+              className="btn px-2 py-0.5 text-[10.5px]"
             >
               Open
             </a>
@@ -162,7 +166,7 @@ export function PreviewPanel({
             <button
               type="button"
               onClick={() => setReload((value) => value + 1)}
-              className="btn px-2.5 py-1 text-[11px]"
+              className="btn px-2 py-0.5 text-[10.5px]"
             >
               Reload
             </button>
@@ -173,7 +177,7 @@ export function PreviewPanel({
               type="button"
               onClick={() => act("stop")}
               disabled={busy}
-              className="btn px-2.5 py-1 text-[11px]"
+              className="btn px-2 py-0.5 text-[10.5px]"
             >
               Stop
             </button>
@@ -182,7 +186,7 @@ export function PreviewPanel({
               type="button"
               onClick={() => act("start")}
               disabled={busy}
-              className="btn px-2.5 py-1 text-[11px]"
+              className="btn px-2 py-0.5 text-[10.5px]"
             >
               Start preview
             </button>
