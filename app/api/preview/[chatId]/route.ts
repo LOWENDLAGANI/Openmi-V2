@@ -9,6 +9,7 @@ import {
 } from "@/lib/execution/preview/session";
 import { readChatPreview, touchChatPreview } from "@/lib/execution/preview/store";
 import { isSameOrigin } from "@/lib/http/origin";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -181,6 +182,25 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     return NextResponse.json({ state: "stopped" }, { headers: NO_STORE });
+  }
+
+  // A start leaves a dev server running and wakes the box; a stop stays
+  // unlimited so a reader who hit the cap can still shut one down.
+  const limited = await checkRateLimit(admin, "preview", session.user.id);
+
+  if (!limited.allowed) {
+    return NextResponse.json(
+      {
+        error: `Too many preview starts. Try again in ${limited.retryAfterSeconds} seconds.`,
+      },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE,
+          "retry-after": String(limited.retryAfterSeconds),
+        },
+      }
+    );
   }
 
   const started = await startChatPreview({

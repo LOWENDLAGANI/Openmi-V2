@@ -28,6 +28,12 @@ export const RATE_LIMITS = {
   oauth: { max: 10, windowMs: RATE_LIMIT_WINDOW_MS },
   // Search arrives as the reader types, so the ceiling is generous but finite.
   search: { max: 90, windowMs: RATE_LIMIT_WINDOW_MS },
+  // A preview start wakes a sandbox and leaves a dev server running, so a loop
+  // here is a loop of processes rather than of requests.
+  preview: { max: 12, windowMs: RATE_LIMIT_WINDOW_MS },
+  // A publish spends the operator's hosting token, not just a request: each one
+  // queues a real deployment against the reader's repository.
+  publish: { max: 6, windowMs: RATE_LIMIT_WINDOW_MS },
 } as const;
 
 export type RateLimitKind = keyof typeof RATE_LIMITS;

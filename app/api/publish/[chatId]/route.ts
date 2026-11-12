@@ -4,6 +4,7 @@ import { deploymentUrl, isPublishableSha, publishEnabled } from "@/lib/publish/p
 import { publishChat, refreshDeployment } from "@/lib/publish/session";
 import { readToken } from "@/lib/github/token";
 import { isSameOrigin } from "@/lib/http/origin";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -123,6 +124,25 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json(
       { error: "Supabase is not configured." },
       { status: 503, headers: NO_STORE }
+    );
+  }
+
+  // Each publish queues a deployment against a real provider account, so the
+  // ceiling is tighter than the one for chat.
+  const limited = await checkRateLimit(admin, "publish", session.user.id);
+
+  if (!limited.allowed) {
+    return NextResponse.json(
+      {
+        error: `Too many publishes. Try again in ${limited.retryAfterSeconds} seconds.`,
+      },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE,
+          "retry-after": String(limited.retryAfterSeconds),
+        },
+      }
     );
   }
 
