@@ -967,7 +967,7 @@ export function ChatPanel({
                       ? "Every message in this chat is covered for the hour."
                       : "The hour starts when the first message sends."
                   }
-                  className="hidden items-center gap-1.5 rounded-full border border-line bg-bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
+                  className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
                 >
                   <span
                     aria-hidden="true"

@@ -231,7 +231,7 @@ export function Sidebar({
   const initial = email.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <aside className="flex h-full min-h-0 flex-col bg-bg-raised md:border-r md:border-line">
+    <aside className="flex h-full min-h-0 flex-col bg-raised md:border-r md:border-line">
       {/* The reference opens the rail with the wordmark, not a search field:
           identity first, then the one action worth being large, then a strip of
           tools that are icons because every one of them is familiar. */}

@@ -47,14 +47,14 @@ export function AppShell({
             onClick={() => setOpen(false)}
             className="fade-in absolute inset-0 bg-black/45 backdrop-blur-[2px]"
           />
-          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-bg-raised shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
+          <div className="drawer-in absolute inset-y-0 left-0 w-[86%] max-w-[320px] overflow-y-auto bg-raised shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
             {sidebar}
           </div>
         </div>
       )}
 
       <main className="flex h-dvh min-w-0 flex-col md:h-full md:min-h-0">
-        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-xl md:px-7">
+        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 py-2.5 backdrop-blur-xl md:px-7">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
