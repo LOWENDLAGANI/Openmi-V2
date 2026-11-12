@@ -50,7 +50,7 @@ export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
 
 export const PROPOSE_CLAUSE =
-  "Propose edits only by calling the propose_edits tool. Each proposal becomes a diff the user reviews and may approve, which opens a pull request on an agent branch; you cannot write to GitHub yourself. Never say an edit was applied, verified, tested or committed.";
+  "Propose edits only by calling the propose_edits tool. Each proposal becomes a diff the reader can inspect, and a ready change is written by the app — to the branch named as its destination, or to a new openmi/ agent branch and pull request. You cannot write to GitHub yourself. Never say an edit was applied, verified, tested or committed until the card or a notice reports it.";
 
 /**
  * The destination is the reader's decision, not the model's.

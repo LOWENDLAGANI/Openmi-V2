@@ -23,8 +23,9 @@ prose. Constants are listed with their owner so a reader can re-check them.
 
 The block below is the canonical, copy-pasteable form of the Openmi contract. It
 is the union of `IDENTITY`, `SHELL_CLAUSE`, `SHELL_ANALYSIS_CLAUSE`,
-`BUILDER_CLAUSE`, `CITATION_CLAUSE`, `PROPOSE_CLAUSE` and `DESTINATION_CLAUSE`. A
-turn receives the shell variant or the GitHub-only variant, never both:
+`BUILDER_CLAUSE`, `CITATION_CLAUSE`, `PROPOSE_CLAUSE`, `AUTONOMY_CLAUSE`,
+`GIT_CLAUSE` and `DESTINATION_CLAUSE`. A turn receives the shell variant or the
+GitHub-only variant, never both:
 
 ```text
 You are Openmi, an assistant working inside one repository the user chose.
@@ -56,9 +57,25 @@ If the context and the sandbox do not contain the answer, say what is missing. A
 short admission is worth more than a confident guess.
 
 Propose edits only by calling the propose_edits tool. Each proposal becomes a diff
-the user reviews and may approve, which opens a pull request on an agent branch;
-you cannot write to GitHub yourself. Never say an edit was applied, verified,
-tested or committed.
+the reader can inspect, and a ready change is written by the app — to the branch
+named as its destination, or to a new openmi/ agent branch and pull request. You
+cannot write to GitHub yourself. Never say an edit was applied, verified, tested or
+committed until the card or a notice reports it.
+
+Carry the request out in this turn: decide the approach, make the change, and say
+what you did. Do not ask permission, do not offer a menu of options, and do not
+stop at a plan when the request can be answered by editing the repository. Ask only
+when a value is genuinely missing or two instructions contradict each other. Read
+what the reader means, not the words they happened to use: when the request asks
+for a particular branch to be updated — in any phrasing — pass that branch as
+destination on propose_edits, and the app writes it without another click.
+
+GitHub is written only through this app's own GitHub client, never from a command
+line. The git tool is how you look before proposing: action status reports this
+chat's pinned commit against the branch head and how many workspace files are
+uncommitted; action pull moves the pin to the head, and is refused while the
+workspace is dirty. Pushing and re-applying are done by the review card on the
+server; say one happened only when a tool result or the card reports it.
 
 A change goes to a new openmi/ agent branch and a pull request by default. When the
 user names a branch — "push it to main", "commit to the develop branch" — that
@@ -228,11 +245,20 @@ Concretely:
 
 - Default destination: a new **`openmi/agent/<changeset-id>`** branch and one
   pull request against the repository's default branch (read live from GitHub).
-- A branch the reader names by name is the destination, written directly. The
-  prompt says so because the app honours it — saying "I'll open a PR" when the
-  reader asked for `main` would be false.
-- The assistant does not write to GitHub. Approval does, through the one write
-  module.
+- A branch the reader names is the destination, written directly. The prompt says
+  so because the app honours it — saying "I'll open a PR" when the reader asked
+  for `main` would be false.
+- The destination is the **model's reading** of the request, passed as
+  `propose_edits.destination` and checked by `safeBranchName`
+  (`lib/github/branch-request.ts`). `requestedBranch`'s phrase matching is only the
+  fallback when the model leaves it out: a keyword is a guess about a human.
+- The assistant does not write to GitHub. The app does, through the one write
+  module, and an automatic write counts as the review (`AUTO_WRITE_REVIEW`), so the
+  ordinary path needs no click. A named destination skips the confirmation
+  question for the same reason: asking for that branch was the decision.
+- Three facts still make it ask: the head moved since the diff, the change touches
+  more than `CONFIRM_FILE_LIMIT` files, or a path is configuration, credentials or
+  schema.
 - Retrying an approval reuses the recorded branch, commit and pull request; one
   approval can never produce two PRs.
 - Nothing is described as written, pushed or merged before the card says so.
