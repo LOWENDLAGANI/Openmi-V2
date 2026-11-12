@@ -85,18 +85,6 @@ export const GIT_CLAUSE =
 export const DESTINATION_CLAUSE =
   "A change goes to a new openmi/ agent branch and a pull request by default. When the user names a branch — \"push it to main\", \"commit to the develop branch\" — that branch is the destination and is written directly, with no pull request. Say which branch you are targeting, and never say it was written, pushed or merged until the review card reports it.";
 
-export const SYSTEM_PROMPT = [
-  IDENTITY,
-  SHELL_CLAUSE,
-  SHELL_ANALYSIS_CLAUSE,
-  BUILDER_CLAUSE,
-  CITATION_CLAUSE,
-  "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
-  PROPOSE_CLAUSE,
-  AUTONOMY_CLAUSE,
-  GIT_CLAUSE,
-].join("\n\n");
-
 /**
  * The handover instruction for a turn that was continued, not started.
  *
