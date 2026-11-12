@@ -286,8 +286,11 @@ export default async function HomePage() {
             <Link href="/about" className="block text-mid hover:text-hi">
               About
             </Link>
-            <Link href="/activity" className="block text-mid hover:text-hi">
-              Activity
+            <Link href="/terms" className="block text-mid hover:text-hi">
+              Terms
+            </Link>
+            <Link href="/privacy" className="block text-mid hover:text-hi">
+              Privacy
             </Link>
           </nav>
 
@@ -308,7 +311,14 @@ export default async function HomePage() {
         <div className="border-t border-line">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-5 py-5 sm:px-8">
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-low">
-              © 2026 Openmi
+              © 2026 Openmi ·{" "}
+              <Link href="/terms" className="hover:text-hi">
+                Terms
+              </Link>{" "}
+              ·{" "}
+              <Link href="/privacy" className="hover:text-hi">
+                Privacy
+              </Link>
             </p>
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-low">
               built for GitHub

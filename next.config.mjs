@@ -9,6 +9,13 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  async redirects() {
+    return [
+      { source: "/terms-of-service", destination: "/terms", permanent: true },
+      { source: "/privacy-policy", destination: "/privacy", permanent: true },
+      { source: "/tos", destination: "/terms", permanent: true },
+    ];
+  },
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
