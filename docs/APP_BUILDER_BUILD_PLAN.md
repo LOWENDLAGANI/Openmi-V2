@@ -142,9 +142,31 @@ Nothing about editing changes.
   explicit `off` removes the surface (no panel, routes 404). Shipping it on is
   deliberate: a hidden preview cannot be reviewed. The kill switch is one
   variable, and turning execution off takes the preview with it.
-- Rollback: set `off`; running previews are stopped by the existing sweep, which
-  gains a "stop dev servers on idle" step.
+- Rollback: set `off`. A running preview is stopped by the lazy expiry on the
+  next status read (the 60-minute and 15-minute limits), and the daily sweep
+  still stops the box itself.
 - **Est:** S.
+
+### T1.7 Editor tab
+
+- **Files:** `lib/files/plan.ts`, `lib/files/session.ts`,
+  `app/api/files/[chatId]/route.ts`, `components/FileEditor.tsx`
+- A collapsed **Files** bar: the workspace listing, one file at a time, a
+  monospace textarea and Save. 200,000 bytes per file, 300 files listed, NUL
+  bytes refused as binary.
+- **Path rule is reused, not rewritten:** `editorPath` goes through the mission
+  tools' `sanitiseWorkspacePath`, so the editor cannot open what the agent's
+  tools refuse.
+- **Save semantics:** writes into the sandbox only, refused while a turn holds
+  the lease, captured as a version by the turn hook, and reachable by GitHub only
+  through a change request. The panel says all three.
+- **Deliberately plain:** no CodeMirror dependency in this slice. Highlighting is
+  a follow-up that costs a real bundle, and the loop works without it.
+- **Est:** S–M.
+- **Status:** shipped. `T1.8` (forwarding preview runtime errors into the
+  composer) stays blocked on the private-preview proxy: a cross-origin iframe
+  cannot be instrumented, and the public sandbox host is a different origin by
+  design.
 
 **Phase gate:** a chat starts `next dev`, the panel renders the app, a
 signed-out request to the preview is refused, `/activity` shows the preview

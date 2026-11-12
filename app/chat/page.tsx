@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
+import { FileEditor } from "@/components/FileEditor";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { VersionPanel } from "@/components/VersionPanel";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
@@ -35,6 +36,7 @@ import { oauthConfigured } from "@/lib/oauth/github";
 import { firstAvailableModel, hasModel } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
+import { filesEnabled } from "@/lib/files/plan";
 import { previewEnabled } from "@/lib/execution/preview/plan";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
@@ -489,6 +491,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             pane would have to compete with it on a phone. */}
         {repo ? (
           <>
+            <FileEditor chatId={chat.id} enabled={filesEnabled()} />
             <VersionPanel chatId={chat.id} enabled={checkpointsEnabled()} />
             <PreviewPanel chatId={chat.id} enabled={previewEnabled()} />
           </>
@@ -497,15 +500,15 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
         <div className="min-h-0 flex-1">
           <ChatPanel
             chatId={chat.id}
-          repo={repo}
-          models={models}
-          initialModel={
-            hasModel(models, chat.model) ? chat.model : firstAvailableModel(models)
-          }
-          initialMessages={messages}
-          validPaths={validPaths}
-          pinnedPath={null}
-          providerReady={providersConfigured()}
+            repo={repo}
+            models={models}
+            initialModel={
+              hasModel(models, chat.model) ? chat.model : firstAvailableModel(models)
+            }
+            initialMessages={messages}
+            validPaths={validPaths}
+            pinnedPath={null}
+            providerReady={providersConfigured()}
             initialRunning={Boolean(runningTurn.data)}
             dew={dew}
           />
