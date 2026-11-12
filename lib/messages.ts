@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/supabase/server";
+import type { AgentStep } from "@/lib/types";
 
 type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
 
@@ -13,6 +14,8 @@ export type MessageRow = {
   seq: number;
   usage_tokens: number | null;
   created_at: string;
+  thinking: string | null;
+  steps: AgentStep[] | null;
 };
 
 export const MAX_HISTORY_MESSAGES = 12;
@@ -30,7 +33,9 @@ export async function listMessages(
 ): Promise<MessageRow[]> {
   const { data, error } = await supabase
     .from("messages")
-    .select("id, chat_id, role, content, model, seq, usage_tokens, created_at")
+    .select(
+      "id, chat_id, role, content, model, seq, usage_tokens, created_at, thinking, steps"
+    )
     .eq("chat_id", chatId)
     .order("seq", { ascending: true });
 
@@ -55,7 +60,9 @@ export async function appendMessage(
   role: MessageRow["role"],
   content: string,
   model: string | null,
-  tokens: number | null = null
+  tokens: number | null = null,
+  thinking: string | null = null,
+  steps: AgentStep[] = []
 ): Promise<MessageRow | null> {
   const { data, error } = await supabase.rpc("append_message", {
     p_chat_id: chatId,
@@ -63,6 +70,8 @@ export async function appendMessage(
     p_content: content,
     p_model: model,
     p_tokens: tokens,
+    p_thinking: thinking,
+    p_steps: steps,
   });
 
   if (error) throw new Error(error.message);

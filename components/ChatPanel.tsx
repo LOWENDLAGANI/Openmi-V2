@@ -14,7 +14,7 @@ import { ModelMenu } from "@/components/ModelMenu";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
 import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
-import type { Message } from "@/lib/types";
+import type { AgentStep, Message } from "@/lib/types";
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
 
@@ -37,13 +37,7 @@ type UiMessage = {
  * and its output live behind the fold so the conversation still reads as a
  * conversation.
  */
-type StepLine = {
-  tool: string;
-  detail: string;
-  state: "start" | "done" | "error";
-  command?: string;
-  output?: string;
-};
+type StepLine = AgentStep;
 
 /** One screenshot, exactly as the sandbox returned it. */
 type Shot = {
@@ -90,6 +84,10 @@ export function ChatPanel({
       content: message.content,
       seq: Number(message.seq),
       model: message.model,
+      // The stored answer carries the work that produced it, so a reload keeps
+      // the console instead of showing a bare paragraph.
+      thinking: message.thinking ?? undefined,
+      steps: Array.isArray(message.steps) ? message.steps : undefined,
     }))
   );
   const [model, setModel] = useState<ModelId>(initialModel);

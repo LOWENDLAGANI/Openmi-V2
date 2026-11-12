@@ -534,6 +534,73 @@ export async function POST(request: Request) {
       let settled = false;
       let turnText = "";
 
+      // The work a turn did belongs to the transcript, not to the tab that
+      // watched it. These accumulators are what `persist` writes onto the
+      // assistant row, so a reload can rebuild the steps and the reasoning
+      // instead of showing a bare answer with no evidence behind it.
+      let reasoningLog = "";
+      const stepLog: {
+        tool: string;
+        detail: string;
+        state: "start" | "done" | "error";
+        command?: string;
+        output?: string;
+      }[] = [];
+
+      // Caps on the stored record, not on the stream: a step keeps the head of
+      // its output, and the oldest steps fall off a turn that runs long.
+      const MAX_PERSISTED_STEPS = 40;
+      const MAX_PERSISTED_STEP_OUTPUT = 4_000;
+
+      const recordReasoning = (text: string) => {
+        reasoningLog += text;
+        send("reasoning", { text });
+      };
+
+      const recordStep = (event: {
+        tool?: string;
+        detail?: string;
+        state?: string;
+        command?: string;
+        output?: string;
+      }) => {
+        const state: "start" | "done" | "error" =
+          event.state === "done" || event.state === "error" ? event.state : "start";
+        const step = {
+          tool: event.tool ?? "step",
+          detail: event.detail ?? "step",
+          state,
+          command: event.command,
+          output: event.output
+            ? event.output.slice(0, MAX_PERSISTED_STEP_OUTPUT)
+            : undefined,
+        };
+
+        // A started step is replaced by its completed row rather than kept as
+        // two entries: the record says what happened, not how many events the
+        // server happened to send.
+        if (state === "start") {
+          stepLog.push(step);
+        } else {
+          let index = -1;
+          for (let i = stepLog.length - 1; i >= 0; i -= 1) {
+            if (stepLog[i].state === "start" && stepLog[i].detail === step.detail) {
+              index = i;
+              break;
+            }
+          }
+
+          if (index >= 0) stepLog[index] = step;
+          else stepLog.push(step);
+        }
+
+        if (stepLog.length > MAX_PERSISTED_STEPS) {
+          stepLog.splice(0, stepLog.length - MAX_PERSISTED_STEPS);
+        }
+
+        send("step", event);
+      };
+
       const send = (event: string, data: unknown) => {
         if (closed) return;
         try {
@@ -637,7 +704,9 @@ export async function POST(request: Request) {
           "assistant",
           text,
           model,
-          Math.ceil(text.length / 4)
+          Math.ceil(text.length / 4),
+          reasoningLog.trim().length > 0 ? reasoningLog.trim() : null,
+          stepLog
         );
 
       // A refund is only due for an hour charged by this request that produced
@@ -865,8 +934,8 @@ export async function POST(request: Request) {
                 return Number(row.steps);
               },
               emitText: (text) => send("delta", { text }),
-              emitReasoning: (text) => send("reasoning", { text }),
-              emitStep: (event) => send("step", event),
+              emitReasoning: recordReasoning,
+              emitStep: recordStep,
               propose,
               shell: shellTurn,
               deadlineMs: shellTurn ? CHAT_SHELL_BUDGET_MS : CONTINUE_AT_MS,
@@ -1049,7 +1118,7 @@ export async function POST(request: Request) {
                 apiKeys: providerKeys(provider),
                 messages: next,
                 signal,
-                onReasoning: (text) => send("reasoning", { text }),
+                onReasoning: recordReasoning,
               }),
           }));
 
@@ -1077,7 +1146,7 @@ export async function POST(request: Request) {
                 apiKeys: providerKeys(provider),
                 messages: plainMessages,
                 signal: abort.signal,
-                onReasoning: (text) => send("reasoning", { text }),
+                onReasoning: recordReasoning,
               })) {
                 produced += delta;
                 send("delta", { text: delta });
