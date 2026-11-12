@@ -103,7 +103,10 @@ export default function PrivacyPage() {
           the repositories you connect, to charge and account for Dew, to run
           sandbox verification when you ask for it, to send operational email
           such as receipt notifications, to enforce rate limits and abuse rules,
-          and to diagnose faults. We do not sell your personal data.
+          and to diagnose faults. We do not sell your personal data. Model
+          providers receive only the prompts and code needed to answer; we do not
+          train our own models on your data, and providers' own retention and
+          training practices are governed by their terms.
         </p>
       </section>
 
@@ -178,8 +181,9 @@ export default function PrivacyPage() {
           The session lives in an httpOnly cookie set by Supabase SSR, which is
           what lets the server redirect a signed-out visitor before paint. Your
           theme choice is stored in localStorage. Advertising partners may set
-          their own cookies. You can clear these in your browser at any time,
-          which signs you out.
+          their own cookies only after you accept the cookie banner; you can
+          decline them there, and you can change your choice by clearing site
+          data in your browser. Clearing cookies signs you out.
         </p>
       </section>
 
