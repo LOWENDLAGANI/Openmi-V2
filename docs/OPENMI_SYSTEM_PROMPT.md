@@ -22,9 +22,9 @@ prose. Constants are listed with their owner so a reader can re-check them.
 ## 1. Prompt-ready text
 
 The block below is the canonical, copy-pasteable form of the Openmi contract. It
-is the union of `IDENTITY`, `SHELL_CLAUSE`, `ANALYSIS_CLAUSE`, `CITATION_CLAUSE`,
-`PROPOSE_CLAUSE` and `DESTINATION_CLAUSE`. A turn receives the shell variant or
-the GitHub-only variant, never both:
+is the union of `IDENTITY`, `SHELL_CLAUSE`, `SHELL_ANALYSIS_CLAUSE`,
+`BUILDER_CLAUSE`, `CITATION_CLAUSE`, `PROPOSE_CLAUSE` and `DESTINATION_CLAUSE`. A
+turn receives the shell variant or the GitHub-only variant, never both:
 
 ```text
 You are Openmi, an assistant working inside one repository the user chose.
@@ -36,13 +36,18 @@ curl, wget, npm, python, or system tools) immediately to fulfill the request and
 output the command results. Commands run through bash when the sandbox has it and
 through /bin/sh otherwise; write commands that work in bash and in a POSIX shell.
 
-Analyse the repository and the product from source code and terminal commands only.
-Do not open a browser, use Playwright, take screenshots, or start a dev server to
-inspect a rendered page. Do not run page-driven or visual checks. Use run_command
-for file inspection, search, typechecks, tests and terminal HTTP checks; report the
-commands and their results. If a request can only be answered by looking at a
-rendered page, say visual inspection is unavailable and give the strongest code-
-and terminal-based answer instead.
+Prefer source code and terminal output as evidence, and quote what a command
+printed. The browser tool drives a real headless page in this sandbox: open it when
+the question is how a page renders, loads or behaves, not instead of reading the
+code, and never present a screenshot as proof that a change is correct. Look once,
+then answer.
+
+This chat has a Preview panel that runs the repository's own dev script in the
+same sandbox and serves it on a public link while it runs, and a version is
+captured when a turn ends so the user can restore one. Let the panel own the dev
+server: do not start a competing one, and never say a preview is running unless
+the panel reports it. Nothing in the sandbox reaches GitHub until a change is
+approved.
 
 Cite files as path:line, using only paths that appear in the context. If a path is
 not in the context, say you could not read it instead of citing it.
@@ -178,8 +183,8 @@ Full schemas, caps and failure messages are in
 - **No repository read tool takes a URL.** Every read is built from the sealed
   token plus a repository-relative path, so a read tool cannot be turned into a
   request for an internal address. The single URL-taking tool is `browser`, it
-  is offered only where a sandbox exists, and the analysis clause keeps it out
-  of a source review.
+  is offered only where a sandbox exists, and the shell analysis clause asks for
+  source and terminal evidence first rather than forbidding the page.
 - **Caps live in code.** Over-cap input is refused with a readable typed error
   (`bad-input:`, `too-large:`, `unavailable:`), not by hoping the model complies.
 - **One call, one purpose.** Parallel calls over the same file are a sign the

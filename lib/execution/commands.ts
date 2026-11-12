@@ -62,15 +62,28 @@ export const EXEC_FREE_TIER_TIMEOUT_SECONDS = 3_600;
  * What an install is allowed to reach, sent as E2B's `allowOut`.
  *
  * Entries are CIDR blocks, bare IPs or hostnames; `"*"` is E2B's catch-all
- * wildcard, matching the HTTP Host header on port 80 and TLS SNI on 443. A
- * domain or wildcard allow list only boots when `denyOut` also names the whole
- * IPv4 space (`0.0.0.0/0`), and `allowOut` wins over `denyOut`, so the pair
- * means "any outbound host" — which is what an install needs.
+ * wildcard, matching the HTTP Host header on port 80 and TLS SNI on 443. That is
+ * a *domain filter*, not "all traffic": ports other than 80/443, bare IP
+ * addresses and untagged TLS are refused unless a CIDR allows them. Omitting
+ * `network` is full egress, so a catch-all is expressed by sending nothing — see
+ * `sendsEgressPolicy`.
  *
  * `"ALL_TRAFFIC"` is the SDK's constant for `0.0.0.0/0`, not a value the API
  * accepts as an entry: sending that string is a 400 at sandbox creation.
  */
 export const EXEC_ALLOWED_DOMAINS: readonly string[] = ["*"];
+
+/**
+ * Whether an allowlist is narrow enough to be worth sending.
+ *
+ * A catch-all sent to the provider would quietly mean less than it says: named
+ * hosts on 443 and 80 work, and a Postgres port, an SSH port or
+ * `https://1.1.1.1` do not. "Any host" is the absence of a policy, so the
+ * wildcard is dropped here rather than forwarded.
+ */
+export function sendsEgressPolicy(domains: readonly string[]): boolean {
+  return !domains.includes("*");
+}
 
 export type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 

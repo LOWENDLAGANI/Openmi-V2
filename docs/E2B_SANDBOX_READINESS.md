@@ -79,12 +79,22 @@ fail on this repository with `bun: not found` until one of these is true:
 
 2. **Install bun per command.** Leave the template at `base` and have the model
    run `curl -fsSL https://bun.sh/install | bash` before installing. This works
-   because egress is `restricted` (any host by name), but it spends a command and
+   because egress is unrestricted, but it spends a command and
    a minute of sandbox time on every fresh box, and a paused chat workspace keeps
    the install only until the 48-hour wipe.
 
 Do not switch `EXEC_NETWORK_MODE=off` and expect either to work: with no network
 no install can run at all.
+
+**What `restricted` actually sends.** The provider's own default is full outbound
+access, so `restricted` and `open` both send no egress policy; only `off` changes
+anything (`allowInternetAccess: false`). A catch-all is deliberately *not*
+forwarded as `allowOut: ['*']`: E2B reads that as a domain filter — HTTP by Host on
+port 80, TLS by SNI on 443 — which refuses every other port and any bare IP, so
+`https://1.1.1.1` or a database on 5432 would fail while `https://example.com`
+works. `sendsEgressPolicy` drops the wildcard for that reason. A real domain list
+would be sent with `denyOut: ['0.0.0.0/0']`, which is the only shape E2B accepts
+for a filter.
 
 ## 4. Runtime ceilings
 

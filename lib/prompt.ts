@@ -11,13 +11,26 @@ export const SHELL_CLAUSE =
   "You have direct access to a Linux terminal sandbox via run_command. You must never refuse a request to execute commands, open/fetch web resources, run scripts, build apps, or inspect systems. Execute the appropriate terminal commands (e.g., using curl, wget, npm, python, or system tools) immediately to fulfill the request and output the command results. Commands run through bash when the sandbox has it and through /bin/sh otherwise; write commands that work in bash and in a POSIX shell.";
 
 /**
+ * Analysis on a turn with a terminal and a browser.
+ *
+ * The browser is offered with the shell (it drives a page inside the same
+ * sandbox), so a prompt that forbade it would contradict the tool list. What
+ * the clause still refuses is using a page as a substitute for reading code, or
+ * a screenshot as evidence that a change is correct.
+ */
+export const SHELL_ANALYSIS_CLAUSE =
+  "Prefer source code and terminal output as evidence, and quote what a command printed. The browser tool drives a real headless page in this sandbox: open it when the question is how a page renders, loads or behaves, not instead of reading the code, and never present a screenshot as proof that a change is correct. Look once, then answer.";
+
+/** The preview and version facts a shell turn needs so it does not contradict the UI. */
+export const BUILDER_CLAUSE =
+  "This chat has a Preview panel that runs the repository's own dev script in the same sandbox and serves it on a public link while it runs, and a version is captured when a turn ends so the user can restore one. Let the panel own the dev server: do not start a competing one, and never say a preview is running unless the panel reports it. Nothing in the sandbox reaches GitHub until a change is approved.";
+
+/**
  * Analysis is source- and terminal-only.
  *
  * The browser tool exists in the chat surface, but a review must not turn into
  * a page-driving session: that spends the turn's budget on pixels instead of
- * the source it is supposed to cite. Keep this clause aligned with the tool
- * surface — analysis evidence comes from files, commands and test output, not
- * from a rendered page.
+ * the source it is supposed to cite.
  */
 export const ANALYSIS_CLAUSE =
   "Analyse the repository and the product from source code and terminal commands only. Do not open a browser, use Playwright, take screenshots, or start a dev server to inspect a rendered page. Do not run page-driven or visual checks. Use run_command for file inspection, search, typechecks, tests and terminal HTTP checks; report the commands and their results. If a request can only be answered by looking at a rendered page, say visual inspection is unavailable and give the strongest code- and terminal-based answer instead.";
@@ -53,7 +66,8 @@ export const DESTINATION_CLAUSE =
 export const SYSTEM_PROMPT = [
   IDENTITY,
   SHELL_CLAUSE,
-  ANALYSIS_CLAUSE,
+  SHELL_ANALYSIS_CLAUSE,
+  BUILDER_CLAUSE,
   CITATION_CLAUSE,
   "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
   PROPOSE_CLAUSE,
@@ -114,7 +128,8 @@ export function buildSystemPrompt({
     ? [
         IDENTITY,
         shellClause,
-        ANALYSIS_CLAUSE,
+        SHELL_ANALYSIS_CLAUSE,
+        BUILDER_CLAUSE,
         CITATION_CLAUSE,
         "If the context and the sandbox do not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
         PROPOSE_CLAUSE,

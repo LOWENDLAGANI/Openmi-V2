@@ -18,6 +18,7 @@ import {
   EXEC_MAX_TIMEOUT_SECONDS,
   EXEC_STEP_TIMEOUT_MS,
   EXEC_WORKDIR,
+  sendsEgressPolicy,
   tailOf,
 } from "./commands";
 import { EXEC_MAX_MINUTES } from "./cost";
@@ -61,11 +62,12 @@ export function executionTemplate(): string {
 /**
  * E2B sandbox egress.
  *
- * `restricted` is the default because an install is the whole point of a run.
- * The current provider SDK requires the restrict+deny pairing below, so
- * `restricted` sends an allowAllOut policy rather than the old hostname allowlist.
- * `off` takes the sandbox off the network entirely, and `open` leaves the
- * provider's defaults in place.
+ * `restricted` is the default because an install is the whole point of a run,
+ * and an install reaches HTTPS anywhere, but also an SSH remote or a database
+ * port. Its shipped allowlist is the catch-all, which the provider expresses by
+ * sending no filter at all; a real host list would be sent with
+ * `denyOut: 0.0.0.0/0` because that is the only shape E2B accepts for a filter.
+ * `off` takes the sandbox off the network entirely, and `open` sends nothing.
  */
 export function executionNetworkMode(): "off" | "restricted" | "open" {
   const configured = (process.env.EXEC_NETWORK_MODE ?? "").trim().toLowerCase();
@@ -82,14 +84,32 @@ type RestrictedNetwork = {
   };
 };
 
+/**
+ * Full egress, public port, no filter.
+ *
+ * `allowPublicTraffic` has to be stated even here: E2B defaults new projects to
+ * private sandbox traffic, and a preview is served from the sandbox's own host,
+ * where an iframe cannot attach the private-traffic header. Omitting `allowOut`
+ * leaves egress at the provider default, which is every destination.
+ */
+type OpenNetwork = { network: { allowPublicTraffic: boolean } };
+
 function networkOption():
   | RestrictedNetwork
+  | OpenNetwork
   | { allowInternetAccess: false }
   | Record<string, never> {
   const mode = executionNetworkMode();
 
   if (mode === "off") return { allowInternetAccess: false };
   if (mode === "restricted") {
+    // A catch-all allowlist means "everything", and the provider already
+    // expresses that by sending nothing. Sending the wildcard pair instead
+    // would quietly narrow it to named HTTP/HTTPS hosts.
+    if (!sendsEgressPolicy(EXEC_ALLOWED_DOMAINS)) {
+      return { network: { allowPublicTraffic: true } };
+    }
+
     const allow: string[] = [...EXEC_ALLOWED_DOMAINS];
     // The CIDR itself, not the SDK's `ALL_TRAFFIC` name: a deny list takes
     // CIDRs and bare IPs only, and the literal name is rejected with a 400.

@@ -6,6 +6,7 @@ import {
   EXEC_MAX_OUTPUT_BYTES,
   EXEC_STEPS,
   detectCommands,
+  sendsEgressPolicy,
   tailOf,
 } from "../lib/execution/commands";
 import {
@@ -148,6 +149,26 @@ test("a terminal run with nothing charged does not read as still pending", () =>
     row({ status: "running", stage: "provision", charged_dew: 0 })
   );
   expect(running.charge).toContain("nothing charged yet");
+});
+
+test("a catch-all allowlist is dropped, because the wildcard is a domain filter", () => {
+  // E2B's `allowOut: ['*']` matches Host on 80 and SNI on 443 only: a database
+  // on 5432, an SSH port or `https://1.1.1.1` are refused. Full egress is the
+  // absence of a policy, so the wildcard must never be sent as one.
+  expect(EXEC_ALLOWED_DOMAINS).toEqual(["*"]);
+  expect(sendsEgressPolicy(EXEC_ALLOWED_DOMAINS)).toBe(false);
+  expect(sendsEgressPolicy(["example.com", "*.example.com"])).toBe(true);
+
+  const provider = readFileSync(
+    new URL("../lib/execution/provider.ts", import.meta.url),
+    "utf8"
+  );
+  expect(provider).toContain(
+    "if (!sendsEgressPolicy(EXEC_ALLOWED_DOMAINS))"
+  );
+  // Full egress must still state public traffic: E2B defaults new projects to
+  // private, and a preview iframe cannot send the private-traffic header.
+  expect(provider).toContain("return { network: { allowPublicTraffic: true } };");
 });
 
 test("egress uses the provider's wildcard pair, never the literal ALL_TRAFFIC", () => {

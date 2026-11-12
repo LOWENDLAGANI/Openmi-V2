@@ -7,6 +7,8 @@ import {
 } from "../lib/context";
 import {
   ANALYSIS_CLAUSE,
+  BUILDER_CLAUSE,
+  SHELL_ANALYSIS_CLAUSE,
   SHELL_CLAUSE,
   buildSystemPrompt,
 } from "../lib/prompt";
@@ -118,7 +120,7 @@ test("the default prompt still proposes shell execution when shell is unset", ()
   expect(prompt).toContain("output the command results");
 });
 
-test("analysis is code- and terminal-only, with no browser path", () => {
+test("a shell turn is told the browser exists, a GitHub-only turn is not", () => {
   const base = {
     repo: "octocat/hello",
     sha: "abc1234",
@@ -128,14 +130,40 @@ test("analysis is code- and terminal-only, with no browser path", () => {
   const shell = buildSystemPrompt({ ...base, shell: true });
   const noShell = buildSystemPrompt({ ...base, shell: false });
 
-  expect(shell).toContain(ANALYSIS_CLAUSE);
-  expect(shell).toContain("Do not open a browser");
-  expect(shell).not.toContain("headless Chromium with Playwright is available");
+  // The shell surface registers `browser`, so the prompt may not forbid it.
+  expect(shell).toContain(SHELL_ANALYSIS_CLAUSE);
+  expect(shell).not.toContain(ANALYSIS_CLAUSE);
+  expect(shell).not.toContain("Do not open a browser");
+  expect(shell).toContain("browser tool");
 
-  // GitHub-only means no terminal, so it is not given terminal advice either.
+  // GitHub-only means no terminal and no browser, so it gets neither clause.
+  expect(noShell).not.toContain(SHELL_ANALYSIS_CLAUSE);
   expect(noShell).not.toContain(ANALYSIS_CLAUSE);
-  expect(noShell).not.toContain("Do not open a browser");
-  expect(noShell).not.toContain("headless Chromium with Playwright is available");
+  expect(noShell).not.toContain("browser tool");
+});
+
+test("a shell turn knows the preview panel and versions exist", () => {
+  const shell = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+  });
+  const noShell = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+    shell: false,
+  });
+
+  expect(shell).toContain(BUILDER_CLAUSE);
+  expect(shell).toContain("Preview panel");
+  expect(shell).toContain("nothing in the sandbox reaches GitHub".replace("nothing", "Nothing"));
+
+  // A GitHub-only turn has neither a preview nor a workspace to snapshot.
+  expect(noShell).not.toContain(BUILDER_CLAUSE);
+  expect(noShell).not.toContain("Preview panel");
 });
 
 test("the system prompt still refuses to pretend when no repository is attached", () => {
