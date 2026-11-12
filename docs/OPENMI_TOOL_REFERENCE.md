@@ -313,6 +313,36 @@ The spec is `BROWSER_TOOL_SPEC`, offered only in a turn that has a sandbox.
   argv or in an error message. Cookies live in `/tmp/openmi-browser` inside the
   chat's box, outside the repository, and die with the container.
 
+### `fetch_url`
+
+Read one public web page over https as quotable text. The spec is
+`FETCH_URL_TOOL_SPEC`, offered with the browser on the sandbox surface.
+
+| Argument | Type | Required | Notes |
+|---|---|---|---|
+| `url` | string | yes | https only, no credentials in the address, no local or private host, ≤2,000 characters. |
+| `purpose` | string | no | One readable line for the step row. |
+
+- **Returns** the final URL, HTTP status, `<title>` and the page text, cut at
+  `FETCH_MAX_TEXT_CHARS = 8_000`.
+- **Caps** `FETCH_MAX_BYTES = 200_000` read, `FETCH_MAX_REDIRECTS = 3`,
+  `FETCH_TIMEOUT_MS = 12_000`.
+- **Refuses** `http`, `file:`, `javascript:`, a URL carrying a username or
+  password, and any host that is loopback, private, link-local, CGNAT,
+  documentation, multicast or reserved space — `127.0.0.0/8`, `10/8`,
+  `172.16/12`, `192.168/16`, `169.254/16`, `100.64/10`, `::1`, `fc00::/7`,
+  `fe80::/10`, v4-mapped forms of all of them, and hostnames ending `.local`,
+  `.internal` or `.localhost`. A hostname that *resolves* to one of those is
+  refused too, which is the DNS-rebinding case.
+- **Redirects are followed by hand**, so each hop is re-checked. `redirect:
+  "follow"` would walk a public address straight to `169.254.169.254`.
+- **Non-text** responses are refused rather than decoded.
+- **Availability** the sandbox surface only, beside `browser`. The chat-only
+  surface still has no tool that takes a URL, which is what keeps "every read is
+  built from the token plus a repository path" true.
+- **It is not a search engine.** It reads one page it was given; there is no
+  query tool, and a model must supply the address.
+
 ---
 
 ## 4. Editing rules that are enforced, not advised
@@ -356,7 +386,7 @@ a product change, not a schema tweak.
 | `TodoWrite` | none | absent — plans are prose and step rows |
 | `Task` (subagents) | none | absent — one turn, one context |
 | `Glob`, `Grep` | `list_files`, `search_code` | merged into two tools |
-| `WebFetch`, `WebSearch` | no chat tool takes a URL | absent on the chat surface |
+| `WebFetch`, `WebSearch` | `fetch_url` (one https page, no search) | present on the sandbox surface only |
 | `NotebookEdit` | none | absent — no notebooks |
 | `ExitPlanMode` | mission autonomy `plan` / `act` / `ship` | replaced |
 | `SlashCommand`, skills | none | absent — no command surface |

@@ -80,7 +80,18 @@ export const AUTONOMY_CLAUSE =
   "Carry the request out in this turn: decide the approach, make the change, and say what you did. Do not ask permission, do not offer a menu of options, and do not stop at a plan when the request can be answered by editing the repository. Ask only when a value is genuinely missing or two instructions contradict each other. Read what the reader means, not the words they happened to use: when the request asks for a particular branch to be updated — in any phrasing — pass that branch as destination on propose_edits, and the app writes it without another click.";
 
 export const GIT_CLAUSE =
-  "GitHub is written only through this app's own GitHub client, never from a command line. The git tool is how you look before proposing: action status reports this chat's pinned commit against the branch head and how many workspace files are uncommitted; action pull moves the pin to the head, and is refused while the workspace is dirty. Pushing and re-applying are done by the review card on the server; say one happened only when a tool result or the card reports it.";
+  "GitHub is written only through this app's own GitHub client, never from a command line. The git tool is how you look before proposing: action status reports this chat's pinned commit against the branch head and how many workspace files are uncommitted; action pull moves the pin to the head, and is refused while the workspace is dirty. Pushing and re-applying are done by the review card on the server; say one happened only when a tool result or the card reports it. The workspace is a git checkout of the pinned commit on an openmi/work branch, with origin set to the repository's public address and no credential: git log and git diff work, and a push from inside the box is refused, because GitHub writes go through the card.";
+
+/**
+ * Read your own work back before calling it done.
+ *
+ * The failure this exists for is not laziness, it is plausibility: a file that
+ * looks right in the diff and does not compile, an import that points at a
+ * symbol the same turn renamed, a caller left expecting the old shape. A turn
+ * that only writes is not finished; a turn that reads what it wrote is.
+ */
+export const REVIEW_CLAUSE =
+  "Before you finish, read back every file you changed and check it: imports resolve, braces and types match, the change does what was asked, and no other file still expects the old shape. Run the repository's check or build command when it has one, and re-read a file after you fix it. Say which files you re-read and what you found; if you could not verify something, say that instead of implying you did.";
 
 export const DESTINATION_CLAUSE =
   "A change goes to a new openmi/ agent branch and a pull request by default. When the user names a branch — \"push it to main\", \"commit to the develop branch\" — that branch is the destination and is written directly, with no pull request. Say which branch you are targeting, and never say it was written, pushed or merged until the review card reports it.";
@@ -147,6 +158,7 @@ export function buildSystemPrompt({
         PROPOSE_CLAUSE,
         AUTONOMY_CLAUSE,
         GIT_CLAUSE,
+        REVIEW_CLAUSE,
         DESTINATION_CLAUSE,
       ]
     : [
@@ -157,6 +169,7 @@ export function buildSystemPrompt({
         PROPOSE_CLAUSE,
         AUTONOMY_CLAUSE,
         GIT_CLAUSE,
+        REVIEW_CLAUSE,
         DESTINATION_CLAUSE,
       ];
 

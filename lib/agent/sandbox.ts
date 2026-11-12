@@ -37,6 +37,7 @@ import {
   validateBrowserTarget,
   type BrowserAction,
 } from "./browser";
+import { FETCH_URL_TOOL_SPEC, fetchUrl } from "./research";
 import {
   CHAT_SHELL_COMMAND_MS,
   CHAT_SHELL_LIST_MAX,
@@ -168,8 +169,13 @@ function specs(): MissionToolDefinition[] {
 
   // The browser is a chat tool, not a mission tool: a mission answers a goal in
   // the workspace it was given, while a page is a question about something
-  // outside it.
-  return [...base, BROWSER_TOOL_SPEC as unknown as MissionToolDefinition];
+  // outside it. `fetch_url` is the cheaper half of the same idea — one page of
+  // text instead of a page driven by script.
+  return [
+    ...base,
+    FETCH_URL_TOOL_SPEC as unknown as MissionToolDefinition,
+    BROWSER_TOOL_SPEC as unknown as MissionToolDefinition,
+  ];
 }
 
 function failure(message: string): { ok: false; error: string } {
@@ -454,6 +460,13 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
       return failure(
         "The sandbox time budget for this message is spent. Answer with what you already have, and say that the work stopped there."
       );
+    }
+
+    // A page is read here, not in the box: no workspace is needed to fetch text,
+    // so a research-only turn never provisions one, and the address is checked
+    // against the SSRF rules in this process rather than by a shell.
+    if (name === "fetch_url") {
+      return fetchUrl(args);
     }
 
     const ready = await ensure();

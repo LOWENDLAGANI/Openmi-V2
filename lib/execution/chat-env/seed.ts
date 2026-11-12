@@ -8,9 +8,12 @@ import type { SandboxHandle } from "@/lib/execution/provider";
 /**
  * Puts a repository into a chat's box, once.
  *
- * The same shape a verification run uses — one tarball at the pinned commit,
- * no remote, no credential, a single `base` commit on a `openmi/work/` branch —
- * with one addition: a marker outside the workspace. The database records that a
+ * The same shape a verification run uses — one tarball at the pinned commit, a
+ * single `base` commit on a `openmi/work/` branch — plus a real `origin` and a
+ * marker outside the workspace. The remote is the repository's public address
+ * and carries no credential: `git log`, `git diff` and `git fetch` of a public
+ * repository work like a clone, while a push is refused on purpose. Every write
+ * to GitHub happens in the app, with the sealed token, through the review card. The database records that a
  * row is seeded; the marker lets a resume ask the disk whether it agrees. A box
  * whose marker is gone is reseeded rather than trusted.
  */
@@ -64,6 +67,24 @@ export async function seedChatWorkspace(input: {
 
   const branch = workBranchName(input.chatId);
 
+  // Validated before it reaches a shell string. A repository name that is not
+  // `owner/name` gets no remote rather than a shell metacharacter.
+  const origin = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(input.repo)
+    ? `https://github.com/${input.repo}.git`
+    : null;
+
+  // No credential helper, no askpass, and `push.default nothing`: a command that
+  // tries to reach GitHub fails immediately and says why, instead of hanging on
+  // a prompt nobody will answer.
+  const remoteSetup = origin
+    ? [
+        `git remote add origin ${origin}`,
+        "git config --local push.default nothing",
+        'git config --local credential.helper ""',
+        'git config --local core.askPass ""',
+      ]
+    : [];
+
   const extracted = await input.sandbox.exec(
     [
       "tar xzf src.tgz",
@@ -78,6 +99,7 @@ export async function seedChatWorkspace(input: {
       // The copy is a clone on its own branch, so an edit here is a change on a
       // branch rather than a change on a detached copy of the default branch.
       `git branch -m ${branch}`,
+      ...remoteSetup,
     ].join(" && "),
     MISSION_WORKDIR,
     120_000

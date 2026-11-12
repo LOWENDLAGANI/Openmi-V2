@@ -23,6 +23,9 @@ export const CHAT_SHELL_TOOL_NAMES = [
   "start_process",
   "read_process",
   "kill_process",
+  // Reading one public page is research, not a command: it is answered by the
+  // server with its own SSRF checks, and needs no workspace to exist.
+  "fetch_url",
   // The headless browser is part of the same box, so it is part of the same
   // surface: a question about a page is answered by looking at the page.
   "browser",
@@ -89,6 +92,13 @@ export function describeShellCall(
     return path.length > 0
       ? `${name === "read_file" ? "Read" : "Write"} ${path}`
       : name;
+  }
+
+  if (name === "fetch_url") {
+    const purpose = typeof args.purpose === "string" ? args.purpose.trim() : "";
+    if (purpose.length > 0) return purpose;
+    const url = typeof args.url === "string" ? args.url : "";
+    return url.length > 0 ? `fetch ${url}` : "fetch a page";
   }
 
   if (name === "list_files") {

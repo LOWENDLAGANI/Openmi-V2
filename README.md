@@ -130,6 +130,12 @@ Every write to GitHub stays server-side: the review card commits to an
 `openmi/agent/` branch and opens the pull request with the sealed token, and a
 branch that moved is re-applied on the live head rather than force-pushed.
 
+With the sandbox on, the surface also carries the shell tools, `browser`, and
+`fetch_url` — one public https page as text (200KB read, 12s, three redirects,
+private and metadata addresses refused). That last one lives on the sandbox
+surface on purpose: the chat-only surface stays free of any tool that takes an
+address.
+
 The turn stops at one of three caps, and the transcript says which:
 
 | Cap | Value |
@@ -396,6 +402,11 @@ records the exit code, the duration and the output tail.
 - The sandbox holds no tokens, no provider keys and no push credential. It
   cannot write to GitHub. Approval is still the only write path, and the derived
   destination is still an `openmi/agent/` branch.
+- The checkout is a real clone: `origin` is the repository's public URL with
+  every credential helper and askpass disabled, and `push.default=nothing`. So
+  `git log`, `git diff` and a public `git fetch` behave normally, a push to a
+  private repository fails immediately instead of waiting on a prompt nobody can
+  answer, and nothing in the box can authenticate to GitHub.
 - Egress goes through E2B's `network` option: `EXEC_NETWORK_MODE=restricted`
   (the default) sends `allowOut: ['*']` with `denyOut: ['0.0.0.0/0']`, the
   provider's catch-all pair from `lib/execution/commands.ts`. A domain or
