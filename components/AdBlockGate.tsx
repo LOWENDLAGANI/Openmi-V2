@@ -11,11 +11,12 @@ import {
   AD_PROBE_CONTROL_URL,
   AD_PROBE_SIZE,
   AD_PROBE_TIMEOUT_MS,
-  AD_PROBE_URL,
+  AD_PROBE_URLS,
   adBlockVerdict,
   decideAdGate,
   isProbeHidden,
   type AdEvidence,
+  type AdVerdict,
   type ProbeAnswer,
 } from "@/lib/adblock";
 import { adConfig } from "@/lib/ads";
@@ -36,49 +37,77 @@ import {
  * either way. The count, not a boolean, is returned because one hidden div is
  * not a filter list.
  */
-async function probeCosmetic(): Promise<number> {
-  if (typeof document === "undefined" || !document.body) return 0;
+async function probeCosmetic(): Promise<{
+  hiddenBaits: number;
+  canaryHidden: boolean;
+}> {
+  if (typeof document === "undefined" || !document.body) {
+    return { hiddenBaits: 0, canaryHidden: false };
+  }
 
   const stage = document.createElement("div");
   stage.setAttribute("aria-hidden", "true");
   stage.style.cssText =
     "position:fixed;top:0;left:-10000px;width:1px;height:1px;overflow:hidden;pointer-events:none";
 
+  const sized = () => {
+    const element = document.createElement("div");
+    element.style.width = `${AD_PROBE_SIZE.width}px`;
+    element.style.height = `${AD_PROBE_SIZE.height}px`;
+    stage.appendChild(element);
+    return element;
+  };
+
+  // A neutral box in the same stage, with no ad class. If it disappears too,
+  // whatever hid the baits was not an ad filter: a global "hide offscreen
+  // elements" rule, an extension tidying the DOM, or the stage itself being
+  // collapsed. That reading is thrown away rather than counted as evidence.
+  const canary = sized();
+
   const baits = AD_PROBE_CLASSES.map((name) => {
-    const bait = document.createElement("div");
+    const bait = sized();
     bait.className = `${name} ads ad-slot`;
-    bait.style.width = `${AD_PROBE_SIZE.width}px`;
-    bait.style.height = `${AD_PROBE_SIZE.height}px`;
-    stage.appendChild(bait);
     return bait;
   });
 
   document.body.appendChild(stage);
 
-  // A hidden tab never paints, so its frames never arrive; the timer is the
-  // floor that keeps a probe from hanging forever.
-  await Promise.race([
-    new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-    ),
-    new Promise<void>((resolve) => window.setTimeout(resolve, 300)),
-  ]);
-
-  const hidden = baits.filter((bait) => {
-    const box = bait.getBoundingClientRect();
-    const style = window.getComputedStyle(bait);
+  const isHidden = (element: HTMLElement) => {
+    const box = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    const detached = element.getClientRects().length === 0;
 
     return isProbeHidden({
-      width: box.width,
-      height: box.height,
+      width: detached ? 0 : box.width,
+      height: detached ? 0 : box.height,
       display: style.display,
       visibility: style.visibility,
       opacity: style.opacity,
     });
-  }).length;
+  };
 
-  stage.remove();
-  return hidden;
+  try {
+    // A hidden tab never paints, so its frames never arrive; the timer is the
+    // floor that keeps a probe from hanging forever.
+    await Promise.race([
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      ),
+      new Promise<void>((resolve) => window.setTimeout(resolve, 300)),
+    ]);
+
+    if (isHidden(canary)) return { hiddenBaits: 0, canaryHidden: true };
+
+    return {
+      hiddenBaits: baits.filter(isHidden).length,
+      canaryHidden: false,
+    };
+  } catch {
+    // A probe that cannot run is not a finding.
+    return { hiddenBaits: 0, canaryHidden: true };
+  } finally {
+    stage.remove();
+  }
 }
 
 /**
@@ -122,16 +151,30 @@ async function probeUrl(url: string): Promise<ProbeAnswer> {
  */
 async function collectEvidence(): Promise<AdEvidence> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return { hiddenBaits: 0, ad: "timeout", control: "timeout" };
+    return {
+      hiddenBaits: 0,
+      canaryHidden: false,
+      refusedAdRequests: 0,
+      adRequests: 0,
+      control: "timeout",
+    };
   }
 
-  const [hiddenBaits, ad, control] = await Promise.all([
+  const [cosmetic, adAnswers, control] = await Promise.all([
     probeCosmetic(),
-    probeUrl(AD_PROBE_URL),
+    Promise.all(AD_PROBE_URLS.map((url) => probeUrl(url))),
     probeUrl(AD_PROBE_CONTROL_URL),
   ]);
 
-  return { hiddenBaits, ad, control };
+  return {
+    hiddenBaits: cosmetic.hiddenBaits,
+    canaryHidden: cosmetic.canaryHidden,
+    // A timeout means the browser gave up, not that a filter refused; it is
+    // not counted as a refusal in either direction.
+    refusedAdRequests: adAnswers.filter((answer) => answer === "failed").length,
+    adRequests: adAnswers.length,
+    control,
+  };
 }
 
 /**
@@ -157,7 +200,7 @@ export function AdBlockGate() {
   );
 
   const [consent, setConsent] = useState<ConsentChoice | null>(null);
-  const [detected, setDetected] = useState(false);
+  const [verdict, setVerdict] = useState<AdVerdict>("clear");
   const [confirmations, setConfirmations] = useState(0);
   const [checking, setChecking] = useState(false);
   const [host, setHost] = useState("");
@@ -199,18 +242,30 @@ export function AdBlockGate() {
         return;
       }
 
-      const verdict = adBlockVerdict(await collectEvidence());
+      let next: AdVerdict;
+      try {
+        next = adBlockVerdict(await collectEvidence());
+      } catch {
+        // A probe that could not run is not a finding; try again on the slow
+        // beat instead of leaving the loop dead.
+        schedule(AD_GATE_RECHECK_MS);
+        return;
+      }
+
       if (!alive) return;
 
-      streak = verdict === "clear" ? 0 : streak + 1;
-      setDetected(streak > 0);
+      // Only a cosmetic finding counts toward the wall. A suspicious reading
+      // keeps its own streak at zero, so repeating a refused request can never
+      // add up to one.
+      streak = next === "blocked" ? streak + 1 : 0;
+      setVerdict(next);
       setConfirmations(streak);
 
-      // A sighting is confirmed on the fast beat, because the reader is about
-      // to be interrupted; a clear page is re-checked slowly, because nothing
-      // is waiting on it.
+      // A finding is confirmed on the fast beat, because the reader is about to
+      // be interrupted; a clear page is re-checked slowly, because nothing is
+      // waiting on it.
       schedule(
-        verdict === "clear" ? AD_GATE_RECHECK_MS : AD_GATE_CONFIRM_MS
+        next === "clear" ? AD_GATE_RECHECK_MS : AD_GATE_CONFIRM_MS
       );
     };
 
@@ -225,7 +280,7 @@ export function AdBlockGate() {
   const decision = decideAdGate({
     adsConfigured: adsActive,
     pathname,
-    detected,
+    verdict,
     confirmations,
   });
 
@@ -246,17 +301,20 @@ export function AdBlockGate() {
   async function checkAgain() {
     setChecking(true);
     try {
-      const verdict = adBlockVerdict(await collectEvidence());
+      const next = adBlockVerdict(await collectEvidence());
+      setVerdict(next);
 
-      if (verdict === "clear") {
-        setDetected(false);
-        setConfirmations(0);
-      } else {
-        // The wall is already up: a re-check that still sees the same thing
-        // holds it there instead of flashing the page for one frame.
-        setDetected(true);
+      if (next === "blocked") {
+        // The wall is already up: the reader asked for this check, so a
+        // confirmed finding holds it instead of flashing the page.
         setConfirmations(AD_GATE_CONFIRMATIONS);
+      } else {
+        // Suspicious and clear both drop the wall: a refused request is not
+        // something the reader can fix by arguing with their browser.
+        setConfirmations(0);
       }
+    } catch {
+      // The probe did not run; the wall stays where it was.
     } finally {
       setChecking(false);
     }

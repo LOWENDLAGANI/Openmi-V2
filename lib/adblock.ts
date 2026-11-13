@@ -5,7 +5,7 @@
  * them is a browser the product cannot afford to serve. Detection happens in
  * the browser — nothing about a visitor is sent anywhere to decide this.
  *
- * Three rules keep the gate honest:
+ * Four rules keep the gate honest:
  *
  * 1. It never engages unless at least one Adsterra key is configured. With no
  *    keys there are no ads to protect, so a dev checkout, a CI run or a fresh
@@ -13,10 +13,14 @@
  * 2. The setup and admin surfaces stay open to operators. Locking the person
  *    who configures the deployment out of the configuration page would turn a
  *    revenue guard into a support incident.
- * 3. No single failed probe is proof. A request can be refused by a captive
- *    portal, a corporate proxy, a DNS filter or a tab that just woke up, and a
- *    page that accuses a normal browser of blocking ads is worse than one that
- *    misses an occasional blocker: the reader has no way to argue with a wall.
+ * 3. A wall needs evidence that something hid an element locally. A refused
+ *    request, however often it repeats, is a network fact: a corporate proxy, a
+ *    DNS filter, a school laptop, a captive portal and an ad-blocking DNS all
+ *    refuse ad hosts while serving this page perfectly well. Repeating one kind
+ *    of evidence does not make it a second kind, so network-only readings stay
+ *    "suspicious" and never become a wall.
+ * 4. No single probe is proof. Two bait boxes have to disappear, or one bait
+ *    plus both ad hosts refusing, before the page accuses the browser.
  *
  * Everything here is pure so the policy can be tested without a DOM.
  */
@@ -31,12 +35,22 @@ export const AD_PROBE_CLASSES = [
   "banner-ad",
 ] as const;
 
-/** A request no ad blocker lets through; the response is opaque and never used. */
-export const AD_PROBE_URL =
-  "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js";
+/**
+ * The hosts the probes ask for, one provider per entry.
+ *
+ * The first is the banner provider this app actually loads from, so a filter
+ * that blocks our revenue is observed directly. The second is a widely targeted
+ * ad host, which catches lists that special-case Google. They are two
+ * independent readings: a single host being unreachable — DNS filtering one
+ * name, a provider outage — is not a pattern.
+ */
+export const AD_PROBE_URLS = [
+  "https://www.highperformanceformat.com/",
+  "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
+] as const;
 
 /**
- * A same-origin request made beside the ad probe.
+ * A same-origin request made beside the ad probes.
  *
  * The control is what separates "a filter refused this one host" from "this
  * browser could not reach anything". Both failing is a network problem, and a
@@ -59,7 +73,13 @@ export const AD_PROBE_TIMEOUT_MS = 2_000;
  */
 export const AD_PROBE_MIN_HIDDEN_BAITS = 2;
 
-/** How often the gate re-checks while the tab is open. */
+/**
+ * How many independent ad hosts must refuse before a single hidden bait is
+ * treated as corroboration rather than coincidence.
+ */
+export const AD_PROBE_MIN_REFUSED_HOSTS = 2;
+
+/** How often the gate re-checks while the tab is open and the page is clear. */
 export const AD_GATE_RECHECK_MS = 5_000;
 
 /** The gap between a first sighting and the check that confirms it. */
@@ -96,18 +116,27 @@ export function isExemptPath(pathname: string): boolean {
 export function decideAdGate(input: {
   adsConfigured: boolean;
   pathname: string;
-  detected: boolean;
   /**
-   * How many consecutive checks reached the same conclusion.
-   *
-   * A single sighting is not enough by default: the caller passes its streak,
-   * and the wall only appears once that streak reaches AD_GATE_CONFIRMATIONS.
+   * What the probes last concluded. Only "blocked" — a local, cosmetic finding
+   * — can become a wall; "suspicious" never does, no matter how many checks
+   * agree with it.
+   */
+  verdict: AdVerdict;
+  /**
+   * How many consecutive checks reached "blocked". The wall appears once that
+   * streak reaches AD_GATE_CONFIRMATIONS, so one frame of layout the filter
+   * list has not reached yet cannot freeze the page.
    */
   confirmations?: number;
 }): AdGateDecision {
   if (!input.adsConfigured) return { block: false, reason: "ads-off" };
   if (isExemptPath(input.pathname)) return { block: false, reason: "exempt" };
-  if (!input.detected) return { block: false, reason: "clear" };
+
+  if (input.verdict === "suspicious") {
+    return { block: false, reason: "unconfirmed" };
+  }
+
+  if (input.verdict !== "blocked") return { block: false, reason: "clear" };
 
   const confirmations = input.confirmations ?? AD_GATE_CONFIRMATIONS;
   if (confirmations < AD_GATE_CONFIRMATIONS) {
@@ -143,9 +172,18 @@ export function isProbeHidden(box: ProbeBox): boolean {
 export type ProbeAnswer = "ok" | "failed" | "timeout";
 
 export type AdEvidence = {
-  /** How many of AD_PROBE_CLASSES a filter hid. */
+  /** How many of AD_PROBE_CLASSES a filter hid. Zero when the canary hid too. */
   hiddenBaits: number;
-  ad: ProbeAnswer;
+  /**
+   * Whether the neutral box beside the baits was hidden as well. When it was,
+   * the hiding was not ad-specific — a global rule, an extension tidying the
+   * DOM, or the probe stage itself collapsing — and the reading proves nothing.
+   */
+  canaryHidden: boolean;
+  /** Ad hosts that refused the request outright. A timeout is not a refusal. */
+  refusedAdRequests: number;
+  /** How many ad hosts were probed. */
+  adRequests: number;
   control: ProbeAnswer;
 };
 
@@ -155,23 +193,36 @@ export type AdVerdict = "clear" | "suspicious" | "blocked";
 /**
  * Reads the evidence without over-claiming.
  *
- * - Both requests failing is the network, not a filter, so it is clear. An
- *   offline browser, a captive portal and a proxy all land here.
+ * - Both the page's own request and the probes failing is the network, not a
+ *   filter, so it is clear. An offline browser, a captive portal and a proxy
+ *   all land here.
+ * - A hidden canary means the baits' disappearance is not about ads, so it is
+ *   clear whatever else was observed.
  * - Two hidden baits are a cosmetic filter on their own, whatever the network
  *   was doing at the time: the hiding happened locally and needs no request.
- * - A slow ad request is a slow ad request. A timeout that the browser aborted
- *   is not a refusal, so it is clear too.
- * - One hidden bait plus a refused ad request is two independent signals, and
- *   the two together are enough.
- * - A refused ad request on its own is "suspicious" and only becomes a wall
- *   after the caller has seen it confirmed.
+ * - One hidden bait plus both ad hosts refusing is two independent signals,
+ *   and the two together are enough.
+ * - A refused request without a local signal stays "suspicious" for good. The
+ *   gate cannot tell a blocker from a filtered network, and a reader has no way
+ *   to argue with a wall.
+ * - A slow ad request is a slow ad request. A timeout the browser aborted is
+ *   not a refusal, so it is not counted either way.
  */
 export function adBlockVerdict(evidence: AdEvidence): AdVerdict {
   if (evidence.control !== "ok") return "clear";
+  if (evidence.canaryHidden) return "clear";
+
   if (evidence.hiddenBaits >= AD_PROBE_MIN_HIDDEN_BAITS) return "blocked";
-  if (evidence.ad === "timeout") return "clear";
-  if (evidence.hiddenBaits >= 1 && evidence.ad === "failed") return "blocked";
-  if (evidence.ad === "failed") return "suspicious";
+
+  if (
+    evidence.hiddenBaits >= 1 &&
+    evidence.refusedAdRequests >= AD_PROBE_MIN_REFUSED_HOSTS
+  ) {
+    return "blocked";
+  }
+
+  if (evidence.refusedAdRequests > 0) return "suspicious";
+  if (evidence.hiddenBaits >= 1) return "suspicious";
 
   return "clear";
 }
