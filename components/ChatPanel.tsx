@@ -13,8 +13,12 @@ import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
+import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
 import type { AgentStep, Message } from "@/lib/types";
+
+/** How close to the server's cap the counter appears, so it is not noise. */
+const MESSAGE_WARN_CHARS = Math.floor(MAX_MESSAGE_CHARS * 0.9);
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
 
@@ -231,6 +235,20 @@ export function ChatPanel({
           prompt: "How do I attach a GitHub repository to this chat?",
         },
       ];
+
+  /**
+   * Back to the live end of the transcript.
+   *
+   * The panel only follows the end while the reader is already at it, which is
+   * right — reading one line of a streaming answer should not be a tug of war.
+   * The cost is that scrolling up once leaves the answer running off-screen, so
+   * the pill above the transcript is the way back.
+   */
+  function jumpToLatest() {
+    const element = scrollRef.current;
+    if (element) scrollToBottom(element, true);
+    setAtBottom(true);
+  }
 
   async function copy(id: string, text: string) {
     try {
@@ -737,7 +755,7 @@ export function ChatPanel({
             element.scrollHeight - element.scrollTop - element.clientHeight;
           setAtBottom(distance < 72);
         }}
-        className="min-h-0 flex-1 overflow-y-auto py-2"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain py-2"
       >
         {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
           <div
@@ -783,9 +801,9 @@ export function ChatPanel({
               message.role === "user" ? (
                 <EnteringArticle
                   key={message.id}
-                  className="flex flex-col items-end gap-1"
+                  className="flex min-w-0 flex-col items-end gap-1"
                 >
-                  <div className="msg-user-bubble max-w-[88%] whitespace-pre-wrap">
+                  <div className="msg-user-bubble max-w-[88%] min-w-0 whitespace-pre-wrap break-words">
                     {message.content}
                   </div>
                   <button
@@ -797,7 +815,7 @@ export function ChatPanel({
                   </button>
                 </EnteringArticle>
               ) : (
-                <EnteringArticle key={message.id} className="group max-w-[94%]">
+                <EnteringArticle key={message.id} className="group min-w-0 max-w-[94%]">
                   <div className="flex items-center justify-between gap-2 pb-1">
                     <span className={`model-badge ${badgeFor(message.model)}`}>
                       {modelLabel(message.model)}
@@ -834,7 +852,7 @@ export function ChatPanel({
               thinking.length > 0 ||
               shots.length > 0 ||
               backgroundRunning) && (
-              <article className="max-w-[94%]" aria-live="polite">
+              <article className="min-w-0 max-w-[94%]" aria-live="polite">
 
                 {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
@@ -862,8 +880,23 @@ export function ChatPanel({
                     chatId={activeChatId ?? ""}
                   />
                 )}
+                {streaming && pending.length > 0 && (
+                  <span aria-hidden="true" className="stream-caret" />
+                )}
               </article>
             )}
+          </div>
+        )}
+
+        {!atBottom && (
+          <div className="pointer-events-none sticky bottom-0 z-10 flex justify-center pb-1">
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              className="pointer-events-auto rounded-full border border-line-strong bg-card px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-mid shadow-[0_8px_20px_rgba(0,0,0,0.22)] hover:text-hi"
+            >
+              {streaming ? "new output ↓" : "jump to end ↓"}
+            </button>
           </div>
         )}
       </div>
@@ -871,7 +904,10 @@ export function ChatPanel({
       {notices.length > 0 && (
         <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2">
           {notices.map((notice, index) => (
-            <li key={`${notice}-${index}`} className="text-[10.5px] leading-relaxed text-mid">
+            <li
+              key={`${notice}-${index}`}
+              className="break-words text-[10.5px] leading-relaxed text-mid"
+            >
               {notice}
             </li>
           ))}
@@ -883,7 +919,7 @@ export function ChatPanel({
           role="alert"
           className="mb-2 space-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] text-warn"
         >
-          <p className="leading-relaxed">{conflict.message}</p>
+          <p className="break-words leading-relaxed">{conflict.message}</p>
           <div className="flex flex-wrap items-center gap-2">
             {conflict.chatId && (
               <a
@@ -917,7 +953,7 @@ export function ChatPanel({
           role="alert"
           className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
         >
-          <span className="min-w-0">{error}</span>
+          <span className="min-w-0 break-words">{error}</span>
           {lastSent.length > 0 && (
             <PendingButton
               onAction={retry}
@@ -1050,6 +1086,19 @@ export function ChatPanel({
                   </button>
                 </div>
               </div>
+
+            {/* The send button refuses an over-cap message, so the count appears
+                before the press instead of as an error after it. */}
+            {draft.length > MESSAGE_WARN_CHARS && (
+              <p
+                className={`mt-1 px-2 text-right font-mono text-[10px] ${
+                  draft.length > MAX_MESSAGE_CHARS ? "text-danger" : "text-low"
+                }`}
+              >
+                {draft.length.toLocaleString()} /{" "}
+                {MAX_MESSAGE_CHARS.toLocaleString()} characters
+              </p>
+            )}
           </form>
         </div>
       </div>
@@ -1097,7 +1146,7 @@ function ThinkingBlock({ text, live = false }: { text: string; live?: boolean })
       <summary className="cursor-pointer font-mono text-[9.5px] uppercase tracking-[0.1em] text-low">
         {live ? "thinking…" : "reasoning"}
       </summary>
-      <p className="mt-1.5 whitespace-pre-wrap text-[11.5px] leading-relaxed text-mid">
+      <p className="mt-1.5 whitespace-pre-wrap break-words text-[11.5px] leading-relaxed text-mid [overflow-wrap:anywhere]">
         {text}
       </p>
     </details>

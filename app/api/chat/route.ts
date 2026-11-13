@@ -30,6 +30,8 @@ import {
   findDraftChangeset,
   loadConfirmationFacts,
 } from "@/lib/changesets/store";
+// Shared with the composer, so the warning and the refusal name one number.
+import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { assembleContext } from "@/lib/context";
 import { formatDew } from "@/lib/dew";
 import { refundReasonFor } from "@/lib/dew/refund";
@@ -83,8 +85,6 @@ export const dynamic = "force-dynamic";
  * any command, and the model call around them inside one invocation.
  */
 export const maxDuration = 300;
-
-const MAX_MESSAGE_CHARS = 20_000;
 
 type ChatRequest = {
   chatId?: unknown;

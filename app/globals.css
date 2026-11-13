@@ -415,11 +415,20 @@ html.ink {
   /* ── Chat surfaces ────────────────────────────────────────────────────── */
 
   .msg-ai-card {
+    min-width: 0;
     border: 1px solid var(--card-border);
     border-radius: 16px;
     background-color: var(--card);
     padding: 0.875rem;
     box-shadow: var(--card-shadow);
+  }
+
+  /* An answer is arbitrary text: a pasted stack trace, a base64 blob or a URL
+     with no spaces in it. Without a break opportunity the longest token decides
+     the width of the card, and the whole column bends around it. */
+  .prose-chat {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .prose-chat h1 {
@@ -452,6 +461,7 @@ html.ink {
   }
 
   .msg-user-bubble {
+    min-width: 0;
     border-radius: 20px;
     border-bottom-right-radius: 8px;
     background-color: var(--bubble-user);
@@ -459,6 +469,35 @@ html.ink {
     padding: 0.625rem 1rem;
     font-size: 14px;
     line-height: 1.6;
+    /* A long prompt is the common case, not the edge case: someone pastes a log
+       or a minified file, and an unbroken token used to run straight out of the
+       bubble instead of wrapping inside it. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* A streaming answer is visibly still being written. The caret is decoration,
+     so the reduced-motion rule above freezes it rather than hiding it. */
+  .stream-caret {
+    display: inline-block;
+    width: 0.45rem;
+    height: 1.02em;
+    margin-left: 0.15rem;
+    vertical-align: text-bottom;
+    border-radius: 1px;
+    background-color: var(--accent);
+    animation: stream-caret-blink 1.05s steps(2, start) infinite;
+  }
+
+  @keyframes stream-caret-blink {
+    0%,
+    55% {
+      opacity: 1;
+    }
+    56%,
+    100% {
+      opacity: 0.1;
+    }
   }
 
   .thread-tool {

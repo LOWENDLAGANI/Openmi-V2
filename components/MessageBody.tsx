@@ -79,7 +79,7 @@ function Citations({
           <a
             key={index}
             href={`/chat?${params.toString()}`}
-            className="rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[12px] text-accent-text no-underline transition-colors hover:bg-accent/20"
+            className="rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[12px] text-accent-text no-underline transition-colors [overflow-wrap:anywhere] hover:bg-accent/20"
             title={`Open ${segment.path} at line ${segment.line}`}
           >
             {segment.text}
@@ -124,7 +124,7 @@ function InlineRun({
             return (
               <code
                 key={index}
-                className="rounded-md border border-line/70 bg-raised px-1.5 py-0.5 font-mono text-[12.5px] text-hi"
+                className="rounded-md border border-line/70 bg-raised px-1.5 py-0.5 font-mono text-[12.5px] text-hi [overflow-wrap:anywhere]"
               >
                 {token.text}
               </code>
@@ -183,7 +183,7 @@ function CodeBlock({ lang, text }: { lang: string; text: string }) {
           {copied ? "copied" : "copy"}
         </button>
       </div>
-      <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[12px] leading-[1.65] text-body">
+      <pre className="max-w-full overflow-x-auto px-3 py-2.5 font-mono text-[12px] leading-[1.65] text-body">
         <code>{text}</code>
       </pre>
     </div>
