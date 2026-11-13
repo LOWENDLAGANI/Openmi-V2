@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SUPPORT_EMAIL, supportMailto } from "@/lib/support";
 
 export const metadata = {
   title: "Privacy Policy — Openmi",
@@ -217,9 +218,15 @@ export default function PrivacyPage() {
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           You may access, correct or delete your data, and you may disconnect
-          GitHub or close your account at any time by contacting support. Where
-          local law grants rights such as access, portability, objection or
-          erasure, you may exercise them through the same channel. We will
+          GitHub or close your account at any time by writing to{" "}
+          <a
+            href={supportMailto("Privacy request")}
+            className="text-accent-text underline-offset-2 hover:underline"
+          >
+            {SUPPORT_EMAIL}
+          </a>
+          . Where local law grants rights such as access, portability, objection
+          or erasure, you may exercise them through the same channel. We will
           respond within a reasonable time.
         </p>
       </section>
@@ -263,10 +270,10 @@ export default function PrivacyPage() {
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Privacy questions and requests:{" "}
           <a
-            href="mailto:support@openmi.space"
+            href={supportMailto("Privacy question")}
             className="text-accent-text underline-offset-2 hover:underline"
           >
-            support@openmi.space
+            {SUPPORT_EMAIL}
           </a>
           .
         </p>

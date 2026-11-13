@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SUPPORT_EMAIL, supportMailto } from "@/lib/support";
 
 export const metadata = {
   title: "Terms of Service — Openmi",
@@ -205,10 +206,17 @@ export default function TermsPage() {
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           You may stop using the service and delete your account at any time by
-          contacting support. We may suspend or terminate access for breach of
-          these terms, for non-payment of accrued charges, or to protect the
-          service or other users. Sections that by their nature should survive
-          termination do survive.
+          writing to{" "}
+          <a
+            href={supportMailto("Close my account")}
+            className="text-accent-text underline-offset-2 hover:underline"
+          >
+            {SUPPORT_EMAIL}
+          </a>
+          . We may suspend or terminate access for breach of these terms, for
+          non-payment of accrued charges, or to protect the service or other
+          users. Sections that by their nature should survive termination do
+          survive.
         </p>
       </section>
 
@@ -241,10 +249,10 @@ export default function TermsPage() {
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           Questions about these terms:{" "}
           <a
-            href="mailto:support@openmi.space"
+            href={supportMailto("Terms question")}
             className="text-accent-text underline-offset-2 hover:underline"
           >
-            support@openmi.space
+            {SUPPORT_EMAIL}
           </a>
           .
         </p>
