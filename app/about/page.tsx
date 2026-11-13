@@ -137,17 +137,18 @@ export default function AboutPage() {
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           One hour of chat costs {DEW_PER_HOUR} Dew, charged once before the
           provider call. More turns inside the hour are free. The daily allowance
-          is {DAILY_FREE_DEW} Dew, or {PAID_DAILY_FREE_DEW} once a top-up has been
-          redeemed; the first message grants a {TRIAL_DEW} Dew trial credit, once
-          per address per day. The
-          balance turns amber below {LOW_BALANCE_DEW} Dew. An invite rewards both
-          sides {INVITE_REWARD_DEW} Dew, up to {MAX_INVITES_PER_ACCOUNT} rewarded
+          is {DAILY_FREE_DEW} Dew, or {PAID_DAILY_FREE_DEW} while a paid plan is
+          active. A {TRIAL_DEW} Dew trial credit is granted once per account, with
+          at most one trial per address in any 24-hour period. The balance turns
+          amber below {LOW_BALANCE_DEW} Dew. An invite rewards both sides{" "}
+          {INVITE_REWARD_DEW} Dew, up to {MAX_INVITES_PER_ACCOUNT} rewarded
           accounts per inviter.
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          A refund is recorded when a provider fails or a turn is stopped before
-          the first token. An hour that produced part of an answer is not
-          refunded. Everything is an append-only ledger row on{" "}
+          A refund is recorded when the provider fails — including after it has
+          streamed part of an answer — or when a turn is stopped before the first
+          token. Stopping once text has arrived is not refunded, because the turn
+          is kept and can be continued. Everything is an append-only ledger row on{" "}
           <Link href="/activity" className="text-accent-text underline-offset-2 hover:underline">
             the activity page
           </Link>

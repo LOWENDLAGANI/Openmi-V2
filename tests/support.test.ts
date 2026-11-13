@@ -32,11 +32,21 @@ test("a mailto link carries the address and encodes its subject", () => {
 });
 
 test("the legal pages use the constant rather than their own copy", () => {
+  // Both documents render through one shell, and the shell owns the address.
+  const shell = readFileSync(
+    new URL("../components/LegalPage.tsx", import.meta.url),
+    "utf8"
+  );
+
+  expect(shell).toContain('from "@/lib/support"');
+  expect(shell).toContain("{SUPPORT_EMAIL}");
+  expect(shell).not.toContain("support@openmi.space");
+
   for (const page of ["../app/privacy/page.tsx", "../app/terms/page.tsx"]) {
     const source = readFileSync(new URL(page, import.meta.url), "utf8");
 
-    expect(source).toContain('from "@/lib/support"');
-    expect(source).toContain("{SUPPORT_EMAIL}");
+    expect(source).toContain('from "@/components/LegalPage"');
+    expect(source).toContain("<LegalPage");
     // A literal address in a page is how the two copies drift apart.
     expect(source).not.toContain("support@openmi.space");
   }

@@ -1,8 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AD_SLOTS, adConfig, type AdSlotId } from "@/lib/ads";
+import {
+  adsAllowed,
+  CONSENT_EVENT,
+  readConsent,
+  type ConsentChoice,
+} from "@/lib/consent";
 
 /**
  * One reserved banner slot.
@@ -14,6 +20,10 @@ import { AD_SLOTS, adConfig, type AdSlotId } from "@/lib/ads";
  *
  * The ad runs in an iframe: Adsterra's loader uses `document.write`, and
  * letting it write into this document would risk replacing the page.
+ *
+ * The frame is not created until the reader accepts advertising in the cookie
+ * banner. Declining therefore makes no request to an ad host at all, which is
+ * what the banner and the privacy policy promise.
  */
 export function AdSlot({
   slot,
@@ -24,6 +34,22 @@ export function AdSlot({
 }) {
   const spec = AD_SLOTS[slot];
   const config = useMemo(() => adConfig(slot), [slot]);
+  const [consent, setConsent] = useState<ConsentChoice | null>(null);
+
+  useEffect(() => {
+    const sync = () => setConsent(readConsent());
+    sync();
+    window.addEventListener(CONSENT_EVENT, sync);
+    // Another tab may have answered the banner; storage is the shared record.
+    window.addEventListener("storage", sync);
+
+    return () => {
+      window.removeEventListener(CONSENT_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const mayLoad = adsAllowed(consent);
 
   const markup = config
     ? `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}iframe{display:block;border:0}</style></head><body><script type="text/javascript">atOptions = ${JSON.stringify(
@@ -46,7 +72,7 @@ export function AdSlot({
     >
       <span className="eyebrow">advertisement</span>
 
-      {config ? (
+      {config && mayLoad ? (
         <iframe
           title={`Advertisement — ${spec.label}`}
           srcDoc={markup}

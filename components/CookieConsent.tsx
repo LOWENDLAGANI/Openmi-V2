@@ -4,28 +4,19 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
-const STORAGE_KEY = "openmi-cookie-consent";
+import { readConsent, writeConsent, type ConsentChoice } from "@/lib/consent";
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    try {
-      if (!window.localStorage.getItem(STORAGE_KEY)) setVisible(true);
-    } catch {
-      // Storage may be unavailable (private mode); show the banner anyway.
-      setVisible(true);
-    }
+    if (readConsent() === null) setVisible(true);
   }, []);
 
   if (!visible) return null;
 
-  const decide = (value: "accepted" | "declined") => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } catch {
-      // Ignore: the banner simply reappears next visit.
-    }
+  const decide = (value: ConsentChoice) => {
+    writeConsent(value);
     setVisible(false);
   };
 
@@ -38,16 +29,17 @@ export function CookieConsent() {
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[12.5px] leading-relaxed text-mid">
-          Openmi uses an essential session cookie to keep you signed in. If
-          advertising is enabled, optional advertising cookies may also be set.
-          See the{" "}
+          Openmi uses an essential session cookie to keep you signed in, and a
+          functional cookie to remember your region. Banner advertising is
+          served by Adsterra and is loaded only if you accept; it may set its own
+          cookies. Read the{" "}
           <Link
-            href="/privacy"
+            href="/privacy#cookies"
             className="text-accent-text underline-offset-2 hover:underline"
           >
-            Privacy Policy
+            cookie section
           </Link>{" "}
-          for details.
+          of the Privacy Policy for the full list.
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -55,14 +47,14 @@ export function CookieConsent() {
             onClick={() => decide("declined")}
             className="btn px-3.5 py-1.5 text-[12px]"
           >
-            Decline
+            Decline ads
           </button>
           <button
             type="button"
             onClick={() => decide("accepted")}
             className="btn btn-primary px-3.5 py-1.5 text-[12px]"
           >
-            Accept
+            Accept ads
           </button>
         </div>
       </div>

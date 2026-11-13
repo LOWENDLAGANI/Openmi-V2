@@ -19,6 +19,12 @@ import {
   type ProbeAnswer,
 } from "@/lib/adblock";
 import { adConfig } from "@/lib/ads";
+import {
+  adsAllowed,
+  CONSENT_EVENT,
+  readConsent,
+  type ConsentChoice,
+} from "@/lib/consent";
 
 /**
  * Counts the bait boxes a filter removed.
@@ -150,6 +156,7 @@ export function AdBlockGate() {
     []
   );
 
+  const [consent, setConsent] = useState<ConsentChoice | null>(null);
   const [detected, setDetected] = useState(false);
   const [confirmations, setConfirmations] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -157,7 +164,23 @@ export function AdBlockGate() {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    if (!adsConfigured) return;
+    const sync = () => setConsent(readConsent());
+    sync();
+    window.addEventListener(CONSENT_EVENT, sync);
+    window.addEventListener("storage", sync);
+
+    return () => {
+      window.removeEventListener(CONSENT_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  // A reader who declined receives no ads, so there is nothing for a blocker to
+  // hide: the gate stays out of the way instead of demanding ads be allowed.
+  const adsActive = adsConfigured && adsAllowed(consent);
+
+  useEffect(() => {
+    if (!adsActive) return;
 
     let alive = true;
     let timer = 0;
@@ -197,10 +220,10 @@ export function AdBlockGate() {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [adsConfigured]);
+  }, [adsActive]);
 
   const decision = decideAdGate({
-    adsConfigured,
+    adsConfigured: adsActive,
     pathname,
     detected,
     confirmations,

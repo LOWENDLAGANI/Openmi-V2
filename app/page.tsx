@@ -5,6 +5,7 @@ import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { DAILY_FREE_DEW, DEW_PER_HOUR } from "@/lib/dew";
 import { getSession } from "@/lib/session";
+import { supportMailto } from "@/lib/support";
 
 // The landing page reads the session to send a signed-in reader to /chat, so it
 // must be evaluated per request even on a deployment with no Supabase keys.
@@ -292,6 +293,18 @@ export default async function HomePage() {
             <Link href="/privacy" className="block text-mid hover:text-hi">
               Privacy
             </Link>
+            <Link
+              href="/privacy#cookies"
+              className="block text-mid hover:text-hi"
+            >
+              Cookies
+            </Link>
+            <a
+              href={supportMailto("Support")}
+              className="block text-mid hover:text-hi"
+            >
+              Support
+            </a>
           </nav>
 
           <nav aria-label="Account" className="space-y-2 text-[12.5px]">

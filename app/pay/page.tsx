@@ -324,6 +324,10 @@ export default async function PayPage({
       </section>
 
 
+      {/* Checkout is paused in this build, so the upload form is not shown at
+          all: a form the reader can fill in and never submit is a dead end
+          dressed as a feature. Past requests stay listed below either way. */}
+      {!TOPUP_PAUSED && (
       <section aria-labelledby="receipt-heading" className="panel mt-6 p-5">
         <h2
           id="receipt-heading"
@@ -411,12 +415,12 @@ export default async function PayPage({
           <SubmitButton
             className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2"
             pendingText="Uploading the receipt…"
-            disabled={TOPUP_PAUSED}
           >
             Submit receipt
           </SubmitButton>
         </form>
       </section>
+      )}
 
       <section aria-labelledby="requests-heading" className="panel mt-5 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -433,7 +437,9 @@ export default async function PayPage({
 
         {requests.length === 0 ? (
           <p className="mt-3 text-[12px] leading-relaxed text-mid">
-            No receipts yet. Pay on Sociabuzz, then upload the proof above.
+            {TOPUP_PAUSED
+              ? "No receipts yet. Uploads are paused while checkout is being tested, so nothing is waiting for review."
+              : "No receipts yet. Pay on Sociabuzz, then upload the proof above."}
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-line">
