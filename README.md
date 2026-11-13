@@ -60,11 +60,23 @@ four characters are ever shown again. Read-only tokens still browse and chat;
 they are refused at approval with a message naming the missing scopes.
 `/api/github/status` reads a query that does not select the sealed column at all.
 
-With `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` set, the
-workspace offers **Continue with GitHub** instead of the paste box: the same
-sealed token is stored, it is just obtained by an authorisation redirect. Register
-`<NEXT_PUBLIC_SITE_URL>/auth/github/callback` as the OAuth App's callback URL,
-and keep the token form in mind as the fallback when those two keys are unset.
+With `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` set, connecting
+is **Continue with GitHub**: the workspace asks for the `repo` scope, exchanges
+the one-time code for an access token, and stores the same sealed row a pasted
+token produces. The two paths are indistinguishable downstream. The paste box
+moves underneath as **Use a personal access token instead**, and is the whole
+panel when those keys are unset.
+
+To turn it on, create a GitHub **OAuth App** (Settings → Developer settings →
+OAuth Apps) and register `<NEXT_PUBLIC_SITE_URL>/auth/github/callback` as its
+callback URL. One OAuth App has one callback URL, so a preview deployment on a
+different origin needs its own app, or the token fallback.
+
+Disconnecting an OAuth connection revokes the grant on GitHub as well, so Openmi
+leaves **Authorized OAuth Apps** instead of lingering there. A pasted token is
+only deleted here, because it is your own credential and has no grant to revoke;
+if GitHub refuses the revoke, the row is still deleted and the message says so
+with the settings link.
 
 Rotating `GITHUB_TOKEN_KEY` makes existing sealed tokens unopenable. That is the
 intended behaviour, not a bug: every account reconnects.
@@ -365,8 +377,10 @@ both as a light fill and as dark text on paper. Focus rings come from a single
    Vercel does not run them; the order is always migrate, then deploy.
 6. Deploy, sign in, open `/admin` → **Configuration & probes**, and make every
    row green.
-7. Connect GitHub with a fine-grained token: contents read/write, pull requests
-   read/write, metadata read.
+7. Optional: register a GitHub OAuth App whose callback is
+   `https://<domain>/auth/github/callback` and set `GITHUB_OAUTH_CLIENT_ID` /
+   `GITHUB_OAUTH_CLIENT_SECRET`. Without it, connect with a fine-grained token
+   instead: contents read/write, pull requests read/write, metadata read.
 8. Pick a repo, send a message, approve one trivial change and confirm the pull
    request's head is `openmi/agent/…`.
 

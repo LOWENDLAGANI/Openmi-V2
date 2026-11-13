@@ -2,6 +2,15 @@ import "server-only";
 
 import { GithubError } from "@/lib/github/read";
 import { serverEnv } from "@/lib/env";
+import {
+  GITHUB_OAUTH_SCOPES,
+  OAUTH_CALLBACK_PATH,
+  authorizeUrlFor,
+  basicAuthHeader,
+  grantRevokeUrl,
+  oauthRedirectUriFrom,
+  tokenRequestBody,
+} from "@/lib/oauth/urls";
 
 /**
  * GitHub OAuth App connect flow.
@@ -15,7 +24,7 @@ import { serverEnv } from "@/lib/env";
  * GET-only (tests/github-read.test.ts), and the token exchange is a POST.
  */
 
-export const GITHUB_OAUTH_SCOPES = "repo";
+export { GITHUB_OAUTH_SCOPES, OAUTH_CALLBACK_PATH };
 
 export const STATE_COOKIE = "openmi-gh-state";
 
@@ -30,9 +39,7 @@ export function oauthConfigured(): boolean {
  * The request origin is only a development fallback.
  */
 export function oauthRedirectUri(origin: string): string {
-  const site = serverEnv().siteUrl?.trim();
-  const base = site && /^https?:\/\//.test(site) ? site : origin;
-  return new URL("/auth/github/callback", base).toString();
+  return oauthRedirectUriFrom(serverEnv().siteUrl, origin);
 }
 
 export function authorizeUrl(state: string, redirectUri: string): string {
@@ -45,12 +52,7 @@ export function authorizeUrl(state: string, redirectUri: string): string {
     );
   }
 
-  const url = new URL("https://github.com/login/oauth/authorize");
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("scope", GITHUB_OAUTH_SCOPES);
-  url.searchParams.set("state", state);
-  return url.toString();
+  return authorizeUrlFor(clientId, state, redirectUri);
 }
 
 type TokenPayload = {
@@ -77,13 +79,13 @@ export async function exchangeCode(
     method: "POST",
     headers: {
       accept: "application/json",
-      "content-type": "application/json",
+      "content-type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({
-      client_id: env.githubOauthClientId,
-      client_secret: env.githubOauthClientSecret,
+    body: tokenRequestBody({
+      clientId: env.githubOauthClientId,
+      clientSecret: env.githubOauthClientSecret,
       code,
-      redirect_uri: redirectUri,
+      redirectUri,
     }),
     cache: "no-store",
   });
@@ -99,4 +101,48 @@ export async function exchangeCode(
   }
 
   return payload.access_token;
+}
+
+/**
+ * Deletes this OAuth App's grant on the reader's account, so Openmi disappears
+ * from github.com/settings/applications instead of lingering as an authorised
+ * app with nothing left here that could revoke it.
+ *
+ * GitHub authenticates the app, not the reader, for this call. A 404 means the
+ * grant was already gone, which is the state this exists to reach.
+ */
+export async function revokeGrant(token: string): Promise<void> {
+  const env = serverEnv();
+
+  if (!env.githubOauthClientId || !env.githubOauthClientSecret) {
+    throw new GithubError(
+      "unavailable",
+      "GitHub OAuth is not configured, so the grant cannot be revoked."
+    );
+  }
+
+  const response = await fetch(grantRevokeUrl(env.githubOauthClientId), {
+    method: "DELETE",
+    headers: {
+      accept: "application/vnd.github+json",
+      authorization: basicAuthHeader(
+        env.githubOauthClientId,
+        env.githubOauthClientSecret
+      ),
+      "content-type": "application/json",
+      "x-github-api-version": "2022-11-28",
+    },
+    body: JSON.stringify({ access_token: token }),
+    // A disconnect must finish even if GitHub is slow; the caller turns a
+    // timeout into "deleted here, revoke failed" rather than hanging the click.
+    signal: AbortSignal.timeout(15_000),
+    cache: "no-store",
+  });
+
+  if (response.status === 204 || response.status === 404) return;
+
+  throw new GithubError(
+    "unavailable",
+    "GitHub did not confirm that the authorisation was revoked."
+  );
 }

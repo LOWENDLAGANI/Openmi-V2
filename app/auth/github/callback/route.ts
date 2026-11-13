@@ -70,7 +70,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const token = await exchangeCode(code, oauthRedirectUri(url.origin));
-    const connection = await saveConnection(session.supabase, session.user.id, token);
+    const connection = await saveConnection(
+      session.supabase,
+      session.user.id,
+      token,
+      "oauth"
+    );
 
     return back(request, `connected=${encodeURIComponent(connection.login)}`);
   } catch (error) {

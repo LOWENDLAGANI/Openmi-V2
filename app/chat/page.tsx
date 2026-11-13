@@ -89,6 +89,32 @@ function Panel({
   );
 }
 
+function TokenForm() {
+  return (
+    <form action={connectGithub} className="panel mt-4 space-y-3 p-4">
+      <label htmlFor="github-token" className="eyebrow block px-1">
+        Personal access token
+      </label>
+      <input
+        id="github-token"
+        name="token"
+        type="password"
+        required
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="github_pat_… or ghp_…"
+        className="field py-2.5 font-mono text-[12px]"
+      />
+      <SubmitButton
+        className="btn btn-primary w-full py-2.5 text-[13px]"
+        pendingText="Connecting to GitHub…"
+      >
+        Seal and connect
+      </SubmitButton>
+    </form>
+  );
+}
+
 function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
   return (
     <div className="mx-auto w-full max-w-xl py-8">
@@ -96,15 +122,20 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
       <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
         Connect GitHub
       </h2>
-      <p className="mt-3 text-[13px] leading-relaxed text-mid">
-        Token scopes: contents, pull requests, metadata.
-      </p>
 
-      {oauthEnabled && (
-        <div className="mt-5">
+      {oauthEnabled ? (
+        <>
+          <p className="mt-3 text-[13px] leading-relaxed text-mid">
+            Authorise Openmi on GitHub once. GitHub asks for the{" "}
+            <span className="font-mono text-[11.5px] text-hi">repo</span> scope
+            — read and write access to your repositories — because that is what
+            opening a pull request needs. The grant is sealed on our server, not
+            kept in your browser, and you can revoke it from GitHub at any time.
+          </p>
+
           <a
             href="/auth/github"
-            className="btn btn-primary w-full py-2.5 text-[13px]"
+            className="btn btn-primary mt-5 w-full py-2.5 text-[13px]"
           >
             Continue with GitHub
             <span aria-hidden="true" className="text-[13px] leading-none">
@@ -112,33 +143,26 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
             </span>
           </a>
           <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-low">
-            or paste a personal access token below
+            nothing to copy or paste
           </p>
-        </div>
+
+          <details className="mt-6">
+            <summary className="cursor-pointer text-[12px] font-medium text-mid hover:text-hi">
+              Use a personal access token instead
+            </summary>
+            <TokenForm />
+          </details>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 text-[13px] leading-relaxed text-mid">
+            Paste a fine-grained token with contents, pull requests and metadata
+            access. It is sealed with AES-256-GCM on the server, and only its
+            last four characters are ever shown again.
+          </p>
+          <TokenForm />
+        </>
       )}
-
-      <form action={connectGithub} className="panel mt-6 space-y-3 p-4">
-        <label htmlFor="github-token" className="eyebrow block px-1">
-          Personal access token
-        </label>
-        <input
-          id="github-token"
-          name="token"
-          type="password"
-          required
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="github_pat_… or ghp_…"
-          className="field py-2.5 font-mono text-[12px]"
-        />
-        <SubmitButton
-          className="btn btn-primary w-full py-2.5 text-[13px]"
-          pendingText="Connecting to GitHub…"
-        >
-          Seal and connect
-        </SubmitButton>
-      </form>
-
     </div>
   );
 }
@@ -321,7 +345,7 @@ async function RepoSurface({
 
           <form action={disconnectGithub}>
             <ConfirmSubmit
-              message="Disconnect GitHub? The sealed token is deleted and the workspace stops reading repositories."
+                                message="Disconnect GitHub? The sealed token is deleted, an OAuth grant is revoked on GitHub, and the workspace stops reading repositories."
               className="btn px-3 py-1.5 text-[11.5px]"
             >
               Disconnect

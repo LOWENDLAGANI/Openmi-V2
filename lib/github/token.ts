@@ -11,14 +11,21 @@ export type Connection = {
   login: string;
   scopes: string[];
   lastFour: string;
+  /** Whether a pasted token or an OAuth grant stored this row. */
+  via: "token" | "oauth";
 };
 
 type Row = {
   login: string;
   scopes: string[] | null;
   token_last_four: string;
+  connected_via?: string | null;
   token_sealed?: string;
 };
+
+function viaOf(row: Row): "token" | "oauth" {
+  return row.connected_via === "oauth" ? "oauth" : "token";
+}
 
 function requireSealKey(): string {
   const key = serverEnv().githubTokenKey;
@@ -40,7 +47,7 @@ export async function readConnection(
 ): Promise<Connection | null> {
   const { data, error } = await supabase
     .from("github_connections")
-    .select("login, scopes, token_last_four")
+    .select("login, scopes, token_last_four, connected_via")
     .eq("owner", owner)
     .maybeSingle();
 
@@ -52,6 +59,7 @@ export async function readConnection(
     login: row.login,
     scopes: row.scopes ?? [],
     lastFour: row.token_last_four,
+    via: viaOf(row),
   };
 }
 
@@ -67,7 +75,7 @@ export async function readToken(
 ): Promise<{ token: string; connection: Connection } | null> {
   const { data, error } = await supabase
     .from("github_connections")
-    .select("login, scopes, token_last_four, token_sealed")
+    .select("login, scopes, token_last_four, connected_via, token_sealed")
     .eq("owner", owner)
     .maybeSingle();
 
@@ -78,6 +86,7 @@ export async function readToken(
     login: row.login,
     scopes: row.scopes ?? [],
     lastFour: row.token_last_four,
+    via: viaOf(row),
   };
 
   let token: string;
@@ -101,7 +110,8 @@ export async function readToken(
 export async function saveConnection(
   supabase: Client,
   owner: string,
-  token: string
+  token: string,
+  via: "token" | "oauth" = "token"
 ): Promise<Connection> {
   const key = requireSealKey();
   const viewer = await getViewer(token);
@@ -109,6 +119,7 @@ export async function saveConnection(
     login: viewer.login,
     scopes: viewer.scopes,
     lastFour: tailOf(token),
+    via,
   };
 
   const { error } = await supabase.from("github_connections").upsert(
@@ -118,6 +129,7 @@ export async function saveConnection(
       scopes: viewer.scopes,
       token_sealed: seal(token, key),
       token_last_four: connection.lastFour,
+      connected_via: via,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "owner" }

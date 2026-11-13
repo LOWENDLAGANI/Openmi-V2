@@ -137,7 +137,7 @@ items are missing because that whole layer is different, not because a button wa
 
 | # | Feature | Status | Where / why |
 |---|---|---|---|
-| 57 | Connect GitHub via OAuth round-trip **or** a pasted token | 🟡 | Token paste is implemented (`app/github/actions.ts`, `lib/github/token.ts`, sealed with AES-256-GCM). No GitHub OAuth app flow. |
+| 57 | Connect GitHub via OAuth round-trip **or** a pasted token | ✅ | OAuth App round-trip in `app/auth/github/route.ts` and `app/auth/github/callback/route.ts`, with a state cookie and a form-encoded code exchange (`lib/oauth/`). The pasted token remains the fallback (`app/github/actions.ts`, `lib/github/token.ts`); both write the same sealed AES-256-GCM row. |
 | 58 | Read-only tree, file viewer, sizes, capped list | ✅ | `components/Workspace.tsx`, `lib/github/read.ts` (caps: 5,000 entries, 200 KB view, 2,000 lines). The tree is the repo as GitHub returns it; there is no dependency/build-output filter list. |
 | 59 | Agent loop with live steps, streaming prose, Stop | ✅ | `lib/agent/run.ts`, `lib/agent/tools.ts`, `app/api/chat/route.ts` step events. |
 | 60 | Turn a read-only answer into a proposed diff | ✅ | `propose` tool → `lib/changesets.ts` → `components/ReviewPanel.tsx`. |

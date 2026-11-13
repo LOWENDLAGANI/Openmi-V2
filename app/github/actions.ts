@@ -11,6 +11,7 @@ import {
   resolveBranchSha,
 } from "@/lib/github/read";
 import { readToken, saveConnection } from "@/lib/github/token";
+import { revokeGrant } from "@/lib/oauth/github";
 import {
   GithubWriteError,
   createRepositoryWithFiles,
@@ -66,6 +67,28 @@ export async function connectGithub(formData: FormData) {
 export async function disconnectGithub() {
   const { supabase, user } = await acting();
 
+  // Deleting the row forgets the token here. A connection made through the
+  // OAuth App is also a grant on the reader's GitHub account, so it is revoked
+  // there too — otherwise Openmi stays listed under Authorized OAuth Apps with
+  // nothing here left that could revoke it. A pasted personal access token is
+  // the reader's own credential and has no grant this app can delete.
+  let revokeFailed = false;
+  let github: Awaited<ReturnType<typeof readToken>> = null;
+  try {
+    github = await readToken(supabase, user.id);
+  } catch {
+    // An unopenable row is still a row to delete; it just cannot be revoked.
+    github = null;
+  }
+
+  if (github?.connection.via === "oauth") {
+    try {
+      await revokeGrant(github.token);
+    } catch {
+      revokeFailed = true;
+    }
+  }
+
   // The sealed token goes with the row; nothing else references it.
   const { error } = await supabase
     .from("github_connections")
@@ -75,6 +98,13 @@ export async function disconnectGithub() {
   if (error) fail(error.message);
 
   revalidatePath("/chat");
+
+  if (revokeFailed) {
+    fail(
+      "GitHub is disconnected here, but the authorisation could not be revoked on GitHub's side. Remove Openmi at github.com/settings/applications."
+    );
+  }
+
   redirect("/chat");
 }
 

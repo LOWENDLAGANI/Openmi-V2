@@ -100,14 +100,14 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "OAuth connect flow (optional; a personal access token works without it)",
-    hint: "GitHub → Developer settings → OAuth Apps",
+    hint: "GitHub → Developer settings → OAuth Apps; callback is <site>/auth/github/callback",
   },
   {
     key: "GITHUB_OAUTH_CLIENT_SECRET",
     scope: "server",
     required: false,
-    unlocks: "OAuth connect flow",
-    hint: "GitHub → Developer settings → OAuth Apps",
+    unlocks: "OAuth connect flow (server only; pairs with the client id)",
+    hint: "The OAuth App's client secret — never a NEXT_PUBLIC_ value",
   },
   {
     key: "ADMIN_EMAILS",
