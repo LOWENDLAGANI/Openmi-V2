@@ -23,7 +23,7 @@ import {
   paymentLink,
   planById,
 } from "@/lib/billing/plans";
-import { formatDew } from "@/lib/dew";
+import { DAILY_FREE_DEW, formatDew, formatPassRemaining } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
 import { getSession } from "@/lib/session";
 import { submitReceipt } from "./actions";
@@ -217,6 +217,14 @@ export default async function PayPage({
             ? "Checkout is paused while the payment path is tested, so no new payment is accepted and the upload form is closed. The plans below are the ones that exist; a redeem code still adds Dew."
             : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, then upload it below. Approval adds the pass's Dew and starts or extends the paid daily allowance."}
         </p>
+
+        {profile?.paidUntil && (
+          <p className="mt-2 max-w-xl text-[11.5px] leading-relaxed text-low">
+            {profile.paidActive
+              ? `Your pass ends ${profile.paidUntil.slice(0, 10)} — ${formatPassRemaining(profile.paidUntil)}.`
+              : `Your last pass ended ${profile.paidUntil.slice(0, 10)}. The daily allowance is back to ${DAILY_FREE_DEW} Dew.`}
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-raised px-4 py-3">
           <div>

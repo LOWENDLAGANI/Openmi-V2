@@ -13,6 +13,7 @@ import {
   TIMEZONES,
   dailyAllowance,
   formatDew,
+  formatPassRemaining,
   isLowBalance,
 } from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
@@ -214,6 +215,14 @@ export default async function ActivityPage({
           called. The daily allowance is {dailyAllowance(profile.paidActive)} Dew,
           settled at local midnight in {profile.timezone}.
         </p>
+
+        {profile.paidUntil && (
+          <p className="mt-2 font-mono text-[10.5px] text-low">
+            {profile.paidActive
+              ? `pass ends ${profile.paidUntil.slice(0, 10)} · ${formatPassRemaining(profile.paidUntil)}`
+              : `pass ended ${profile.paidUntil.slice(0, 10)}`}
+          </p>
+        )}
 
         {current ? (active
           ? `An hour is running until ${utc(current.expires_at)} UTC; turns inside it are free.`

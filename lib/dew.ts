@@ -136,3 +136,33 @@ export function hourRemainingMs(input: {
 export function dailyAllowance(paidActive: boolean): number {
   return paidActive ? PAID_DAILY_FREE_DEW : DAILY_FREE_DEW;
 }
+
+/**
+ * How long is left on a paid pass, as a sentence a reader can act on.
+ *
+ * Days while there is at least a day, hours inside the last day, and a plain
+ * "ended" once it is past. Null means no pass was ever bought, or the stored
+ * date is unreadable; the caller decides what to show for that.
+ */
+export function formatPassRemaining(
+  until: string | null | undefined,
+  now: number = Date.now()
+): string | null {
+  if (!until) return null;
+
+  const ends = Date.parse(until);
+  if (!Number.isFinite(ends)) return null;
+
+  const ms = ends - now;
+  if (ms <= 0) return "ended";
+
+  const hour = 60 * 60 * 1000;
+  if (ms < hour) return "less than an hour left";
+  if (ms < 24 * hour) {
+    const hours = Math.ceil(ms / hour);
+    return `${hours} hour${hours === 1 ? "" : "s"} left`;
+  }
+
+  const days = Math.ceil(ms / (24 * hour));
+  return `${days} day${days === 1 ? "" : "s"} left`;
+}

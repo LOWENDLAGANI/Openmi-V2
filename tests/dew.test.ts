@@ -18,6 +18,7 @@ import {
   dailyAllowance,
   formatDew,
   formatHourRemaining,
+  formatPassRemaining,
   hourRemainingMs,
   isLowBalance,
   normalizeTimezone,
@@ -124,6 +125,27 @@ test("the low-balance state is a named threshold", () => {
 test("the daily allowance depends on whether the account has paid", () => {
   expect(dailyAllowance(false)).toBe(DAILY_FREE_DEW);
   expect(dailyAllowance(true)).toBe(PAID_DAILY_FREE_DEW);
+});
+
+test("the pass countdown says how long is left before the free tier returns", () => {
+  const now = Date.parse("2026-11-13T10:00:00.000Z");
+
+  expect(formatPassRemaining(null, now)).toBeNull();
+  expect(formatPassRemaining("not a date", now)).toBeNull();
+  expect(formatPassRemaining("2026-11-13T09:00:00.000Z", now)).toBe("ended");
+  expect(formatPassRemaining("2026-11-13T10:30:00.000Z", now)).toBe(
+    "less than an hour left"
+  );
+  expect(formatPassRemaining("2026-11-13T13:00:00.000Z", now)).toBe(
+    "3 hours left"
+  );
+  expect(formatPassRemaining("2026-11-14T12:00:00.000Z", now)).toBe(
+    "2 days left"
+  );
+  // A pass bought right now reads as its full length, not one day short.
+  expect(formatPassRemaining("2026-11-28T10:00:00.000Z", now)).toBe(
+    "15 days left"
+  );
 });
 
 test("the activity timezones include the profile default and reject junk", () => {
