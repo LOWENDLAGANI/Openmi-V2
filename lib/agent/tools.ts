@@ -35,7 +35,7 @@ export const TOOL_SPECS: ToolDefinition[] = [
   {
     name: "list_files",
     description:
-      "List repository file paths, optionally filtered by directory prefix. Returns at most 200 paths.",
+      "List repository file paths, optionally filtered to one directory. Returns at most 200 paths. Omit prefix, or pass '/', to list from the repository root.",
     parameters: {
       type: "object",
       properties: {
@@ -201,6 +201,29 @@ function safePath(value: string): string | null {
   return value;
 }
 
+/**
+ * The directory a `prefix` names, as a bare path prefix.
+ *
+ * "The root directory" arrives in a tool call as `/`, `.`, `./` or as no
+ * argument at all, and every one of those means the whole repository. Matching
+ * the raw string made all of them return nothing, which reads back as an empty
+ * repository — a turn then tells the reader its tools are broken instead of
+ * listing the tree it already had. A trailing slash is dropped for the same
+ * reason: `lib/` and `lib` name one directory.
+ */
+export function listPrefix(value: unknown): string | null {
+  if (value === undefined) return "";
+  if (typeof value !== "string") return null;
+
+  const trimmed = value
+    .trim()
+    .replace(/^(\.\/)+/, "")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+
+  return trimmed === "." ? "" : trimmed;
+}
+
 export function parseArguments(raw: string): Record<string, unknown> | null {
   if (raw.trim().length === 0) return {};
   try {
@@ -233,14 +256,28 @@ export async function runTool(
 
   if (name === "list_files") {
     if (!onlyKeys(args, ["prefix"])) return badInput("unexpected argument");
-    const prefix = args.prefix;
-    if (prefix !== undefined && typeof prefix !== "string") {
-      return badInput("prefix must be a string");
+    const prefix = listPrefix(args.prefix);
+    if (prefix === null) return badInput("prefix must be a string");
+
+    const matching =
+      prefix.length === 0
+        ? context.paths
+        : context.paths.filter(
+            (path) => path === prefix || path.startsWith(`${prefix}/`)
+          );
+
+    // An empty answer for a directory that does exist would read back to the
+    // model as an empty repository, so a miss says what was searched instead.
+    if (matching.length === 0) {
+      return {
+        ok: true,
+        text: `No path is under ${prefix} at ${context.sha.slice(
+          0,
+          7
+        )}; ${context.paths.length} path(s) are available. Omit prefix to list from the repository root.`,
+      };
     }
 
-    const matching = context.paths.filter(
-      (path) => typeof prefix !== "string" || prefix.length === 0 || path.startsWith(prefix)
-    );
     const listed = matching.slice(0, MAX_LIST_FILES);
     const header = `${matching.length} path(s) match; showing ${listed.length} of at most ${MAX_LIST_FILES}.`;
 

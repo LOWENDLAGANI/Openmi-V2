@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { sandboxTurnsEnabled } from "../lib/env";
 import {
   GITHUB_ONLY_CLAUSE,
+  NO_READ_CLAUSE,
   SHELL_CLAUSE,
   buildSystemPrompt,
 } from "../lib/prompt";
@@ -36,6 +37,22 @@ test("the route asks the policy before it provisions a shell turn", () => {
   // The sandbox is moved aside, not deleted: pause, resume and release are wired.
   expect(ROUTE).toContain("await shellTurn?.close()");
   expect(ROUTE).toContain("retainsWorkspace()");
+});
+
+test("a turn whose repository could not be opened is not told it has read tools", () => {
+  const prompt = buildSystemPrompt({
+    repo: "octocat/hello",
+    sha: "abc123",
+    context: "",
+    notes: [],
+    shell: false,
+    readTools: false,
+  });
+
+  // The fallback path offers no tools, so the prompt may not promise any.
+  expect(prompt).toContain(NO_READ_CLAUSE);
+  expect(prompt).not.toContain(GITHUB_ONLY_CLAUSE);
+  expect(prompt).not.toContain("propose_edits");
 });
 
 test("a GitHub-only turn is not told it has a terminal", () => {

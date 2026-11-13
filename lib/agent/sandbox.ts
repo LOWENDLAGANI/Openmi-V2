@@ -622,7 +622,14 @@ export function createShellTurn(options: ShellTurnOptions): ShellTurn | null {
     }
 
     if (name === "list_files") {
-      const path = args.path === undefined ? "" : sanitiseWorkspacePath(args.path);
+      // The workspace root is spelled "", ".", "./" or "/" depending on how
+      // the model phrases it; all four are the same directory, and refusing one
+      // of them would answer "what is in the root" with an error instead.
+      const asked = args.path;
+      const path =
+        asked === undefined || asked === "" || asked === "." || asked === "./" || asked === "/"
+          ? ""
+          : sanitiseWorkspacePath(asked);
       if (path === null) return failure("bad-input: path must be a directory inside the workspace");
 
       const listed = await execDetailed(shellListCommand(path), MISSION_WORKDIR, 30_000);

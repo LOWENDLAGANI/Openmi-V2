@@ -497,6 +497,11 @@ export async function POST(request: Request) {
     sandbox: executionConfigured(),
     // With a handle in hand the answer is different, and so is the prompt.
     shell: Boolean(shellTurn),
+    // The read tools exist only on the agent path, which needs a pinned commit
+    // and a readable repository: a turn that fell back to a plain completion
+    // has none, and telling it otherwise is how a model ends up promising a
+    // listing or blaming the server for tools it was never given.
+    readTools: Boolean(repoFullName && sha && githubToken),
     // A persistent workspace may be described as such; a per-message box may
     // not, because its files are gone when the answer ends.
     persistentShell,

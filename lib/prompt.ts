@@ -44,7 +44,18 @@ export const ANALYSIS_CLAUSE =
  * means nothing ran, not that nothing is available.
  */
 export const GITHUB_ONLY_CLAUSE =
-  "This turn is GitHub-only: you have no terminal, no sandbox and no browser. Read code with the GitHub tools, and change code only by calling propose_edits. Never say you ran a command, a build or a test; never claim an edit was applied or verified. An accepted diff is written to its own openmi/ agent branch and reported on the review card.";
+  "This turn is GitHub-only: you have no terminal, no sandbox and no browser. Your GitHub tools do work and you are expected to use them: list_files lists repository paths (omit prefix, or pass '/', for the root), read_file reads one file, search_code finds literal text, and the pinned commit's path list is already in your context. Never say a tool is unavailable, that you could not run ls, or that tools are broken on this server: if the context and the tools do not contain the answer, say what is missing. Read code with the GitHub tools, and change code only by calling propose_edits. Never say you ran a command, a build or a test; never claim an edit was applied or verified. An accepted diff is written to its own openmi/ agent branch and reported on the review card.";
+
+/**
+ * A turn that could not open the repository at all.
+ *
+ * The prompt has to match the tool list: a turn with no read tools that is told
+ * to "read code with the GitHub tools" can only answer by inventing files or by
+ * blaming the server. Naming the real problem is the honest option, and it is
+ * the one the reader can act on.
+ */
+export const NO_READ_CLAUSE =
+  "No repository could be read for this turn, and it has no repository read tools: you cannot list, search or read a file, and nothing from the repository is in your context. Say that the repository could not be opened this turn, and do not describe files you cannot see or blame a tool for a connection that is missing.";
 
 export const CITATION_CLAUSE =
   "Cite files as path:line, using only paths that appear in the context. If a path is not in the context, say you could not read it instead of citing it.";
@@ -123,6 +134,7 @@ export function buildSystemPrompt({
   shell = true,
   persistentShell = false,
   continuation = false,
+  readTools = true,
 }: {
   repo: string | null;
   sha: string | null;
@@ -137,6 +149,8 @@ export function buildSystemPrompt({
   persistentShell?: boolean;
   /** True when this message continues a turn that hit its time limit. */
   continuation?: boolean;
+  /** False when this turn has no repository read tool at all. */
+  readTools?: boolean;
 }): string {
   // A persistent workspace changes what the model may promise: files and a
   // background process both stay until they are stopped or the box is swept.
@@ -161,25 +175,39 @@ export function buildSystemPrompt({
         REVIEW_CLAUSE,
         DESTINATION_CLAUSE,
       ]
-    : [
-        IDENTITY,
-        GITHUB_ONLY_CLAUSE,
-        CITATION_CLAUSE,
-        "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
-        PROPOSE_CLAUSE,
-        AUTONOMY_CLAUSE,
-        GIT_CLAUSE,
-        REVIEW_CLAUSE,
-        DESTINATION_CLAUSE,
-      ];
+    : readTools
+      ? [
+          IDENTITY,
+          GITHUB_ONLY_CLAUSE,
+          CITATION_CLAUSE,
+          "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
+          PROPOSE_CLAUSE,
+          AUTONOMY_CLAUSE,
+          GIT_CLAUSE,
+          REVIEW_CLAUSE,
+          DESTINATION_CLAUSE,
+        ]
+      : [
+          // No read tool, no workspace and no diff: the clauses that ask for a
+          // proposal or a verification would be instructions to do the
+          // impossible, and a model that cannot follow them improvises.
+          IDENTITY,
+          NO_READ_CLAUSE,
+          CITATION_CLAUSE,
+          "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
+        ];
 
   const tail: string[] = [
     repo && sha
-      ? `The attached repository is ${repo} at commit ${sha}. Every citation must be a path in that commit.`
+      ? readTools
+        ? `The attached repository is ${repo} at commit ${sha}. Every citation must be a path in that commit.`
+        : `This chat is pinned to ${repo} at commit ${sha}, but the repository could not be read this turn: no file from it is in the context, so do not cite one.`
       : "No repository is attached to this chat, so you have no file context. Say so rather than describing code you cannot see.",
   ].filter(Boolean);
 
-  if (repo && sha) {
+  // A turn that could not open the repository has nothing to propose against,
+  // so the editing paragraph is only added when a read tool exists.
+  if (repo && sha && readTools) {
     tail.push(
       edits
         ? "You may propose edits with the propose_edits tool, using whole-file content or an exact string to replace at the pinned commit. The app writes a ready change itself: to a new openmi/ agent branch with a pull request, or straight to the branch you pass as destination when the reader asked for one. Never say a change was written, pushed or merged until the review card or a notice reports it."

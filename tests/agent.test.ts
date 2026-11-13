@@ -164,6 +164,39 @@ test("list_files caps and reports honestly without a network call", async () => 
   expect(result.text).not.toContain(`src/f-${MAX_LIST_FILES + 1}.ts`);
 });
 
+test("the root is listable however the model spells it", async () => {
+  const context = {
+    token: "unused",
+    fullName: "octocat/hello",
+    sha: "abc1234",
+    paths: ["README.md", "lib/a.ts", "lib/agent/b.ts"],
+  };
+
+  // "What is in my root directory" arrives as any of these. None may be zero.
+  for (const prefix of [undefined, "", "/", ".", "./", ".//"]) {
+    const result = await runTool("list_files", prefix === undefined ? {} : { prefix }, context);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).toContain("README.md");
+    expect(result.text).toContain("lib/agent/b.ts");
+  }
+
+  // A directory is a directory with or without the slash, and a file is exact.
+  for (const prefix of ["lib", "lib/", "./lib/"]) {
+    const result = await runTool("list_files", { prefix }, context);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).toContain("lib/a.ts");
+    expect(result.text).not.toContain("README.md");
+  }
+
+  // A directory that is not in the commit says so instead of reading as empty.
+  const missing = await runTool("list_files", { prefix: "nope" }, context);
+  expect(missing.ok).toBe(true);
+  if (!missing.ok) return;
+  expect(missing.text).toContain("3 path(s) are available");
+});
+
 test("arguments that are not JSON are refused rather than guessed", () => {
   expect(parseArguments("not json")).toBeNull();
   expect(parseArguments("[1,2]")).toBeNull();

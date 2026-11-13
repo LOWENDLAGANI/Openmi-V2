@@ -26,3 +26,6 @@ dist/
 # logs and os noise
 *.log
 .DS_Store
+
+# browser/tooling artefacts left in the repo root by an agent
+.freebuff-browser-*
