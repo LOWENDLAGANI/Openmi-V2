@@ -144,9 +144,12 @@ test("the paid benefits are the ones advertised", () => {
   const plans = readFileSync(new URL("../lib/billing/plans.ts", import.meta.url), "utf8");
 
   expect(plans).toContain("export const PAID_BENEFITS = [");
-  expect(plans).toContain("Bumped up to 15 Dew a day");
-  expect(plans).toContain("Priority support");
-  expect(plans).toContain("Everything in free");
+  // The allowance is a constant the daily refill implements, not a number typed
+  // into the copy: the two lines below cannot drift apart.
+  expect(plans).toContain(`${PAID_DAILY_FREE_DEW} Dew a day instead of ${DAILY_FREE_DEW}`);
+  // Paid accounts get the free tier as well; nothing here promises a support
+  // channel or any other benefit the app does not implement.
+  expect(plans).toContain("Everything the free tier includes");
 });
 
 test("the hour countdown reads as time left, and never goes negative", () => {
