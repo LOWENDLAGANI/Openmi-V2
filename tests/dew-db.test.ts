@@ -20,6 +20,7 @@ const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const C = "77777777-7777-4777-8777-777777777777";
 const D = "44444444-4444-4444-8444-444444444444";
+const E = "55555555-5555-4555-8555-555555555555";
 
 // Keyed hashes, as the server sends them: never an address.
 const IP_ONE = "1111111111111111aaaaaaaaaaaaaaaa";
@@ -288,7 +289,7 @@ test("a balance below one hour refuses the session before anything runs", async 
   await db.query("update public.profiles set dew_balance = 11 where id = $1", [A]);
 });
 
-test("a redeem code is service-role only, works once and marks the account as paid", async () => {
+test("a redeem code is service-role only, works once and adds Dew only", async () => {
   await reset();
   await db.query(
     "insert into public.dew_codes (code, dew_amount, kind, note) values ('TOPUP-20', 20, 'topup', 'test')"
@@ -313,12 +314,118 @@ test("a redeem code is service-role only, works once and marks the account as pa
   ).rejects.toThrow(/already redeemed/);
 
   await reset();
-  const { rows } = await db.query<{ has_paid: boolean }>(
-    "select has_paid from public.profiles where id = $1",
-    [A]
-  );
-  expect(rows[0].has_paid).toBe(true);
+  const { rows } = await db.query<{
+    has_paid: boolean;
+    paid_until: string | null;
+  }>("select has_paid, paid_until from public.profiles where id = $1", [A]);
+  // A code is not a plan: under the subscription model it must not open the
+  // paid window (or the allowance it controls).
+  expect(rows[0].has_paid).toBe(false);
+  expect(rows[0].paid_until).toBeNull();
   expect(await ledgerCount(A, "topup")).toBe(1);
+});
+
+test("a pass is a window: approval extends paid_until and grants its Dew", async () => {
+  await signUp(E, "e@example.test");
+  await reset();
+  await db.query(
+    "insert into public.admin_users (user_id, note) values ($1, 'test') on conflict (user_id) do nothing",
+    [E]
+  );
+
+  const opened = await db.query<{ id: string }>(
+    `insert into public.payment_requests
+       (owner, plan, amount, reference, receipt_path, status)
+     values ($1, 'pass-15', 18, 'ref-15', $2, 'pending')
+     returning id`,
+    [E, `${E}/receipt.pdf`]
+  );
+
+  await actAs("authenticated", E);
+  await db.query(
+    "select * from public.review_payment_request($1, 'approved', 'ok', 30)",
+    [opened.rows[0].id]
+  );
+
+  const { rows } = await db.query<{
+    has_paid: boolean;
+    days: number;
+    balance: string;
+  }>(
+    `select has_paid,
+            extract(day from paid_until - now())::int as days,
+            dew_balance as balance
+       from public.profiles where id = $1`,
+    [E]
+  );
+
+  expect(rows[0].has_paid).toBe(true);
+  expect(Number(rows[0].days)).toBeGreaterThanOrEqual(14);
+  expect(Number(rows[0].balance)).toBe(30);
+});
+
+test("operator aggregates are admin-only and self-revoke by id is refused", async () => {
+  await actAs("authenticated", A);
+  await expect(db.query("select public.admin_dew_held()")).rejects.toThrow(
+    /admin: not allowed/
+  );
+
+  await actAs("authenticated", E);
+  const held = await db.query<{ total: string }>(
+    "select public.admin_dew_held() as total"
+  );
+  expect(Number(held.rows[0].total)).toBeGreaterThan(0);
+
+  await expect(
+    db.query("select * from public.admin_set_admin_id($1, false)", [E])
+  ).rejects.toThrow(/cannot remove your own access/);
+});
+
+test("the daily allowance is 15 only while the pass is running", async () => {
+  await reset();
+  await db.query(
+    `update public.profiles
+        set dew_balance = 0,
+            dew_day = (now() at time zone timezone)::date - 1,
+            paid_until = now() + interval '2 days'
+      where id = $1`,
+    [E]
+  );
+
+  await actAs("authenticated", E);
+  const paid = await db.query<{ balance: string }>(
+    "select public.refill_daily_dew() as balance"
+  );
+  expect(Number(paid.rows[0].balance)).toBe(15);
+
+  await reset();
+  await db.query(
+    `update public.profiles
+        set dew_balance = 0,
+            dew_day = (now() at time zone timezone)::date - 1,
+            paid_until = now() - interval '1 day'
+      where id = $1`,
+    [E]
+  );
+
+  await actAs("authenticated", E);
+  const ended = await db.query<{ balance: string }>(
+    "select public.refill_daily_dew() as balance"
+  );
+  expect(Number(ended.rows[0].balance)).toBe(6);
+
+  // These two checks set balances directly; restore the invariant the last test
+  // asserts for every account, without touching anyone else's rows.
+  await reset();
+  await db.query(
+    `update public.profiles
+        set dew_balance = coalesce(
+          (select sum(amount) from public.dew_transactions where owner = $1),
+          0
+        )
+      where id = $1`,
+    [E]
+  );
 });
 
 test("operator correction is service-role only and stays in the ledger", async () => {

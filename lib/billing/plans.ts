@@ -6,13 +6,17 @@
  * created in `payment_requests` with status `pending` and stays visible on the
  * plans page until an operator approves or rejects it.
  *
- * Two kinds of plan: a one-off pack of Dew, and a timed pass that also raises
- * the daily allowance. The pass ids are mirrored in
- * `supabase/migrations/019_chat_billing_modes.sql`; a plan the database does
+ * Every plan is a pass: a window of the paid daily allowance that ends. The pass
+ * ids are mirrored in `supabase/migrations/019_chat_billing_modes.sql` and the
+ * days are mirrored in `038_subscription_passes.sql`; a plan the database does
  * not know is refused at submission rather than stored as a string.
+ *
+ * The one-off Dew packs are gone. They sold Dew at RM0.60–0.75 each while a pass
+ * already raised the daily allowance, so they were strictly worse value and one
+ * of them undercut the cheapest pass.
  */
 
-export type PlanId = "starter" | "pro" | "studio" | "pass-15" | "pass-30";
+export type PlanId = "pass-15" | "pass-30";
 
 export type Plan = {
   id: PlanId;
@@ -21,8 +25,8 @@ export type Plan = {
   price: number;
   /** Dew granted when a receipt for this plan is approved. */
   dew: number;
-  /** Days of paid allowance a pass covers. Packs are one-off, so no days. */
-  days?: number;
+  /** Days of paid allowance the pass covers. */
+  days: number;
   blurb: string;
 };
 
@@ -33,7 +37,7 @@ export const PLANS: readonly Plan[] = [
     price: 18,
     dew: 30,
     days: 15,
-    blurb: "Fifteen days at the paid allowance, paid once.",
+    blurb: "Fifteen days at 15 Dew a day, plus 30 Dew up front.",
   },
   {
     id: "pass-30",
@@ -41,28 +45,7 @@ export const PLANS: readonly Plan[] = [
     price: 36,
     dew: 70,
     days: 30,
-    blurb: "A month at the paid allowance, paid once.",
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: 15,
-    dew: 20,
-    blurb: "Roughly ten chat hours, and the paid daily allowance.",
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: 35,
-    dew: 50,
-    blurb: "Roughly twenty-five chat hours, for a project week.",
-  },
-  {
-    id: "studio",
-    name: "Studio",
-    price: 60,
-    dew: 100,
-    blurb: "Roughly fifty hours, for a long sprint.",
+    blurb: "Thirty days at 15 Dew a day, plus 70 Dew up front.",
   },
 ];
 
@@ -70,12 +53,13 @@ export const PLAN_IDS = PLANS.map((plan) => plan.id);
 
 /**
  * What a paid account actually gets. Shown next to the plans, and the same
- * list the daily refill implements: fifteen Dew a day instead of six.
+ * rules the receipt review and the daily refill implement: fifteen Dew a day
+ * while the pass is active, six once it ends.
  */
 export const PAID_BENEFITS = [
   "15 Dew a day instead of 6",
-  "Approval switches the account to the paid allowance",
-  "The same branch, review and approval rules as free",
+  "For the length of the pass — the allowance returns to 6 when it ends",
+  "Approval extends a running pass from its current end, never from today",
   "Everything the free tier includes",
 ] as const;
 
@@ -87,8 +71,6 @@ export const PAID_BENEFITS = [
  * page, the copy and its test cannot disagree about whether checkout is live.
  */
 export const TOPUP_PAUSED = true;
-
-
 
 export function planById(value: string | null | undefined): Plan | null {
   if (!value) return null;

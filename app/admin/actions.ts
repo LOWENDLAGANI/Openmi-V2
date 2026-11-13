@@ -128,15 +128,26 @@ export async function setAdmin(formData: FormData) {
   const supabase = await actingClient();
 
   const email = field(formData, "email");
+  const userId = field(formData, "userId");
   const enabled = field(formData, "enabled") === "1";
 
-  if (email.length === 0) fail("Enter the account's email.");
+  if (email.length === 0 && userId.length === 0) {
+    fail("Enter the account's email.");
+  }
 
-  const { error } = await supabase.rpc("admin_set_admin", {
-    p_email: email,
-    p_enabled: enabled,
-    p_note: enabled ? "granted from the admin panel" : null,
-  });
+  // A revoke comes from the admin list, which knows the id even when the
+  // profile has no email; a grant comes from a field that only has an address.
+  const { error } =
+    userId.length > 0
+      ? await supabase.rpc("admin_set_admin_id", {
+          p_user_id: userId,
+          p_enabled: enabled,
+        })
+      : await supabase.rpc("admin_set_admin", {
+          p_email: email,
+          p_enabled: enabled,
+          p_note: enabled ? "granted from the admin panel" : null,
+        });
 
   if (error) fail(error.message.replace(/^admin:\s*/, ""));
 

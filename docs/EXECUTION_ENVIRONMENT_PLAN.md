@@ -111,13 +111,14 @@ storage  (8 − 5 free) × $0.000108 = $0.000324/h
                                     $0.165924/h  =  $0.00277/min
 ```
 
-At the plan floor of **RM 0.75 per Dew** (Starter: RM15 / 20 Dew):
+At the pass floor of **RM 0.60 per Dew** (15-day pass: RM18 / 30 Dew, plus the
+daily allowance while it runs):
 
 | | Cost to Openmi | Charged | Margin |
 |---|---|---|---|
-| 1 minute | RM 0.0126 | 0.05 Dew = RM 0.0375 | ~3× |
-| 10-minute run | RM 0.126 | 0.5 Dew = RM 0.375 | ~3× |
-| 1 hour | RM 0.754 | 3 Dew = RM 2.25 | ~3× |
+| 1 minute | RM 0.0126 | 0.05 Dew = RM 0.030 | ~2× |
+| 10-minute run | RM 0.126 | 0.5 Dew = RM 0.300 | ~2× |
+| 1 hour | RM 0.754 | 2 Dew = RM 1.20 | ~1.6× |
 
 The symmetry is deliberate and easy to say out loud: **an execution hour costs
 the same as a chat hour.** Model tokens for the run are already covered by the

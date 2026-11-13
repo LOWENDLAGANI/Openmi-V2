@@ -221,18 +221,24 @@ of which takes an amount.
 | Dust floor | 0.05 |
 
 On the first day the daily allowance is added to the trial credit; after that it
-tops the balance up to 6 Dew (15 once a top-up has been redeemed) at local
-midnight in the account's timezone. It never refills on a day that is ahead of
-the local date, so a clock that steps backwards mints nothing. The trial credit
-is a ledger row written on the first message, not an unrecorded default: 5 Dew
-once per account, and at most one paid trial per address per day, so bulk
-signups mint accounts but not Dew.
+tops the balance up to 6 Dew (15 while a paid pass is active) at local midnight
+in the account's timezone. It never refills on a day that is ahead of the local
+date, so a clock that steps backwards mints nothing. The trial credit is a ledger
+row written on the first message, not an unrecorded default: 5 Dew once per
+account, and at most one paid trial per address per day, so bulk signups mint
+accounts but not Dew.
+
+A pass is a window, not a badge. `profiles.paid_until` is the entitlement: the
+15-day and 30-day passes extend it from whichever is later, now or its current
+end, and the allowance is back to 6 when it passes. `has_paid` records only that
+a pass was ever bought. The one-off Dew packs are gone; the catalogue is the two
+passes, and a receipt for anything else is refused at submission.
 
 An invite rewards both sides 5 Dew, once per invitee, up to 10 rewarded
 accounts. Refunds are one per session at the original price and are written for
 a provider failure or an abort before the first token; anything else is an
-operator adjustment, which is service-role only. Top-up packs are
-operator-issued redeem codes — there is no card payment in this build.
+operator adjustment, which is service-role only. Top-ups are operator-issued
+redeem codes — there is no card payment in this build.
 
 `/activity` shows the ledger, the running hour, per-chat token estimates, the
 invite code, the redeem form and the refill timezone. The sum of the ledger

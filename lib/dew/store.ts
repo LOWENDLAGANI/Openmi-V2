@@ -49,6 +49,11 @@ export type DewProfile = {
   /** Paid credit, spent only after the daily balance cannot cover a charge. */
   wallet: number;
   timezone: string;
+  /** True while a paid pass is running: this is what decides the allowance. */
+  paidActive: boolean;
+  /** End of the paid window, ISO, or null when no pass has been bought. */
+  paidUntil: string | null;
+  /** History only: a pass was bought at some point. */
   hasPaid: boolean;
   inviteCode: string | null;
   invitedBy: string | null;
@@ -286,7 +291,9 @@ export async function readDewProfile(
 ): Promise<DewProfile | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("dew_balance, wallet_dew, timezone, has_paid, invite_code, invited_by")
+    .select(
+      "dew_balance, wallet_dew, timezone, has_paid, paid_until, invite_code, invited_by"
+    )
     .eq("id", owner)
     .maybeSingle();
 
@@ -297,14 +304,19 @@ export async function readDewProfile(
     wallet_dew?: number | string;
     timezone: string;
     has_paid: boolean;
+    paid_until: string | null;
     invite_code: string | null;
     invited_by: string | null;
   };
+
+  const paidUntil = row.paid_until ?? null;
 
   return {
     balance: Number(row.dew_balance),
     wallet: Number(row.wallet_dew ?? 0),
     timezone: row.timezone ?? "UTC",
+    paidActive: paidUntil !== null && Date.parse(paidUntil) > Date.now(),
+    paidUntil,
     hasPaid: Boolean(row.has_paid),
     inviteCode: row.invite_code,
     invitedBy: row.invited_by,

@@ -60,16 +60,6 @@ function utc(value: string | null): string {
   return value.slice(0, 16).replace("T", " ");
 }
 
-/**
- * What a member can buy here.
- *
- * The one-off packs stay in `PLANS` because older receipts and the operator's
- * manual grants still name them, but this page sells the paid passes only: a
- * top-up is no longer an option on the public pricing page. The admin panel is
- * untouched, so an operator can still add Dew by hand.
- */
-const OFFERED_PLANS = PLANS.filter((plan) => plan.days !== undefined);
-
 export default async function PayPage({
   searchParams,
 }: {
@@ -214,8 +204,10 @@ export default async function PayPage({
                 {pending} receipt{pending === 1 ? "" : "s"} pending
               </StatusPill>
             )}
-            <StatusPill tone={profile?.hasPaid ? "ok" : "optional"}>
-              {profile?.hasPaid ? "paid plan" : "free tier"}
+            <StatusPill tone={profile?.paidActive ? "ok" : "optional"}>
+              {profile?.paidActive && profile.paidUntil
+                ? `paid until ${profile.paidUntil.slice(0, 10)}`
+                : "free tier"}
             </StatusPill>
           </div>
         </div>
@@ -223,7 +215,7 @@ export default async function PayPage({
         <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-mid">
           {TOPUP_PAUSED
             ? "Checkout is paused while the payment path is tested, so no new payment is accepted and the upload form is closed. The plans below are the ones that exist; a redeem code still adds Dew."
-            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, then upload it below. Approval adds the Dew and switches the account to the paid daily allowance."}
+            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, then upload it below. Approval adds the pass's Dew and starts or extends the paid daily allowance."}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-raised px-4 py-3">
@@ -282,7 +274,7 @@ export default async function PayPage({
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {OFFERED_PLANS.map((plan) => (
+          {PLANS.map((plan) => (
             <div
               key={plan.id}
               className="rounded-3xl border border-line bg-raised px-4 py-4"
@@ -305,7 +297,7 @@ export default async function PayPage({
                 </span>
               </p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
-                {plan.days ? `${plan.days} days` : "one-off"}
+                {plan.days} days
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-mid">
                 {plan.blurb}
@@ -345,10 +337,10 @@ export default async function PayPage({
             <span className="eyebrow block px-1 pb-1.5">Plan</span>
             <select
               name="plan"
-              defaultValue={OFFERED_PLANS[0]?.id}
+              defaultValue={PLANS[0]?.id}
               className="field py-2 text-[12px]"
             >
-              {OFFERED_PLANS.map((plan) => (
+              {PLANS.map((plan) => (
                 <option key={plan.id} value={plan.id}>
                   {plan.name} — {plan.dew} Dew
                 </option>
@@ -366,7 +358,7 @@ export default async function PayPage({
               min="0"
               step="0.01"
               inputMode="decimal"
-              placeholder={String(OFFERED_PLANS[0]?.price ?? "")}
+              placeholder={String(PLANS[0]?.price ?? "")}
               className="field py-2 font-mono text-[12px]"
             />
           </label>

@@ -39,7 +39,7 @@ type ProfileRow = {
   id: string;
   email: string | null;
   dew_balance: number | string;
-  has_paid: boolean;
+  paid_until: string | null;
 };
 
 type AccountRow = ProfileRow & {
@@ -77,6 +77,11 @@ function accountsHref(query: string, shown: number): string {
 function utc(value: string | null): string {
   if (!value) return "—";
   return value.slice(0, 16).replace("T", " ");
+}
+
+/** Entitlement is the window, not the historical "has ever paid" flag. */
+function paidActive(until: string | null | undefined): boolean {
+  return typeof until === "string" && Date.parse(until) > Date.now();
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -125,28 +130,56 @@ export default async function AdminPage({
     );
   }
 
-  const [requestsResult, adminsResult, membersResult, balancesResult, codesResult] =
-    await Promise.all([
-      admin
-        .from("payment_requests")
-        .select(
-          "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, dew_granted, decision_note, created_at, decided_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(60),
-      admin
-        .from("admin_users")
-        .select("user_id, granted_at")
-        .order("granted_at", { ascending: false })
-        .limit(50),
-      admin.from("profiles").select("id", { count: "exact", head: true }),
-      admin.from("profiles").select("dew_balance").limit(5000),
-      admin
-        .from("dew_codes")
-        .select("code, dew_amount, note, created_at, redeemed_at")
-        .order("created_at", { ascending: false })
-        .limit(12),
-    ]);
+  // Pending receipts are their own query. Filtering them out of the newest 60
+  // requests left older pending rows invisible — and unreviewable — on a busy
+  // deployment. Decisions are a separate, small, newest-first list.
+  const [
+    pendingResult,
+    decidedResult,
+    adminsResult,
+    adminCountResult,
+    membersResult,
+    dewHeldResult,
+    selfAdminResult,
+    codesResult,
+  ] = await Promise.all([
+    admin
+      .from("payment_requests")
+      .select(
+        "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, dew_granted, decision_note, created_at, decided_at"
+      )
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(50),
+    admin
+      .from("payment_requests")
+      .select(
+        "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, dew_granted, decision_note, created_at, decided_at"
+      )
+      .neq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    admin
+      .from("admin_users")
+      .select("user_id, granted_at")
+      .order("granted_at", { ascending: false })
+      .limit(50),
+    admin.from("admin_users").select("user_id", { count: "exact", head: true }),
+    admin.from("profiles").select("id", { count: "exact", head: true }),
+    // One aggregate for the whole table: summing a capped page undercounted.
+    admin.rpc("admin_dew_held"),
+    // The warning below asks about this operator, not about the first 50 rows.
+    admin
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", access.userId)
+      .maybeSingle(),
+    admin
+      .from("dew_codes")
+      .select("code, dew_amount, note, created_at, redeemed_at")
+      .order("created_at", { ascending: false })
+      .limit(12),
+  ]);
 
   const giveawayCodes = (codesResult.data ?? []) as Array<{
     code: string;
@@ -155,31 +188,36 @@ export default async function AdminPage({
     redeemed_at: string | null;
   }>;
 
-  const requests = (requestsResult.data ?? []) as RequestRow[];
+  const pending = (pendingResult.data ?? []) as RequestRow[];
+  const decided = (decidedResult.data ?? []) as RequestRow[];
   const adminRows = (adminsResult.data ?? []) as Array<{
     user_id: string;
     granted_at: string;
   }>;
 
-  const ownerIds = [...new Set([...requests.map((row) => row.owner), ...adminRows.map((row) => row.user_id)])];
+  const adminCount = adminCountResult.count ?? adminRows.length;
+  const dewHeld = dewHeldResult.error ? null : Number(dewHeldResult.data ?? 0);
+  const selfIsStoredAdmin = Boolean(selfAdminResult.data);
+  const paymentsError = pendingResult.error ?? decidedResult.error;
+
+  const ownerIds = [
+    ...new Set([
+      ...pending.map((row) => row.owner),
+      ...decided.map((row) => row.owner),
+      ...adminRows.map((row) => row.user_id),
+    ]),
+  ];
 
   const profilesResult = ownerIds.length
     ? await admin
         .from("profiles")
-        .select("id, email, dew_balance, has_paid")
+        .select("id, email, dew_balance, paid_until")
         .in("id", ownerIds)
     : { data: [] as ProfileRow[] };
 
   const profiles = new Map(
     ((profilesResult.data ?? []) as ProfileRow[]).map((row) => [row.id, row])
   );
-
-  const pending = requests.filter((row) => row.status === "pending");
-  const decided = requests.filter((row) => row.status !== "pending").slice(0, 10);
-
-  const dewHeld = ((balancesResult.data ?? []) as Array<{
-    dew_balance: number | string;
-  }>).reduce((total, row) => total + Number(row.dew_balance), 0);
 
   // Accounts are their own query so the panel does not get slower as the member
   // list grows. Search and paging run in Postgres and only the slice on screen
@@ -192,7 +230,7 @@ export default async function AdminPage({
 
   let accountQuery = admin
     .from("profiles")
-    .select("id, email, handle, dew_balance, has_paid, created_at", {
+    .select("id, email, handle, dew_balance, paid_until, created_at", {
       count: "exact",
     });
 
@@ -217,10 +255,6 @@ export default async function AdminPage({
         .createSignedUrl(row.receipt_path, 600);
       if (data?.signedUrl) signed.set(row.id, data.signedUrl);
     })
-  );
-
-  const selfIsStoredAdmin = adminRows.some(
-    (row) => row.user_id === access.userId
   );
 
   return (
@@ -294,8 +328,11 @@ export default async function AdminPage({
         {[
           { label: "members", value: String(membersResult.count ?? 0) },
           { label: "receipts waiting", value: String(pending.length) },
-          { label: "dew held", value: formatDew(dewHeld) },
-          { label: "admins", value: String(adminRows.length) },
+          {
+            label: "dew + wallet",
+            value: dewHeld === null ? "—" : formatDew(dewHeld),
+          },
+          { label: "admins", value: String(adminCount) },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -380,8 +417,8 @@ export default async function AdminPage({
                   <span className="font-mono text-[10.5px] text-low">
                     {formatDew(Number(member.dew_balance))} dew
                   </span>
-                  <StatusPill tone={member.has_paid ? "ok" : "optional"}>
-                    {member.has_paid ? "paid" : "free"}
+                  <StatusPill tone={paidActive(member.paid_until) ? "ok" : "optional"}>
+                    {paidActive(member.paid_until) ? "paid" : "free"}
                   </StatusPill>
                 </div>
               </li>
@@ -412,13 +449,14 @@ export default async function AdminPage({
         )}
       </section>
 
-      {requestsResult.error && (
+      {paymentsError && (
         <p
           role="alert"
           className="mt-5 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] leading-relaxed text-danger"
         >
-          Payment tables are not readable: {requestsResult.error.message}. Apply
-          migration 013 with <span className="font-mono">supabase db push</span>.
+          Payment tables are not readable: {paymentsError.message}. Check that
+          the migrations in <span className="font-mono">supabase/migrations</span>{" "}
+          are applied with <span className="font-mono">supabase db push</span>.
         </p>
       )}
 
@@ -490,7 +528,7 @@ export default async function AdminPage({
                       balance {formatDew(Number(member?.dew_balance ?? 0))}
                     </span>
                     <span className="font-mono text-[10px] text-low">
-                      {member?.has_paid ? "paid" : "free"}
+                      {paidActive(member?.paid_until) ? "paid" : "free"}
                     </span>
                   </div>
 
@@ -711,11 +749,7 @@ export default async function AdminPage({
                   </div>
                   <form action={setAdmin}>
                     <input type="hidden" name="enabled" value="0" />
-                    <input
-                      type="hidden"
-                      name="email"
-                      value={profiles.get(row.user_id)?.email ?? ""}
-                    />
+                    <input type="hidden" name="userId" value={row.user_id} />
                     <SubmitButton
                       className="text-[10.5px] text-danger hover:underline"
                       pendingText="Revoking…"

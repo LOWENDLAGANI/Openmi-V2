@@ -376,10 +376,17 @@ test("only the approval path imports the GitHub write client", () => {
         !file.startsWith("tests/")
     );
 
+  // Creating a chat from a template makes one private repository of its own;
+  // it never writes to a repository the reader attached. Everything else that
+  // writes goes through approval or undo.
+  const ALLOWED = new Set([
+    "lib/changesets/commit.ts",
+    "lib/changesets/undo.ts",
+    "app/github/actions.ts",
+  ]);
+
   const offenders = files.filter((file) => {
-    if (file === "lib/changesets/commit.ts" || file === "lib/changesets/undo.ts") {
-      return false;
-    }
+    if (ALLOWED.has(file)) return false;
     const text = readFileSync(join(ROOT, file), "utf8");
     return /from\s+"@\/lib\/github\/write"/.test(text);
   });

@@ -41,9 +41,6 @@ export const LOW_BALANCE_DEW = 10;
 export const INVITE_REWARD_DEW = 5;
 export const MAX_INVITES_PER_ACCOUNT = 10;
 
-/** Top-up sizes an operator can issue as a code. No card payment exists yet. */
-export const TOPUP_PACKS = [20, 50, 100] as const;
-
 /**
  * Timezones offered in the activity page. The profile column defaults to
  * Asia/Kuala_Lumpur, so it must be in this list.
@@ -135,7 +132,7 @@ export function hourRemainingMs(input: {
   return Math.min(Math.max(0, limit), Math.max(0, ends - base - elapsed));
 }
 
-/** The daily allowance for an account, in Dew. */
-export function dailyAllowance(hasPaid: boolean): number {
-  return hasPaid ? PAID_DAILY_FREE_DEW : DAILY_FREE_DEW;
+/** The daily allowance for an account, in Dew: 15 while a pass is active. */
+export function dailyAllowance(paidActive: boolean): number {
+  return paidActive ? PAID_DAILY_FREE_DEW : DAILY_FREE_DEW;
 }

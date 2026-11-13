@@ -1,21 +1,30 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { PLANS, PLAN_IDS } from "../lib/billing/plans";
+
 const page = () => readFileSync("app/pay/page.tsx", "utf8");
 const admin = () => readFileSync("app/admin/page.tsx", "utf8");
 
-test("the plans page offers the paid passes, not the one-off top-up packs", () => {
+test("the plans page sells the passes and nothing else", () => {
   const source = page();
 
-  expect(source).toContain(
-    "const OFFERED_PLANS = PLANS.filter((plan) => plan.days !== undefined)"
-  );
-  expect(source).toContain("OFFERED_PLANS.map");
   // Every list on the page — the cards, the receipt form's options and its
-  // default — reads the filtered set, so a hidden pack cannot be picked.
-  // A word boundary on the left keeps this from matching OFFERED_PLANS.
-  expect(/[^\w]PLANS\.map/.test(source)).toBe(false);
-  expect(/[^\w]PLANS\[/.test(source)).toBe(false);
+  // defaults — reads the same catalogue.
+  expect(source).toContain("{PLANS.map(");
+  expect(source).toContain("defaultValue={PLANS[0]?.id}");
+  expect(source).not.toContain("OFFERED_PLANS");
+});
+
+test("every sellable plan is an expiring pass", () => {
+  expect(PLAN_IDS).toEqual(["pass-15", "pass-30"]);
+
+  for (const plan of PLANS) {
+    // A plan without days would be the old permanent badge in disguise.
+    expect(plan.days).toBeGreaterThan(0);
+    expect(plan.price).toBeGreaterThan(0);
+    expect(plan.dew).toBeGreaterThan(0);
+  }
 });
 
 test("the admin panel still tops up a balance by hand", () => {

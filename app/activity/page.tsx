@@ -211,7 +211,7 @@ export default async function ActivityPage({
         </p>
         <p className="mt-3 text-[12.5px] leading-relaxed text-mid">
           An hour of chat costs {DEW_PER_HOUR} Dew, charged before the provider is
-          called. The daily allowance is {dailyAllowance(profile.hasPaid)} Dew,
+          called. The daily allowance is {dailyAllowance(profile.paidActive)} Dew,
           settled at local midnight in {profile.timezone}.
         </p>
 

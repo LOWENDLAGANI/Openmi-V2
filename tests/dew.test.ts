@@ -12,7 +12,6 @@ import {
   MAX_INVITES_PER_ACCOUNT,
   PAID_DAILY_FREE_DEW,
   TIMEZONES,
-  TOPUP_PACKS,
   TRIAL_DEW,
   TRIAL_GRANT_MAX_PER_IP,
   TRIAL_GRANT_WINDOW_HOURS,
@@ -133,11 +132,6 @@ test("the activity timezones include the profile default and reject junk", () =>
   expect(normalizeTimezone(" Mars/Olympus ")).toBeNull();
   expect(normalizeTimezone("")).toBeNull();
   expect(normalizeTimezone(undefined)).toBeNull();
-});
-
-test("top-up packs are positive and ordered", () => {
-  expect(TOPUP_PACKS[0]).toBeGreaterThan(0);
-  expect([...TOPUP_PACKS]).toEqual([...TOPUP_PACKS].sort((a, b) => a - b));
 });
 
 test("the paid benefits are the ones advertised", () => {
