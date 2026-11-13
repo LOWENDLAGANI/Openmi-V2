@@ -300,6 +300,15 @@ test("a redeem code is service-role only, works once and adds Dew only", async (
     db.query("select * from public.redeem_dew_code('topup-20')")
   ).rejects.toThrow(/permission denied/);
 
+  // The owner is not the caller's to choose: a signed-in account can only
+  // redeem into its own balance. The mismatch is refused before the code is
+  // touched, so the code survives for its real owner.
+  await expect(
+    db.query(
+      "select * from public.redeem_dew_code('99999999-9999-4999-8999-999999999999', 'topup-20')"
+    )
+  ).rejects.toThrow(/not your balance/);
+
   await reset();
   const redeemed = await db.query<{ amount: string; balance: string }>(
     "select * from public.redeem_dew_code($1, 'topup-20')",
@@ -323,6 +332,40 @@ test("a redeem code is service-role only, works once and adds Dew only", async (
   expect(rows[0].has_paid).toBe(false);
   expect(rows[0].paid_until).toBeNull();
   expect(await ledgerCount(A, "topup")).toBe(1);
+});
+
+test("a receipt reference is single-use and cannot underpay its plan", async () => {
+  await reset();
+  await actAs("authenticated", A);
+
+  const first = await db.query<{ id: string }>(
+    "select * from public.submit_payment_request('pass-15', 18, 'TX-REPLAY-1', null, $1)",
+    [`${A}/first.pdf`]
+  );
+  expect(first.rows).toHaveLength(1);
+
+  // Same transaction, second plan: already used, even with different casing.
+  await expect(
+    db.query(
+      "select * from public.submit_payment_request('pass-30', 36, 'tx-replay-1', null, $1)",
+      [`${A}/second.pdf`]
+    )
+  ).rejects.toThrow(/already submitted/);
+
+  // A RM36 pass paid with RM35.99 would still open thirty paid days.
+  await expect(
+    db.query(
+      "select * from public.submit_payment_request('pass-30', 35.99, 'TX-UNDER-1', null, $1)",
+      [`${A}/third.pdf`]
+    )
+  ).rejects.toThrow(/below the plan price/);
+
+  await reset();
+  const { rows } = await db.query<{ count: number }>(
+    "select count(*)::int as count from public.payment_requests where owner = $1 and reference like 'TX-%'",
+    [A]
+  );
+  expect(Number(rows[0].count)).toBe(1);
 });
 
 test("a pass is a window: approval extends paid_until and grants its Dew", async () => {

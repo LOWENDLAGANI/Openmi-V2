@@ -27,6 +27,20 @@ test("every sellable plan is an expiring pass", () => {
   }
 });
 
+test("the database charges and extends exactly what the catalogue sells", () => {
+  const sql = [
+    readFileSync("supabase/migrations/038_subscription_passes.sql", "utf8"),
+    readFileSync("supabase/migrations/039_payment_holes.sql", "utf8"),
+  ].join("\n");
+
+  // The price and the days live in SQL as well as here; drift in either place
+  // would sell something the database does not honour.
+  for (const plan of PLANS) {
+    expect(sql).toContain(`when '${plan.id}' then ${plan.price}`);
+    expect(sql).toContain(`when '${plan.id}' then ${plan.days}`);
+  }
+});
+
 test("the admin panel still tops up a balance by hand", () => {
   const source = admin();
 

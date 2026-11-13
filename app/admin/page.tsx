@@ -148,6 +148,7 @@ export default async function AdminPage({
     decidedResult,
     adminsResult,
     adminCountResult,
+    pendingCountResult,
     membersResult,
     dewHeldResult,
     selfAdminResult,
@@ -175,6 +176,12 @@ export default async function AdminPage({
       .order("granted_at", { ascending: false })
       .limit(50),
     admin.from("admin_users").select("user_id", { count: "exact", head: true }),
+    // The queue below is capped at the 50 oldest; the stat must still be the
+    // real number waiting, not the length of that page.
+    admin
+      .from("payment_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
     admin.from("profiles").select("id", { count: "exact", head: true }),
     // One aggregate for the whole table: summing a capped page undercounted.
     admin.rpc("admin_dew_held"),
@@ -206,9 +213,11 @@ export default async function AdminPage({
   }>;
 
   const adminCount = adminCountResult.count ?? adminRows.length;
+  const pendingTotal = pendingCountResult.count ?? pending.length;
   const dewHeld = dewHeldResult.error ? null : Number(dewHeldResult.data ?? 0);
   const selfIsStoredAdmin = Boolean(selfAdminResult.data);
-  const paymentsError = pendingResult.error ?? decidedResult.error;
+  const paymentsError =
+    pendingResult.error ?? decidedResult.error ?? pendingCountResult.error;
 
   const ownerIds = [
     ...new Set([
@@ -337,7 +346,7 @@ export default async function AdminPage({
       <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "members", value: String(membersResult.count ?? 0) },
-          { label: "receipts waiting", value: String(pending.length) },
+          { label: "receipts waiting", value: String(pendingTotal) },
           {
             label: "dew + wallet",
             value: dewHeld === null ? "—" : formatDew(dewHeld),
