@@ -1,28 +1,37 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  AD_GATE_CONFIRMATIONS,
+  AD_GATE_CONFIRM_MS,
   AD_GATE_RECHECK_MS,
   AD_PROBE_CLASSES,
+  AD_PROBE_CONTROL_URL,
   AD_PROBE_SIZE,
   AD_PROBE_TIMEOUT_MS,
   AD_PROBE_URL,
+  adBlockVerdict,
   decideAdGate,
   isProbeHidden,
+  type AdEvidence,
+  type ProbeAnswer,
 } from "@/lib/adblock";
 import { adConfig } from "@/lib/ads";
 
 /**
- * Detects a hidden bait box, or a refused request to an ad host.
+ * Counts the bait boxes a filter removed.
  *
- * The bait stage sits off the left edge at a real 300×250, so a cosmetic filter
- * that hides `.adsbox` and friends leaves it with a zero box. The stage is
- * removed in the same tick, before anything can paint.
+ * The stage sits off the left edge at a real 300×250, so a cosmetic filter that
+ * hides `.adsbox` and friends leaves a zero box behind. The measurement waits
+ * for two frames: a filter list can be injected after the element is appended,
+ * and a box read in the same tick the element was created reports its size
+ * either way. The count, not a boolean, is returned because one hidden div is
+ * not a filter list.
  */
-function probeCosmetic(): boolean {
-  if (typeof document === "undefined" || !document.body) return false;
+async function probeCosmetic(): Promise<number> {
+  if (typeof document === "undefined" || !document.body) return 0;
 
   const stage = document.createElement("div");
   stage.setAttribute("aria-hidden", "true");
@@ -40,7 +49,16 @@ function probeCosmetic(): boolean {
 
   document.body.appendChild(stage);
 
-  const hidden = baits.some((bait) => {
+  // A hidden tab never paints, so its frames never arrive; the timer is the
+  // floor that keeps a probe from hanging forever.
+  await Promise.race([
+    new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    ),
+    new Promise<void>((resolve) => window.setTimeout(resolve, 300)),
+  ]);
+
+  const hidden = baits.filter((bait) => {
     const box = bait.getBoundingClientRect();
     const style = window.getComputedStyle(bait);
 
@@ -51,22 +69,21 @@ function probeCosmetic(): boolean {
       visibility: style.visibility,
       opacity: style.opacity,
     });
-  });
+  }).length;
 
   stage.remove();
   return hidden;
 }
 
 /**
- * A blocked request is evidence; a slow one is not. A timeout answers "no
- * answer", which is treated as clear so a bad connection never reads as a
- * blocker. An offline browser is likewise not accused.
+ * One request, and what came back.
+ *
+ * `no-cors` keeps the response opaque, which is all this needs: the question is
+ * whether the request was allowed to leave, not what the host answered. A
+ * timeout is its own answer, because a request the browser gave up on is not
+ * the same thing as one a filter refused.
  */
-async function probeNetwork(): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return false;
-  }
-
+async function probeUrl(url: string): Promise<ProbeAnswer> {
   const controller = new AbortController();
   let timedOut = false;
   const timer = window.setTimeout(() => {
@@ -75,28 +92,51 @@ async function probeNetwork(): Promise<boolean> {
   }, AD_PROBE_TIMEOUT_MS);
 
   try {
-    await fetch(AD_PROBE_URL, {
+    await fetch(url, {
       mode: "no-cors",
       cache: "no-store",
       redirect: "follow",
       signal: controller.signal,
     });
-    return false;
+    return "ok";
   } catch {
-    return !timedOut;
+    return timedOut ? "timeout" : "failed";
   } finally {
     window.clearTimeout(timer);
   }
 }
 
 /**
+ * Both probes, side by side.
+ *
+ * The control request is what stops a bad connection from reading as a blocker:
+ * the ad host and this site's own favicon are fetched at the same moment, and
+ * only a refusal of the first while the second succeeds says anything about
+ * ads. A browser that reports itself offline says nothing at all.
+ */
+async function collectEvidence(): Promise<AdEvidence> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return { hiddenBaits: 0, ad: "timeout", control: "timeout" };
+  }
+
+  const [hiddenBaits, ad, control] = await Promise.all([
+    probeCosmetic(),
+    probeUrl(AD_PROBE_URL),
+    probeUrl(AD_PROBE_CONTROL_URL),
+  ]);
+
+  return { hiddenBaits, ad, control };
+}
+
+/**
  * The blocking notice.
  *
- * It is mounted once in the root layout and covers the viewport when all three
- * conditions hold: an ad key is configured, the current path is a product
- * surface, and the browser is hiding the bait. It re-checks on an interval so
- * turning the blocker off clears it without a reload, and it never renders
- * during server rendering, so a wall cannot be baked into the HTML.
+ * It is mounted once in the root layout and covers the viewport only when an ad
+ * key is configured, the current path is a product surface, and repeated checks
+ * agree that the browser is hiding ads. It re-checks on a fast beat while it is
+ * unsure and on a slow one once the page is clear, so turning a blocker off
+ * clears the wall without a reload, and it never renders during server
+ * rendering, so a wall cannot be baked into the HTML.
  */
 export function AdBlockGate() {
   const pathname = usePathname() ?? "/";
@@ -111,40 +151,60 @@ export function AdBlockGate() {
   );
 
   const [detected, setDetected] = useState(false);
+  const [confirmations, setConfirmations] = useState(0);
   const [checking, setChecking] = useState(false);
   const [host, setHost] = useState("");
   const buttonRef = useRef<HTMLButtonElement | null>(null);
-
-  const runProbe = useCallback(async (withNetwork: boolean) => {
-    if (probeCosmetic()) return true;
-    if (!withNetwork) return false;
-
-    return probeNetwork();
-  }, []);
 
   useEffect(() => {
     if (!adsConfigured) return;
 
     let alive = true;
+    let timer = 0;
+    let streak = 0;
 
-    const check = async (withNetwork: boolean) => {
-      const blocked = await runProbe(withNetwork);
-      if (alive) setDetected(blocked);
+    const schedule = (ms: number) => {
+      if (!alive) return;
+      timer = window.setTimeout(() => void run(), ms);
     };
 
-    void check(true);
-    const timer = window.setInterval(
-      () => void check(false),
-      AD_GATE_RECHECK_MS
-    );
+    const run = async () => {
+      // A background tab throttles timers and drops requests; that silence is
+      // not evidence about ads, so it is skipped rather than counted as one.
+      if (document.visibilityState !== "visible") {
+        schedule(AD_GATE_RECHECK_MS);
+        return;
+      }
+
+      const verdict = adBlockVerdict(await collectEvidence());
+      if (!alive) return;
+
+      streak = verdict === "clear" ? 0 : streak + 1;
+      setDetected(streak > 0);
+      setConfirmations(streak);
+
+      // A sighting is confirmed on the fast beat, because the reader is about
+      // to be interrupted; a clear page is re-checked slowly, because nothing
+      // is waiting on it.
+      schedule(
+        verdict === "clear" ? AD_GATE_RECHECK_MS : AD_GATE_CONFIRM_MS
+      );
+    };
+
+    void run();
 
     return () => {
       alive = false;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
-  }, [adsConfigured, runProbe]);
+  }, [adsConfigured]);
 
-  const decision = decideAdGate({ adsConfigured, pathname, detected });
+  const decision = decideAdGate({
+    adsConfigured,
+    pathname,
+    detected,
+    confirmations,
+  });
 
   useEffect(() => {
     if (!decision.block) return;
@@ -163,7 +223,17 @@ export function AdBlockGate() {
   async function checkAgain() {
     setChecking(true);
     try {
-      setDetected(await runProbe(true));
+      const verdict = adBlockVerdict(await collectEvidence());
+
+      if (verdict === "clear") {
+        setDetected(false);
+        setConfirmations(0);
+      } else {
+        // The wall is already up: a re-check that still sees the same thing
+        // holds it there instead of flashing the page for one frame.
+        setDetected(true);
+        setConfirmations(AD_GATE_CONFIRMATIONS);
+      }
     } finally {
       setChecking(false);
     }
