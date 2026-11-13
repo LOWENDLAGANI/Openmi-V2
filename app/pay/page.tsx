@@ -23,7 +23,12 @@ import {
   paymentLink,
   planById,
 } from "@/lib/billing/plans";
-import { DAILY_FREE_DEW, formatDew, formatPassRemaining } from "@/lib/dew";
+import {
+  DAILY_FREE_DEW,
+  formatDew,
+  formatPassDate,
+  formatPassRemaining,
+} from "@/lib/dew";
 import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
 import { getSession } from "@/lib/session";
 import { submitReceipt } from "./actions";
@@ -206,7 +211,7 @@ export default async function PayPage({
             )}
             <StatusPill tone={profile?.paidActive ? "ok" : "optional"}>
               {profile?.paidActive && profile.paidUntil
-                ? `paid until ${profile.paidUntil.slice(0, 10)}`
+                ? `paid until ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}`
                 : "free tier"}
             </StatusPill>
           </div>
@@ -221,8 +226,8 @@ export default async function PayPage({
         {profile?.paidUntil && (
           <p className="mt-2 max-w-xl text-[11.5px] leading-relaxed text-low">
             {profile.paidActive
-              ? `Your pass ends ${profile.paidUntil.slice(0, 10)} — ${formatPassRemaining(profile.paidUntil)}.`
-              : `Your last pass ended ${profile.paidUntil.slice(0, 10)}. The daily allowance is back to ${DAILY_FREE_DEW} Dew.`}
+              ? `Your pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} — ${formatPassRemaining(profile.paidUntil)}.`
+              : `Your last pass ended ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}. The daily allowance is back to ${DAILY_FREE_DEW} Dew.`}
           </p>
         )}
 

@@ -138,6 +138,34 @@ export function dailyAllowance(paidActive: boolean): number {
 }
 
 /**
+ * The calendar date a pass ends, in the member's own timezone.
+ *
+ * A pass ending at 00:30 in Kuala Lumpur is still the previous day in UTC, and
+ * the date a member reads should be their date. An unset or invalid zone falls
+ * back to UTC rather than hiding the date.
+ */
+export function formatPassDate(
+  until: string | null | undefined,
+  timeZone: string | null | undefined
+): string | null {
+  if (!until) return null;
+
+  const ends = new Date(until);
+  if (Number.isNaN(ends.getTime())) return null;
+
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timeZone || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(ends);
+  } catch {
+    return ends.toISOString().slice(0, 10);
+  }
+}
+
+/**
  * How long is left on a paid pass, as a sentence a reader can act on.
  *
  * Days while there is at least a day, hours inside the last day, and a plain

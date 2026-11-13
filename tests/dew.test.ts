@@ -18,6 +18,7 @@ import {
   dailyAllowance,
   formatDew,
   formatHourRemaining,
+  formatPassDate,
   formatPassRemaining,
   hourRemainingMs,
   isLowBalance,
@@ -146,6 +147,18 @@ test("the pass countdown says how long is left before the free tier returns", ()
   expect(formatPassRemaining("2026-11-28T10:00:00.000Z", now)).toBe(
     "15 days left"
   );
+});
+
+test("a pass ends on the member's date, not the UTC date", () => {
+  const until = "2026-12-01T17:30:00.000Z";
+
+  // 17:30 UTC is already 01:30 on the next day in Kuala Lumpur.
+  expect(formatPassDate(until, "Asia/Kuala_Lumpur")).toBe("2026-12-02");
+  expect(formatPassDate(until, "UTC")).toBe("2026-12-01");
+  expect(formatPassDate(until, null)).toBe("2026-12-01");
+  expect(formatPassDate(until, "Not/AZone")).toBe("2026-12-01");
+  expect(formatPassDate(null, "UTC")).toBeNull();
+  expect(formatPassDate("not a date", "UTC")).toBeNull();
 });
 
 test("the activity timezones include the profile default and reject junk", () => {

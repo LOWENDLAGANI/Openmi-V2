@@ -13,6 +13,7 @@ import {
   TIMEZONES,
   dailyAllowance,
   formatDew,
+  formatPassDate,
   formatPassRemaining,
   isLowBalance,
 } from "@/lib/dew";
@@ -219,8 +220,8 @@ export default async function ActivityPage({
         {profile.paidUntil && (
           <p className="mt-2 font-mono text-[10.5px] text-low">
             {profile.paidActive
-              ? `pass ends ${profile.paidUntil.slice(0, 10)} · ${formatPassRemaining(profile.paidUntil)}`
-              : `pass ended ${profile.paidUntil.slice(0, 10)}`}
+              ? `pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} · ${formatPassRemaining(profile.paidUntil)}`
+              : `pass ended ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}`}
           </p>
         )}
 
