@@ -84,6 +84,16 @@ function paidActive(until: string | null | undefined): boolean {
   return typeof until === "string" && Date.parse(until) > Date.now();
 }
 
+/** The date an operator needs: when the allowance ends, or when it ended. */
+function passLabel(until: string | null | undefined): string | null {
+  if (typeof until !== "string" || Number.isNaN(Date.parse(until))) {
+    return null;
+  }
+
+  const date = until.slice(0, 10);
+  return paidActive(until) ? `pass until ${date}` : `pass ended ${date}`;
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
@@ -396,33 +406,39 @@ export default async function AdminPage({
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-line">
-            {accountRows.map((member) => (
-              <li
-                key={member.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-[12px] text-body"
-                    title={member.email ?? member.handle ?? member.id}
-                  >
-                    {member.email ?? member.handle ?? member.id}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10px] text-low">
-                    joined {utc(member.created_at)}
-                  </p>
-                </div>
+            {accountRows.map((member) => {
+              const active = paidActive(member.paid_until);
+              const pass = passLabel(member.paid_until);
 
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="font-mono text-[10.5px] text-low">
-                    {formatDew(Number(member.dew_balance))} dew
-                  </span>
-                  <StatusPill tone={paidActive(member.paid_until) ? "ok" : "optional"}>
-                    {paidActive(member.paid_until) ? "paid" : "free"}
-                  </StatusPill>
-                </div>
-              </li>
-            ))}
+              return (
+                <li
+                  key={member.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-[12px] text-body"
+                      title={member.email ?? member.handle ?? member.id}
+                    >
+                      {member.email ?? member.handle ?? member.id}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] text-low">
+                      joined {utc(member.created_at)}
+                      {pass ? ` · ${pass}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-mono text-[10.5px] text-low">
+                      {formatDew(Number(member.dew_balance))} dew
+                    </span>
+                    <StatusPill tone={active ? "ok" : "optional"}>
+                      {active ? "paid" : "free"}
+                    </StatusPill>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
 

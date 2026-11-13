@@ -33,3 +33,13 @@ test("the admin panel still tops up a balance by hand", () => {
   expect(source).toContain("Top up a balance");
   expect(source).toContain("grantDew");
 });
+
+test("the admin member list shows when a pass ends", () => {
+  const source = admin();
+
+  // paid_until is the entitlement; an operator reading the list needs the date,
+  // not only the paid/free pill.
+  expect(source).toContain("passLabel(member.paid_until)");
+  expect(source).toContain("pass until");
+  expect(source).toContain("pass ended");
+});
