@@ -131,6 +131,13 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to the Sociabuzz page in lib/billing/plans.ts",
   },
   {
+    key: "TOPUP_PAUSED",
+    scope: "server",
+    required: false,
+    unlocks: "Open real-money checkout on /pay",
+    hint: 'Closed by default; set to "off" to show the payment link and receipt form',
+  },
+  {
     key: "RESEND_API_KEY",
     scope: "server",
     required: false,

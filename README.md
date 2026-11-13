@@ -36,6 +36,21 @@ Nothing is required to boot. With an empty `.env.local` the app starts and
 migrations have been applied. Once Supabase is configured that report lives in
 the admin panel under **Configuration & probes**; it is not a public page.
 
+## Before a public launch
+
+- Apply the database with `supabase db push`. Migrations 038 and 039 add
+  `paid_until`, the pass-window allowance and the payment guards; the UI and
+  the schema have to move together.
+- Set `NEXT_PUBLIC_SITE_URL` to the public origin, and add
+  `https://<your-domain>/auth/callback` to Supabase → Authentication → URL
+  configuration.
+- Set `ADMIN_EMAILS` (or `ADMIN_EMAIL_DOMAIN`) so the admin panel has an
+  operator, and `GITHUB_TOKEN_KEY` so connected GitHub tokens can be sealed.
+- Checkout is closed by default. Point `PAYMENT_LINK` at the live page, then set
+  `TOPUP_PAUSED=off` to show the payment link and the receipt form.
+- Set `CRON_SECRET`; without it the sandbox sweep answers 503 and E2B's own idle
+  and expiry timers are the only backstop.
+
 ## Sign in
 
 Email and password through Supabase Auth. The session lives in an httpOnly
@@ -238,7 +253,9 @@ An invite rewards both sides 5 Dew, once per invitee, up to 10 rewarded
 accounts. Refunds are one per session at the original price and are written for
 a provider failure or an abort before the first token; anything else is an
 operator adjustment, which is service-role only. Top-ups are operator-issued
-redeem codes — there is no card payment in this build.
+redeem codes — there is no card payment in this build. Checkout is closed by
+default; set `TOPUP_PAUSED=off` to show the hosted payment link and the receipt
+form.
 
 `/activity` shows the ledger, the running hour, per-chat token estimates, the
 invite code, the redeem form and the refill timezone. The sum of the ledger

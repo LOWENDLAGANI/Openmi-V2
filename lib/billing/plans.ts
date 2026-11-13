@@ -64,13 +64,20 @@ export const PAID_BENEFITS = [
 ] as const;
 
 /**
- * Real-money top-ups are paused while the payment path is being tested.
+ * Real-money checkout is closed unless the operator opens it.
  *
- * A code still works, because an operator hands it out and no checkout is
- * involved. The flag is a constant rather than an environment variable so the
- * page, the copy and its test cannot disagree about whether checkout is live.
+ * `TOPUP_PAUSED=off` shows the hosted payment link and the receipt form; unset,
+ * or any other value, keeps the safe default of a closed checkout. A redeem
+ * code works either way, because no checkout is involved. The page, its copy
+ * and the tests all read this one switch, so they cannot disagree about whether
+ * money can be taken.
  */
-export const TOPUP_PAUSED = true;
+export function checkoutPaused(value: string | undefined): boolean {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return !["off", "false", "0"].includes(normalized);
+}
+
+export const TOPUP_PAUSED = checkoutPaused(process.env.TOPUP_PAUSED);
 
 export function planById(value: string | null | undefined): Plan | null {
   if (!value) return null;

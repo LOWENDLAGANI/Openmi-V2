@@ -119,7 +119,7 @@ const SECTIONS: LegalSection[] = [
         kind: "list",
         items: [
           "Paid plans are sold through a hosted payment page operated by Sociabuzz. We never receive or store card details.",
-          "A plan becomes active when a receipt you upload is approved. While checkout is paused, no new payment is accepted; a redeem code issued by an operator still adds Dew.",
+          "A plan becomes active when a receipt you upload is approved. A redeem code issued by an operator adds Dew only; it does not start or extend a pass.",
           "A refund is recorded when the provider fails — including when it fails after streaming part of an answer — or when you stop a turn before the first token. Stopping after text has arrived, reaching a time or step limit, or pausing a turn does not refund, because the work is kept and the turn can continue.",
           "Dew has no cash value, is not transferable, and may not be resold. A balance is a licence to use the service, not a deposit, and it is not redeemable for money.",
           "Prices and allowances may change. A change applies to hours started after it is announced in the product.",

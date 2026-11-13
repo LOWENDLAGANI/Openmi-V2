@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { PLANS, PLAN_IDS } from "../lib/billing/plans";
+import { PLANS, PLAN_IDS, checkoutPaused } from "../lib/billing/plans";
 
 const page = () => readFileSync("app/pay/page.tsx", "utf8");
 const admin = () => readFileSync("app/admin/page.tsx", "utf8");
@@ -39,6 +39,15 @@ test("the database charges and extends exactly what the catalogue sells", () => 
     expect(sql).toContain(`when '${plan.id}' then ${plan.price}`);
     expect(sql).toContain(`when '${plan.id}' then ${plan.days}`);
   }
+});
+
+test("checkout opens only with an explicit off switch", () => {
+  // A fresh deployment must not start taking money because a variable is unset.
+  expect(checkoutPaused(undefined)).toBe(true);
+  expect(checkoutPaused("")).toBe(true);
+  expect(checkoutPaused("on")).toBe(true);
+  expect(checkoutPaused("off")).toBe(false);
+  expect(checkoutPaused("FALSE")).toBe(false);
 });
 
 test("the admin panel still tops up a balance by hand", () => {
