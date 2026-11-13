@@ -200,7 +200,7 @@ export default async function PayPage({
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="eyebrow">balance</p>
-            <p className="mt-1 text-[clamp(2rem,5vw,2.7rem)] font-semibold leading-none tracking-[-0.04em] text-hi">
+            <p className="mt-1 text-[clamp(2rem,5vw,2.7rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums text-hi">
               {formatDew(profile?.balance ?? 0)}{" "}
               <span className="text-[0.42em] font-medium uppercase tracking-[0.08em] text-low">
                 dew
@@ -222,14 +222,14 @@ export default async function PayPage({
 
         <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-mid">
           {TOPUP_PAUSED
-            ? "Checkout is paused while the payment path is tested, so no new payment is accepted and receipt upload is disabled. The plans below are the ones that exist; a redeem code still adds Dew."
+            ? "Checkout is paused while the payment path is tested, so no new payment is accepted and the upload form is closed. The plans below are the ones that exist; a redeem code still adds Dew."
             : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, then upload it below. Approval adds the Dew and switches the account to the paid daily allowance."}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-raised px-4 py-3">
           <div>
             <p className="eyebrow">wallet credit</p>
-            <p className="mt-0.5 font-mono text-[16px] leading-none text-hi">
+            <p className="mt-0.5 font-mono text-[16px] leading-none tabular-nums text-hi">
               {formatDew(profile?.wallet ?? 0)}{" "}
               <span className="text-[10px] uppercase tracking-[0.1em] text-low">
                 dew
@@ -290,7 +290,7 @@ export default async function PayPage({
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[13px] font-semibold text-hi">{plan.name}</p>
                 <p
-                  className="font-mono text-[11px] text-low"
+                  className="font-mono text-[11px] tabular-nums text-low"
                   title={`Charged as RM ${plan.price} on the payment page`}
                 >
                   {localPrices
@@ -298,7 +298,7 @@ export default async function PayPage({
                     : `RM ${plan.price}`}
                 </p>
               </div>
-              <p className="mt-2 font-mono text-[20px] leading-none text-accent-text">
+              <p className="mt-2 font-mono text-[20px] leading-none tabular-nums text-accent-text">
                 {plan.dew}
                 <span className="ml-1 text-[10px] uppercase tracking-[0.12em] text-low">
                   dew

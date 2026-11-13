@@ -57,13 +57,13 @@ export function LegalPage({
       </header>
 
       <p className="eyebrow mt-10">{eyebrow}</p>
-      <h1 className="mt-3 text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
+      <h1 className="mt-3 text-balance text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
         {title}
       </h1>
       <p className="mt-3 text-[12px] font-mono uppercase tracking-[0.12em] text-low">
         Last updated {updated}
       </p>
-      <p className="mt-4 text-[14px] leading-relaxed text-mid">{intro}</p>
+      <p className="mt-4 text-pretty text-[14px] leading-relaxed text-mid">{intro}</p>
 
       {sections.map((section) => (
         <section
@@ -79,7 +79,7 @@ export function LegalPage({
             block.kind === "p" ? (
               <p
                 key={index}
-                className="mt-2 text-[13px] leading-relaxed text-mid"
+                className="mt-2 text-pretty text-[13px] leading-relaxed text-mid"
               >
                 {block.text}
               </p>
@@ -123,7 +123,7 @@ export function LegalPage({
       </section>
 
       <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
-        <p className="eyebrow">openmi · review before push</p>
+        <p className="text-[11.5px] text-low">© 2026 Openmi</p>
         <div className="flex items-center gap-3">
           <Link href="/terms" className="eyebrow hover:text-hi">
             terms

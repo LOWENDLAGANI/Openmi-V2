@@ -58,7 +58,7 @@ export default function AboutPage() {
       </section>
 
       <p className="eyebrow mt-10">the contract</p>
-      <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
+      <h1 className="mt-3 max-w-2xl text-balance text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
         What Openmi does, and what it does not.
       </h1>
       <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-mid">
