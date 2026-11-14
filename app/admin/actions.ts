@@ -34,6 +34,75 @@ async function actingClient() {
   return supabase;
 }
 
+/**
+ * Stops an account.
+ *
+ * The RPC checks the role again, refuses a self-ban, cancels live runs and
+ * records who did it. The reason is not optional: it is the sentence the
+ * account reads on /banned, and a ban nobody can explain is one nobody can
+ * review.
+ */
+export async function banUser(formData: FormData) {
+  const supabase = await actingClient();
+
+  const userId = field(formData, "userId");
+  const reason = field(formData, "reason");
+  const hours = field(formData, "hours");
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    fail("That account does not exist.");
+  }
+
+  if (reason.length < 3) fail("Write a reason — the account is shown it.");
+
+  const duration = hours === "" ? null : Number(hours);
+
+  if (duration !== null && (!Number.isFinite(duration) || duration < 1)) {
+    fail("Choose how long the stop lasts.");
+  }
+
+  const { error } = await supabase.rpc("admin_ban_user", {
+    p_user: userId,
+    p_reason: reason,
+    p_hours: duration === null ? null : Math.round(duration),
+  });
+
+  if (error) fail(error.message);
+
+  revalidatePath("/admin");
+  redirect("/admin?done=Account+stopped");
+}
+
+export async function unbanUser(formData: FormData) {
+  const supabase = await actingClient();
+  const userId = field(formData, "userId");
+
+  if (userId.length === 0) fail("That account does not exist.");
+
+  const { error } = await supabase.rpc("admin_unban_user", { p_user: userId });
+  if (error) fail(error.message);
+
+  revalidatePath("/admin");
+  redirect("/admin?done=Ban+lifted");
+}
+
+export async function resolveRisk(formData: FormData) {
+  const supabase = await actingClient();
+  const riskId = field(formData, "riskId");
+
+  if (riskId.length === 0) fail("That signal does not exist.");
+
+  const { error } = await supabase.rpc("admin_resolve_risk", {
+    p_id: riskId,
+    p_note: field(formData, "note") || null,
+  });
+
+  if (error) fail(error.message);
+
+  revalidatePath("/admin");
+  redirect("/admin?done=Signal+closed");
+}
+
 export async function reviewReceipt(formData: FormData) {
   const supabase = await actingClient();
 

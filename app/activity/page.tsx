@@ -87,6 +87,8 @@ export default async function ActivityPage({
     );
   }
 
+  if (session.state === "banned") redirect("/banned");
+
   const { supabase, user } = session;
 
   // Settle the local day before reading, so the balance shown is the balance

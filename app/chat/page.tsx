@@ -582,6 +582,8 @@ export default async function ChatPage({
     );
   }
 
+  if (session.state === "banned") redirect("/banned");
+
   const { supabase, user } = session;
   const trashView = params.trash === "1";
 

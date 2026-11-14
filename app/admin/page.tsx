@@ -11,11 +11,14 @@ import { planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
+  banUser,
   createGiveawayCodes,
   grantDew,
+  resolveRisk,
   reviewReceipt,
   setAdmin,
   setPass,
+  unbanUser,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +43,38 @@ type RequestRow = {
   created_at: string;
   decided_at: string | null;
 };
+
+type RiskRow = {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  handle: string | null;
+  kind: string;
+  severity: "low" | "medium" | "high" | "critical";
+  summary: string;
+  detail: Record<string, unknown> | null;
+  route: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  resolution: string | null;
+};
+
+type BannedRow = {
+  id: string;
+  email: string | null;
+  handle: string | null;
+  banned_at: string;
+  ban_expires_at: string | null;
+  ban_reason: string | null;
+};
+
+/** A severity a person can read at a glance, not a colour chart. */
+function severityClass(severity: RiskRow["severity"]): string {
+  if (severity === "critical") return "border-danger/45 bg-danger/12 text-danger";
+  if (severity === "high") return "border-danger/30 bg-danger/8 text-danger";
+  if (severity === "medium") return "border-line-strong bg-raised text-mid";
+  return "border-line bg-raised text-low";
+}
 
 type ProfileRow = {
   id: string;
@@ -268,6 +303,33 @@ export default async function AdminPage({
 
   const accountRows = (accountsResult.data ?? []) as AccountRow[];
   const accountTotal = accountsResult.count ?? accountRows.length;
+
+  // Moderation is its own pair of queries: the newest signals, and who is
+  // stopped right now. Both are service-role reads behind requireAdmin().
+  const [riskResult, bannedResult, openRiskResult] = await Promise.all([
+    admin
+      .from("risk_events")
+      .select(
+        "id, user_id, email, handle, kind, severity, summary, detail, route, created_at, resolved_at, resolution"
+      )
+      .order("created_at", { ascending: false })
+      .limit(40),
+    admin
+      .from("profiles")
+      .select("id, email, handle, banned_at, ban_expires_at, ban_reason")
+      .not("banned_at", "is", null)
+      .order("banned_at", { ascending: false })
+      .limit(40),
+    admin
+      .from("risk_events")
+      .select("id", { count: "exact", head: true })
+      .is("resolved_at", null)
+      .in("severity", ["high", "critical"]),
+  ]);
+
+  const riskRows = (riskResult.data ?? []) as RiskRow[];
+  const bannedRows = (bannedResult.data ?? []) as BannedRow[];
+  const openRisk = openRiskResult.count ?? 0;
 
   // Short-lived links: the bucket is private and the operator is the only
   // viewer here.
@@ -528,6 +590,142 @@ export default async function AdminPage({
           are applied with <span className="font-mono">supabase db push</span>.
         </p>
       )}
+
+      <section aria-labelledby="risk-heading" className="panel mt-5 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2
+            id="risk-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
+            Risk signals
+          </h2>
+          <p className="text-[10.5px] text-low">
+            {openRisk === 0 ? "nothing open" : `${openRisk} open high or critical`}
+          </p>
+        </div>
+
+        <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
+          Written by the app when an account does something that looks wrong — a
+          sandbox command naming an internal address, a rate limit hammered, a
+          second run started while one was live. Newest first; the email and
+          handle are the ones that account had at the time.
+        </p>
+
+        {riskRows.length === 0 ? (
+          <p className="mt-3 text-[12px] text-low">No signals yet.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {riskRows.map((row) => (
+              <li
+                key={row.id}
+                className="rounded-2xl border border-line bg-raised px-4 py-3"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="break-words text-[12.5px] font-semibold text-hi">
+                    {row.email ?? row.handle ?? row.user_id ?? "signed-out visitor"}
+                  </p>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] ${severityClass(row.severity)}`}
+                  >
+                    {row.severity}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-[12px] leading-relaxed text-mid">
+                  {row.summary}
+                </p>
+
+                <p className="mt-1 break-words font-mono text-[10.5px] text-low">
+                  {row.kind}
+                  {row.route ? ` · ${row.route}` : ""}
+                  {row.handle ? ` · @${row.handle}` : ""} · {utc(row.created_at)}
+                  {row.resolved_at ? " · resolved" : ""}
+                </p>
+
+                {row.user_id ? (
+                  <details className="mt-2">
+                    <summary className="eyebrow cursor-pointer hover:text-hi">
+                      stop this account
+                    </summary>
+                    <form action={banUser} className="mt-2 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="userId" value={row.user_id} />
+                      <input
+                        name="reason"
+                        required
+                        maxLength={200}
+                        placeholder="reason, shown to them"
+                        className="field w-60 py-1 text-[11.5px]"
+                      />
+                      <select
+                        name="hours"
+                        defaultValue="24"
+                        className="field w-32 py-1 text-[11.5px]"
+                      >
+                        <option value="24">24 hours</option>
+                        <option value="168">7 days</option>
+                        <option value="">permanent</option>
+                      </select>
+                      <SubmitButton
+                        className="btn px-3 py-1 text-[11.5px]"
+                        pendingText="Stopping…"
+                        optimisticText="Stopped"
+                      >
+                        Stop account
+                      </SubmitButton>
+                    </form>
+                  </details>
+                ) : null}
+
+                {row.resolved_at ? null : (
+                  <form action={resolveRisk} className="mt-2">
+                    <input type="hidden" name="riskId" value={row.id} />
+                    <SubmitButton
+                      className="btn px-3 py-1 text-[11.5px]"
+                      pendingText="Closing…"
+                    >
+                      Mark looked at
+                    </SubmitButton>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {bannedRows.length > 0 && (
+          <div className="mt-4 border-t border-line pt-3">
+            <p className="eyebrow">stopped accounts</p>
+            <ul className="mt-2 space-y-2">
+              {bannedRows.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-raised px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] text-hi">
+                      {row.email ?? row.id}
+                    </p>
+                    <p className="font-mono text-[10px] text-low">
+                      {row.ban_reason ?? "no reason recorded"} ·{" "}
+                      {row.ban_expires_at ? `until ${utc(row.ban_expires_at)}` : "permanent"}
+                    </p>
+                  </div>
+                  <form action={unbanUser}>
+                    <input type="hidden" name="userId" value={row.id} />
+                    <SubmitButton
+                      className="btn px-3 py-1 text-[11.5px]"
+                      pendingText="Lifting…"
+                      optimisticText="Lifted"
+                    >
+                      Lift ban
+                    </SubmitButton>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
 
       <section aria-labelledby="queue-heading" className="panel mt-5 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

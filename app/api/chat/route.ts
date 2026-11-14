@@ -14,6 +14,7 @@ import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
 import { firstAvailableModel, hasModel, type ModelId } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
+import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkRunQuota } from "@/lib/runs/limits";
 import {
@@ -98,6 +99,19 @@ export async function POST(request: Request) {
   const limited = await checkRateLimit(supabaseAdmin(), "chat", session.user.id);
 
   if (!limited.allowed) {
+    // One row per window, not one per refused request: the feed is for a person
+    // to read, and a hammering client is a single fact about an account.
+    if (firstSignalIn(`chat-rate:${session.user.id}`, 10 * 60_000)) {
+      void recordRiskSignal({
+        userId: session.user.id,
+        kind: "rate-limit",
+        severity: "medium",
+        summary: `Chat rate limit tripped (${limited.limit}/min), refusals continue`,
+        detail: { retryAfterSeconds: limited.retryAfterSeconds },
+        route: "POST /api/chat",
+      });
+    }
+
     return json(
       {
         error: `Too many messages. Try again in ${limited.retryAfterSeconds} seconds.`,
@@ -339,6 +353,17 @@ export async function POST(request: Request) {
       caught instanceof Error ? caught.message : "The message could not be queued.";
 
     if (/duplicate key|unique/i.test(message)) {
+      if (firstSignalIn(`run-concurrency:${session.user.id}`, 10 * 60_000)) {
+        void recordRiskSignal({
+          userId: session.user.id,
+          kind: "run-concurrency",
+          severity: "low",
+          summary: "Started a second run while one was live",
+          detail: { chatId },
+          route: "POST /api/chat",
+        });
+      }
+
       return json(
         {
           error: "You already have a run in progress. Wait for it to finish, or stop it first.",

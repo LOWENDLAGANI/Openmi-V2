@@ -82,6 +82,25 @@ the incident is contained:
 delete from public.admin_users where user_id = '<the account id>';
 ```
 
+### Risk signals and bans
+
+The app records what looks wrong while it happens, and the panel opens with that
+feed. A row lands in `risk_events` when a sandbox command names an internal
+address and is refused (high), when the chat rate limit is tripped and refusals
+continue (medium), and when an account starts a second run while one is live
+(low). Each row keeps the email and handle the account had at the time, the
+route that saw it, and a capped detail object. The account a signal is about
+cannot read it — there is no policy and no grant — because knowing what tripped
+the alarm is a hint for the next attempt. Repeats inside ten minutes collapse to
+one row, so the feed stays readable.
+
+**Stop account** on a signal bans it: reason (shown to the account) plus a
+duration (24 hours, 7 days or permanent). The ban lives on `profiles.banned_at`
+and is enforced three times over — `getSession()` resolves to `banned`, so every
+page and route refuses; `claim_next_run` skips the owner, so a queued run cannot
+start; and the RPC cancels runs already live. The account lands on `/banned` with
+the reason and the end date. "Lift ban" restores it; nothing is deleted.
+
 ## Sign in
 
 Email and password through Supabase Auth. The session lives in an httpOnly

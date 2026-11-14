@@ -90,6 +90,7 @@ export default async function PayPage({
   }
 
   if (session.state === "signed-out") redirect("/login?next=%2Fpay");
+  if (session.state === "banned") redirect("/banned");
 
   const { supabase, user } = session;
 

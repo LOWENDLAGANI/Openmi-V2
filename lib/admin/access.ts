@@ -64,6 +64,10 @@ export async function readAdminAccess(): Promise<AdminAccess> {
 
   if (session.state === "signed-out") return { state: "signed-out" };
 
+  // A stopped account is not an operator, and the panel answers 404 rather than
+  // explaining the difference.
+  if (session.state === "banned") return { state: "forbidden", email: null };
+
   const { user, supabase } = session;
 
   if (isVerifiedAllowlistedAdmin(user.email, user.emailVerified)) {

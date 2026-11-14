@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { refundDewSession } from "@/lib/dew/store";
+import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
 import { refundReasonFor } from "@/lib/dew/refund";
 import { readToken } from "@/lib/github/token";
 import { AUTO_MODEL, type ModelId } from "@/lib/models";
@@ -446,6 +447,32 @@ export async function executeRun(
         }
 
         const durationMs = Date.now() - toolStartedAt;
+
+        // An attempt to reach loopback, a private range or the metadata service
+        // is the one tool failure that is about intent rather than a bad
+        // command. One signal per run: the operator needs to know it happened,
+        // not how many times the model retried.
+        if (
+          result.text.startsWith("refused:") &&
+          firstSignalIn(`egress:${runId}`, 6 * 3_600_000)
+        ) {
+          void recordRiskSignal({
+            userId: run.owner,
+            kind: "sandbox-egress",
+            severity: "high",
+            summary:
+              "A sandbox command named an internal address and was refused",
+            detail: {
+              runId,
+              tool: call.name,
+              command:
+                typeof args?.command === "string"
+                  ? args.command.slice(0, 200)
+                  : null,
+            },
+            route: "worker:run_command",
+          });
+        }
 
         await appendToolCall(admin, {
           runId,

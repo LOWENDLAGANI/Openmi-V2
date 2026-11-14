@@ -27,6 +27,13 @@ export async function GET() {
     );
   }
 
+  if (session.state === "banned") {
+    return NextResponse.json(
+      { error: "account-suspended" },
+      { status: 403, headers }
+    );
+  }
+
   const connection = await readConnection(session.supabase, session.user.id);
 
   return NextResponse.json(
