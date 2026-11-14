@@ -54,6 +54,26 @@ the admin panel under **Configuration & probes**; it is not a public page.
 - Set `CRON_SECRET`; without it the sandbox sweep answers 503 and E2B's own idle
   and expiry timers are the only backstop.
 
+### Turning the admin panel off
+
+`OPENMI_ADMIN_PANEL=off` — in Vercel, Settings → Environment Variables, then
+**Redeploy**; a deployment keeps the environment it was built with — makes
+`readAdminAccess()` answer `forbidden` before it consults the allowlist or
+`is_admin()`. That is one choke point, and every admin surface goes through it:
+`/admin` and `/setup` 404, every admin action redirects to `/chat`, and
+`/api/admin/status` says `admin: false`. No session, cookie, URL or database role
+outranks it, and nothing in the product can turn it back on. Unset or blank is
+the default and means on.
+
+An environment variable is not visible inside Postgres, so the admin RPCs
+(`admin_grant_dew`, `admin_set_admin`, `review_payment_request`, …) stay callable
+with a live admin JWT. For full revocation in an incident, also delete the role
+row:
+
+```sql
+delete from public.admin_users where user_id = '<the account id>';
+```
+
 ## Sign in
 
 Email and password through Supabase Auth. The session lives in an httpOnly

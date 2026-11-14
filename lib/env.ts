@@ -314,6 +314,14 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Vercel → Team settings → General → Team ID (optional)",
   },
   {
+    key: "OPENMI_ADMIN_PANEL",
+    scope: "server",
+    required: false,
+    unlocks:
+      "The /admin panel and every admin action; off revokes admin for everyone on the deployment",
+    hint: 'On by default; set to "off" and redeploy to take admin access away in an incident',
+  },
+  {
     key: "OPENMI_AUTO_WRITE",
     scope: "server",
     required: false,

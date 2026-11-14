@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { isVerifiedAllowlistedAdmin } from "@/lib/admin/allowlist";
+import { adminPanelEnabled } from "@/lib/admin/switches";
 import { getSession } from "@/lib/session";
 
 /**
@@ -38,7 +39,22 @@ export type AdminAccess =
 export async function readAdminAccess(): Promise<AdminAccess> {
   const session = await getSession();
 
+  // Before a configuration claim is read, so a deployment that is not set up
+  // can still reach /setup — but before any identity is trusted.
   if (session.state === "unconfigured") return { state: "unconfigured" };
+
+  // The kill switch, and the reason it is here rather than in the page: every
+  // surface that answers "is this person an admin?" funnels through this
+  // function, and every admin action calls it again. When it says off, the
+  // answer is the same one a stranger gets — `forbidden` — so the panel 404s,
+  // the actions redirect, the status route says no, and nothing explains why.
+  //
+  // It deliberately runs before the allowlist and before `is_admin()`: a
+  // compromised account still holding its row and a valid session is exactly
+  // the case this exists for, so a database role must not be able to outrank an
+  // operator flipping the deployment's environment.
+  if (!adminPanelEnabled()) return { state: "forbidden", email: null };
+
   if (session.state === "signed-out") return { state: "signed-out" };
 
   const { user, supabase } = session;
