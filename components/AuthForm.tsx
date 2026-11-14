@@ -7,6 +7,19 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 
+/**
+ * Carries the intended post-login destination across the OAuth round trip.
+ *
+ * Supabase only honours `redirectTo` values on its redirect allow list, and a
+ * query string is not matched, so the destination cannot travel in the URL.
+ * A same-site cookie survives the top-level navigation to Google and back.
+ */
+function setNextCookie(next: string) {
+  if (typeof document === "undefined") return;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `openmi_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
+}
+
 export function AuthForm({
   next,
   configured,
@@ -54,7 +67,7 @@ export function AuthForm({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data:
             inviteCode.trim().length > 0
               ? { invite_code: inviteCode.trim() }
@@ -103,10 +116,16 @@ export function AuthForm({
     setError(null);
     setNotice(null);
 
+    // Supabase drops query parameters from `redirectTo` when they are not on
+    // its redirect allow list, which silently sends the user to the Site URL
+    // (the landing page) instead of here. Keep the allow-listed path clean and
+    // carry the intended destination in a short-lived cookie instead.
+    setNextCookie(next);
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: { prompt: "select_account" },
       },
     });

@@ -83,12 +83,17 @@ export function AboutLogoGate() {
     setBusy(true);
     setError(null);
 
+    // See AuthForm: keep the allow-listed callback path free of query params and
+    // carry the destination in a cookie instead.
+    if (typeof document !== "undefined") {
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `openmi_next=${encodeURIComponent("/admin")}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
+    }
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-          "/admin",
-        )}`,
+        redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: { prompt: "select_account" },
       },
     });

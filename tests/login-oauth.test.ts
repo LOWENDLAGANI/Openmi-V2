@@ -18,7 +18,7 @@ const CALLBACK = readFileSync(
 
 test("the sign-in form offers Google through the shared callback", () => {
   expect(AUTH_FORM).toContain('provider: "google"');
-  expect(AUTH_FORM).toContain("/auth/callback?next=");
+  expect(AUTH_FORM).toContain("/auth/callback");
   expect(AUTH_FORM).toContain("Continue with Google");
 
   // Both tabs are the same component, so the provider is offered at sign-up
