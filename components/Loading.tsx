@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { OpenmiMark } from "@/components/OpenmiMark";
 
 /**
@@ -32,9 +34,12 @@ export function Spinner({
  */
 export function ThinkingPill({
   label,
+  icon,
   className = "",
 }: {
   label: string;
+  /** The mark beside the label; the brand spinner unless a caller supplies one. */
+  icon?: ReactNode;
   className?: string;
 }) {
   return (
@@ -43,7 +48,7 @@ export function ThinkingPill({
       aria-live="polite"
       className={`flex w-fit max-w-full items-center gap-2.5 rounded-full bg-accent-soft px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-text ${className}`}
     >
-      <Spinner size={15} className="text-accent-text" />
+      {icon ?? <Spinner size={15} className="text-accent-text" />}
       <span className="min-w-0 truncate">{label}</span>
       <span className="computing inline-flex gap-[2px]" aria-hidden="true">
         <span>·</span>
