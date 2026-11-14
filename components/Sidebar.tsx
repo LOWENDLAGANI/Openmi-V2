@@ -151,6 +151,16 @@ export function Sidebar({
           <Glyph name="compose" className="size-[18px]" />
           New chat
         </Link>
+
+        {/* The run surface is a second way in, not a replacement for a chat:
+            a run owns its sandbox and its event log, so it can outlive a tab. */}
+        <Link
+          href="/agent"
+          className="rail-icon mt-2 flex w-full items-center justify-between rounded-2xl px-4 py-2 text-[13px] font-medium text-low"
+        >
+          Agent runs
+          <span aria-hidden="true">→</span>
+        </Link>
       </div>
 
       {/* The hour is the unit that was paid for, so its clock belongs where the

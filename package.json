@@ -9,6 +9,7 @@
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
+    "worker": "bun --conditions=react-server worker/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test tests",
     "test:rls": "bun test tests/rls.test.ts tests/rls-audit.test.ts",

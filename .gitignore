@@ -25,7 +25,11 @@ dist/
 
 # logs and os noise
 *.log
+*.pid
 .DS_Store
+
+# run artifacts written by the local worker (fs backend default)
+.openmi-artifacts/
 
 # browser/tooling artefacts left in the repo root by an agent
 .freebuff-browser-*

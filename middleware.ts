@@ -33,6 +33,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/chat/:path*",
+    "/agent/:path*",
     "/activity/:path*",
     "/pay/:path*",
     // A paint-saving redirect only. /admin decides the role on the server and

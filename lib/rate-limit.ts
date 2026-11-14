@@ -34,6 +34,9 @@ export const RATE_LIMITS = {
   // A publish spends the operator's hosting token, not just a request: each one
   // queues a real deployment against the reader's repository.
   publish: { max: 6, windowMs: RATE_LIMIT_WINDOW_MS },
+  // A run starts a sandbox and spends a model budget, so the minute counter is
+  // a spam ceiling under the daily quota rather than the quota itself.
+  run: { max: 6, windowMs: RATE_LIMIT_WINDOW_MS },
 } as const;
 
 /**

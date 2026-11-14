@@ -559,6 +559,51 @@ The four decisions this depends on — what may run (D6.1), what a minute costs
 cannot start (D6.4) — are answered in
 [docs/EXECUTION_ENVIRONMENT_PLAN.md](docs/EXECUTION_ENVIRONMENT_PLAN.md).
 
+## Web agent runs
+
+`/agent` is the server-owned agent surface. It is the implementation of the
+finalized web-agent build plan in this repository: the browser is a view, and
+nothing it does executes agent work.
+
+- `POST /api/runs` authenticates, checks the per-account quota and rate limit,
+  writes a `queued` row and answers `202`. It never calls a provider.
+- `bun run worker` starts the long-lived worker. It claims a run with
+  `for update skip locked`, executes the loop in one E2B sandbox, and appends
+  every step, tool call and event to Postgres before the next model call.
+- `GET /api/runs/:id/stream` is SSE over `fetch`, replayable from
+  `Last-Event-ID`, with a heartbeat every 15 seconds. A reload replays the log;
+  closing the tab does not stop the run.
+- `POST /api/runs/:id/cancel` sets a flag. The loop reads it at each step and
+  tool boundary and lets the tool in flight finish.
+- The diff and changed files are collected before teardown and stored as
+  artifacts (`RUN_ARTIFACT_DIR`, or an S3-compatible bucket). The review card is
+  `/agent/:id`.
+
+| Limit | Value |
+|---|---|
+| Steps per run | 40 |
+| Tokens per run (estimated) | 120,000 |
+| Wall clock | 15 min |
+| Concurrent runs per account | 1 |
+| Runs per day | 20 |
+| Tokens per day | 400,000 |
+
+Vercel does not run the worker: point a small VM or container at
+`bun run worker`. `GET /api/cron/run-sweep` (bearer `CRON_SECRET`) reaps a run
+whose heartbeat stopped and destroys sandboxes no live row claims, so a crashed
+worker does not leave a run waiting forever.
+
+The contract, the phase map, the sandbox facts (including why the workspace is
+`/home/user/work` rather than `/work`) and what still needs a real key to verify
+are in [docs/WEB_AGENT_RUNS.md](docs/WEB_AGENT_RUNS.md). The chat surface is
+unchanged; a run is a separate unit of work that can outlive the tab.
+
+For Render, the repository carries `Dockerfile.worker` and `render.yaml`: apply
+the Blueprint (or create a **Background Worker** with Language **Docker**) and
+set the variables the Blueprint names. A run's artifacts need the
+`RUN_ARTIFACTS_*` bucket there — the worker's own disk is ephemeral and the web
+app runs elsewhere.
+
 ## Rules for contributors
 
 - Pushes are authored as **`Openmi`** — see

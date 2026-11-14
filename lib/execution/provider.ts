@@ -542,6 +542,129 @@ export async function createSandbox(
   return handleFor(sandbox, sandbox.sandboxId);
 }
 
+/**
+ * The addresses a web-agent run may not reach.
+ *
+ * Loopback, RFC1918, link-local (including the cloud metadata service),
+ * carrier-grade NAT, benchmarking ranges and IPv6 equivalents. The list is
+ * sent to the provider as `denyOut` and is the plan's SSRF boundary; the run's
+ * `run_command` tool adds a second, textual check for commands that name an
+ * internal address directly.
+ *
+ * E2B evaluates its allow list before its deny list, so a wildcard `allowOut`
+ * is sent with the denials: the deny list is what the provider can enforce,
+ * and the tool check closes the case where it does not. This is verified
+ * against a real sandbox in the launch checklist, not assumed.
+ */
+export const RUN_EGRESS_DENY: readonly string[] = [
+  "0.0.0.0/8",
+  "10.0.0.0/8",
+  "100.64.0.0/10",
+  "127.0.0.0/8",
+  "169.254.0.0/16",
+  "172.16.0.0/12",
+  "192.0.0.0/24",
+  "192.168.0.0/16",
+  "198.18.0.0/15",
+  "224.0.0.0/4",
+  "240.0.0.0/4",
+  "::1/128",
+  "fc00::/7",
+  "fe80::/10",
+];
+
+/**
+ * A run's egress: the public internet, minus everything internal.
+ *
+ * `allowPublicTraffic` is stated because the sandbox serves nothing; the flag
+ * is about inbound and the project default must not decide it.
+ */
+export function runNetworkOption(): {
+  network: { allowOut: string[]; denyOut: string[]; allowPublicTraffic: boolean };
+} {
+  return {
+    network: {
+      allowOut: ["*"],
+      denyOut: [...RUN_EGRESS_DENY],
+      allowPublicTraffic: true,
+    },
+  };
+}
+
+/**
+ * One sandbox for one web-agent run.
+ *
+ * Separate from `createSandbox` because the network policy differs: a
+ * verification build only needs registries, while a run is allowed to install
+ * packages, fetch pages and query APIs — with the internal ranges denied. The
+ * lifetime is the run's own ceiling, and `onTimeout: kill` means a crashed
+ * worker cannot bill a box past it.
+ *
+ * CPU, memory and pid limits come from the template, not from this call: E2B
+ * applies them at image level, so `EXECUTION_TEMPLATE` must name a template
+ * built with the run limits (see docs/WEB_AGENT_RUNS.md).
+ */
+export async function createRunSandbox(
+  runId: string,
+  ttlMinutes: number
+): Promise<SandboxHandle> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  const ttl = Math.max(5, Math.trunc(ttlMinutes));
+
+  let sandbox: Sandbox;
+  try {
+    sandbox = await Sandbox.create({
+      template: executionTemplate(),
+      timeoutMs: boundedTimeoutMs(ttl * 60),
+      lifecycle: { onTimeout: "kill", autoResume: false },
+      metadata: { app: "openmi", kind: "run", run: runId },
+      ...runNetworkOption(),
+      ...clientOptions(),
+    });
+  } catch (caught) {
+    throw classifyStartError(caught, "create");
+  }
+
+  return handleFor(sandbox, sandbox.sandboxId);
+}
+
+/** Run sandboxes the provider knows about, for the orphan sweep. */
+export async function listRunSandboxes(
+  limit = 200
+): Promise<RemoteSandboxSummary[]> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  try {
+    const paginator = Sandbox.list({
+      query: { metadata: { app: "openmi", kind: "run" } },
+      limit,
+      ...clientOptions(),
+    });
+
+    const found = paginator.hasNext ? await paginator.nextItems() : [];
+
+    return found.slice(0, limit).map((sandbox) => ({
+      id: sandbox.sandboxId,
+      labels: sandbox.metadata ?? {},
+      createdAt:
+        sandbox.startedAt instanceof Date ? sandbox.startedAt.toISOString() : null,
+    }));
+  } catch (caught) {
+    throw classifyStartError(caught, "attach");
+  }
+}
+
 export type ChatSandboxOptions = {
   chatId: string;
   owner: string;
