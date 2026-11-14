@@ -36,7 +36,7 @@ function documented(label: string): string | null {
 }
 
 test("the documented Dew numbers are the exported constants", () => {
-  expect(DEW_PER_HOUR).toBe(2);
+  expect(DEW_PER_HOUR).toBe(3);
   expect(HOUR_SESSION_MS).toBe(3_600_000);
   expect(DAILY_FREE_DEW).toBe(6);
   expect(PAID_DAILY_FREE_DEW).toBe(15);
@@ -49,10 +49,10 @@ test("the documented Dew numbers are the exported constants", () => {
 });
 
 test("an hour is priced per model, and the database agrees with the catalogue", () => {
-  // 026 redefines `model_hour_dew` after teaching it Auto, so it is the current
-  // definition; 025 is the migration that introduced the function.
+  // 041 is the current definition: it makes Auto free and prices DeepSeek at 3.
+  // 025 introduced the function and 026 taught it Auto, so those two are history.
   const migration = readFileSync(
-    new URL("../supabase/migrations/026_auto_model_pricing.sql", import.meta.url),
+    new URL("../supabase/migrations/041_free_auto_pricing.sql", import.meta.url),
     "utf8"
   );
 
@@ -60,7 +60,9 @@ test("an hour is priced per model, and the database agrees with the catalogue", 
     // The same number in both places, or the picker advertises a price the
     // charge does not use.
     expect(migration).toContain(`when '${model.id}' then ${model.dewPerHour}::numeric`);
-    expect(model.dewPerHour).toBe(DEW_PER_HOUR);
+    // Auto is the one free hour; every other catalogue entry charges the
+    // documented price.
+    expect(model.dewPerHour).toBe(model.id === "auto" ? 0 : DEW_PER_HOUR);
   }
 });
 

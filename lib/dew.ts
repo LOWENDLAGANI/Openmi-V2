@@ -10,14 +10,16 @@
  */
 
 /**
- * The price of an hour on the default model, and on every built-in model today.
+ * The price of an hour on the default model, and the price of an hour on any
+ * model the catalogue does not name.
  *
  * An hour is priced per model, because the model is what the reader chooses:
  * `ModelCapability.dewPerHour` carries that price and `model_hour_dew` decides
- * it in the database, so the browser cannot ask for a cheaper hour. This value
- * is the default a custom entry without a price of its own falls back to.
+ * it in the database, so the browser cannot ask for a cheaper hour. Auto is the
+ * one free hour; this value is what DeepSeek Flash and a custom entry without a
+ * price of its own charge.
  */
-export const DEW_PER_HOUR = 2;
+export const DEW_PER_HOUR = 3;
 export const HOUR_SESSION_MS = 3_600_000;
 export const DAILY_FREE_DEW = 6;
 export const PAID_DAILY_FREE_DEW = 15;

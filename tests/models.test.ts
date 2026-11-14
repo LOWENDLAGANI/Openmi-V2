@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
+import { DEW_PER_HOUR } from "../lib/dew";
 import {
   DEFAULT_MODEL,
   MODELS,
@@ -73,18 +74,19 @@ test("the browser catalogue carries no endpoint, upstream id or key", () => {
   }
 });
 
-test("every model prices its own hour, and the built-ins cost the same today", () => {
+test("every model prices its own hour: Auto free, DeepSeek the default", () => {
   for (const model of MODELS) {
     expect(Number.isFinite(model.dewPerHour)).toBe(true);
-    expect(model.dewPerHour).toBeGreaterThan(0);
+    // Zero is a price. A negative one would be a credit nobody asked for.
+    expect(model.dewPerHour).toBeGreaterThanOrEqual(0);
   }
 
-  expect(modelHourDew("deepseek-flash")).toBe(2);
-  expect(modelHourDew("auto")).toBe(2);
+  expect(modelHourDew("auto")).toBe(0);
+  expect(modelHourDew("deepseek-flash")).toBe(DEW_PER_HOUR);
 
   // A model the catalogue does not know is charged the default, never nothing:
   // a missing price must not become a free hour.
-  expect(modelHourDew("not-a-model")).toBe(MODELS[0].dewPerHour);
+  expect(modelHourDew("not-a-model")).toBe(DEW_PER_HOUR);
 });
 
 test("no component claims a build or a test ran", () => {

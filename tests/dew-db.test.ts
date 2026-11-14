@@ -220,8 +220,9 @@ test("an hour is charged once and reused inside the hour", async () => {
   }>("select * from public.start_hour_session('auto', 'octocat/hello')");
 
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].price)).toBe(2);
-  expect(Number(started.rows[0].balance)).toBe(9);
+  // Auto's hour is free: the session exists, and no Dew moved.
+  expect(Number(started.rows[0].price)).toBe(0);
+  expect(Number(started.rows[0].balance)).toBe(11);
 
   sessionA = String(started.rows[0].session_id);
 
@@ -233,7 +234,7 @@ test("an hour is charged once and reused inside the hour", async () => {
 
   expect(again.rows[0].started).toBe(false);
   expect(String(again.rows[0].session_id)).toBe(sessionA);
-  expect(Number(again.rows[0].balance)).toBe(9);
+  expect(Number(again.rows[0].balance)).toBe(11);
 
   await reset();
   const sessions = await db.query<{ count: number }>(
@@ -242,12 +243,24 @@ test("an hour is charged once and reused inside the hour", async () => {
   );
   expect(Number(sessions.rows[0].count)).toBe(1);
 
-  expect(await ledgerCount(A, "session")).toBe(1);
-  expect(await ledgerSum(A)).toBe(9);
+  // Nothing was charged, so there is no session row to point at: a zero-amount
+  // ledger entry is what `dew_transactions.amount <> 0` exists to refuse.
+  expect(await ledgerCount(A, "session")).toBe(0);
+  expect(await ledgerSum(A)).toBe(11);
 });
 
 test("a refund is service-role only, and happens once", async () => {
   await actAs("authenticated", A);
+
+  // The hour above is Auto's free hour, so it has nothing to refund. End it and
+  // buy a paid hour, so this test still exercises a refund that moves Dew.
+  await db.query("select public.end_hour_session()");
+  const paid = await db.query<{ session_id: string; price: string }>(
+    "select * from public.start_hour_session('deepseek-flash', 'octocat/hello')"
+  );
+  sessionA = String(paid.rows[0].session_id);
+  expect(Number(paid.rows[0].price)).toBe(3);
+
   await expect(
     db.query("select public.refund_hour_session($1, 'provider failed')", [sessionA])
   ).rejects.toThrow(/permission denied/);
@@ -280,7 +293,7 @@ test("a balance below one hour refuses the session before anything runs", async 
 
   await actAs("authenticated", A);
   await expect(
-    db.query("select * from public.start_hour_session('auto', null)")
+    db.query("select * from public.start_hour_session('deepseek-flash', null)")
   ).rejects.toThrow(/insufficient balance/);
 
   expect(await ledgerCount(A, "session")).toBe(1);

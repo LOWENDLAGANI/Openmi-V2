@@ -245,12 +245,13 @@ test("Auto calls UnoRouter's OpenAI-compatible endpoint", () => {
   expect(providers).not.toContain("openrouter.ai");
 });
 
-test("Auto is a catalogue entry with a price, not a route", () => {
+test("Auto is a free catalogue entry, not a route", () => {
   const auto = MODELS.find((model) => model.id === AUTO_MODEL);
 
   expect(auto?.name).toBe("Auto");
   expect(auto?.category).toBe("general");
-  expect(auto?.dewPerHour).toBe(2);
+  // Free is a price: the hour still opens, it just costs nothing.
+  expect(auto?.dewPerHour).toBe(0);
 
   // Auto is a router, so it has no registry profile of its own: a queue that
   // could contain Auto would be a loop.

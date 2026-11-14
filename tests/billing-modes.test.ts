@@ -145,7 +145,8 @@ test("an hour in another chat refuses both a new hour and a request", async () =
     [CHAT_A]
   );
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].balance)).toBe(8);
+  // Auto's hour is free: the session opens and the balance does not move.
+  expect(Number(started.rows[0].balance)).toBe(10);
 
   // Same chat, same hour: reused, free, and not an error.
   const reused = await db.query<{ started: boolean; balance: string }>(
@@ -153,7 +154,7 @@ test("an hour in another chat refuses both a new hour and a request", async () =
     [CHAT_A]
   );
   expect(reused.rows[0].started).toBe(false);
-  expect(Number(reused.rows[0].balance)).toBe(8);
+  expect(Number(reused.rows[0].balance)).toBe(10);
 
   await expect(
     db.query("select * from public.start_hour_session('auto', null, $1)", [CHAT_B])
@@ -163,7 +164,7 @@ test("an hour in another chat refuses both a new hour and a request", async () =
     db.query("select * from public.charge_chat_request('auto', $1)", [CHAT_B])
   ).rejects.toThrow(/hour active/);
 
-  expect((await balances()).balance).toBe(8);
+  expect((await balances()).balance).toBe(10);
 });
 
 test("an hour is priced by its model and locked to it", async () => {
@@ -174,7 +175,7 @@ test("an hour is priced by its model and locked to it", async () => {
     [CHAT_A]
   );
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].price)).toBe(2);
+  expect(Number(started.rows[0].price)).toBe(3);
 
   // Same chat, same model: the hour is reused and costs nothing.
   const again = await db.query<{ price: string; started: boolean }>(
@@ -182,14 +183,37 @@ test("an hour is priced by its model and locked to it", async () => {
     [CHAT_A]
   );
   expect(again.rows[0].started).toBe(false);
-  expect(Number(again.rows[0].price)).toBe(2);
+  expect(Number(again.rows[0].price)).toBe(3);
 
   // A turn for another model cannot ride an hour it did not pay for.
   await expect(
     db.query("select * from public.start_hour_session('auto', null, $1)", [CHAT_A])
   ).rejects.toThrow(/hour on model/);
 
-  expect((await balances()).balance).toBe(8);
+  expect((await balances()).balance).toBe(7);
+});
+
+test("a free hour starts on an empty balance", async () => {
+  await db.query(
+    `update public.profiles
+        set dew_balance = 0,
+            dew_day = (now() at time zone timezone)::date
+      where id = $1`,
+    [A]
+  );
+  await actAsOwner();
+
+  const started = await db.query<{
+    started: boolean;
+    price: string;
+    balance: string;
+  }>("select * from public.start_hour_session('auto', null, $1)", [CHAT_A]);
+
+  // Nothing to pay is not nothing to start: the session is written, and the
+  // charge it would have made is zero.
+  expect(started.rows[0].started).toBe(true);
+  expect(Number(started.rows[0].price)).toBe(0);
+  expect(Number(started.rows[0].balance)).toBe(0);
 });
 
 test("ending the hour lets the current chat start a new one", async () => {
@@ -206,7 +230,7 @@ test("ending the hour lets the current chat start a new one", async () => {
     [CHAT_B]
   );
   expect(started.rows[0].started).toBe(true);
-  expect(Number(started.rows[0].balance)).toBe(6);
+  expect(Number(started.rows[0].balance)).toBe(10);
 });
 
 test("the wallet pays only what the balance cannot, and only when it covers it", async () => {

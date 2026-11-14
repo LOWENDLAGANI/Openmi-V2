@@ -64,9 +64,10 @@ export const MODELS: ModelCapability[] = [
     blurb: "Reads each message, picks the model that fits it, and moves on if one drops.",
     images: false,
     documents: false,
-    // An Auto hour costs one price whatever answers it: the picker sells the
-    // hour, and `model_hour_dew('auto')` in the database agrees.
-    dewPerHour: 2,
+    // Auto answers with free models, so its hour is free: the picker shows 0
+    // and `model_hour_dew('auto')` in the database agrees. Free is a price,
+    // not an exemption — the hour still starts and still scopes the chat.
+    dewPerHour: 0,
   },
   {
     id: "deepseek-flash",
@@ -75,9 +76,8 @@ export const MODELS: ModelCapability[] = [
     blurb: "DeepSeek's fast model, and the only DeepSeek model offered here.",
     images: false,
     documents: false,
-    // Kept level with GPT OSS: the hour is the chat, not the model's list price,
-    // and charging DeepSeek more would need a reason the ledger cannot explain.
-    dewPerHour: 2,
+    // The catalogue's priced model, and what `DEW_PER_HOUR` documents.
+    dewPerHour: 3,
   },
 ];
 

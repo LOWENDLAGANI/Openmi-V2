@@ -109,7 +109,7 @@ const SECTIONS: LegalSection[] = [
     blocks: [
       {
         kind: "p",
-        text: `Chat is billed in Dew. Each model has an hourly price, shown before you send; for every built-in model today it is ${DEW_PER_HOUR} Dew per hour. The hour is charged before the model provider is called, and further turns inside that hour are included. Every charge, refund and grant is written to an append-only ledger you can read on the activity page.`,
+        text: `Chat is billed in Dew. Each model has an hourly price, shown before you send; DeepSeek Flash is ${DEW_PER_HOUR} Dew per hour and Auto is free. The hour is charged before the model provider is called, and further turns inside that hour are included. Every charge, refund and grant is written to an append-only ledger you can read on the activity page.`,
       },
       {
         kind: "p",

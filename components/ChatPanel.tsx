@@ -270,8 +270,10 @@ export function ChatPanel({
     if (content.trim().length === 0) return;
 
     // A new chat confirms the hour before it spends anything; an existing chat
-    // is already paid for, so its messages go straight out.
-    if (activeChatId === null) {
+    // is already paid for, so its messages go straight out. A free hour has
+    // nothing to confirm, so it goes straight out too — and still starts the
+    // session server-side, because the hour scopes the chat, not the charge.
+    if (activeChatId === null && modelHourDew(model, models) > 0) {
       setChargeFor(content);
       return;
     }

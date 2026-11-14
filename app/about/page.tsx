@@ -24,7 +24,7 @@ const DOES = [
   "Proposes edits as per-file unified diffs; you accept or reject each file.",
   `By default, writes a ready changeset to one branch named ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
   "Runs commands in a disposable Linux sandbox when the deployment has an execution key, and reports the exit code it observed.",
-  `Charges ${DEW_PER_HOUR} Dew for an hour of chat before the provider is called, and records every change in a ledger.`,
+  `Charges ${DEW_PER_HOUR} Dew for an hour of chat (nothing on Auto) before the provider is called, and records every change in a ledger.`,
 ];
 
 const DOES_NOT = [
@@ -135,8 +135,8 @@ export default function AboutPage() {
           What an hour costs
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          One hour of chat costs {DEW_PER_HOUR} Dew, charged once before the
-          provider call. More turns inside the hour are free. The daily allowance
+          One hour of chat costs {DEW_PER_HOUR} Dew, or nothing on Auto,
+          charged once before the provider call. More turns inside the hour are free. The daily allowance
           is {DAILY_FREE_DEW} Dew, or {PAID_DAILY_FREE_DEW} while a paid plan is
           active. A {TRIAL_DEW} Dew trial credit is granted once per account, with
           at most one trial per address in any 24-hour period. The balance turns

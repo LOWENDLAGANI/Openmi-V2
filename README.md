@@ -221,7 +221,8 @@ branch, commit and pull request, so one approval cannot produce two PRs.
 
 ## Dew
 
-One hour of chat costs 2 Dew, charged before the provider is called. The hour is
+One hour of chat costs 3 Dew, charged before the provider is called; Auto's hour
+is free. The hour is
 priced per model and belongs to the model and chat that started it: a running
 hour is reused for free, and a turn for another model or another chat is refused
 with what holds it instead of silently riding it. The price is decided by
@@ -230,7 +231,7 @@ of which takes an amount.
 
 | Constant | Value |
 |---|---|
-| Hour price | 2 |
+| Hour price | 3 |
 | Daily free allowance | 6 |
 | Paid daily allowance | 15 |
 | Trial credit | 5 |
@@ -368,7 +369,7 @@ vision, search, context — and carries no endpoint, upstream id or key.
 Auto's pool is `AUTO_ROUTES`, and it is available when `OPENROUTER_API_KEY` is
 set: all fifty free models are attempted in fitness order until one answers. A
 deployment without that key shows Auto as unavailable instead of spending a
-different provider through it. The hour still costs 2 Dew whatever answers,
+different provider through it. Auto's hour is free whatever answers,
 because `model_hour_dew` prices the model that was chosen — Auto — not the one it
 routed to.
 
