@@ -23,7 +23,7 @@ import {
   runWallClockMs,
 } from "./limits";
 import { capPayload, previewText } from "./redact";
-import { closeRunWorkspace, openRunWorkspace } from "./sandbox";
+import { openRunWorkspace, pauseRunWorkspace } from "./sandbox";
 import {
   RUN_AGENT_ID,
   buildRunSystemPrompt,
@@ -65,8 +65,8 @@ import { toolSummary } from "./events";
  *     cancelled or finished run can never spend another token;
  *   - cancellation is read at each step and tool boundary, and a tool in flight
  *     is always allowed to finish;
- *   - the sandbox is destroyed in a `finally`, whether the loop returned, threw
- *     or was stopped at a cap;
+ *   - the sandbox is paused in a `finally`, whether the loop returned, threw or
+ *     was stopped at a cap; it is destroyed 48 hours later by the sweep;
  *   - usage is recorded once, on the way out, from what the loop actually saw.
  */
 
@@ -465,8 +465,9 @@ export async function executeRun(
       stopReason = "cancelled";
     }
 
-    // Artifacts are collected before teardown: once the box is gone there is
-    // nothing left to diff. A store that is not configured is not a failure.
+    // Artifacts are collected before the box is paused: the disk is still
+    // there afterwards, but a run should not depend on a later process finding
+    // it. A store that is not configured is not a failure.
     if (sandbox) {
       const collected = await collectRunArtifacts(sandbox, runId).catch(() => null);
 
@@ -489,7 +490,7 @@ export async function executeRun(
   } finally {
     clearInterval(lease);
 
-    if (sandbox) await closeRunWorkspace(sandbox);
+    if (sandbox) await pauseRunWorkspace(sandbox);
 
     const cost = runCostUsd(inputTokens, outputTokens);
 

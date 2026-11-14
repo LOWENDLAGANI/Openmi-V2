@@ -10,6 +10,7 @@ import {
 } from "e2b";
 
 import { executionConfigured } from "@/lib/env";
+import { RUN_SANDBOX_IDLE_MINUTES } from "@/lib/runs/limits";
 
 import {
   DEFAULT_TEMPLATE,
@@ -596,18 +597,25 @@ export function runNetworkOption(): {
  *
  * Separate from `createSandbox` because the network policy differs: a
  * verification build only needs registries, while a run is allowed to install
- * packages, fetch pages and query APIs — with the internal ranges denied. The
- * lifetime is the run's own ceiling, and `onTimeout: kill` means a crashed
- * worker cannot bill a box past it.
+ * packages, fetch pages and query APIs — with the internal ranges denied.
+ *
+ * The lifecycle is the chat workspace's, not the verification run's: at the
+ * deadline the box **pauses** (compute released, disk kept) and `autoResume`
+ * wakes it if anything connects again. The worker pauses it when the run
+ * settles, and the sweep destroys it `RUN_SANDBOX_TTL_HOURS` (48) later. A
+ * crashed worker therefore cannot bill compute past fifteen minutes — it can
+ * only leave a snapshot, which the sweep removes.
+ *
+ * A paused box is also what makes a resumed run cheap: the workspace, its
+ * installed packages and its uncommitted edits are still on disk. This build
+ * does not reattach from the UI, but the disk is retained on purpose rather
+ * than thrown away.
  *
  * CPU, memory and pid limits come from the template, not from this call: E2B
  * applies them at image level, so `EXECUTION_TEMPLATE` must name a template
  * built with the run limits (see docs/WEB_AGENT_RUNS.md).
  */
-export async function createRunSandbox(
-  runId: string,
-  ttlMinutes: number
-): Promise<SandboxHandle> {
+export async function createRunSandbox(runId: string): Promise<SandboxHandle> {
   if (!executionConfigured()) {
     throw new SandboxStartError(
       "not_configured",
@@ -615,14 +623,15 @@ export async function createRunSandbox(
     );
   }
 
-  const ttl = Math.max(5, Math.trunc(ttlMinutes));
+  const idle = Math.max(1, Math.trunc(RUN_SANDBOX_IDLE_MINUTES));
 
   let sandbox: Sandbox;
   try {
     sandbox = await Sandbox.create({
       template: executionTemplate(),
-      timeoutMs: boundedTimeoutMs(ttl * 60),
-      lifecycle: { onTimeout: "kill", autoResume: false },
+      timeoutMs: boundedTimeoutMs(idle * 60),
+      // Pause, never kill: the disk is the run's workspace and outlives it.
+      lifecycle: { onTimeout: "pause", autoResume: true },
       metadata: { app: "openmi", kind: "run", run: runId },
       ...runNetworkOption(),
       ...clientOptions(),

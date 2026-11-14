@@ -16,8 +16,67 @@ export const RUN_MAX_TOKENS = 120_000;
 /** Wall clock, from claim to teardown. The sandbox is killed at the same edge. */
 export const RUN_WALL_CLOCK_MS = 15 * 60_000;
 
-/** The sandbox lifetime the provider is asked for; the loop's own clock is shorter. */
-export const RUN_SANDBOX_TTL_MINUTES = 20;
+/**
+ * The workspace outlives the run.
+ *
+ * A run executes for at most fifteen minutes. At that point its sandbox is
+ * **paused** — compute released, disk kept — not killed. It is destroyed
+ * forty-eight hours after the run settled, by the sweep, which is the same
+ * contract a chat workspace already has.
+ *
+ * The provider timeout is the pause trigger; the 48 hours is our own rule,
+ * read by `sweepRunSandboxes`. Both numbers are exported so the docs, the
+ * sweep and the sandbox factory read one source.
+ */
+export const RUN_SANDBOX_IDLE_MINUTES = 15;
+export const RUN_SANDBOX_TTL_HOURS = 48;
+export const RUN_SANDBOX_MIN_TTL_HOURS = 1;
+export const RUN_SANDBOX_MAX_TTL_HOURS = 168;
+
+/** `RUN_SANDBOX_IDLE_MINUTES`, clamped so a typo cannot buy a long-lived box. */
+export function runSandboxIdleMinutes(
+  env: Record<string, string | undefined> = process.env
+): number {
+  const raw = Number(env.RUN_SANDBOX_IDLE_MINUTES ?? "");
+  if (!Number.isFinite(raw) || raw <= 0) return RUN_SANDBOX_IDLE_MINUTES;
+  return Math.min(60, Math.max(1, Math.trunc(raw)));
+}
+
+/** `RUN_SANDBOX_TTL_HOURS`, clamped to 1..168 (one week). */
+export function runSandboxTtlHours(
+  env: Record<string, string | undefined> = process.env
+): number {
+  const raw = Number(env.RUN_SANDBOX_TTL_HOURS ?? "");
+  if (!Number.isFinite(raw) || raw <= 0) return RUN_SANDBOX_TTL_HOURS;
+  return Math.min(
+    RUN_SANDBOX_MAX_TTL_HOURS,
+    Math.max(RUN_SANDBOX_MIN_TTL_HOURS, Math.trunc(raw))
+  );
+}
+
+/** When a settled run's workspace falls due for destruction. */
+export function runSandboxExpiresAt(
+  settledAt: string | null | undefined,
+  env: Record<string, string | undefined> = process.env
+): number | null {
+  if (!settledAt) return null;
+  const settled = Date.parse(settledAt);
+  if (!Number.isFinite(settled)) return null;
+  return settled + runSandboxTtlHours(env) * 3_600_000;
+}
+
+/**
+ * True when the 48 hours are up — or when there is no readable settlement
+ * time, which is a row the sweep must not keep forever.
+ */
+export function runSandboxExpired(
+  settledAt: string | null | undefined,
+  now: number = Date.now(),
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const expires = runSandboxExpiresAt(settledAt, env);
+  return expires === null ? true : now >= expires;
+}
 
 /** Concurrent runs per account. Start at one; the queue is not a scheduler. */
 export const RUN_MAX_CONCURRENT = 1;

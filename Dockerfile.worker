@@ -1,9 +1,11 @@
 # The web-agent run worker, as a container.
 #
-# Render builds this with `docker build`; the process is long-lived and serves
-# no HTTP, so it belongs on a Background Worker, not a Web Service. Nothing is
-# compiled: Bun runs the TypeScript directly and resolves the `@/*` paths from
-# tsconfig.json.
+# Render builds this with `docker build`. The process is a long-lived queue
+# worker; when the host sets `PORT` it also answers `GET /healthz` on that port,
+# which is what lets the same image run as a free Web Service with a health
+# check. Without `PORT` (a VM, or a Background Worker) no port is opened.
+# Nothing is compiled: Bun runs the TypeScript directly and resolves the `@/*`
+# paths from tsconfig.json.
 #
 # Only the worker's own graph is copied — `worker/`, `lib/`, the lockfile and
 # the tsconfig. The Next app is not in this image, which is the point: agent work

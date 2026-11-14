@@ -359,6 +359,20 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to 2, clamped to 1..8; per-account concurrency is a separate limit of 1",
   },
   {
+    key: "RUN_SANDBOX_IDLE_MINUTES",
+    scope: "server",
+    required: false,
+    unlocks: "When a run's sandbox pauses (compute released, disk kept)",
+    hint: "Defaults to 15, clamped to 1..60; the run's own wall clock is the same 15 minutes",
+  },
+  {
+    key: "RUN_SANDBOX_TTL_HOURS",
+    scope: "server",
+    required: false,
+    unlocks: "When a paused run workspace is destroyed",
+    hint: "Defaults to 48, clamped to 1..168; the sweep enforces it",
+  },
+  {
     key: "RUN_ARTIFACT_DIR",
     scope: "server",
     required: false,

@@ -34,7 +34,7 @@ Browser
 | Loop owner | `app/api/chat/route.ts`, inside the request | `lib/runs/loop.ts`, in the worker |
 | Progress | SSE built from in-memory state | append-only `run_events`, replayed on reload |
 | Cancellation | provider abort flag on a turn row | `runs.cancel_requested`, read at step boundaries |
-| Workspace | chat sandbox / GitHub-only turn | one sandbox per run, destroyed in `finally` |
+| Workspace | chat sandbox / GitHub-only turn | one sandbox per run, paused when it settles, destroyed after 48 h |
 | Budget | Dew hour + turn caps | plus per-account concurrent, daily-run and daily-token caps |
 | Output | changeset rows | diff + files as artifacts, reviewed in the UI |
 
@@ -82,16 +82,19 @@ execute grant on a mutating function.
 4. Each iteration: `begin_run_step` (compare-and-set, refuses a cancelled run),
    model call with streaming deltas, tool calls, persisted step and tool rows,
    `usage` event, then the next iteration.
-5. Settle: artifacts collected before teardown, `runs` updated, usage recorded
-   once, terminal event appended, sandbox destroyed in `finally`.
+5. Settle: artifacts collected, `runs` updated, usage recorded once, terminal
+   event appended, sandbox paused in `finally` (compute released, disk kept).
+   The sweep destroys it 48 hours later — `RUN_SANDBOX_TTL_HOURS`.
 
 Cancellation is a flag checked before each step and before each tool call. A
 tool in flight is allowed to finish: a half-applied edit is worse than a slow
 cancel.
 
 A run whose heartbeat stops is marked failed by `reapStaleRuns`, called on
-worker start and from `GET /api/cron/run-sweep` with `CRON_SECRET`. Sandboxes
-labelled `kind=run` that no live row points at are destroyed by the same sweep.
+worker start and from `GET /api/cron/run-sweep` with `CRON_SECRET`. The same
+sweep reconciles sandboxes: a box with no row is destroyed as an orphan, a live
+run's box is kept, and a settled run's box is kept until its 48-hour window
+closes.
 
 ## Event protocol
 
@@ -105,8 +108,9 @@ labelled `kind=run` that no live row points at are destroyed by the same sweep.
 - Tool results reach the client as previews; the full text is in the snapshot.
 - Chain-of-thought is never streamed. `RunView` shows tool summaries.
 
-`preview.ready` is defined for compatibility but not emitted: a per-run preview
-would need the sandbox kept alive past teardown, which this build does not do.
+`preview.ready` is defined for compatibility but not emitted: it would need a
+dev server kept running inside the box and a signed proxy in front of it. The
+paused workspace is retained but not served.
 
 ## Limits
 
@@ -120,14 +124,25 @@ would need the sandbox kept alive past teardown, which this build does not do.
 | Tokens per account per UTC day | 400,000 | `RUN_DAILY_TOKENS` |
 | Run requests per minute | 6 | `RATE_LIMITS.run` |
 | Compaction | 0.8 × 128k context | `RUN_COMPACT_AT` |
+| Sandbox pause | 15 min (`RUN_SANDBOX_IDLE_MINUTES`) | `runSandboxIdleMinutes` |
+| Sandbox destroy | 48 h after the run settles (`RUN_SANDBOX_TTL_HOURS`) | `runSandboxExpired` |
 | Files / file size / diff | 40 / 200 KB / 400 KB | `lib/runs/limits.ts` |
 
 Every number is a named constant and `tests/runs.test.ts` reads it.
 
 ## Sandbox
 
-One box per run, from `EXECUTION_TEMPLATE`, `onTimeout: kill`, no credential,
+One box per run, from `EXECUTION_TEMPLATE`, `onTimeout: pause`, no credential,
 no docker socket. Tools see paths relative to the workspace root.
+
+The workspace outlives the run, on purpose. At 15 minutes — the run's own
+ceiling — the provider pauses the box (`RUN_SANDBOX_IDLE_MINUTES`), and the
+worker pauses it again the moment the run settles. Compute stops billing and
+the disk keeps the installed packages and the edits. The box is destroyed 48
+hours after the run ended (`RUN_SANDBOX_TTL_HOURS`), the same contract a chat
+workspace has. Nothing reattaches to it in this build; retaining it is what
+makes a resume cheap when that lands, and it is why a crashed worker leaves a
+paused workspace rather than a running box.
 
 - The plan says `/work`. E2B's user can only write under `/home/user`, so the
   workspace is **`/home/user/work`**. The tool layer only ever sees relative
@@ -172,21 +187,23 @@ worker, runs wait in `queued` exactly as the row says.
 
 ## Deploying the worker on Render
 
-The repository ships `Dockerfile.worker` and `render.yaml` for this. A
-background worker is the right service type: it runs continuously, polls the
-queue, and receives no inbound traffic, so there is no port, URL or health check
-to configure.
+The repository ships `Dockerfile.worker` and `render.yaml` for this. The
+Blueprint uses a **Web Service on the free plan**, because that is the instance
+type Render gives away: the worker binds to `$PORT` and answers
+`GET /healthz`, and keeps polling the queue behind that health route. It is
+still not a product server — `/healthz` is the only route, and it returns
+counters, never run content. A paid **Background Worker** also works with the
+same image and needs no port at all.
 
 1. **Apply the migration first.** `supabase link --project-ref <ref> && supabase db push`.
    The worker claims runs through `claim_next_run`; without 043 applied it
    cannot claim anything.
 2. **Push this repository to GitHub.** Render builds from a Git repo.
 3. **Create the service.** Render Dashboard → **New +** → **Blueprint**, point
-   it at the repository (it reads `render.yaml`). Or **New +** → **Background
-   Worker** manually: Language **Docker**, Dockerfile Path `Dockerfile.worker`,
-   Docker Context `.`, then pick an instance type. Background workers have no
-   free tier; `starter` is 0.5 CPU / 512 MB, `standard` (1 CPU / 2 GB) is the
-   comfortable choice if you run two concurrent runs.
+   it at the repository (it reads `render.yaml` and creates the free Web
+   Service with `healthCheckPath: /healthz`). Or manually: **New +** → **Web
+   Service**, Language **Docker**, Dockerfile Path `Dockerfile.worker`, Docker
+   Context `.`, plan **Free**, health check path `/healthz`.
 4. **Set the environment variables.** The Blueprint lists them; values marked
    `sync: false` are prompts, so secrets are entered in the dashboard and never
    in Git. Required: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
@@ -206,14 +223,23 @@ to configure.
    done`, and the run page streams events as they arrive. Close the tab
    mid-run; the log still reaches `finished` and a reload replays the log.
 
+**Free-plan behaviour, plainly.** A free Web Service sleeps after 15 minutes
+without inbound traffic, so while it sleeps no run is claimed — queued runs wait
+and execute on the next wake. Keep it awake with an external pinger every five
+minutes (UptimeRobot, cron-job.org) pointed at `/healthz` if runs should start
+immediately. A deploy or a spin-down also sends `SIGTERM`: the worker pauses the
+sandbox and lets the current run finish inside the grace period; a run killed by
+that window is settled as failed by the reaper, while its workspace stays paused
+for the rest of the 48 hours.
+
 Operations that matter on Render:
 
 - **A deploy stops the worker.** Render sends `SIGTERM` and waits
-  `maxShutdownDelaySeconds` (300 in the Blueprint, the maximum). The worker
-  stops claiming and waits for in-flight runs. A run longer than that window is
-  killed; the reaper marks it failed after its heartbeat goes stale, and the
-  sandbox's own 20-minute timeout destroys the box. Deploy between runs if you
-  need a guarantee.
+  `maxShutdownDelaySeconds` (300 in the Blueprint; free instances may use a
+  shorter grace period). The worker stops claiming and waits for in-flight runs.
+  A run killed by that window is marked failed by the reaper once its heartbeat
+  goes stale; its sandbox stays paused, and the 48-hour clock still decides when
+  it is destroyed.
 - **Scaling out is more instances.** Claiming uses `for update skip locked`, so
   two workers never take the same run. Set `RUN_WORKER_CONCURRENCY` down if the
   instance is small.
@@ -251,7 +277,9 @@ guard).
 Not verified here, and required before launch:
 
 - a real run end-to-end against an E2B key (create → seed → install → edit →
-  diff → teardown), including a worker crash mid-run and the reaper;
+  diff → pause), including a worker crash mid-run, the reaper, and the 48-hour
+  sweep actually destroying the box;
+- the worker's `/healthz` route and Render's health check on a real deploy;
 - two accounts, to confirm one cannot read another's run through RLS on the new
   tables;
 - the provider's actual `denyOut` behaviour from inside a sandbox

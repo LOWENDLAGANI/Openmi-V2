@@ -15,6 +15,10 @@ import {
   estimateTokens,
   runCostUsd,
   runMaxMinutes,
+  runSandboxExpired,
+  runSandboxExpiresAt,
+  runSandboxIdleMinutes,
+  runSandboxTtlHours,
   workerConcurrency,
 } from "../lib/runs/limits";
 import {
@@ -79,6 +83,64 @@ describe("run limits", () => {
     expect(estimateTokens("")).toBe(1);
     expect(estimateTokens("abcd")).toBe(1);
     expect(estimateTokens("a".repeat(400))).toBe(100);
+  });
+});
+
+describe("workspace lifetime", () => {
+  test("a run's sandbox pauses at fifteen minutes and lives for forty-eight hours", () => {
+    expect(runSandboxIdleMinutes({})).toBe(15);
+    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "99" })).toBe(60);
+    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "0" })).toBe(15);
+    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "nonsense" })).toBe(15);
+
+    expect(runSandboxTtlHours({})).toBe(48);
+    expect(runSandboxTtlHours({ RUN_SANDBOX_TTL_HOURS: "999" })).toBe(168);
+    expect(runSandboxTtlHours({ RUN_SANDBOX_TTL_HOURS: "0" })).toBe(48);
+    expect(runSandboxTtlHours({ RUN_SANDBOX_TTL_HOURS: "2" })).toBe(2);
+  });
+
+  test("the destroy clock starts when the run settles, not when it starts", () => {
+    const settled = new Date(Date.now() - 47 * 3_600_000).toISOString();
+    const expires = runSandboxExpiresAt(settled);
+
+    expect(expires).not.toBeNull();
+    expect(runSandboxExpired(settled)).toBe(false);
+
+    const old = new Date(Date.now() - 49 * 3_600_000).toISOString();
+    expect(runSandboxExpired(old)).toBe(true);
+
+    // A row with no readable settlement time is not kept forever.
+    expect(runSandboxExpired(null)).toBe(true);
+    expect(runSandboxExpired("not a date")).toBe(true);
+  });
+
+  test("the runtime pauses the box and lets the sweep destroy it", () => {
+    const loop = read("/lib/runs/loop.ts");
+    const worker = read("/lib/runs/worker.ts");
+    const provider = read("/lib/execution/provider.ts");
+
+    expect(loop).toContain("pauseRunWorkspace");
+    expect(loop).not.toContain("closeRunWorkspace");
+    expect(worker).toContain("runSandboxExpired");
+
+    const factory = provider.slice(
+      provider.indexOf("export async function createRunSandbox"),
+      provider.indexOf("export async function listRunSandboxes")
+    );
+
+    expect(factory).toContain('onTimeout: "pause"');
+    expect(factory).not.toContain('onTimeout: "kill"');
+  });
+
+  test("the free Render path is a web service with a health route", () => {
+    const main = read("/worker/main.ts");
+    const blueprint = read("/render.yaml");
+
+    expect(main).toContain("/healthz");
+    expect(main).toContain("PORT");
+    expect(blueprint).toContain("type: web");
+    expect(blueprint).toContain("healthCheckPath: /healthz");
+    expect(blueprint).toContain("plan: free");
   });
 });
 

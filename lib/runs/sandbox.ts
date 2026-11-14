@@ -4,7 +4,6 @@ import {
   type SandboxHandle,
 } from "@/lib/execution/provider";
 
-import { RUN_SANDBOX_TTL_MINUTES } from "./limits";
 import { RUN_WORKDIR } from "./tools";
 
 /**
@@ -13,11 +12,13 @@ import { RUN_WORKDIR } from "./tools";
  * The plan asks for `/work`. E2B runs commands and writes files as its `user`,
  * whose only writable root is `/home/user`, so the workspace is
  * `/home/user/work` — the provider's home decides the path, and the tool layer
- * only ever sees paths relative to that root. The plan's intent (one ephemeral
- * directory per run, with a fixed name) is kept; the absolute path is not.
+ * only ever sees paths relative to that root. The plan's intent (one directory
+ * per run, with a fixed name) is kept; the absolute path is not.
  *
- * The sandbox is created from a fixed template, is non-root, has no docker
- * socket and no credential, and is killed in the caller's `finally`.
+ * The sandbox is created from a fixed template, is non-root and has no docker
+ * socket or credential. It is **paused**, not killed, when the run settles:
+ * compute is released, the disk is kept for `RUN_SANDBOX_TTL_HOURS` (48), and
+ * the sweep destroys it after that.
  */
 
 export { RUN_WORKDIR };
@@ -35,7 +36,7 @@ export async function openRunWorkspace(input: {
   let sandbox: SandboxHandle;
 
   try {
-    sandbox = await createProviderSandbox(input.runId, RUN_SANDBOX_TTL_MINUTES);
+    sandbox = await createProviderSandbox(input.runId);
   } catch (caught) {
     return {
       ok: false,
@@ -183,16 +184,22 @@ export async function seedRunWorkspace(input: {
 }
 
 /**
- * Teardown, in a `finally`.
+ * Teardown, in a `finally`: pause, never destroy.
  *
- * A failed kill is not a failed run: the provider's own `onTimeout: kill` is
- * the backstop, and the orphan sweep destroys anything a row no longer points
- * at. Returning rather than throwing here is deliberate.
+ * The disk is the only copy of what the run installed and wrote, and the
+ * 48-hour retention is a promise the UI and the sweep both make. Pausing
+ * releases compute immediately, so a run costs memory for minutes and disk for
+ * two days, not a box running overnight.
+ *
+ * A refused pause is not a failed run: the provider's own `onTimeout: pause`
+ * does the same job at the deadline, and the sweep removes the box when the
+ * window closes. Returning rather than throwing is deliberate.
  */
-export async function closeRunWorkspace(sandbox: SandboxHandle): Promise<void> {
+export async function pauseRunWorkspace(sandbox: SandboxHandle): Promise<void> {
   try {
-    await sandbox.destroy();
+    await sandbox.stop();
   } catch {
-    // Backstop: the sandbox TTL.
+    // Backstop: the provider pauses at the deadline, and the sweep still owns
+    // the destruction clock.
   }
 }

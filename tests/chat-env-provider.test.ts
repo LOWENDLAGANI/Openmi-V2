@@ -37,8 +37,10 @@ const chatFactory = () =>
     "export async function attachSandbox"
   );
 
+// The slice ends at the next factory rather than at `ChatSandboxOptions`: a
+// run box sits between them now, and its lifecycle is asserted separately.
 const ephemeralFactory = () =>
-  bodyOf("export async function createSandbox", "export type ChatSandboxOptions");
+  bodyOf("export async function createSandbox", "export async function createRunSandbox");
 
 test("a chat environment parks at its deadline instead of dying", () => {
   const chat = chatFactory();

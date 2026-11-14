@@ -575,15 +575,17 @@ nothing it does executes agent work.
   closing the tab does not stop the run.
 - `POST /api/runs/:id/cancel` sets a flag. The loop reads it at each step and
   tool boundary and lets the tool in flight finish.
-- The diff and changed files are collected before teardown and stored as
-  artifacts (`RUN_ARTIFACT_DIR`, or an S3-compatible bucket). The review card is
-  `/agent/:id`.
+- The diff and changed files are collected before the sandbox is paused and
+  stored as artifacts (`RUN_ARTIFACT_DIR`, or an S3-compatible bucket). The
+  review card is `/agent/:id`.
 
 | Limit | Value |
 |---|---|
 | Steps per run | 40 |
 | Tokens per run (estimated) | 120,000 |
 | Wall clock | 15 min |
+| Sandbox paused | 15 min (compute released, disk kept) |
+| Sandbox destroyed | 48 h after the run settles |
 | Concurrent runs per account | 1 |
 | Runs per day | 20 |
 | Tokens per day | 400,000 |
@@ -598,11 +600,13 @@ The contract, the phase map, the sandbox facts (including why the workspace is
 are in [docs/WEB_AGENT_RUNS.md](docs/WEB_AGENT_RUNS.md). The chat surface is
 unchanged; a run is a separate unit of work that can outlive the tab.
 
-For Render, the repository carries `Dockerfile.worker` and `render.yaml`: apply
-the Blueprint (or create a **Background Worker** with Language **Docker**) and
-set the variables the Blueprint names. A run's artifacts need the
-`RUN_ARTIFACTS_*` bucket there — the worker's own disk is ephemeral and the web
-app runs elsewhere.
+For Render, the repository carries `Dockerfile.worker` and `render.yaml`. The
+Blueprint creates a **free Web Service** — the type Render gives away — which is
+why the worker also answers `GET /healthz` on `$PORT`; the run queue is polled
+behind it. Free Web Services sleep after 15 minutes without traffic, so ping
+`/healthz` every five minutes if runs should start immediately. A run's
+artifacts need the `RUN_ARTIFACTS_*` bucket there: a free instance has no disk
+and the web app runs elsewhere.
 
 ## Rules for contributors
 

@@ -1,25 +1,32 @@
 # Render Blueprint for the web-agent run worker.
 #
-# One background worker, no public route. `render.yaml` is applied from the
-# Render Dashboard (New + → Blueprint) or by pointing a new Background Worker at
-# the repository and choosing Docker with `Dockerfile.worker`.
+# A **Web Service** on the free plan, because that is the instance type Render
+# gives away: the worker binds to `$PORT` and answers `GET /healthz`, and keeps
+# polling the run queue behind it. It still receives no product traffic — the
+# only route is the health check.
 #
-# Background workers have no free instance type. `starter` is 0.5 CPU / 512 MB;
-# the worker itself is mostly waiting on a model stream, but two concurrent runs
-# plus Bun want headroom, so `standard` (1 CPU / 2 GB) is the comfortable choice.
-# Scaling out is adding instances, not changing code: claims are exclusive.
+# Free-plan reality, stated plainly: a free Web Service sleeps after 15 minutes
+# without inbound traffic. While it sleeps no run is claimed; queued runs wait
+# and are executed on the next wake. If you want runs to start immediately, keep
+# it awake with an external pinger every 5 minutes (UptimeRobot, cron-job.org)
+# pointed at `/healthz`, or move to a paid instance.
+#
+# Artifacts still need the bucket: a free instance has no disk, and the web app
+# runs on another host, so `RUN_ARTIFACT_DIR` could not be read back.
 
 services:
-  - type: worker
+  - type: web
     name: openmi-runs
     runtime: docker
     dockerfilePath: ./Dockerfile.worker
     dockerContext: .
-    plan: starter
+    plan: free
+    healthCheckPath: /healthz
     autoDeploy: true
     # A run may take up to RUN_MAX_MINUTES. Render sends SIGTERM and waits this
     # long (max 300) before killing the process; the worker stops claiming and
-    # lets in-flight runs finish inside that window.
+    # lets in-flight runs finish inside that window. Free instances may use a
+    # shorter grace period than the value requested here.
     maxShutdownDelaySeconds: 300
     envVars:
       # ── Required ───────────────────────────────────────────────────────────
@@ -54,17 +61,21 @@ services:
       - key: EXEC_NETWORK_MODE
         value: restricted
 
-      # ── Limits ─────────────────────────────────────────────────────────────
+      # ── Limits and workspace lifetime ──────────────────────────────────────
       - key: RUN_MAX_MINUTES
         value: "15"
+      # Pause the sandbox after 15 minutes (compute released, disk kept) and
+      # destroy it 48 hours after the run settled.
+      - key: RUN_SANDBOX_IDLE_MINUTES
+        value: "15"
+      - key: RUN_SANDBOX_TTL_HOURS
+        value: "48"
       - key: RUN_WORKER_CONCURRENCY
-        value: "2"
+        value: "1"
 
       # ── Artifacts ──────────────────────────────────────────────────────────
-      # Required on Render: the worker's own disk is ephemeral, and the web app
-      # runs elsewhere, so it could not read a local artifact directory. Use an
-      # S3-compatible bucket (Cloudflare R2, S3, MinIO). Set all five or the
-      # worker writes to a disk that disappears on the next deploy.
+      # Required on Render: no disk, and the web app runs elsewhere. Use an
+      # S3-compatible bucket (Cloudflare R2, S3, MinIO) and set all five.
       - key: RUN_ARTIFACTS_BUCKET
         sync: false
       - key: RUN_ARTIFACTS_ENDPOINT
