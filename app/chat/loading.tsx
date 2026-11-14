@@ -1,3 +1,4 @@
+import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { Spinner } from "@/components/Loading";
 
 /**
@@ -7,6 +8,9 @@ import { Spinner } from "@/components/Loading";
  * frame — sidebar, header, composer — on screen instead of a blank flash. It
  * mirrors the real shell, including the mobile height, so the composer does not
  * jump when the transcript arrives.
+ *
+ * The column itself is `ChatSkeleton`, the same component the page uses for its
+ * in-page Suspense boundary: one skeleton, two moments, no drift between them.
  */
 export default function ChatLoading() {
   return (
@@ -46,18 +50,8 @@ export default function ChatLoading() {
           </div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 overflow-hidden px-4 py-6 md:px-7">
-          <div className="skeleton h-9 w-2/3 self-end rounded-[26px]" />
-
-          <div className="space-y-2.5">
-            <div className="skeleton h-2.5 w-16 rounded-full" />
-            <div className="skeleton h-3 w-full rounded-full" />
-            <div className="skeleton h-3 w-11/12 rounded-full" />
-            <div className="skeleton h-3 w-4/5 rounded-full" />
-            <div className="skeleton h-3 w-2/3 rounded-full" />
-          </div>
-
-          <div className="skeleton mt-auto h-28 w-full rounded-[28px] border border-line" />
+        <div className="min-h-0 flex-1 px-4 py-6 md:px-7">
+          <ChatSkeleton />
         </div>
       </main>
     </div>

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
 import { ChatPanel } from "@/components/ChatPanel";
+import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { SandboxDock } from "@/components/SandboxDock";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { DewChip } from "@/components/DewChip";
@@ -336,7 +338,22 @@ async function RepoSurface({
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const models = modelCatalogue();
 
-  const [messages, proposals, runningTurn, profileResult, autoApproval] =
+  // The citation index is a GitHub round trip, so it is started before the
+  // first await and settled alongside the database reads. Sequenced after them,
+  // it added its whole latency to the transcript for no reason.
+  const citationPaths =
+    chat.repo_full_name && chat.repo_base_sha
+      ? readCitationPaths(session, chat.repo_full_name, chat.repo_base_sha)
+      : Promise.resolve<string[]>([]);
+
+  const [
+    messages,
+    proposals,
+    runningTurn,
+    profileResult,
+    autoApproval,
+    validPaths,
+  ] =
     await Promise.all([
     listMessages(session.supabase, chat.id),
     loadChangesets(session.supabase, chat.id),
@@ -363,6 +380,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .eq("repo_full_name", chat.repo_full_name ?? "")
       .eq("branch", chat.repo_branch ?? "main")
       .maybeSingle(),
+    citationPaths,
   ]);
 
   const balances = (profileResult.data ?? {}) as {
@@ -376,32 +394,14 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const autoApproveBranch =
     (autoApproval.data as { branch?: string } | null)?.branch ?? null;
 
-  let repo: { fullName: string; branch: string; sha: string } | null = null;
-  let validPaths: string[] = [];
-
-  if (chat.repo_full_name && chat.repo_base_sha) {
-    repo = {
-      fullName: chat.repo_full_name,
-      branch: chat.repo_branch ?? "",
-      sha: chat.repo_base_sha,
-    };
-
-    // Citations are checked against the tree at the pinned commit, so a link
-    // only appears when the path exists there. If this read fails, the
-    // transcript still renders and citations stay plain text.
-    try {
-      const github = await readToken(session.supabase, session.user.id);
-      if (github) {
-        const tree = await getTree(github.token, chat.repo_full_name, chat.repo_base_sha);
-        validPaths = tree.entries
-          .filter((entry) => entry.type === "blob")
-          .map((entry) => entry.path)
-          .slice(0, MAX_PATH_INDEX);
-      }
-    } catch {
-      validPaths = [];
-    }
-  }
+  const repo =
+    chat.repo_full_name && chat.repo_base_sha
+      ? {
+          fullName: chat.repo_full_name,
+          branch: chat.repo_branch ?? "",
+          sha: chat.repo_base_sha,
+        }
+      : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -478,6 +478,33 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       </div>
     </div>
   );
+}
+
+/**
+ * The paths a citation may link to, read at the pinned commit.
+ *
+ * Failure is an empty list, not an error: a transcript whose citations stay
+ * plain text is still a transcript, and a GitHub outage should not blank a
+ * conversation that is already stored.
+ */
+async function readCitationPaths(
+  session: SignedIn,
+  fullName: string,
+  sha: string
+): Promise<string[]> {
+  try {
+    const github = await readToken(session.supabase, session.user.id);
+    if (!github) return [];
+
+    const tree = await getTree(github.token, fullName, sha);
+
+    return tree.entries
+      .filter((entry) => entry.type === "blob")
+      .map((entry) => entry.path)
+      .slice(0, MAX_PATH_INDEX);
+  } catch {
+    return [];
+  }
 }
 
 async function DraftChat({
@@ -690,11 +717,23 @@ export default async function ChatPage({
   } else if (draft) {
     body = <DraftChat repo={draftRepo} />;
   } else if (activeChat && !workspaceView) {
-    body = await ChatView({ session, chat: activeChat });
+    // The conversation streams into a boundary of its own instead of holding
+    // the page. Awaiting it here made every GitHub read part of the first byte:
+    // the sidebar and header could not paint until the tree for citation links
+    // had answered. Now the shell is immediate and this column fills in.
+    body = (
+      <Suspense fallback={<ChatSkeleton />}>
+        <ChatView session={session} chat={activeChat} />
+      </Suspense>
+    );
   } else if (workspaceView) {
     // The repository browser is a place you ask for: the sidebar's Repositories
     // row and every citation link pass `view`.
-    body = await RepoSurface({ session, params, chat: activeChat });
+    body = (
+      <Suspense fallback={<ChatSkeleton label="Loading the repository" />}>
+        <RepoSurface session={session} params={params} chat={activeChat} />
+      </Suspense>
+    );
   } else {
     body = <DraftChat repo={latestRepo} />;
   }

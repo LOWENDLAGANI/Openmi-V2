@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useOptimistic } from "react";
+import { useEffect, useOptimistic, useRef, useState } from "react";
 
 import {
   createFolder,
@@ -80,11 +80,13 @@ function ChatRow({
   active,
   folders,
   onChange,
+  onOpen,
 }: {
   chat: Chat;
   active: boolean;
   folders: Folder[];
   onChange: (change: Change) => void;
+  onOpen: (chatId: string) => void;
 }) {
   async function move(formData: FormData) {
     const folderId = String(formData.get("folderId") ?? "");
@@ -113,6 +115,7 @@ function ChatRow({
       <Link
         href={`/chat?chat=${chat.id}`}
         aria-current={active ? "page" : undefined}
+        onClick={() => onOpen(chat.id)}
         title={chat.title}
         className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-1"
       >
@@ -192,6 +195,39 @@ export function ChatList({
 }) {
   const [board, change] = useOptimistic<Board, Change>({ chats, folders }, apply);
 
+  // A click answers in the same frame, even though the row it opens is a server
+  // render. Without this the highlight waited for the response — long enough to
+  // look ignored, and the reason a reader clicks a second time.
+  const [opening, setOpening] = useState<string | null>(null);
+  const openingTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (openingTimer.current !== null) {
+      window.clearTimeout(openingTimer.current);
+      openingTimer.current = null;
+    }
+    setOpening(null);
+  }, [activeChatId]);
+
+  useEffect(
+    () => () => {
+      if (openingTimer.current !== null) window.clearTimeout(openingTimer.current);
+    },
+    []
+  );
+
+  function open(chatId: string) {
+    setOpening(chatId);
+
+    // Backstop: a navigation that never lands (an offline tab, a failed RSC
+    // fetch) must not leave a row looking active forever.
+    if (openingTimer.current !== null) window.clearTimeout(openingTimer.current);
+    openingTimer.current = window.setTimeout(() => {
+      openingTimer.current = null;
+      setOpening(null);
+    }, 10_000);
+  }
+
   const ungrouped = board.chats.filter((chat) => !chat.folder_id);
   const inFolder = (folderId: string) =>
     board.chats.filter((chat) => chat.folder_id === folderId);
@@ -220,9 +256,10 @@ export function ChatList({
             <ChatRow
               key={chat.id}
               chat={chat}
-              active={chat.id === activeChatId}
+              active={chat.id === activeChatId || chat.id === opening}
               folders={board.folders}
               onChange={change}
+              onOpen={open}
             />
           ))}
         </div>
@@ -256,9 +293,10 @@ export function ChatList({
                   <ChatRow
                     key={chat.id}
                     chat={chat}
-                    active={chat.id === activeChatId}
+                    active={chat.id === activeChatId || chat.id === opening}
                     folders={board.folders}
                     onChange={change}
+                    onOpen={open}
                   />
                 ))
               )}
