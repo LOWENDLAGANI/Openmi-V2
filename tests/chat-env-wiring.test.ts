@@ -37,16 +37,19 @@ test("ending a persistent turn releases the lease and never destroys the disk", 
   expect(at(close, "releaseChatSandbox")).toBeLessThan(at(close, "handle.destroy()"));
 });
 
-test("the route passes the session owner and lets a paused workspace continue", () => {
+test("the route hands the owner and the chat to the run, and can reattach to it", () => {
   expect(route).toContain("owner: session.user.id");
   expect(route).toContain("chatId,");
-  expect(route).toContain("onNotice:");
-  expect(route).toContain("retainsWorkspace()");
-  expect(route).toContain('const pausable = result.stopped === "paused" && (!shellTurn || retainedWorkspace)');
 
-  // The old rule refused every paused shell turn. It must be gone, not merely
-  // shadowed by a second declaration.
-  expect(route).not.toContain('const pausable = result.stopped === "paused" && !shellTurn');
+  // A continuation is the same run's next window, not a second turn: the run is
+  // read by id and checked against this owner and this chat before streaming.
+  expect(route).toContain("continuationId");
+  expect(route).toContain("run.owner !== session.user.id");
+  expect(route).toContain("run.chat_id !== chatId");
+
+  // The in-request shell lease is gone with the loop that held it.
+  expect(route).not.toContain("createShellTurn");
+  expect(route).not.toContain("onNotice:");
 });
 
 test("only a persistent workspace is described to the model as persistent", () => {

@@ -561,23 +561,27 @@ cannot start (D6.4) — are answered in
 
 ## Web agent runs
 
-`/agent` is the server-owned agent surface. It is the implementation of the
-finalized web-agent build plan in this repository: the browser is a view, and
-nothing it does executes agent work.
+A chat message is a run. The conversation at `/chat` is the only agent surface:
+the browser is a view, and nothing it does executes agent work.
 
-- `POST /api/runs` authenticates, checks the per-account quota and rate limit,
-  writes a `queued` row and answers `202`. It never calls a provider.
+- `POST /api/chat` authenticates, checks the per-account quota and rate limit,
+  writes the question to the transcript, queues a `runs` row with the chat's
+  recent history and streams that run's events in the protocol the transcript
+  already speaks. It never calls a provider.
 - `bun run worker` starts the long-lived worker. It claims a run with
   `for update skip locked`, executes the loop in one E2B sandbox, and appends
   every step, tool call and event to Postgres before the next model call.
-- `GET /api/runs/:id/stream` is SSE over `fetch`, replayable from
-  `Last-Event-ID`, with a heartbeat every 15 seconds. A reload replays the log;
-  closing the tab does not stop the run.
-- `POST /api/runs/:id/cancel` sets a flag. The loop reads it at each step and
-  tool boundary and lets the tool in flight finish.
-- The diff and changed files are collected before the sandbox is paused and
-  stored as artifacts (`RUN_ARTIFACT_DIR`, or an S3-compatible bucket). The
-  review card is `/agent/:id`.
+- When the run settles, the worker appends the answer to `messages` (so the
+  transcript is the same on every device) and proposes the diff as the chat's
+  changeset, which is what the review card and its pull-request button act on.
+- `POST /api/chat/stop` sets a flag. The loop reads it at each step and tool
+  boundary and lets the tool in flight finish. A stop before any text refunds
+  the hour; a failed run refunds it too.
+- `POST /api/runs`, `GET /api/runs/:id`, `GET /api/runs/:id/stream` and
+  `POST /api/runs/:id/cancel` remain as the same runtime's API, for tooling and
+  for the tests; the product does not need them.
+- The diff and changed files are also collected as artifacts
+  (`RUN_ARTIFACT_DIR`, or an S3-compatible bucket) before the sandbox pauses.
 
 | Limit | Value |
 |---|---|
@@ -597,8 +601,8 @@ worker does not leave a run waiting forever.
 
 The contract, the phase map, the sandbox facts (including why the workspace is
 `/home/user/work` rather than `/work`) and what still needs a real key to verify
-are in [docs/WEB_AGENT_RUNS.md](docs/WEB_AGENT_RUNS.md). The chat surface is
-unchanged; a run is a separate unit of work that can outlive the tab.
+are in [docs/WEB_AGENT_RUNS.md](docs/WEB_AGENT_RUNS.md). The chat's engine is the
+run runtime; the transcript is its event log made readable.
 
 For Render, the repository carries `Dockerfile.worker` and `render.yaml`. The
 Blueprint creates a **free Web Service** — the type Render gives away — which is

@@ -28,15 +28,16 @@ test("a chat turn gets the sandbox unless the operator turns it off", () => {
   }
 });
 
-test("the route asks the policy before it provisions a shell turn", () => {
-  expect(ROUTE).toContain("sandboxTurnsEnabled()");
-  expect(ROUTE.indexOf("createShellTurn(")).toBeGreaterThan(
-    ROUTE.indexOf("sandboxTurnsEnabled()")
+test("the route refuses before it queues when there is no execution provider", () => {
+  // A chat turn is a run, and a run always owns a sandbox. The refusal names
+  // the missing configuration instead of queueing work that can only fail.
+  expect(ROUTE).toContain("executionConfigured()");
+  expect(ROUTE.indexOf("executionConfigured()")).toBeLessThan(
+    ROUTE.indexOf("createRun(")
   );
 
-  // The sandbox is moved aside, not deleted: pause, resume and release are wired.
-  expect(ROUTE).toContain("await shellTurn?.close()");
-  expect(ROUTE).toContain("retainsWorkspace()");
+  // The in-request shell is gone: the worker opens the workspace, not the route.
+  expect(ROUTE).not.toContain("createShellTurn");
 });
 
 test("a turn whose repository could not be opened is not told it has read tools", () => {

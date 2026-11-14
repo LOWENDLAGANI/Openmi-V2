@@ -360,12 +360,11 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     // A turn keeps running after the tab closes. Reading the flag here is what
     // turns "the answer will arrive" into something the page can show.
     session.supabase
-      .from("agent_turns")
-      .select("turn_id")
+      .from("runs")
+      .select("id")
       .eq("chat_id", chat.id)
-      .eq("status", "running")
-      .eq("cancel_requested", false)
-      .gt("expires_at", new Date().toISOString())
+      .in("status", ["queued", "running"])
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     session.supabase

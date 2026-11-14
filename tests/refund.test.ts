@@ -36,10 +36,14 @@ test("a reason reads as a sentence fragment without a stray full stop", () => {
   }
 });
 
-test("both chat paths refund through the shared decision", () => {
+test("the worker refunds through the shared decision, against the charged hour", () => {
+  const loop = readFileSync(new URL("../lib/runs/loop.ts", import.meta.url), "utf8");
   const route = readFileSync(new URL("../app/api/chat/route.ts", import.meta.url), "utf8");
 
-  // One plain completion path and one agent path.
-  expect(route.split("refundReasonFor(").length - 1).toBe(2);
-  expect(route).not.toContain("result.stopped === \"error\" || result.stopped === \"aborted\"");
+  // The run settles out of band, so the refund belongs to the loop and the
+  // request only hands over the session it charged.
+  expect(loop.split("refundReasonFor(").length - 1).toBe(1);
+  expect(loop).toContain("refundDewSession(");
+  expect(route).not.toContain("refundReasonFor(");
+  expect(route).toContain("dewSessionId: dew.session.sessionId");
 });

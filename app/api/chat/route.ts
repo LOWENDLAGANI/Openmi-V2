@@ -1,99 +1,63 @@
-import { after, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
-import {
-  CONTINUE_AT_MS,
-  MAX_STEPS,
-  TURN_TTL_MS,
-  hashPrompt,
-  newTurnId,
-  signEnvelope,
-  verifyEnvelope,
-} from "@/lib/agent/envelope";
-import { runAgent } from "@/lib/agent/run";
-import type { ToolContext } from "@/lib/agent/tools";
-import { createShellTurn } from "@/lib/agent/sandbox";
-import { CHAT_SHELL_BUDGET_MS } from "@/lib/agent/shell";
-import type { EditRequest } from "@/lib/changesets";
-import { readAutoApproval } from "@/lib/changesets/autoapproval";
-import {
-  needsConfirmation,
-  withAutoWriteReview,
-  withStandingApproval,
-} from "@/lib/changesets/confirmation";
-import { autoWriteEnabled } from "@/lib/github/autowrite";
-import { requestedBranch, safeBranchName } from "@/lib/github/branch-request";
-import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
-import {
-  addEdits,
-  createChangeset,
-  finalizeChangeset,
-  findDraftChangeset,
-  loadConfirmationFacts,
-} from "@/lib/changesets/store";
-// Shared with the composer, so the warning and the refusal name one number.
+import { NextResponse } from "next/server";
+
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
-import { assembleContext } from "@/lib/context";
+import { titleFromMessage } from "@/lib/chat-title";
 import { formatDew } from "@/lib/dew";
-import { refundReasonFor } from "@/lib/dew/refund";
-import {
-  grantTrialDew,
-  refundDewSession,
-  startDewSession,
-  type DewGate,
-} from "@/lib/dew/store";
-import { executionConfigured, sandboxTurnsEnabled, serverEnv } from "@/lib/env";
-import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
-import { pullChatBranch, readGitStatus } from "@/lib/execution/sync/session";
-import {
-  getFile,
-  getRepo,
-  getTree,
-  isRepoFullName,
-  MAX_PATH_INDEX,
-  resolveBranchSha,
-} from "@/lib/github/read";
+import { grantTrialDew, startDewSession, type DewGate } from "@/lib/dew/store";
+import { executionConfigured, serverEnv } from "@/lib/env";
+import { isRepoFullName, getRepo, resolveBranchSha } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { hashIp, requestIp } from "@/lib/http/ip";
 import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
-import {
-  AUTO_MODEL,
-  firstAvailableModel,
-  hasModel,
-  type ModelId,
-} from "@/lib/models";
-import { buildSystemPrompt } from "@/lib/prompt";
-import {
-  autoChain,
-  modelCatalogue,
-  providerKeys,
-  providersConfigured,
-  providersFor,
-  streamCompletion,
-  type ChatMessage,
-} from "@/lib/providers";
-import { titleFromMessage } from "@/lib/chat-title";
+import { firstAvailableModel, hasModel, type ModelId } from "@/lib/models";
+import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { streamRouted } from "@/lib/routing/pipeline";
+import { checkRunQuota } from "@/lib/runs/limits";
+import {
+  appendRunMessage,
+  createRun,
+  readEventsSince,
+  readQuota,
+  readRun,
+  type RunRow,
+} from "@/lib/runs/store";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/**
- * A message that decides to use its sandbox needs the sandbox's own ceiling.
- * The same 300 s the mission and verification routes ask for: provisioning,
- * any command, and the model call around them inside one invocation.
- */
+/** The stream's window is 240 s, so the invocation's ceiling is 300 s. */
 export const maxDuration = 300;
+
+/**
+ * A chat message, executed as a run.
+ *
+ * The request does three things and then gets out of the way: it writes the
+ * question to the transcript, queues a run for the worker, and streams the run's
+ * events back in the shape the chat already understands. Nothing about the
+ * answer happens inside this invocation, so closing the tab cannot interrupt it
+ * and a deployment cannot cut it in half.
+ *
+ * The stream is a view over `run_events`, which means a reload can replay it and
+ * a long run can be picked up again: the window closes before the function's
+ * ceiling and sends `paused` with the run id, and the client continues from
+ * there. No work is duplicated, because nothing in this route produces work.
+ */
+
+/** Stop well before the 300 s ceiling and hand the reader the run's id. */
+const WINDOW_MS = 240_000;
+const POLL_MS = 250;
 
 type ChatRequest = {
   chatId?: unknown;
   content?: unknown;
   model?: unknown;
   path?: unknown;
+  /** A continuation: the run the client is already watching. */
   turn?: unknown;
-  /** The repository a draft chat was started from, if any. */
   repo?: unknown;
   branch?: unknown;
   sha?: unknown;
@@ -103,17 +67,19 @@ function json(
   body: unknown,
   status: number,
   extra: Record<string, string> = {}
-) {
+): NextResponse {
   return NextResponse.json(body, {
     status,
     headers: { "cache-control": "no-store", ...extra },
   });
 }
 
-function messageOf(error: unknown): string {
-  return error instanceof Error && error.message.length > 0
-    ? error.message
-    : "That did not work.";
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function terminal(status: string): boolean {
+  return status !== "queued" && status !== "running";
 }
 
 export async function POST(request: Request) {
@@ -129,9 +95,6 @@ export async function POST(request: Request) {
 
   if (session.state !== "signed-in") return json({ error: "Sign in to chat." }, 401);
 
-  // Before the body is read and before any provider call: one shared counter per
-  // account per minute. A degraded limiter allows the turn and reports itself on
-  // /setup, rather than turning a missing variable into a failed request.
   const limited = await checkRateLimit(supabaseAdmin(), "chat", session.user.id);
 
   if (!limited.allowed) {
@@ -149,12 +112,10 @@ export async function POST(request: Request) {
 
   if (!body) return json({ error: "Malformed request." }, 400);
 
-  const continuationToken = typeof body.turn === "string" ? body.turn : null;
+  const continuationId = typeof body.turn === "string" ? body.turn : "";
   const content = typeof body.content === "string" ? body.content.trim() : "";
 
-  // Refused before anything is written: an empty message must not create a
-  // chat row, and a deployment with no provider must not leave one behind.
-  if (!continuationToken) {
+  if (!continuationId) {
     if (content.length === 0) return json({ error: "Write something first." }, 400);
     if (content.length > MAX_MESSAGE_CHARS) {
       return json(
@@ -174,21 +135,60 @@ export async function POST(request: Request) {
     );
   }
 
+  // A chat turn runs in a sandbox, because the agent is the thing behind it.
+  // Saying so before a row exists is better than queueing a run that can only
+  // fail: the message names the missing configuration, not a generic error.
+  if (!executionConfigured()) {
+    return json(
+      {
+        error:
+          "The agent needs its execution provider configured (E2B_API_KEY) before it can answer.",
+        code: "no-execution",
+      },
+      409
+    );
+  }
+
+  const admin = supabaseAdmin();
+
+  if (!admin) {
+    return json(
+      { error: "This deployment has no service role key, so the agent cannot run." },
+      503
+    );
+  }
+
   let chatId =
     typeof body.chatId === "string" && body.chatId.length > 0 ? body.chatId : "";
-  let createdChat = false;
 
-  if (chatId.length === 0) {
-    if (continuationToken) {
+  // ── A continuation: the same run, the next window ─────────────────────────
+  if (continuationId) {
+    if (chatId.length === 0) {
       return json({ error: "A continuation needs its chat." }, 400);
     }
 
+    const run = await readRun(admin, continuationId).catch(() => null);
+
+    if (!run || run.owner !== session.user.id || run.chat_id !== chatId) {
+      return json({ error: "That run does not exist." }, 404);
+    }
+
+    return streamRun({
+      admin,
+      session,
+      chatId,
+      run,
+      cursor: run.last_event_seq,
+      greeting: null,
+    });
+  }
+
+  // ── A new message ─────────────────────────────────────────────────────────
+  let createdChat = false;
+
+  if (chatId.length === 0) {
     // Created on the first message, not when "New chat" is clicked. An empty
     // chat is not a conversation, and it should not appear in history.
-    //
-    // A draft started from a repository carries that repository into the row.
-    // Without this, picking a repo and pressing "New chat" produced a chat with
-    // no code attached, and the first answer had nothing to cite.
     const requestedRepo =
       typeof body.repo === "string" && isRepoFullName(body.repo.trim())
         ? body.repo.trim()
@@ -200,8 +200,8 @@ export async function POST(request: Request) {
         ? body.sha.trim()
         : "";
 
-    // The pin is resolved on the server when the draft did not carry one, so
-    // the sha in the database is one GitHub reported, not one a form supplied.
+    // The pin is resolved on the server when the draft did not carry one, so the
+    // sha in the database is one GitHub reported, not one a form supplied.
     if (requestedRepo && (!requestedBranch || !requestedSha)) {
       try {
         const github = await readToken(session.supabase, session.user.id);
@@ -218,9 +218,7 @@ export async function POST(request: Request) {
           }
         }
       } catch {
-        // A repository that cannot be read is not attached. The message still
-        // sends, and the workspace keeps saying there is no repository rather
-        // than pinning a commit nobody verified.
+        // A repository that cannot be read is not attached.
       }
     }
 
@@ -245,124 +243,50 @@ export async function POST(request: Request) {
       .single();
 
     if (createError || !created) {
-      return json(
-        { error: createError?.message ?? "Could not start a chat." },
-        500
-      );
+      return json({ error: createError?.message ?? "Could not start a chat." }, 500);
     }
 
     chatId = String((created as { id: string }).id);
     createdChat = true;
   }
 
-  // An id the catalogue does not know — an old tab, a renamed custom entry, a
-  // chat written before the catalogue shrank — opens the first model this
-  // deployment can actually call, instead of failing the turn or opening on a
-  // model whose key is missing.
   const modelOptions = modelCatalogue();
   const model: ModelId = hasModel(modelOptions, body.model)
     ? (body.model as string)
     : firstAvailableModel(modelOptions);
 
-
-  // RLS decides whether this chat exists for this account; the select is the
-  // request, not a second authority.
   const { data: chat, error } = await session.supabase
     .from("chats")
-    .select("id, repo_full_name, repo_base_sha, repo_branch")
+    .select("id, repo_full_name, repo_base_sha")
     .eq("id", chatId)
     .maybeSingle();
 
   if (error) return json({ error: error.message }, 500);
   if (!chat) return json({ error: "That chat does not exist." }, 404);
 
+  const repoFullName =
+    typeof chat.repo_full_name === "string" && isRepoFullName(chat.repo_full_name)
+      ? chat.repo_full_name
+      : null;
+  const sha = typeof chat.repo_base_sha === "string" ? chat.repo_base_sha : null;
+
   const sealKey = serverEnv().githubTokenKey;
-
-  let continuation: { turnId: string; steps: number; exp: number } | null = null;
-
-  if (continuationToken) {
-    if (!sealKey) {
-      return json(
-        { error: "Continuation tokens cannot be verified without GITHUB_TOKEN_KEY." },
-        503
-      );
-    }
-
-    const verified = verifyEnvelope(continuationToken, sealKey);
-
-    if (!verified.ok) {
-      return json(
-        {
-          error: "That continuation token is not valid for this deployment.",
-          code: "turn-invalid",
-        },
-        409
-      );
-    }
-
-    if (verified.payload.chatId !== chatId) {
-      return json(
-        { error: "That continuation token belongs to a different chat." },
-        409
-      );
-    }
-
-    // The row is the authority on steps. A token that claims a step count it no
-    // longer has is a replay of a spent turn, and it is refused here.
-    const { data: row, error: rowError } = await session.supabase
-      .from("agent_turns")
-      .select("turn_id, steps, expires_at")
-      .eq("turn_id", verified.payload.turnId)
-      .maybeSingle();
-
-    if (rowError) return json({ error: rowError.message }, 500);
-    if (!row) return json({ error: "That turn no longer exists." }, 409);
-
-    if (Number(row.steps) !== verified.payload.steps) {
-      return json(
-        {
-          error: "This turn was already continued or has moved on.",
-          code: "turn-replay",
-        },
-        409
-      );
-    }
-
-    if (new Date(row.expires_at).getTime() < Date.now()) {
-      return json({ error: "That turn expired." }, 409);
-    }
-
-    continuation = {
-      turnId: verified.payload.turnId,
-      steps: Number(row.steps),
-      exp: verified.payload.exp,
-    };
-  }
 
   // Trial Dew is granted here, not at signup: this is the first point in the
   // flow where the request has an address, and the grant is capped per address
-  // per day. An account farm still gets accounts; it no longer gets paid for
-  // them. A grant that fails is not a turn failure — the daily allowance still
-  // applies, and nothing in the answer depends on it.
-  const callerIp = continuationToken ? null : requestIp(request.headers);
+  // per day.
+  const callerIp = requestIp(request.headers);
 
   if (callerIp && sealKey) {
-    const admin = supabaseAdmin();
-    if (admin) {
-      await grantTrialDew(admin, session.user.id, hashIp(callerIp, sealKey));
-    }
+    await grantTrialDew(admin, session.user.id, hashIp(callerIp, sealKey));
   }
 
-  // Charged only after the deployment can answer and after a continuation has
-  // proved it belongs to this chat, so a bad token never costs anything. A
-  // continuation inside the same running hour is reused by the database and
-  // costs nothing, so it is safe to ask again here.
-  const dew: DewGate = await startDewSession(
-    session.supabase,
-    model,
-    typeof chat.repo_full_name === "string" ? chat.repo_full_name : null,
-    { chatId }
-  );
+  // Charged once per running hour, and the database reuses a live hour, so a
+  // second message inside it costs nothing. A refusal here happens before any
+  // row is written.
+  const dew: DewGate = await startDewSession(session.supabase, model, repoFullName, {
+    chatId,
+  });
 
   if (!dew.ok) {
     return json(
@@ -371,249 +295,116 @@ export async function POST(request: Request) {
     );
   }
 
-  const turnId = continuation?.turnId ?? newTurnId();
-  const expiresAt = continuation ? continuation.exp : Date.now() + TURN_TTL_MS;
-
-  if (continuation) {
-    // A continuation is the same turn, so it is running again. Without this the
-    // turn stays "paused" and the page cannot tell that work resumed.
-    await session.supabase
-      .from("agent_turns")
-      .update({ status: "running", cancel_requested: false, finished_at: null })
-      .eq("turn_id", turnId)
-      .eq("owner", session.user.id);
-  }
-
   let userMessage = null;
 
-  if (!continuation) {
-    // Persisted before the provider call: a failed answer leaves the question in
-    // the transcript instead of erasing what the user typed.
-    try {
-      userMessage = await appendMessage(session.supabase, chatId, "user", content, model);
-    } catch (caught) {
-      return json({ error: messageOf(caught) }, 500);
-    }
-
-    if (!userMessage) return json({ error: "The message was not saved." }, 500);
-
-    const { error: turnError } = await session.supabase.from("agent_turns").insert({
-      turn_id: turnId,
-      owner: session.user.id,
-      chat_id: chatId,
-      model,
-      prompt_hash: hashPrompt(content),
-      max_steps: MAX_STEPS,
-      expires_at: new Date(expiresAt).toISOString(),
-    });
-
-    if (turnError) return json({ error: turnError.message }, 500);
+  try {
+    userMessage = await appendMessage(session.supabase, chatId, "user", content, model);
+  } catch (caught) {
+    return json(
+      { error: caught instanceof Error ? caught.message : "The message was not saved." },
+      500
+    );
   }
 
-  const repoFullName =
-    typeof chat.repo_full_name === "string" && isRepoFullName(chat.repo_full_name)
-      ? chat.repo_full_name
-      : null;
-  const sha = typeof chat.repo_base_sha === "string" ? chat.repo_base_sha : null;
+  if (!userMessage) return json({ error: "The message was not saved." }, 500);
 
-  let context = assembleContext({ paths: [], pinned: null });
-  let paths: string[] = [];
-  let githubToken: string | null = null;
-  let repoFailed = false;
+  const quota = await readQuota(admin, session.user.id);
+  const decision = checkRunQuota(quota);
 
-  if (repoFullName && sha) {
-    try {
-      const github = await readToken(session.supabase, session.user.id);
-
-      if (!github) {
-        repoFailed = true;
-      } else {
-        githubToken = github.token;
-
-        const tree = await getTree(github.token, repoFullName, sha);
-        paths = tree.entries
-          .filter((entry) => entry.type === "blob")
-          .map((entry) => entry.path)
-          .slice(0, MAX_PATH_INDEX);
-
-        const pinnedPath =
-          typeof body.path === "string" && body.path.length > 0 ? body.path : null;
-
-        const pinned = pinnedPath
-          ? await getFile(github.token, repoFullName, sha, pinnedPath)
-              .then((file) => ({ path: file.path, text: file.text }))
-              .catch(() => null)
-          : null;
-
-        context = assembleContext({ paths, pinned });
-
-        if (pinnedPath && !pinned) {
-          context.notes.push(
-            `The open file ${pinnedPath} could not be read at ${sha.slice(0, 7)}; it was not included.`
-          );
-        }
-      }
-    } catch (caught) {
-      repoFailed = true;
-      githubToken = null;
-      context = assembleContext({ paths: [], pinned: null });
-      context.notes.push(`The repository could not be read: ${messageOf(caught)}`);
-    }
+  if (!decision.allowed) {
+    return json(
+      { error: decision.message, code: decision.code, quota },
+      decision.code === "concurrency" ? 409 : 402
+    );
   }
 
+  const runId = randomUUID();
   const history = recentHistory(await listMessages(session.supabase, chatId));
-  const startedAt = Date.now();
 
-  // The one composer: a message carries a sandbox if this deployment has one
-  // and the chat is pinned to a repository. Nothing is created here — the
-  // handle is lazy, so a message that never runs a command never pays for a
-  // sandbox. The model chooses by calling a tool or not.
-  // Notices are raised from inside the stream (a stopped workspace may have to
-  // wake before the first command), so the callback is bound to the stream's
-  // `send` once it exists rather than assuming one here.
-  let sendNotice: (message: string) => void = () => {};
+  let run: RunRow;
 
-  // GitHub-only is the default: a turn reads the repository and proposes a diff
-  // without provisioning a box. The sandbox is still whole — verification runs
-  // and missions use their own — and one switch gives it back to chat turns.
-  const shellTurn =
-    sandboxTurnsEnabled() && executionConfigured() && repoFullName && sha && githubToken
-      ? createShellTurn({
-          token: githubToken,
-          repo: repoFullName,
-          sha,
-          runId: turnId,
-          deadline: startedAt + CHAT_SHELL_BUDGET_MS,
-          chatId,
-          owner: session.user.id,
-          onNotice: (message) => sendNotice(message),
-        })
-      : null;
-  const persistentShell = Boolean(shellTurn) && chatSandboxesEnabled();
+  try {
+    run = await createRun(admin, {
+      id: runId,
+      owner: session.user.id,
+      chatId,
+      repo: repoFullName,
+      baseSha: sha,
+      prompt: content,
+      model,
+      dewSessionId: dew.session.sessionId,
+    });
+  } catch (caught) {
+    const message =
+      caught instanceof Error ? caught.message : "The message could not be queued.";
 
-  const system = buildSystemPrompt({
-    repo: repoFullName,
-    sha,
-    context: context.text,
-    notes: context.notes,
-    edits: Boolean(repoFullName && sha && sealKey),
-    // The model is told what this deployment can actually do, so "do you have
-    // a Linux environment" gets the true answer: a sandbox exists for a ready
-    // diff, but not as a shell for this chat.
-    sandbox: executionConfigured(),
-    // With a handle in hand the answer is different, and so is the prompt.
-    shell: Boolean(shellTurn),
-    // The read tools exist only on the agent path, which needs a pinned commit
-    // and a readable repository: a turn that fell back to a plain completion
-    // has none, and telling it otherwise is how a model ends up promising a
-    // listing or blaming the server for tools it was never given.
-    readTools: Boolean(repoFullName && sha && githubToken),
-    // A persistent workspace may be described as such; a per-message box may
-    // not, because its files are gone when the answer ends.
-    persistentShell,
-    // A paused turn hands back an empty message. The clause is what makes the
-    // model continue its own work — in the sandbox it still has — instead of
-    // answering like a fresh chat.
-    continuation: Boolean(continuation),
+    if (/duplicate key|unique/i.test(message)) {
+      return json(
+        {
+          error: "You already have a run in progress. Wait for it to finish, or stop it first.",
+          code: "concurrency",
+        },
+        409
+      );
+    }
+
+    return json({ error: message }, 500);
+  }
+
+  // The conversation behind the message travels with the run: the worker builds
+  // its model call from these rows, so the answer remembers the chat without
+  // the chat route having to run anything.
+  for (const message of history) {
+    await appendRunMessage(admin, runId, message.role, {
+      text: message.content,
+    }).catch(() => null);
+  }
+
+  const greeting = createdChat ? chatId : null;
+
+  return streamRun({
+    admin,
+    session,
+    chatId,
+    run,
+    cursor: 0,
+    greeting,
+    userMessage: userMessage
+      ? { id: userMessage.id, seq: Number(userMessage.seq) }
+      : null,
+    dew,
   });
+}
 
-  const plainMessages: ChatMessage[] = [
-    { role: "system", content: system },
-    ...history.map((message) => ({ role: message.role, content: message.content })),
-  ];
+type StreamInput = {
+  admin: NonNullable<ReturnType<typeof supabaseAdmin>>;
+  session: Extract<Awaited<ReturnType<typeof getSession>>, { state: "signed-in" }>;
+  chatId: string;
+  run: RunRow;
+  cursor: number;
+  greeting: string | null;
+  userMessage?: { id: string; seq: number } | null;
+  dew?: Extract<DewGate, { ok: true }>;
+};
 
-  const userSeq = userMessage ? Number(userMessage.seq) : null;
+/**
+ * Translates a run's event log into the chat's stream.
+ *
+ * The names the panel knows (`delta`, `step`, `done`) are the contract with the
+ * existing conversation UI. The runtime's own vocabulary stays in the database;
+ * what crosses the wire is only what a transcript can show.
+ */
+function streamRun(input: StreamInput): NextResponse {
+  const { admin, session, chatId, run } = input;
+  const encoder = new TextEncoder();
 
-  // A turn outlives the tab that started it. `after()` keeps this invocation
-  // alive once the response is closed, so the answer is written down even when
-  // nobody is listening any more. `maxDuration` is still the ceiling, which is
-  // why the turn pauses at CONTINUE_AT_MS instead of running past it.
-  let settleTurn: (() => void) | null = null;
-  const turnFinished = new Promise<void>((resolve) => {
-    settleTurn = resolve;
-  });
-  // The race is a backstop: an invocation that never reaches `finish` must not
-  // hold the function open until the platform kills it.
-  after(() =>
-    Promise.race([
-      turnFinished,
-      new Promise<void>((resolve) => setTimeout(resolve, 60_000)),
-    ])
-  );
-
-  const stream = new ReadableStream<Uint8Array>({
+  const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const encoder = new TextEncoder();
       let closed = false;
-      let settled = false;
-      let turnText = "";
-
-      // The work a turn did belongs to the transcript, not to the tab that
-      // watched it. These accumulators are what `persist` writes onto the
-      // assistant row, so a reload can rebuild the steps and the reasoning
-      // instead of showing a bare answer with no evidence behind it.
-      let reasoningLog = "";
-      const stepLog: {
-        tool: string;
-        detail: string;
-        state: "start" | "done" | "error";
-        command?: string;
-        output?: string;
-      }[] = [];
-
-      // Caps on the stored record, not on the stream: a step keeps the head of
-      // its output, and the oldest steps fall off a turn that runs long.
-      const MAX_PERSISTED_STEPS = 40;
-      const MAX_PERSISTED_STEP_OUTPUT = 4_000;
-
-      const recordReasoning = (text: string) => {
-        reasoningLog += text;
-        send("reasoning", { text });
-      };
-
-      const recordStep = (event: {
-        tool?: string;
-        detail?: string;
-        state?: string;
-        command?: string;
-        output?: string;
-      }) => {
-        const state: "start" | "done" | "error" =
-          event.state === "done" || event.state === "error" ? event.state : "start";
-        const step = {
-          tool: event.tool ?? "step",
-          detail: event.detail ?? "step",
-          state,
-          command: event.command,
-          output: event.output
-            ? event.output.slice(0, MAX_PERSISTED_STEP_OUTPUT)
-            : undefined,
-        };
-
-        // A started step is replaced by its completed row rather than kept as
-        // two entries: the record says what happened, not how many events the
-        // server happened to send.
-        if (state === "start") {
-          stepLog.push(step);
-        } else {
-          let index = -1;
-          for (let i = stepLog.length - 1; i >= 0; i -= 1) {
-            if (stepLog[i].state === "start" && stepLog[i].detail === step.detail) {
-              index = i;
-              break;
-            }
-          }
-
-          if (index >= 0) stepLog[index] = step;
-          else stepLog.push(step);
-        }
-
-        if (stepLog.length > MAX_PERSISTED_STEPS) {
-          stepLog.splice(0, stepLog.length - MAX_PERSISTED_STEPS);
-        }
-
-        send("step", event);
-      };
+      let cursor = input.cursor;
+      let terminalStatus: string | null = null;
+      let sawError = false;
+      const summaries = new Map<string, string>();
 
       const send = (event: string, data: unknown) => {
         if (closed) return;
@@ -626,697 +417,168 @@ export async function POST(request: Request) {
         }
       };
 
-      sendNotice = (message: string) => send("notice", { message });
-
-      // Generation is deliberately NOT wired to request.signal. Closing the
-      // tab ends this stream, not the work. Only an explicit Stop — the
-      // cancel_requested flag on the turn row, set by /api/chat/stop — aborts
-      // the provider call, so "leave the page" and "stop" stay different acts.
-      const abort = new AbortController();
-
-      const finish = async (
-        status: "done" | "error" | "paused",
-        finalText: string
-      ) => {
-        if (settled) return;
-        settled = true;
+      const close = () => {
+        if (closed) return;
         closed = true;
-        clearInterval(watcher);
-
-        try {
-          await session.supabase
-            .from("agent_turns")
-            .update({
-              status,
-              partial: finalText.slice(0, 20_000),
-              finished_at: new Date().toISOString(),
-            })
-            .eq("turn_id", turnId)
-            .eq("owner", session.user.id);
-        } catch {
-          // The answer is already stored as a message. A status write that
-          // fails must not turn a finished turn into a broken stream.
-        }
-
         try {
           controller.close();
         } catch {
-          // The reader went away; the work above is what mattered.
+          // The reader went away; the run is unaffected.
         }
-
-        settleTurn?.();
       };
 
-      const watcher = setInterval(() => {
-        if (abort.signal.aborted) return;
+      if (input.greeting) send("chat", { id: input.greeting });
+      if (input.userMessage) send("user", input.userMessage);
 
-        void session.supabase
-          .from("agent_turns")
-          .select("cancel_requested")
-          .eq("turn_id", turnId)
-          .maybeSingle()
-          .then(({ data }) => {
-            const row = data as { cancel_requested?: boolean } | null;
-            if (row?.cancel_requested) abort.abort();
+      if (input.dew) {
+        if (input.dew.session.started) {
+          send("dew", {
+            charged: true,
+            mode: input.dew.session.mode,
+            price: input.dew.session.price,
+            balance: input.dew.session.balance,
+            wallet: input.dew.session.wallet,
+            combined: input.dew.session.combined,
+            label: `Started an hour of chat: ${formatDew(input.dew.session.price)} Dew charged. Balance ${formatDew(input.dew.session.balance)}.`,
           });
-      }, 2_000);
-
-      if (createdChat) send("chat", { id: chatId });
-
-      if (userMessage && userSeq !== null) {
-        send("user", { id: userMessage.id, seq: userSeq });
+        }
       }
 
-      send("context", {
-        usedChars: context.usedChars,
-        budgetChars: context.budgetChars,
-        notes: [
-          ...context.notes,
-          ...(repoFailed ? ["Repository reads failed for this turn."] : []),
-        ],
-      });
+      const deadline = Date.now() + WINDOW_MS;
+      let idle = 0;
 
-      // A charge is a fact the reader should see, not a silent balance change.
-      // Sent only when something was actually charged: a turn inside a running
-      // hour costs nothing and says nothing.
-      if (dew.session.started) {
-        send("dew", {
-          charged: true,
-          mode: dew.session.mode,
-          price: dew.session.price,
-          balance: dew.session.balance,
-          wallet: dew.session.wallet,
-          combined: dew.session.combined,
-          label: `Started an hour of chat: ${formatDew(dew.session.price)} Dew charged. Balance ${formatDew(dew.session.balance)}.`,
-        });
-      }
-
-      const persist = (text: string) =>
-        appendMessage(
-          session.supabase,
-          chatId,
-          "assistant",
-          text,
-          model,
-          Math.ceil(text.length / 4),
-          reasoningLog.trim().length > 0 ? reasoningLog.trim() : null,
-          stepLog
-        );
-
-      // A refund is only due for an hour charged by this request that produced
-      // no answer at all. The database allows one refund per session.
-      let refunded = false;
-
-      const refundTurn = async (reason: string) => {
-        if (refunded || !dew.session.started) return;
-        refunded = true;
-
-        const admin = supabaseAdmin();
-        const ok = admin
-          ? await refundDewSession(
-              admin,
-              session.user.id,
-              dew.session.sessionId,
-              reason
-            )
-          : false;
-
-        if (ok) {
-          send("notice", {
-            message: `Refunded automatically: ${reason.toLowerCase()}.`,
-          });
-        } else {
-          send("notice", {
-            message:
-              "This hour could not be refunded automatically; the ledger still shows the charge.",
-          });
-        }
-      };
-
-      // A proposal is a row, created on first use and signed when the turn
-      // settles. A paused turn keeps its draft so the continuation adds to the
-      // same card instead of starting a second one.
-      let changesetId: string | null = null;
-      let changesetFiles = 0;
-      let changesetSettled = false;
-      // The destination the model read out of the reader's own sentence. It is
-      // a decision, not a keyword: "get this live on the main site" and "push it
-      // to main" both land here, and the phrasing is the model's problem, not a
-      // regex's.
-      let askedDestination: string | null = null;
-
-      const propose = async (
-        edits: EditRequest[],
-        destination: string | null
-      ): Promise<{ ok: true; text: string } | { ok: false; error: string }> => {
-        if (!repoFullName || !sha || !githubToken) {
-          return {
-            ok: false,
-            error: "no repository is pinned to this chat, so there is nothing to edit",
-          };
-        }
-
-        if (!sealKey) {
-          return {
-            ok: false,
-            error: "this deployment cannot sign a changeset without GITHUB_TOKEN_KEY",
-          };
-        }
-
-        if (destination !== null) {
-          const safe = safeBranchName(destination);
-          if (safe === null) {
-            return { ok: false, error: `"${destination}" is not a branch name` };
-          }
-          askedDestination = safe;
-        }
-
-        if (!changesetId) {
-          changesetId = await findDraftChangeset(session.supabase, turnId);
-        }
-
-        if (!changesetId) {
-          const created = await createChangeset(session.supabase, {
-            owner: session.user.id,
-            chatId,
-            turnId,
-            repo: repoFullName,
-            baseSha: sha,
-          });
-
-          if (!created.ok) return { ok: false, error: created.error };
-          changesetId = created.id;
-        }
-
-        const result = await addEdits(session.supabase, {
-          changesetId,
-          owner: session.user.id,
-          token: githubToken,
-          repo: repoFullName,
-          sha,
-          edits,
-        });
-
-        if (!result.ok) return { ok: false, error: result.error };
-
-        changesetFiles += result.added;
-        return { ok: true, text: result.text };
-      };
-
-      const settleChangeset = async () => {
-        if (!changesetId || changesetSettled) return;
-        changesetSettled = true;
+      while (!closed) {
+        let events: Awaited<ReturnType<typeof readEventsSince>> = [];
 
         try {
-          const finalized = await finalizeChangeset(session.supabase, {
-            changesetId,
-            baseSha: sha ?? "",
-            sealKey: sealKey ?? null,
-          });
-
-          send("changeset", {
-            id: changesetId,
-            status: finalized.status,
-            files: finalized.files,
-          });
-
-          // A ready diff is written automatically unless it is one the reader
-          // should decide on: the code moved, it is large, it touches
-          // configuration, credentials or the schema, or nobody has reviewed
-          // it. Those stay on the card, where the apply dialog asks first.
-          if (finalized.status === "ready" && githubToken) {
-            const { data: chatRow } = await session.supabase
-              .from("chats")
-              .select("repo_branch")
-              .eq("id", chatId)
-              .maybeSingle();
-
-            const chatRowValue = chatRow as { repo_branch?: string | null } | null;
-            const autoWrite = autoWriteEnabled();
-            const branch = chatRowValue?.repo_branch ?? "main";
-
-            if (sealKey && repoFullName) {
-              // A ready diff is written without a click by default; a standing
-              // approval is the fallback when an operator turns that off.
-              const remembered = await readAutoApproval(session.supabase, {
-                owner: session.user.id,
-                repo: repoFullName,
-                branch,
-              });
-
-              if (autoWrite || remembered) {
-                const facts = changesetId
-                  ? await loadConfirmationFacts(session.supabase, changesetId)
-                  : null;
-
-                let head: string | null = null;
-
-                try {
-                  head = await resolveBranchSha(githubToken, repoFullName, branch);
-                } catch {
-                  // A head that cannot be read is a reason to ask, not a reason
-                  // to assume nothing moved since the suggestion.
-                  head = null;
-                }
-
-                // "Push it to main" is a destination, not a preference. The
-                // reader naming a branch is the permission to write it, so the
-                // auto-write goes where they asked instead of demoting it to a
-                // pull request on an agent branch.
-                //
-                // It is also the answer to the confirmation question: that gate
-                // exists for writes nobody asked about by name, and a reader who
-                // typed the branch has already made the decision. The write
-                // client stays bounded regardless — one commit, never forced,
-                // and a head that moved is re-applied rather than overwritten.
-                const askedBranch =
-                  askedDestination ?? requestedBranch(content, branch);
-
-                // An automatic write is the review. The old rule counted a fresh
-                // suggestion as "nobody has reviewed it" and asked every time,
-                // which is why the automatic path never actually ran.
-                const reviewed =
-                  facts === null
-                    ? null
-                    : autoWrite
-                      ? withAutoWriteReview(facts)
-                      : withStandingApproval(facts, remembered);
-
-                const mustAsk =
-                  reviewed === null ||
-                  (askedBranch === null && needsConfirmation(reviewed, head));
-
-                if (mustAsk) {
-                  send("notice", {
-                    message:
-                      "This change needs your go-ahead. Use the card to apply it, look it over first, or discard it.",
-                  });
-                } else {
-                  const approved = await approveChangesetAndOpenPullRequest(
-                    session.supabase,
-                    {
-                      changesetId: changesetId as string,
-                      owner: session.user.id,
-                      sealKey,
-                      target: askedBranch
-                        ? { branch: askedBranch, explicit: true }
-                        : undefined,
-                    }
-                  );
-
-                  send("notice", {
-                    message: approved.ok
-                      ? approved.prUrl
-                        ? `Auto-approved on ${approved.branch}: ${approved.prUrl}`
-                        : `Auto-approved on ${approved.branch}.`
-                      : `The standing approval could not write this diff: ${approved.error}`,
-                  });
-
-                  if (approved.ok) {
-                    send("changeset", {
-                      id: changesetId,
-                      status: "approved",
-                      files: finalized.files,
-                    });
-                  }
-                }
-              }
-            }
-          }
-        } catch (caught) {
-          send("notice", {
-            message: `The changeset could not be prepared: ${messageOf(caught)}`,
-          });
-        }
-      };
-
-      // Git, served by this request rather than by a terminal. The sandbox has
-      // no remote and no token; these two actions use the sealed token the turn
-      // already opened, so "look at the branch" and "follow it" need no second
-      // credential and no second path to GitHub.
-      const gitActions = ((): ToolContext["git"] => {
-        const token = githubToken;
-        const pinnedRepo = repoFullName;
-
-        if (!token || !pinnedRepo) return undefined;
-
-        const admin = supabaseAdmin();
-        if (!admin) return undefined;
-
-        return {
-          status: async () => {
-            const state = await readGitStatus({
-              admin,
-              supabase: session.supabase,
-              chatId,
-              token,
-            });
-
-            if (!state.ok) return { ok: false, error: state.message };
-
-            return {
-              ok: true,
-              text: [
-                `branch ${state.branch}`,
-                `head ${state.head.slice(0, 7)}`,
-                `pinned ${state.pinned.slice(0, 7)}${state.behind ? " (behind the head)" : " (at the head)"}`,
-                `${state.dirtyFiles} uncommitted file(s) in the workspace`,
-              ].join("\n"),
-            };
-          },
-
-          pull: async () => {
-            const pulled = await pullChatBranch({
-              admin,
-              supabase: session.supabase,
-              chatId,
-              token,
-              allowDuringTurn: true,
-            });
-
-            if (!pulled.ok) return { ok: false, error: pulled.message };
-
-            return {
-              ok: true,
-              text:
-                pulled.verdict === "up-to-date"
-                  ? `Already at ${pulled.head.slice(0, 7)}; nothing moved.`
-                  : `Pin moved to ${pulled.head.slice(0, 7)}. The workspace is reseeded on the next turn; GitHub is unchanged.`,
-            };
-          },
-        };
-      })();
-
-      if (repoFullName && sha && githubToken) {
-        // The sandbox is released before anything else runs, so a failure in
-        // the answer path cannot leave a box billing behind the chat.
-        const result = await (async () => {
-          try {
-            return await runAgent({
-              githubToken,
-              repo: repoFullName,
-              sha,
-              paths,
-              model,
-              system,
-              history: history.map((message) => ({
-                role: message.role,
-                content: message.content,
-              })),
-              steps: continuation?.steps ?? 0,
-              consume: async (expected) => {
-                const { data, error: stepError } = await session.supabase.rpc(
-                  "consume_agent_step",
-                  { p_turn_id: turnId, p_steps: expected }
-                );
-
-                if (stepError || !data) return null;
-
-                const row = data as { steps: number };
-                return Number(row.steps);
-              },
-              emitText: (text) => send("delta", { text }),
-              emitReasoning: recordReasoning,
-              emitStep: recordStep,
-              propose,
-              git: gitActions,
-              shell: shellTurn,
-              deadlineMs: shellTurn ? CHAT_SHELL_BUDGET_MS : CONTINUE_AT_MS,
-              signal: abort.signal,
-              startedAt,
-            });
-          } finally {
-            await shellTurn?.close();
-          }
-        })();
-
-        // Any failure that produced no answer is refunded, including an
-        // empty completion and a turn that could not advance.
-        const refundReason = refundReasonFor({
-          textLength: result.text.length,
-          stopped: result.stopped,
-        });
-
-        if (refundReason) await refundTurn(refundReason);
-
-        // A paused turn continues when its workspace survives the invocation.
-        // With a chat-scoped environment the continuation reattaches to the
-        // same disk; with the per-message box it would reseed and re-run what
-        // the reader already watched, so that path still ends here.
-        const retainedWorkspace = shellTurn?.retainsWorkspace() ?? false;
-        const pausable = result.stopped === "paused" && (!shellTurn || retainedWorkspace);
-
-        if (result.notice) {
-          send("notice", {
-            message:
-              result.stopped === "paused" && shellTurn && !retainedWorkspace
-                ? "This message reached its time limit. The sandbox was released; send another message to carry on."
-                : result.notice,
-          });
+          events = await readEventsSince(admin, run.id, cursor, 200);
+        } catch {
+          events = [];
         }
 
-        if (pausable) {
-          // Still a draft: the signed continuation is what may add to it.
-          if (changesetId) {
-            send("changeset", {
-              id: changesetId,
-              status: "draft",
-              files: changesetFiles,
-            });
-          }
-        } else {
-          await settleChangeset();
-        }
+        for (const event of events) {
+          cursor = Math.max(cursor, event.seq);
+          idle = 0;
 
-        if (pausable) {
-          if (result.text.length > 0) {
-            try {
-              await persist(
-                `${result.text}\n\n_(paused at the time limit; the answer continues in the next message)_`
-              );
-            } catch (caught) {
-              send("error", {
-                message: `The answer could not be saved: ${messageOf(caught)}`,
-                code: "persist",
-              });
-            }
+          const payload = event.payload as Record<string, unknown>;
+
+          if (event.kind === "message.delta") {
+            const text = typeof payload.text === "string" ? payload.text : "";
+            if (text.length > 0) send("delta", { text });
+            continue;
           }
 
-          if (sealKey) {
-            send("paused", {
-              turn: signEnvelope(
-                {
-                  turnId,
-                  chatId,
-                  model,
-                  promptHash: hashPrompt(content || "continue"),
-                  steps: result.steps,
-                  exp: expiresAt,
-                },
-                sealKey
-              ),
+          if (event.kind === "tool.started") {
+            const name = typeof payload.name === "string" ? payload.name : "tool";
+            const summary =
+              typeof payload.summary === "string" ? payload.summary : name;
+
+            summaries.set(name, summary);
+            send("step", { tool: name, detail: summary, state: "start" });
+            continue;
+          }
+
+          if (event.kind === "tool.finished") {
+            const name = typeof payload.name === "string" ? payload.name : "tool";
+            const preview =
+              typeof payload.resultPreview === "string" ? payload.resultPreview : "";
+            const failed = payload.isError === true;
+
+            send("step", {
+              tool: name,
+              detail: summaries.get(name) ?? name,
+              state: failed ? "error" : "done",
+              output: preview,
             });
-          } else {
+            continue;
+          }
+
+          if (event.kind === "warning") {
+            const message = typeof payload.message === "string" ? payload.message : "";
+            if (message.length > 0) send("notice", { message });
+            continue;
+          }
+
+          if (event.kind === "run.finished") {
+            terminalStatus =
+              typeof payload.status === "string" ? payload.status : "done";
+            continue;
+          }
+
+          if (event.kind === "run.error") {
+            terminalStatus = "failed";
+            sawError = true;
             send("error", {
               message:
-                "This turn reached its time limit, and continuations are unavailable without GITHUB_TOKEN_KEY.",
-              code: "paused",
+                typeof payload.message === "string"
+                  ? payload.message
+                  : "The agent could not finish.",
             });
+            continue;
           }
+        }
 
-          await finish("paused", result.text);
+        if (terminalStatus) break;
+
+        // A worker that died leaves the row running until the reaper settles it;
+        // the start log is the authority on that, not this stream's patience.
+        if (events.length === 0) {
+          idle += 1;
+          if (idle % 24 === 0) {
+            const fresh = await readRun(admin, run.id).catch(() => null);
+
+            if (fresh && terminal(fresh.status) && cursor >= fresh.last_event_seq) {
+              terminalStatus = fresh.status;
+              break;
+            }
+          }
+        }
+
+        if (Date.now() > deadline) {
+          send("paused", { turn: run.id });
+          close();
           return;
         }
 
-        const text =
-          result.stopped === "aborted" && result.text.length > 0
-            ? `${result.text}\n\n_(stopped before this answer finished)_`
-            : result.stopped === "paused" && shellTurn && !retainedWorkspace && result.text.length > 0
-              ? `${result.text}\n\n_(this message reached its time limit in the sandbox)_`
-              : (result.stopped === "error" || result.stopped === "conflict") &&
-                  result.text.length > 0
-                ? `${result.text}\n\n_(this answer stopped before it finished)_`
-                : result.text;
-
-        turnText = text;
-
-        if (text.length > 0) {
-          try {
-            const saved = await persist(text);
-            send("done", {
-              id: saved?.id ?? null,
-              seq: saved ? Number(saved.seq) : null,
-              stopped:
-                result.stopped === "error" || result.stopped === "conflict"
-                  ? "partial"
-                  : result.stopped,
-              steps: result.steps,
-              tokens: result.tokens,
-            });
-          } catch (caught) {
-            send("error", {
-              message: `The answer could not be saved: ${messageOf(caught)}`,
-              code: "persist",
-            });
-          }
-        } else if (result.stopped === "error" || result.stopped === "conflict") {
-          send("error", {
-            message: result.notice ?? "The turn failed.",
-            code: result.stopped,
-          });
-        } else if (result.stopped === "aborted") {
-          send("error", { message: "Stopped before the first token.", code: "aborted" });
-        } else if (result.stopped === "paused") {
-          send("error", {
-            message: "The sandbox reached its time limit before there was an answer.",
-            code: "paused",
-          });
-        } else {
-          send("error", {
-            message: "The provider returned an empty answer.",
-            code: "empty",
-          });
-        }
-      } else {
-        let produced = "";
-        let failure: Error | null = null;
-        // Only Auto can settle incomplete: a named model has one endpoint, so
-        // exhausting a queue is not a state it has.
-        let complete = true;
-
-        const auto = model === AUTO_MODEL;
-
-        const prompt =
-          content.length > 0
-            ? content
-            : [...history].reverse().find((message) => message.role === "user")?.content ?? "";
-
-        const chain = auto ? autoChain(prompt) : providersFor(model);
-
-        // A named model has exactly one provider. If its key is absent the loop
-        // below would run zero times and the old path would report an empty
-        // answer, which blames the model for a configuration gap.
-        if (chain.length === 0) {
-          failure = new Error(
-            auto
-              ? "No model is available to answer right now. Try again in a moment."
-              : "That model isn't available right now. Pick another one."
-          );
-        } else if (auto) {
-          // Auto is a queue, not an endpoint: the classifier picks the model
-          // that fits, and a drop hands the partial answer to the next one. The
-          // reader sees one answer either way, because a handover is not their
-          // problem.
-          const targets = chain.map((provider) => ({
-            id: provider.model,
-            stream: ({
-              messages: next,
-              signal,
-            }: {
-              messages: ChatMessage[];
-              signal: AbortSignal;
-            }) =>
-              streamCompletion({
-                provider,
-                apiKeys: providerKeys(provider),
-                messages: next,
-                signal,
-                onReasoning: recordReasoning,
-              }),
-          }));
-
-          try {
-            for await (const event of streamRouted({
-              targets,
-              messages: plainMessages,
-              signal: abort.signal,
-            })) {
-              if (event.type === "delta") {
-                produced += event.text;
-                send("delta", { text: event.text });
-              } else {
-                complete = event.complete;
-              }
-            }
-          } catch (caught) {
-            failure = caught instanceof Error ? caught : new Error("The provider failed.");
-          }
-        } else {
-          for (const provider of chain) {
-            try {
-              for await (const delta of streamCompletion({
-                provider,
-                apiKeys: providerKeys(provider),
-                messages: plainMessages,
-                signal: abort.signal,
-                onReasoning: recordReasoning,
-              })) {
-                produced += delta;
-                send("delta", { text: delta });
-              }
-              failure = null;
-              break;
-            } catch (caught) {
-              failure = caught instanceof Error ? caught : new Error("The provider failed.");
-              if (abort.signal.aborted) break;
-            }
-          }
-        }
-
-        // An empty completion is a failed turn, so this is not limited to
-        // thrown provider errors.
-        const refundReason = refundReasonFor({
-          textLength: produced.length,
-          stopped: abort.signal.aborted
-            ? "aborted"
-            : failure || !complete
-              ? "error"
-              : "done",
-        });
-
-        if (refundReason) await refundTurn(refundReason);
-
-        const incomplete = Boolean(failure) || !complete;
-
-        if (produced.length > 0) {
-          const text = abort.signal.aborted
-            ? `${produced}\n\n_(stopped before this answer finished)_`
-            : incomplete
-              ? `${produced}\n\n_(this answer stopped before it finished)_`
-              : produced;
-
-          turnText = text;
-
-          try {
-            const saved = await persist(text);
-            send("done", {
-              id: saved?.id ?? null,
-              seq: saved ? Number(saved.seq) : null,
-              stopped: abort.signal.aborted ? "aborted" : incomplete ? "partial" : "done",
-              steps: 0,
-              tokens: Math.ceil(text.length / 4),
-            });
-          } catch (caught) {
-            send("error", {
-              message: `The answer could not be saved: ${messageOf(caught)}`,
-              code: "persist",
-            });
-          }
-        } else if (failure) {
-          send("error", {
-            message: abort.signal.aborted ? "Stopped before the first token." : messageOf(failure),
-            code: abort.signal.aborted ? "aborted" : "provider",
-          });
-        } else {
-          send("error", { message: "The provider returned an empty answer.", code: "empty" });
-        }
+        await sleep(POLL_MS);
       }
 
-      await finish(turnText.length > 0 ? "done" : "error", turnText);
+      // The worker writes the answer (and its proposed diff) before it emits
+      // `run.finished`, so both reads below are racing nothing.
+      const { data: stored } = await session.supabase
+        .from("messages")
+        .select("id, seq")
+        .eq("chat_id", chatId)
+        .eq("role", "assistant")
+        .order("seq", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      send("changeset", {});
+
+      const row = stored as { id?: string; seq?: number } | null;
+      const stopped =
+        terminalStatus === "cancelled"
+          ? "aborted"
+          : terminalStatus === "blocked"
+            ? "partial"
+            : undefined;
+
+      if (!sawError || row?.id) {
+        send("done", {
+          id: row?.id ?? `assistant-${run.id}`,
+          seq: typeof row?.seq === "number" ? row.seq : null,
+          ...(stopped ? { stopped } : {}),
+          status: terminalStatus ?? "done",
+        });
+      }
+
+      close();
     },
   });
 
-  return new Response(stream, {
+  return new NextResponse(body, {
+    status: 200,
     headers: {
       "content-type": "text/event-stream; charset=utf-8",
       "cache-control": "no-store, no-transform",

@@ -225,12 +225,16 @@ test("the hour clock measures from the server and never promises more than an ho
 test("the charge gate runs before any provider request", () => {
   const route = readFileSync(new URL("../app/api/chat/route.ts", import.meta.url), "utf8");
 
-  const gate = route.indexOf("startDewSession(");
+  const gate = route.indexOf("await startDewSession(");
   const providerReady = route.indexOf("if (!providersConfigured())");
-  const firstProviderCall = route.indexOf("streamCompletion({");
+  const queued = route.indexOf("createRun(admin");
 
   expect(gate).toBeGreaterThan(-1);
-  expect(gate).toBeLessThan(firstProviderCall);
+  expect(queued).toBeGreaterThan(-1);
+
+  // The model call lives in the worker now, so the queue is the last thing this
+  // request can do; the charge gate has to come before it.
+  expect(gate).toBeLessThan(queued);
   // A missing provider key must not cost an hour, so it is checked first.
   expect(providerReady).toBeLessThan(gate);
 });

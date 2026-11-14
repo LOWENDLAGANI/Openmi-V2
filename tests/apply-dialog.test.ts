@@ -358,9 +358,9 @@ test("the sandbox rebase has no write token and no way to update a ref", () => {
 
 // ── The automatic write path ─────────────────────────────────────────────────
 
-test("the automatic write path asks the dialog before it writes", () => {
-  const route = readFileSync(
-    new URL("../app/api/chat/route.ts", import.meta.url),
+test("the worker proposes a diff, so the card always asks before anything is written", () => {
+  const worker = readFileSync(
+    new URL("../lib/runs/chat.ts", import.meta.url),
     "utf8"
   );
   const panel = readFileSync(
@@ -368,14 +368,12 @@ test("the automatic write path asks the dialog before it writes", () => {
     "utf8"
   );
 
-  expect(route).toContain("loadConfirmationFacts");
-  expect(route).toContain("withStandingApproval");
-  expect(route).toContain("This change needs your go-ahead");
-  expect(route.indexOf("needsConfirmation(")).toBeLessThan(
-    route.indexOf("await approveChangesetAndOpenPullRequest(")
-  );
+  // The run settles with a signed changeset; the write stays on the card.
+  expect(worker).toContain("finalizeChangeset");
+  expect(worker).not.toContain("approveChangesetAndOpenPullRequest");
 
-  // The route can defer, so the card must always offer the decision.
+  // Because nothing was written on the reader's behalf, the card must always
+  // offer the decision.
   expect(panel).toContain("<ApplyControl");
   expect(panel).not.toContain("autoWrite");
 });

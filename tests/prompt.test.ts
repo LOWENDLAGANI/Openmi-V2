@@ -51,9 +51,12 @@ test("the sections are joined in exactly one place", () => {
   expect(joins).toHaveLength(1);
 });
 
-test("the chat route builds its prompt through that function", () => {
-  // The route composes: it does not concatenate clauses of its own, and it does
-  // not keep a fallback prompt for the case where the builder is inconvenient.
-  expect(ROUTE).toContain("buildSystemPrompt({");
-  expect(ROUTE).not.toMatch(/\bSYSTEM_PROMPT\b/);
+test("the run loop builds its prompt through a builder, not a constant", () => {
+  // Execution moved into the worker, and so did the prompt: the loop composes
+  // from the workspace it opened, and keeps no fallback of its own.
+  const LOOP = readFileSync(new URL("../lib/runs/loop.ts", import.meta.url), "utf8");
+
+  expect(LOOP).toContain("buildRunSystemPrompt({");
+  expect(LOOP).not.toMatch(/\bSYSTEM_PROMPT\b/);
+  expect(ROUTE).not.toContain("buildSystemPrompt(");
 });

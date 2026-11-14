@@ -273,16 +273,15 @@ test("Auto's queue is built from the UnoRouter pool, and Auto is never in it", (
   expect(providers).toContain('"deepseek-v4-1-flash-1017"');
 });
 
-test("the chat route sends Auto through the pipeline and leaves the rest alone", () => {
-  const route = source("../app/api/chat/route.ts");
+test("the run loop sends Auto through the pipeline and leaves the rest alone", () => {
+  const loop = source("../lib/runs/loop.ts");
 
-  expect(route).toContain("model === AUTO_MODEL");
-  expect(route).toContain("autoChain(prompt)");
-  expect(route).toContain("streamRouted({");
+  expect(loop).toContain("model === AUTO_MODEL");
+  expect(loop).toContain("autoChain(run.prompt)");
 
   // A named model resolves to its provider chain and the loop tries it in order.
-  expect(route).toContain("providersFor(model)");
-  expect(route).toContain("for (const provider of chain)");
+  expect(loop).toContain("providersFor(run.model");
+  expect(loop).toContain("for (const provider of chain)");
 });
 
 test("a tool turn only rotates while the step has produced nothing", () => {

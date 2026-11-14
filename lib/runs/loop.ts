@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { refundDewSession } from "@/lib/dew/store";
+import { refundReasonFor } from "@/lib/dew/refund";
 import { readToken } from "@/lib/github/token";
 import { AUTO_MODEL, type ModelId } from "@/lib/models";
 import {
@@ -12,8 +14,10 @@ import {
   type WireMessage,
 } from "@/lib/providers";
 import type { SandboxHandle } from "@/lib/execution/provider";
+import { serverEnv } from "@/lib/env";
 
 import { collectRunArtifacts } from "./artifacts";
+import { deliverChatTurn } from "./chat";
 import {
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
@@ -37,6 +41,7 @@ import {
   cancelRequested,
   finishStep,
   heartbeat,
+  listRunMessages,
   readRun,
   recordRunUsage,
   updateRun,
@@ -114,6 +119,14 @@ export async function executeRun(
   let outputTokens = 0;
   let steps = run.steps;
 
+  // What the chat gets back when this settles. `answerText` is the step that
+  // ended without a tool call; `collectedText` is everything the model wrote,
+  // which is what a cancelled or failed run has to show.
+  let answerText = "";
+  let collectedText = "";
+  let changedFiles: string[] = [];
+  let chatToken: string | null = null;
+
   const startedAt = Date.now();
   const deadline = startedAt + runWallClockMs();
 
@@ -152,7 +165,15 @@ export async function executeRun(
 
     sandbox = opened.sandbox;
     await updateRun(admin, runId, { sandbox_id: sandbox.id });
-    await appendRunMessage(admin, runId, "user", { text: run.prompt }, []);
+
+    // A chat turn arrives with the conversation behind it, already written to
+    // run_messages by the route. A run started without history is seeded with
+    // its prompt, so one loop serves both.
+    const seeded = await listRunMessages(admin, runId);
+
+    if (seeded.length === 0) {
+      await appendRunMessage(admin, runId, "user", { text: run.prompt }, []);
+    }
 
     const tree = await listWorkspaceFiles(sandbox);
     const instructions = await readProjectInstructions(sandbox);
@@ -163,10 +184,14 @@ export async function executeRun(
       instructions,
     });
 
-    const messages: WireMessage[] = [
-      { role: "system", content: system },
-      { role: "user", content: run.prompt },
-    ];
+    const history: WireMessage[] =
+      seeded.length > 0
+        ? seeded.map((message) => ({ role: message.role, content: message.text }))
+        : [{ role: "user", content: run.prompt }];
+
+    const messages: WireMessage[] = [{ role: "system", content: system }, ...history];
+
+    chatToken = github?.token ?? null;
 
     const chain =
       run.model === AUTO_MODEL
@@ -340,6 +365,8 @@ export async function executeRun(
       }
 
       if (stepText.length > 0) {
+        collectedText += `${collectedText.length > 0 ? "\n\n" : ""}${stepText}`;
+
         await appendRunMessage(
           admin,
           runId,
@@ -361,6 +388,7 @@ export async function executeRun(
         await appendEvent(admin, runId, "message.done", { step: idx });
         await emitUsage();
 
+        answerText = stepText;
         summary = summaryOf(stepText);
         status = "done";
         stopReason = "answer";
@@ -472,6 +500,7 @@ export async function executeRun(
       const collected = await collectRunArtifacts(sandbox, runId).catch(() => null);
 
       if (collected && collected.files.length > 0) {
+        changedFiles = collected.files;
         summary = summary || `${collected.files.length} file(s) changed.`;
         await appendEvent(admin, runId, "usage", {
           inputTokens,
@@ -489,6 +518,50 @@ export async function executeRun(
     stopReason = "error";
   } finally {
     clearInterval(lease);
+
+    // The chat is the product: the answer and its proposed diff are written
+    // before the workspace is paused and before the run is marked settled, so a
+    // reader who sees `run.finished` can already reload the transcript.
+    if (run.chat_id) {
+      const delivered = await deliverChatTurn({
+        admin,
+        run,
+        sandbox,
+        text: status === "done" ? answerText : collectedText,
+        files: changedFiles,
+        token: chatToken,
+        sealKey: serverEnv().githubTokenKey,
+        tokens: inputTokens + outputTokens,
+      }).catch(() => ({ message: false, changeset: null }));
+
+      if (!delivered.message) {
+        console.error(`[runs] ${runId}: the chat answer was not written`);
+      }
+    }
+
+    // The hour a chat turn paid for is refunded when the run failed with
+    // nothing to show. A run that was stopped after text arrived stays charged,
+    // for the same reason a stopped chat turn did: the reader got what they
+    // asked for, then chose to end it.
+    if (
+      run.chat_id &&
+      run.dew_session_id &&
+      (status === "failed" || status === "cancelled")
+    ) {
+      const reason = refundReasonFor({
+        textLength: collectedText.length,
+        stopped: status === "failed" ? "error" : "aborted",
+      });
+
+      if (reason) {
+        await refundDewSession(
+          admin as never,
+          run.owner,
+          run.dew_session_id,
+          reason
+        ).catch(() => false);
+      }
+    }
 
     if (sandbox) await pauseRunWorkspace(sandbox);
 

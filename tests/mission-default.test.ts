@@ -31,13 +31,14 @@ describe("one composer decides nothing about modes", () => {
     expect(existsSync(join(root, "components/MissionPanel.tsx"))).toBe(false);
   });
 
-  test("the turn carries a sandbox the model may use", () => {
+  test("the turn is a run, and the run owns the sandbox", () => {
     const route = read("app/api/chat/route.ts");
 
-    expect(route).toContain("createShellTurn(");
-    expect(route).toContain("shell: shellTurn");
-    expect(route).toContain("await shellTurn?.close()");
-    // A message that runs commands needs the sandbox's ceiling, not 60 s.
+    // The route queues a run; the worker opens the workspace behind it.
+    expect(route).toContain("createRun(admin");
+    expect(read("lib/runs/loop.ts")).toContain("openRunWorkspace(");
+
+    // A message that runs commands needs a streaming ceiling, not 60 s.
     expect(route).toContain("export const maxDuration = 300");
   });
 
@@ -62,7 +63,11 @@ describe("one composer decides nothing about modes", () => {
     // The old denial clause was removed when the prompt switched to shell-first.
     expect(prompt).not.toContain("NO_EXECUTION_CLAUSE");
     expect(prompt).toContain("/bin/sh otherwise");
-    expect(read("app/api/chat/route.ts")).toContain("shell: Boolean(shellTurn)");
+
+    // The run's prompt is the one that describes the workspace now, and it
+    // always has a shell: a run cannot start without a sandbox.
+    expect(read("lib/runs/prompt.ts")).toContain("run_command");
+    expect(read("app/api/chat/route.ts")).not.toContain("shell: Boolean(shellTurn)");
   });
 
   test("a shell supersedes the repository reads it can do itself", () => {

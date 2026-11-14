@@ -102,6 +102,13 @@ export function ChatPanel({
   const [lastSent, setLastSent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
+
+  // A stored run can outlive the tab that started it. When the server says one
+  // is live — on a reload, or on the refresh after a dropped stream — polling
+  // has to resume, or the answer would arrive with nobody watching for it.
+  useEffect(() => {
+    if (initialRunning) setBackgroundRunning(true);
+  }, [initialRunning]);
   const [atBottom, setAtBottom] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId);
   // The first message of a new chat waits here until the hour is confirmed.
@@ -121,7 +128,10 @@ export function ChatPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
-  const continuedRef = useRef(false);
+  // How many times this tab has reattached to a turn that outlived one request
+  // window. A run is bounded at fifteen minutes and a window is four, so six is
+  // headroom, not a loop.
+  const continuedRef = useRef(0);
   const stopTimerRef = useRef<number | null>(null);
 
   /**
@@ -672,8 +682,8 @@ export function ChatPanel({
 
     // A paused turn is continued once, with the signed token the server issued.
     // If that continuation also pauses, the reader is told instead of looping.
-    if (pausedToken && !continuedRef.current) {
-      continuedRef.current = true;
+    if (pausedToken && continuedRef.current < 6) {
+      continuedRef.current += 1;
       await send("", pausedToken);
     }
   }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isSameOrigin } from "@/lib/http/origin";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +15,12 @@ function json(body: unknown, status: number) {
 }
 
 /**
- * Stops the running turn for a chat.
+ * Stops the run answering this chat.
  *
- * The flag is written to Postgres rather than to this process, because the
- * request that stopped the turn may be handled by a different instance than the
- * one running it. The runner polls the flag and aborts the provider call.
+ * The flag is written to Postgres, not to the process that received this
+ * request: the run is owned by a worker somewhere else. The worker reads it at
+ * the next step boundary, so a tool in flight finishes before the run stops —
+ * a half-applied edit is worse than a slow stop.
  */
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
@@ -38,26 +40,31 @@ export async function POST(request: Request) {
 
   if (chatId.length === 0) return json({ error: "A chat id is required." }, 400);
 
-  // RLS scopes the update to this owner; the explicit owner filter makes the
-  // intent readable and turns a policy regression into a no-op.
-  // The flag is what the runner polls, and the status is what the workspace
-  // polls. Both are written here because the runner may already be gone: a
-  // closed tab ends the invocation, and the row would otherwise keep saying
-  // "running" for its full 30-minute TTL — which is why a stopped chat still
-  // showed "still working on the server" after a commit or a reload. If the
-  // runner is alive it writes its partial answer over the same row.
-  const { error } = await session.supabase
-    .from("agent_turns")
-    .update({
-      cancel_requested: true,
-      status: "done",
-      finished_at: new Date().toISOString(),
-    })
+  const admin = supabaseAdmin();
+
+  if (!admin) return json({ error: "This deployment cannot stop a run." }, 503);
+
+  // RLS scopes the read to this owner; the explicit owner filter on the cancel
+  // call is the second check, so a policy regression is a no-op, not a leak.
+  const { data } = await session.supabase
+    .from("runs")
+    .select("id")
     .eq("chat_id", chatId)
-    .eq("owner", session.user.id)
-    .eq("status", "running");
+    .in("status", ["queued", "running"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const runId = data ? String((data as { id: string }).id) : null;
+
+  if (!runId) return json({ ok: true, cancelled: false }, 200);
+
+  const { error } = await admin.rpc("request_run_cancel", {
+    p_run: runId,
+    p_owner: session.user.id,
+  });
 
   if (error) return json({ error: error.message }, 500);
 
-  return json({ ok: true }, 200);
+  return json({ ok: true, cancelled: true, runId }, 200);
 }

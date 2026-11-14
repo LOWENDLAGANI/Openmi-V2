@@ -6,12 +6,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Whether a chat still has a turn being answered.
+ * Whether this chat still has a run being answered.
  *
- * The client polls this while it thinks a turn is running. It is what makes
- * "close the tab, come back" honest: the answer is written by the server, and
- * the transcript refreshes when the turn finishes instead of showing a question
- * with no reply forever.
+ * The client polls this while it thinks work is happening elsewhere. It is what
+ * makes "close the tab, come back" honest: the worker writes the answer, and the
+ * transcript refreshes when the run settles instead of showing a question with
+ * no reply forever.
  */
 export async function GET(request: Request) {
   const session = await getSession();
@@ -33,20 +33,21 @@ export async function GET(request: Request) {
   }
 
   const { data } = await session.supabase
-    .from("agent_turns")
-    .select("turn_id, status, expires_at, cancel_requested")
+    .from("runs")
+    .select("id, status")
     .eq("chat_id", chatId)
-    .eq("status", "running")
-    .eq("cancel_requested", false)
-    .gt("expires_at", new Date().toISOString())
+    .in("status", ["queued", "running"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  const row = data as { id?: string; status?: string } | null;
+
   return NextResponse.json(
     {
-      running: Boolean(data),
-      turnId: data ? String((data as { turn_id: string }).turn_id) : null,
+      running: Boolean(row?.id),
+      turnId: row?.id ?? null,
+      status: row?.status ?? null,
     },
     { headers: { "cache-control": "no-store" } }
   );

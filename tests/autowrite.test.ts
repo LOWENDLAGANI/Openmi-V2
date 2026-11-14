@@ -37,20 +37,21 @@ test("direct default-branch writes are a separate, off-by-default choice", () =>
   }
 });
 
-test("the chat route asks before an automatic write when the change needs it", () => {
-  expect(ROUTE).toContain("autoWriteEnabled");
-  expect(ROUTE).toContain("if (autoWrite || remembered)");
-  expect(ROUTE).toContain("loadConfirmationFacts");
-  expect(ROUTE).toContain("needsConfirmation(");
-  expect(ROUTE).toContain("withStandingApproval");
-
-  // The question is decided before the write, not after it.
-  expect(ROUTE.indexOf("needsConfirmation(")).toBeLessThan(
-    ROUTE.indexOf("await approveChangesetAndOpenPullRequest(")
+test("the agent proposes its diff and never writes one from the worker", () => {
+  const WORKER = readFileSync(
+    new URL("../lib/runs/chat.ts", import.meta.url),
+    "utf8"
   );
 
-  // The standing approval is still read, so turning auto-write off keeps it.
-  expect(ROUTE).toContain("readAutoApproval(session.supabase");
+  // A run ends with a changeset card, not a push. The write is a deliberate act
+  // on that card, so there is no automatic path left to guard.
+  expect(WORKER).toContain("createChangeset");
+  expect(WORKER).toContain("finalizeChangeset");
+  expect(WORKER).not.toContain("approveChangesetAndOpenPullRequest");
+  expect(ROUTE).not.toContain("approveChangesetAndOpenPullRequest");
+
+  // The card always offers the decision, because nothing wrote on its behalf.
+  expect(PANEL).toContain("<ApplyControl");
 });
 
 test("the card always offers the apply decision", () => {

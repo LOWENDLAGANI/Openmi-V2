@@ -36,18 +36,23 @@ Browser
 | Cancellation | provider abort flag on a turn row | `runs.cancel_requested`, read at step boundaries |
 | Workspace | chat sandbox / GitHub-only turn | one sandbox per run, paused when it settles, destroyed after 48 h |
 | Budget | Dew hour + turn caps | plus per-account concurrent, daily-run and daily-token caps |
-| Output | changeset rows | diff + files as artifacts, reviewed in the UI |
+| Output | changeset rows written by the loop | changeset proposed by the worker, plus diff/files as artifacts |
+| Chat | its own in-request loop | the run runtime: one chat message queues one run |
 
-The chat surface still exists and still works; `/agent` is the run surface.
+There is no second surface. A message in `/chat` writes the question, queues the
+run and streams the run's events; the answer and the proposed diff are written
+by the worker, so closing the tab, reloading or redeploying cannot interrupt a
+turn. `app/api/runs/**` stays as the same runtime's API for tooling, but the
+product does not need it.
 
 ## Phase map
 
 | Plan phase | Where it lives |
 |---|---|
 | 0 Audit | This doc and the schema: `supabase/migrations/043_agent_runs.sql` |
-| 1 Run skeleton | `app/api/runs/**`, `lib/runs/store.ts`, `lib/runs/worker.ts`, `worker/main.ts`, `components/RunView.tsx` |
+| 1 Run skeleton | `app/api/runs/**`, `lib/runs/store.ts`, `lib/runs/worker.ts`, `worker/main.ts` |
 | 2 Real loop | `lib/runs/loop.ts`, `lib/runs/tools.ts`, `lib/runs/sandbox.ts`, `lib/runs/prompt.ts` |
-| 3 Streaming/UX | `lib/runs/events.ts`, `app/api/runs/[id]/stream/route.ts`, `components/RunView.tsx` |
+| 3 Streaming/UX | `lib/runs/events.ts`, `app/api/runs/[id]/stream/route.ts`, `app/api/chat/route.ts` (translation into the transcript's protocol) |
 | 4 Context/cost | `lib/runs/limits.ts` (compaction, budgets, cost), `lib/runs/prompt.ts`, `run_usage_daily` |
 | 5 Evals | Not built (see below) |
 | 6 Hardening | `lib/runs/redact.ts`, egress guard in `lib/runs/tools.ts`, `lib/execution/provider.ts` (`RUN_EGRESS_DENY`), orphan sweep, `app/api/cron/run-sweep` |
@@ -106,7 +111,7 @@ closes.
 - A `: keep-alive` comment every 15 s; the stream closes after ten minutes and
   the client reconnects from its cursor.
 - Tool results reach the client as previews; the full text is in the snapshot.
-- Chain-of-thought is never streamed. `RunView` shows tool summaries.
+- Chain-of-thought is never streamed. The transcript shows tool summaries.
 
 `preview.ready` is defined for compatibility but not emitted: it would need a
 dev server kept running inside the box and a signed proxy in front of it. The
@@ -167,7 +172,7 @@ paused workspace rather than a running box.
 ```bash
 supabase db push          # applies 043_agent_runs.sql
 bun run worker            # one long-lived process, no public route
-bun run dev              # the app; /agent is the run surface
+bun run dev              # the app; /chat is the run surface
 ```
 
 The worker needs `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
@@ -218,10 +223,10 @@ same image and needs no port at all.
 6. **Deploy and read the first log lines.** A healthy start prints
    `[runs] worker <id> starting, concurrency <n>`. Any configuration problem is
    named on its own line, never with a key value.
-7. **Prove it end to end.** Queue one run from `/agent` on the deployed web app.
+7. **Prove it end to end.** Send one message in a chat on the deployed web app.
    The Render log shows `[runs] claimed <runId>` then `[runs] finished <runId>:
-   done`, and the run page streams events as they arrive. Close the tab
-   mid-run; the log still reaches `finished` and a reload replays the log.
+   done`, and the transcript streams steps as they arrive. Close the tab
+   mid-run; the log still reaches `finished` and a reload shows the answer.
 
 **Free-plan behaviour, plainly.** A free Web Service sleeps after 15 minutes
 without inbound traffic, so while it sleeps no run is claimed — queued runs wait

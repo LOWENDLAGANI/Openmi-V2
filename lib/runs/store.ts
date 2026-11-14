@@ -50,6 +50,8 @@ export type RunRow = {
   output_tokens: number;
   cost_usd: number;
   cancel_requested: boolean;
+  /** The charged hour a chat turn will be refunded against if it fails. */
+  dew_session_id: string | null;
   last_event_seq: number;
   created_at: string;
   started_at: string | null;
@@ -118,7 +120,7 @@ function normalizeRun(row: Record<string, unknown>): RunRow {
 }
 
 export const RUN_COLUMNS =
-  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
+  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, dew_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
 
 export async function createRun(
   admin: Client,
@@ -130,6 +132,8 @@ export async function createRun(
     baseSha: string | null;
     prompt: string;
     model: string;
+    /** Set by a chat turn: the hour that is refunded if the run fails. */
+    dewSessionId?: string | null;
   }
 ): Promise<RunRow> {
   const { data, error } = await admin
@@ -142,6 +146,7 @@ export async function createRun(
       base_sha: input.baseSha,
       prompt: input.prompt,
       model: input.model,
+      dew_session_id: input.dewSessionId ?? null,
       status: "queued",
     })
     .select(RUN_COLUMNS)
@@ -271,6 +276,42 @@ export async function appendEvent(
 
   if (error) return null;
   return typeof data === "number" ? data : null;
+}
+
+/**
+ * The transcript a run was seeded with, in order.
+ *
+ * A chat turn arrives with the conversation behind it: the route writes the
+ * recent messages here before the worker claims the run, and the loop builds
+ * its model call from them instead of starting cold. Empty for a run started
+ * without history, which is why the loop falls back to the prompt.
+ */
+export async function listRunMessages(
+  admin: Client,
+  runId: string
+): Promise<{ role: "user" | "assistant"; text: string }[]> {
+  const { data, error } = await admin
+    .from("run_messages")
+    .select("idx, role, content_json")
+    .eq("run_id", runId)
+    .order("idx", { ascending: true });
+
+  if (error || !data) return [];
+
+  const out: { role: "user" | "assistant"; text: string }[] = [];
+
+  for (const row of data as Record<string, unknown>[]) {
+    const role = String(row.role);
+    if (role !== "user" && role !== "assistant") continue;
+
+    const content = (row.content_json ?? {}) as { text?: unknown };
+    const text = typeof content.text === "string" ? content.text : "";
+    if (text.trim().length === 0) continue;
+
+    out.push({ role, text });
+  }
+
+  return out;
 }
 
 export async function appendRunMessage(

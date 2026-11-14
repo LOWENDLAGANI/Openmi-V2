@@ -44,11 +44,14 @@ test("remembering is a choice on the approval card, and it can be turned off", (
   expect(MODULE).toContain("readAutoApproval");
 });
 
-test("the chat route writes without asking by default, and falls back to a standing approval", () => {
-  expect(ROUTE).toContain("autoWriteEnabled");
-  expect(ROUTE).toContain("readAutoApproval(session.supabase");
-  expect(ROUTE).toContain("approveChangesetAndOpenPullRequest");
+test("an agent turn ends at the card, where a standing approval can answer for it", () => {
+  // The run proposes the diff; nothing in the request or the worker writes.
+  expect(ROUTE).not.toContain("approveChangesetAndOpenPullRequest");
   expect(ROUTE).not.toContain("autopilot");
+
+  // The approval itself is unchanged, and it still reads the standing approval.
+  expect(ACTIONS).toContain("rememberAutoApproval");
+  expect(MODULE).toContain("readAutoApproval");
 });
 
 test("the autopilot switch is gone, and its behaviour is the default", () => {
