@@ -21,7 +21,7 @@ import {
   type ModelCategory,
 } from "../models";
 
-export const CUSTOM_MODEL_PROVIDERS = ["openrouter", "deepseek"] as const;
+export const CUSTOM_MODEL_PROVIDERS = ["openrouter", "straitly", "deepseek"] as const;
 
 export type CustomProvider = (typeof CUSTOM_MODEL_PROVIDERS)[number];
 

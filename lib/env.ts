@@ -26,6 +26,7 @@ export type EnvSpec = {
 /** Chat needs one of these. Any single provider is enough to answer. */
 export const AI_PROVIDER_KEYS = [
   "OPENROUTER_API_KEY",
+  "STRAITLY_API_KEY",
   "DEEPSEEK_API_KEY",
 ] as const;
 
@@ -75,10 +76,17 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "At least one provider key is required",
   },
   {
+    key: "STRAITLY_API_KEY",
+    scope: "server",
+    required: false,
+    unlocks: "Primary provider for the named DeepSeek model (falls back to DeepSeek)",
+    hint: "At least one provider key is required",
+  },
+  {
     key: "DEEPSEEK_API_KEY",
     scope: "server",
     required: false,
-    unlocks: "The named DeepSeek model",
+    unlocks: "Fallback provider for the named DeepSeek model",
     hint: "At least one provider key is required",
   },
   {
@@ -86,6 +94,13 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Extra UnoRouter keys, tried before the first token",
+    hint: "Comma or space separated; the primary key is always tried first",
+  },
+  {
+    key: "STRAITLY_API_KEYS",
+    scope: "server",
+    required: false,
+    unlocks: "Extra Straitly keys, tried before the first token",
     hint: "Comma or space separated; the primary key is always tried first",
   },
   {

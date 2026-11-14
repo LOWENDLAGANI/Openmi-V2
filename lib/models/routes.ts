@@ -6,7 +6,7 @@
  * so a display name can be public while the routing stays on the server.
  */
 
-export type RouteProvider = "openrouter" | "deepseek";
+export type RouteProvider = "openrouter" | "straitly" | "deepseek";
 
 export type ModelRoute = { provider: RouteProvider; upstream: string };
 
@@ -123,9 +123,10 @@ export const AUTO_ROUTES: Record<string, ModelRoute> = {
 
 export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
   ...AUTO_ROUTES,
-  // The one named model served directly by its own vendor. It is deliberately
-  // absent from AUTO_ROUTES: Auto never spends DeepSeek.
-  "deepseek-flash": { provider: "deepseek", upstream: "deepseek-flash" },
+  // The named DeepSeek model: tried through Straitly first and falling back to
+  // direct DeepSeek (handled in providersFor). It is absent from AUTO_ROUTES:
+  // Auto never spends these providers.
+  "deepseek-flash": { provider: "straitly", upstream: "deepseek-v4-1-flash-1017" },
 };
 
 export type CustomRouteInput = {

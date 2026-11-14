@@ -32,13 +32,13 @@ import {
  * paths.
  */
 
-export type ProviderId = "openrouter" | "deepseek";
+export type ProviderId = "openrouter" | "straitly" | "deepseek";
 
 export type Provider = {
   id: ProviderId;
   endpoint: string;
   model: string;
-  keyName: "OPENROUTER_API_KEY" | "DEEPSEEK_API_KEY";
+  keyName: "OPENROUTER_API_KEY" | "STRAITLY_API_KEY" | "DEEPSEEK_API_KEY";
   /**
    * The vendor reasons before it answers unless the request says otherwise.
    *
@@ -65,11 +65,20 @@ const OPENROUTER: Provider = {
   keyName: "OPENROUTER_API_KEY",
 };
 
+const STRAITLY: Provider = {
+  id: "straitly",
+  endpoint: "https://api.straitly.ai/v1/chat/completions",
+  // Tried first for the named DeepSeek model. On failure the request falls back
+  // to the direct DeepSeek provider with the same model family.
+  model: "deepseek-v4-1-flash-1017",
+  keyName: "STRAITLY_API_KEY",
+  thinksByDefault: true,
+};
+
 const DEEPSEEK: Provider = {
   id: "deepseek",
   endpoint: "https://api.deepseek.com/chat/completions",
-  // The only DeepSeek model this deployment offers. A named route may override
-  // it, and the route table is where that decision lives.
+  // The direct DeepSeek fallback for the named DeepSeek model.
   model: "deepseek-flash",
   keyName: "DEEPSEEK_API_KEY",
   thinksByDefault: true,
@@ -142,6 +151,22 @@ export function providersFor(
   // verification ask for one model and iterate the result, so handing them the
   // whole queue lets them walk it the same way the chat turn does.
   if (model === AUTO_MODEL) return autoChain("", env);
+
+  // The named DeepSeek model is tried through Straitly first, then falls back
+  // to the direct DeepSeek provider if Straitly fails or has no key.
+  if (model === "deepseek-flash") {
+    const chain: Provider[] = [];
+
+    if (providerKeys(STRAITLY, env).length > 0) {
+      chain.push({ ...STRAITLY, model: "deepseek-v4-1-flash-1017" });
+    }
+
+    if (providerKeys(DEEPSEEK, env).length > 0) {
+      chain.push({ ...DEEPSEEK, model: "deepseek-flash" });
+    }
+
+    return chain;
+  }
 
   const route = routeForModel(model, custom);
   if (!route) return [];
@@ -258,7 +283,7 @@ export function providersConfigured(
 
 /** Every provider, for the setup page to probe each configured key. */
 export function providerCatalogue(): Provider[] {
-  return [OPENROUTER, DEEPSEEK];
+  return [OPENROUTER, STRAITLY, DEEPSEEK];
 }
 
 /**

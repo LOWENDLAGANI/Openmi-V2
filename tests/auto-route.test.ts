@@ -224,10 +224,11 @@ test("Auto's pool is the fifty UnoRouter free routes", () => {
   }
 
   // The named DeepSeek model is a route of its own and is not in Auto's pool.
+  // It is tried through Straitly first and falls back to direct DeepSeek.
   expect(AUTO_ROUTES["deepseek-flash"]).toBeUndefined();
   expect(BUILTIN_ROUTES["deepseek-flash"]).toEqual({
-    provider: "deepseek",
-    upstream: "deepseek-flash",
+    provider: "straitly",
+    upstream: "deepseek-v4-1-flash-1017",
   });
 
   // The pool never falls back to the direct DeepSeek provider.
@@ -264,8 +265,11 @@ test("Auto's queue is built from the UnoRouter pool, and Auto is never in it", (
   expect(providers).toContain("classifyTask(prompt)");
   expect(providers).toContain("planChain(");
 
-  // The named model keeps the single-provider path it had.
+  // The named DeepSeek model falls back from Straitly to direct DeepSeek.
   expect(providers).toContain("export function providersFor");
+  expect(providers).toContain('model === "deepseek-flash"');
+  expect(providers).toContain('STRAITLY');
+  expect(providers).toContain('"deepseek-v4-1-flash-1017"');
 });
 
 test("the chat route sends Auto through the pipeline and leaves the rest alone", () => {
@@ -275,7 +279,7 @@ test("the chat route sends Auto through the pipeline and leaves the rest alone",
   expect(route).toContain("autoChain(prompt)");
   expect(route).toContain("streamRouted({");
 
-  // A named model still resolves to one provider and the loop it always had.
+  // A named model resolves to its provider chain and the loop tries it in order.
   expect(route).toContain("providersFor(model)");
   expect(route).toContain("for (const provider of chain)");
 });

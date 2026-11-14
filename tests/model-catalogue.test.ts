@@ -115,15 +115,13 @@ test("every built-in model has a provider route, and Auto has a queue", () => {
   expect(routeForModel("nope")).toBeNull();
 });
 
-test("DeepSeek is one model, and it is deepseek-flash", () => {
-  const deepseek = MODELS.filter(
-    (model) => BUILTIN_ROUTES[model.id]?.provider === "deepseek"
-  );
+test("DeepSeek is one named model with a Straitly-first fallback chain", () => {
+  const deepseek = MODELS.filter((model) => model.id === "deepseek-flash");
 
   expect(deepseek.map((model) => model.id)).toEqual(["deepseek-flash"]);
   expect(BUILTIN_ROUTES["deepseek-flash"]).toEqual({
-    provider: "deepseek",
-    upstream: "deepseek-flash",
+    provider: "straitly",
+    upstream: "deepseek-v4-1-flash-1017",
   });
 });
 
