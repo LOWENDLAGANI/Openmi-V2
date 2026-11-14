@@ -72,3 +72,32 @@ test("the switch is documented where an operator would look for it", () => {
   expect(EXAMPLE).toContain("OPENMI_ADMIN_PANEL=");
   expect(EXAMPLE).toContain("kill switch");
 });
+
+test("the switch is mirrored into the database, so a stolen token is not enough", () => {
+  const CONTROL = readFileSync(
+    new URL("../lib/admin/control.ts", import.meta.url),
+    "utf8"
+  );
+  const SQL = readFileSync(
+    new URL("../supabase/migrations/045_admin_panel_switch.sql", import.meta.url),
+    "utf8"
+  );
+  const INSTRUMENTATION = readFileSync(
+    new URL("../instrumentation.ts", import.meta.url),
+    "utf8"
+  );
+
+  // The app writes the value through the service role, and the request path
+  // writes it too — the boot hook covers a deployment where nobody opens /admin.
+  expect(CONTROL).toContain('rpc("admin_set_disabled"');
+  expect(CONTROL).toContain("p_disabled: desired");
+  expect(ACCESS).toContain("await syncAdminControl()");
+  expect(INSTRUMENTATION).toContain("syncAdminControl");
+
+  // The database is where a direct RPC call is stopped: is_admin() itself
+  // answers false while the mirror says off, so every admin function declines.
+  expect(SQL).toContain("create table if not exists public.admin_control");
+  expect(SQL).toContain("when public.admin_panel_disabled() then false");
+  expect(SQL).toContain("grant execute on function public.admin_set_disabled(boolean) to service_role");
+  expect(SQL).not.toContain("grant execute on function public.admin_set_disabled(boolean) to authenticated");
+});

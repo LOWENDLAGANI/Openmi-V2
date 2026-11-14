@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { isVerifiedAllowlistedAdmin } from "@/lib/admin/allowlist";
+import { syncAdminControl } from "@/lib/admin/control";
 import { adminPanelEnabled } from "@/lib/admin/switches";
 import { getSession } from "@/lib/session";
 
@@ -42,6 +43,12 @@ export async function readAdminAccess(): Promise<AdminAccess> {
   // Before a configuration claim is read, so a deployment that is not set up
   // can still reach /setup — but before any identity is trusted.
   if (session.state === "unconfigured") return { state: "unconfigured" };
+
+  // Postgres cannot read the host's environment, and the admin RPCs live there.
+  // The mirror is what makes "off" true for a token used straight against
+  // PostgREST, without this app in the path. It runs even when the switch is
+  // off — otherwise the database would never learn that it is.
+  await syncAdminControl().catch(() => false);
 
   // The kill switch, and the reason it is here rather than in the page: every
   // surface that answers "is this person an admin?" funnels through this

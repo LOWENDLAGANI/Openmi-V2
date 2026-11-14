@@ -318,7 +318,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks:
-      "The /admin panel and every admin action; off revokes admin for everyone on the deployment",
+      "The /admin panel, every admin action and the admin RPCs; off revokes admin for everyone, including a stolen token",
     hint: 'On by default; set to "off" and redeploy to take admin access away in an incident',
   },
   {

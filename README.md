@@ -65,10 +65,18 @@ the admin panel under **Configuration & probes**; it is not a public page.
 outranks it, and nothing in the product can turn it back on. Unset or blank is
 the default and means on.
 
-An environment variable is not visible inside Postgres, so the admin RPCs
-(`admin_grant_dew`, `admin_set_admin`, `review_payment_request`, …) stay callable
-with a live admin JWT. For full revocation in an incident, also delete the role
-row:
+Postgres cannot read the host's environment, so the switch is mirrored into the
+database: `admin_control` holds one row, the service role writes it (at boot via
+`instrumentation.ts`, and again on the first admin request), and `is_admin()`
+returns false while it says off. Every admin RPC starts with
+`if not public.is_admin()`, so a stolen admin token calling `admin_grant_dew`,
+`admin_set_admin`, `review_payment_request`, the Dew-code functions or
+`admin_set_pass` straight against PostgREST is refused too — that request never
+reaches this app, and it no longer has to. A session cannot flip the row back:
+`admin_set_disabled` is executable by the service role only.
+
+Deleting the role row remains the belt to that braces, and is worth doing once
+the incident is contained:
 
 ```sql
 delete from public.admin_users where user_id = '<the account id>';
