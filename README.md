@@ -49,8 +49,8 @@ the admin panel under **Configuration & probes**; it is not a public page.
   Leave email confirmation on in Supabase: an allowlisted address only counts
   once Supabase has confirmed the mailbox, so an unconfirmed signup that types
   an operator's address is not an operator.
-- Checkout is closed by default. Point `PAYMENT_LINK` at the live page, then set
-  `TOPUP_PAUSED=off` to show the payment link and the receipt form.
+- Checkout is open by default. Point `PAYMENT_LINK` at the live page; set
+  `TOPUP_PAUSED=on` to pause it while testing.
 - Set `CRON_SECRET`; without it the sandbox sweep answers 503 and E2B's own idle
   and expiry timers are the only backstop.
 
@@ -257,8 +257,8 @@ An invite rewards both sides 5 Dew, once per invitee, up to 10 rewarded
 accounts. Refunds are one per session at the original price and are written for
 a provider failure or an abort before the first token; anything else is an
 operator adjustment, which is service-role only. Top-ups are operator-issued
-redeem codes — there is no card payment in this build. Checkout is closed by
-default; set `TOPUP_PAUSED=off` to show the hosted payment link and the receipt
+redeem codes — there is no card payment in this build. Checkout is open by
+default; set `TOPUP_PAUSED=on` to pause the hosted payment link and the receipt
 form.
 
 `/activity` shows the ledger, the running hour, per-chat token estimates, the

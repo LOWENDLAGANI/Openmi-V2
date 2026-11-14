@@ -41,13 +41,14 @@ test("the database charges and extends exactly what the catalogue sells", () => 
   }
 });
 
-test("checkout opens only with an explicit off switch", () => {
-  // A fresh deployment must not start taking money because a variable is unset.
-  expect(checkoutPaused(undefined)).toBe(true);
-  expect(checkoutPaused("")).toBe(true);
-  expect(checkoutPaused("on")).toBe(true);
+test("checkout is open by default and pauses only on an explicit on switch", () => {
+  // A fresh deployment takes money unless an operator pauses it.
+  expect(checkoutPaused(undefined)).toBe(false);
+  expect(checkoutPaused("")).toBe(false);
   expect(checkoutPaused("off")).toBe(false);
   expect(checkoutPaused("FALSE")).toBe(false);
+  expect(checkoutPaused("on")).toBe(true);
+  expect(checkoutPaused("TRUE")).toBe(true);
 });
 
 test("the admin panel still tops up a balance by hand", () => {

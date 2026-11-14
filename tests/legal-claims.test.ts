@@ -87,9 +87,9 @@ test("the banner's answer is read where ads are served", () => {
 });
 
 test("the paused checkout does not show a form that cannot be submitted", () => {
-  // Checkout is closed by default: the upload form is not rendered, and the
-  // empty state does not tell a reader to pay and upload. Opening it with
-  // TOPUP_PAUSED=off keeps the same structure, just renders the form.
+  // Checkout can be paused: the upload form is not rendered, and the empty
+  // state does not tell a reader to pay and upload. Pausing with
+  // TOPUP_PAUSED=on keeps the same structure, just hides the form.
   expect(PAY).toContain("{!TOPUP_PAUSED && (");
   expect(PAY).toContain("Uploads are paused while checkout is being tested");
   expect(PAY).not.toContain("disabled={TOPUP_PAUSED}");

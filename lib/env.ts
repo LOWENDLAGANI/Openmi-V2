@@ -150,7 +150,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Open real-money checkout on /pay",
-    hint: 'Closed by default; set to "off" to show the payment link and receipt form',
+    hint: 'Open by default; set to "on" to pause the payment link and receipt form',
   },
   {
     key: "RESEND_API_KEY",

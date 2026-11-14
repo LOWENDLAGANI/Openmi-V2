@@ -64,17 +64,19 @@ export const PAID_BENEFITS = [
 ] as const;
 
 /**
- * Real-money checkout is closed unless the operator opens it.
+ * Real-money checkout is open unless the operator pauses it.
  *
- * `TOPUP_PAUSED=off` shows the hosted payment link and the receipt form; unset,
- * or any other value, keeps the safe default of a closed checkout. A redeem
- * code works either way, because no checkout is involved. The page, its copy
- * and the tests all read this one switch, so they cannot disagree about whether
- * money can be taken.
+ * Checkout is resumed by default: a fresh deployment takes money without any
+ * extra configuration. An operator pauses it by setting `TOPUP_PAUSED=on`
+ * (or `true`, `1`, `paused`, `yes`); `off`, `false`, `0`, `no`, an empty
+ * value or an unset variable all leave it open. A redeem code works either
+ * way, because no checkout is involved. The page, its copy and the tests all
+ * read this one switch, so they cannot disagree about whether money can be
+ * taken.
  */
 export function checkoutPaused(value: string | undefined): boolean {
   const normalized = (value ?? "").trim().toLowerCase();
-  return !["off", "false", "0"].includes(normalized);
+  return ["on", "true", "1", "paused", "yes"].includes(normalized);
 }
 
 export const TOPUP_PAUSED = checkoutPaused(process.env.TOPUP_PAUSED);
