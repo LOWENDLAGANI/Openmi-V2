@@ -10,7 +10,13 @@ import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createGiveawayCodes, grantDew, reviewReceipt, setAdmin } from "./actions";
+import {
+  createGiveawayCodes,
+  grantDew,
+  reviewReceipt,
+  setAdmin,
+  setPass,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -331,7 +337,11 @@ export default async function AdminPage({
                   ? "Giveaway codes created. They are listed below."
                   : params.done === "granted"
                   ? "Admin access granted."
-                  : "Admin access revoked."}
+                  : params.done === "pass"
+                    ? "Paid pass granted. The allowance rises at the next refill."
+                    : params.done === "pass-off"
+                      ? "Paid pass revoked. The free allowance applies at the next refill."
+                      : "Admin access revoked."}
         </p>
       )}
 
@@ -445,6 +455,41 @@ export default async function AdminPage({
                       {active ? "paid" : "free"}
                     </StatusPill>
                   </div>
+
+                  {member.email && (
+                    <form
+                      action={setPass}
+                      className="flex w-full items-center gap-1.5 sm:w-auto"
+                    >
+                      <input type="hidden" name="email" value={member.email} />
+                      <input
+                        name="days"
+                        type="number"
+                        min={1}
+                        max={3660}
+                        defaultValue={30}
+                        aria-label={`Days of pass to grant ${member.email}`}
+                        className="field w-16 px-2 py-1 text-[11px]"
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-quiet px-2.5 py-1 text-[10.5px]"
+                      >
+                        grant pass
+                      </button>
+                      {active && (
+                        <button
+                          type="submit"
+                          name="action"
+                          value="revoke"
+                          formNoValidate
+                          className="btn btn-quiet px-2.5 py-1 text-[10.5px]"
+                        >
+                          revoke
+                        </button>
+                      )}
+                    </form>
+                  )}
                 </li>
               );
             })}

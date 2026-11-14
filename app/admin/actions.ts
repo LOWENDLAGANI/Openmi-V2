@@ -154,3 +154,35 @@ export async function setAdmin(formData: FormData) {
   revalidatePath("/admin");
   redirect(`/admin?done=${enabled ? "granted" : "revoked"}`);
 }
+
+/**
+ * A paid pass, granted or revoked by hand.
+ *
+ * The days field is the instruction and "revoke" sends zero: a grant extends
+ * the window from the later of now and its current end, so comping a month to a
+ * running pass adds to it. No Dew moves, so there is no ledger row — the
+ * entitlement is `paid_until`, and `admin_set_pass` re-checks the role.
+ */
+export async function setPass(formData: FormData) {
+  const supabase = await actingClient();
+
+  const email = field(formData, "email");
+  const revoke = field(formData, "action") === "revoke";
+  const days = revoke ? 0 : Number(field(formData, "days") || "0");
+
+  if (email.length === 0) fail("That account has no email to pass on.");
+  if (!Number.isFinite(days) || days < 0 || days > 3660) {
+    fail("Enter between 1 and 3660 days.");
+  }
+
+  const { error } = await supabase.rpc("admin_set_pass", {
+    p_email: email,
+    p_days: Math.round(days),
+  });
+
+  if (error) fail(error.message.replace(/^pass:\s*/, ""));
+
+  revalidatePath("/admin");
+  revalidatePath("/activity");
+  redirect(`/admin?done=${revoke ? "pass-off" : "pass"}`);
+}
