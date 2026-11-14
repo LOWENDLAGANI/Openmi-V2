@@ -1,4 +1,10 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 
 /**
  * AES-256-GCM sealing for credentials the server must keep at rest.
@@ -80,6 +86,22 @@ export function open(sealed: string, base64Key: string): string {
   const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 
   return plaintext.toString("utf8");
+}
+
+/**
+ * Whether two values are equal, in time that does not depend on where they
+ * first differ or on how long they are.
+ *
+ * Hashing first is what makes the comparison length-independent: a value an
+ * attacker sends is not the length of the secret, and `timingSafeEqual` throws
+ * on different lengths. This is the same shape the cron route uses for its
+ * bearer token, and it is what an OAuth state cookie is compared with.
+ */
+export function secretsMatch(given: string, expected: string): boolean {
+  const left = createHash("sha256").update(given, "utf8").digest();
+  const right = createHash("sha256").update(expected, "utf8").digest();
+
+  return timingSafeEqual(left, right);
 }
 
 /** The only part of a token that may be shown back to a person. */

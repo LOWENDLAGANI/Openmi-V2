@@ -2,19 +2,21 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import { isAllowlistedAdmin } from "@/lib/admin/allowlist";
+import { isVerifiedAllowlistedAdmin } from "@/lib/admin/allowlist";
 import { getSession } from "@/lib/session";
 
 /**
  * Admin access is decided here, on the server, from two facts:
  *
- *   A) the signed-in email is on the ADMIN_EMAILS / ADMIN_EMAIL_DOMAIN list, or
+ *   A) the signed-in email is on the ADMIN_EMAILS / ADMIN_EMAIL_DOMAIN list
+ *      *and* Supabase has confirmed that mailbox, or
  *   B) `is_admin()` — a security-definer function over `public.admin_users` —
  *      says the account holds the admin role.
  *
  * Neither fact is taken from the request body. `getUser()` is a call to the
  * auth server, so a forged Supabase cookie resolves to "signed-out" rather than
- * to somebody else's email.
+ * to somebody else's email — and signup is open, so an unconfirmed address is a
+ * claim, not an identity.
  *
  * Hiding the `/admin` link is a convenience. This module and the RLS-defying
  * SQL functions behind the panel are the actual gate: every admin action calls
@@ -41,7 +43,7 @@ export async function readAdminAccess(): Promise<AdminAccess> {
 
   const { user, supabase } = session;
 
-  if (isAllowlistedAdmin(user.email)) {
+  if (isVerifiedAllowlistedAdmin(user.email, user.emailVerified)) {
     return {
       state: "admin",
       email: user.email ?? null,

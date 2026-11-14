@@ -46,6 +46,9 @@ the admin panel under **Configuration & probes**; it is not a public page.
   configuration.
 - Set `ADMIN_EMAILS` (or `ADMIN_EMAIL_DOMAIN`) so the admin panel has an
   operator, and `GITHUB_TOKEN_KEY` so connected GitHub tokens can be sealed.
+  Leave email confirmation on in Supabase: an allowlisted address only counts
+  once Supabase has confirmed the mailbox, so an unconfirmed signup that types
+  an operator's address is not an operator.
 - Checkout is closed by default. Point `PAYMENT_LINK` at the live page, then set
   `TOPUP_PAUSED=off` to show the payment link and the receipt form.
 - Set `CRON_SECRET`; without it the sandbox sweep answers 503 and E2B's own idle

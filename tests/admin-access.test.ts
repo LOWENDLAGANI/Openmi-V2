@@ -4,6 +4,7 @@ import {
   isAdminDomainEmail,
   isAllowlistedAdmin,
   isExactAdminEmail,
+  isVerifiedAllowlistedAdmin,
   normalizeDomain,
 } from "../lib/admin/allowlist";
 import {
@@ -40,6 +41,22 @@ test("domains are normalized and several can be listed", () => {
   const env = { ADMIN_EMAIL_DOMAIN: "mycompany.com, @studio.dev" };
   expect(isAdminDomainEmail("a@mycompany.com", env)).toBe(true);
   expect(isAdminDomainEmail("b@studio.dev", env)).toBe(true);
+});
+
+test("an unconfirmed address is never an operator, whatever it says", () => {
+  const env = {
+    ADMIN_EMAILS: "boss@example.com",
+    ADMIN_EMAIL_DOMAIN: "mycompany.com",
+  };
+
+  expect(isVerifiedAllowlistedAdmin("boss@example.com", true, env)).toBe(true);
+  expect(isVerifiedAllowlistedAdmin("owner@mycompany.com", true, env)).toBe(true);
+
+  // Signup is open: typing an admin address is not owning the mailbox.
+  expect(isVerifiedAllowlistedAdmin("boss@example.com", false, env)).toBe(false);
+  expect(isVerifiedAllowlistedAdmin("owner@mycompany.com", false, env)).toBe(
+    false
+  );
 });
 
 test("an unset or empty allowlist allows nobody", () => {

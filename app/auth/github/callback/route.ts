@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { secretsMatch } from "@/lib/crypto";
 import { describeGithubError } from "@/lib/github/read";
 import { saveConnection } from "@/lib/github/token";
 import {
@@ -61,7 +62,9 @@ export async function GET(request: NextRequest) {
   const state = url.searchParams.get("state");
   const expected = request.cookies.get(STATE_COOKIE)?.value;
 
-  if (!code || !state || !expected || state !== expected) {
+  // Constant-time: the state is the CSRF token, so which byte differs is not
+  // something this comparison should reveal.
+  if (!code || !state || !expected || !secretsMatch(state, expected)) {
     return failure(
       request,
       "That GitHub sign-in could not be verified. Start the connection again."

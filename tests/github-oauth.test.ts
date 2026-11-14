@@ -113,7 +113,10 @@ test("nothing is stored until saveConnection has verified the token", () => {
 
 test("the callback refuses a code that does not match the state cookie", () => {
   expect(CALLBACK).toContain("STATE_COOKIE");
-  expect(CALLBACK).toContain("state !== expected");
+  // Compared through a constant-time helper, so the response time does not say
+  // which byte of the state differed.
+  expect(CALLBACK).toContain("secretsMatch(state, expected)");
+  expect(CALLBACK).not.toContain("state !== expected");
 });
 
 test("the connect panel leads with OAuth and keeps the token form as a fallback", () => {

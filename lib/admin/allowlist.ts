@@ -64,10 +64,28 @@ export function isAdminDomainEmail(
   });
 }
 
-/** Requirement A: the verified Google address is on the operator list. */
+/** Requirement A: the address is on the operator list. */
 export function isAllowlistedAdmin(
   email: string | null | undefined,
   env: AdminEnv = process.env
 ): boolean {
   return isExactAdminEmail(email, env) || isAdminDomainEmail(email, env);
+}
+
+/**
+ * Requirement A, plus the one fact matching a string cannot see: the address
+ * was verified.
+ *
+ * Signup is open, so "boss@mycompany.com" is a string anyone can type. What
+ * makes it the operator's is that Supabase confirmed the mailbox — the same
+ * distinction nOAuth turns into account takeover when an app trusts an
+ * unverified provider email. An account that has not confirmed is therefore
+ * never an operator, whatever its address says.
+ */
+export function isVerifiedAllowlistedAdmin(
+  email: string | null | undefined,
+  emailVerified: boolean,
+  env: AdminEnv = process.env
+): boolean {
+  return emailVerified && isAllowlistedAdmin(email, env);
 }
