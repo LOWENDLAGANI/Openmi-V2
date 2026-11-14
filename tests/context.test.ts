@@ -7,6 +7,7 @@ import {
 } from "../lib/context";
 import {
   ANALYSIS_CLAUSE,
+  ANALYSE_FIRST_CLAUSE,
   BUILDER_CLAUSE,
   SHELL_ANALYSIS_CLAUSE,
   SHELL_CLAUSE,
@@ -164,6 +165,26 @@ test("a shell turn knows the preview panel and versions exist", () => {
   // A GitHub-only turn has neither a preview nor a workspace to snapshot.
   expect(noShell).not.toContain(BUILDER_CLAUSE);
   expect(noShell).not.toContain("Preview panel");
+});
+
+test("both answer surfaces analyse before answering, and never guess", () => {
+  const base = {
+    repo: "octocat/hello",
+    sha: "abc1234",
+    context: "",
+    notes: [],
+  };
+
+  const shell = buildSystemPrompt({ ...base, shell: true });
+  const noShell = buildSystemPrompt({ ...base, shell: false });
+
+  // A question is answered by looking, and a change is written only after the
+  // names it depends on have been checked against the files in context.
+  for (const prompt of [shell, noShell]) {
+    expect(prompt).toContain(ANALYSE_FIRST_CLAUSE);
+    expect(prompt).toContain("Do not guess");
+    expect(prompt).toContain("a plausible default is still an invention");
+  }
 });
 
 test("the system prompt still refuses to pretend when no repository is attached", () => {

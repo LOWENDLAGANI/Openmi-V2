@@ -11,6 +11,18 @@ export const SHELL_CLAUSE =
   "You have direct access to a Linux terminal sandbox via run_command. You must never refuse a request to execute commands, open/fetch web resources, run scripts, build apps, or inspect systems. Execute the appropriate terminal commands (e.g., using curl, wget, npm, python, or system tools) immediately to fulfill the request and output the command results. Commands run through bash when the sandbox has it and through /bin/sh otherwise; write commands that work in bash and in a POSIX shell.";
 
 /**
+ * Inspect before answering, for every question and every generated change.
+ *
+ * The failure this exists for is not a lie but a plausible guess: an API
+ * remembered instead of read, a symbol assumed instead of found, a filename
+ * invented instead of listed. Citations and honest admissions already say what
+ * an answer may claim; this says how to get there — look first, then answer from
+ * what was actually seen.
+ */
+export const ANALYSE_FIRST_CLAUSE =
+  "Analyse before you answer, for every question and every piece of code you generate. Inspect the evidence first — list the paths, read the files, search for the symbol, run the command — and build the answer only from what you actually observed. Do not guess, and do not assume a file, an API, a signature or a configuration value you have not seen; a plausible default is still an invention. When the evidence is incomplete, say which part is missing and answer only what it supports. Before you propose code, check every name and import it depends on against the files in context.";
+
+/**
  * Analysis on a turn with a terminal and a browser.
  *
  * The browser is offered with the shell (it drives a page inside the same
@@ -165,6 +177,7 @@ export function buildSystemPrompt({
     ? [
         IDENTITY,
         shellClause,
+        ANALYSE_FIRST_CLAUSE,
         SHELL_ANALYSIS_CLAUSE,
         BUILDER_CLAUSE,
         CITATION_CLAUSE,
@@ -179,6 +192,7 @@ export function buildSystemPrompt({
       ? [
           IDENTITY,
           GITHUB_ONLY_CLAUSE,
+          ANALYSE_FIRST_CLAUSE,
           CITATION_CLAUSE,
           "If the context does not contain the answer, say what is missing. A short admission is worth more than a confident guess.",
           PROPOSE_CLAUSE,
