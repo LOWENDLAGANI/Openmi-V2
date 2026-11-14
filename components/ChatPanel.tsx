@@ -5,22 +5,20 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
-import { Beam } from "@/components/Beam";
 import { ChargeDialog } from "@/components/ChargeDialog";
+import {
+  Composer,
+  type ComposerCommand,
+  type ContextMeter,
+} from "@/components/Composer";
 import { DEW_EVENT } from "@/components/DewChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
-import { ContextCircle } from "@/components/ContextCircle";
 import { RetryNotice } from "@/components/RetryNotice";
 import { MessageBody } from "@/components/MessageBody";
-import { ModelMenu } from "@/components/ModelMenu";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
-import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
 import type { AgentStep, Message } from "@/lib/types";
-
-/** How close to the server's cap the counter appears, so it is not noise. */
-const MESSAGE_WARN_CHARS = Math.floor(MAX_MESSAGE_CHARS * 0.9);
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
 
@@ -50,12 +48,6 @@ type Shot = {
   mime: string;
   base64: string;
   caption: string;
-};
-
-type ContextMeter = {
-  usedChars: number;
-  budgetChars: number;
-  notes: string[];
 };
 
 export function ChatPanel({
@@ -97,7 +89,7 @@ export function ChatPanel({
     }))
   );
   const [model, setModel] = useState<ModelId>(initialModel);
-  const [draft, setDraft] = useState("");
+  const [composer, setComposer] = useState<ComposerCommand>({ text: "", nonce: 0 });
   const [pending, setPending] = useState("");
   const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<StepLine[]>([]);
@@ -127,11 +119,20 @@ export function ChatPanel({
 
   const createdChatRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const continuedRef = useRef(false);
   const stopTimerRef = useRef<number | null>(null);
+
+  /**
+   * Hands text to the composer: an edited message, or an empty field after a
+   * send. The draft lives in <Composer>, so typing re-renders one textarea
+   * instead of this transcript; the parent bumps a token and the composer
+   * adopts whatever came with it.
+   */
+  function seedComposer(next: string) {
+    setComposer((current) => ({ text: next, nonce: current.nonce + 1 }));
+  }
 
   /** A badge per model family, and the name shown on the card. */
   function modelLabel(id: string | null): string {
@@ -191,15 +192,6 @@ export function ChatPanel({
       tween?.kill();
     };
   }, [messages, pending, steps, backgroundRunning, atBottom]);
-
-  // A composer that grows with the question instead of showing a scrollbar
-  // after two lines.
-  useEffect(() => {
-    const element = textareaRef.current;
-    if (!element) return;
-    element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
-  }, [draft]);
 
   // A pending stop timer must not outlive the component.
   useEffect(() => {
@@ -354,8 +346,7 @@ export function ChatPanel({
 
     if (!continuation) {
       setLastSent(content);
-      setDraft("");
-      textareaRef.current?.focus();
+      seedComposer("");
       optimisticId = `local-${Date.now()}`;
       const localId = optimisticId;
       setMessages((current) => [
@@ -812,7 +803,7 @@ export function ChatPanel({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setDraft(message.content)}
+                    onClick={() => seedComposer(message.content)}
                     className="thread-tool mr-1"
                   >
                     edit
@@ -984,130 +975,19 @@ export function ChatPanel({
             </div>
           )}
 
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              beginSend(draft);
-            }}
-          >
-            {/* The model and the hour's price sit above the capsule, the way the
-                reference parks its context ring there: a message field with four
-                chips inside it stops reading as one field. */}
-            <div className="mb-1 flex items-center justify-between gap-2 px-1">
-              <ModelMenu
-                models={models}
-                value={model}
-                onChange={(id) => setModel(id as ModelId)}
-              />
-
-              <div className="flex min-w-0 items-center gap-1.5">
-                {/* What the next message costs, so the price is never a
-                    surprise after the answer. */}
-                <span
-                  title={
-                    activeChatId !== null
-                      ? "Every message in this chat is covered for the hour."
-                      : "The hour starts when the first message sends."
-                  }
-                  className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`size-1 rounded-full ${
-                      activeChatId !== null ? "bg-accent" : "bg-line-strong"
-                    }`}
-                  />
-                  {activeChatId !== null
-                    ? `hour · ${modelHourDew(model, models)} dew`
-                    : "pay on send"}
-                </span>
-
-                {meter && (
-                  <ContextCircle
-                    usedChars={meter.usedChars}
-                    budgetChars={meter.budgetChars}
-                    notes={meter.notes}
-                  />
-                )}
-              </div>
-            </div>
-
-            <Beam>
-              <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
-                <textarea
-                  ref={textareaRef}
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      beginSend(draft);
-                    }
-                  }}
-                  rows={1}
-                  placeholder={
-                    providerReady ? "Ask anything…" : "Chat is unavailable right now."
-                  }
-                  className="composer-input max-h-[168px] min-h-[40px] flex-1 px-2 py-2.5 text-[15px] leading-snug focus:outline-none"
-                />
-
-                <div className="flex shrink-0 items-center gap-1.5">
-                    {streaming && (
-                      <button
-                        type="button"
-                        onClick={stop}
-                        disabled={stopping}
-                        aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
-                        title={stopping ? "Stopping…" : "Stop"}
-                        className="lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`size-3 rounded-[3px] bg-current ${stopping ? "animate-blink" : ""}`}
-                        />
-                      </button>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={streaming || draft.trim().length === 0}
-                      aria-label="Send message"
-                      className={`lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
-                        streaming || draft.trim().length === 0
-                          ? "send-idle"
-                          : "bg-accent text-on-accent"
-                      }`}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        className="size-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 19V5M6 11l6-6 6 6" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-            </Beam>
-
-            {/* The send button refuses an over-cap message, so the count appears
-                before the press instead of as an error after it. */}
-            {draft.length > MESSAGE_WARN_CHARS && (
-              <p
-                className={`mt-1 px-2 text-right font-mono text-[10px] ${
-                  draft.length > MAX_MESSAGE_CHARS ? "text-danger" : "text-low"
-                }`}
-              >
-                {draft.length.toLocaleString()} /{" "}
-                {MAX_MESSAGE_CHARS.toLocaleString()} characters
-              </p>
-            )}
-          </form>
+          <Composer
+            models={models}
+            model={model}
+            onModelChange={(id) => setModel(id as ModelId)}
+            meter={meter}
+            activeChatId={activeChatId}
+            streaming={streaming}
+            stopping={stopping}
+            providerReady={providerReady}
+            command={composer}
+            onSend={beginSend}
+            onStop={stop}
+          />
         </div>
       </div>
 

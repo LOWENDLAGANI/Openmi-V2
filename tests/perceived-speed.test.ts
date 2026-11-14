@@ -46,6 +46,19 @@ test("the skeleton reserves the composer's height", () => {
   expect(SKELETON).toContain("skeleton");
 });
 
+test("a keystroke re-renders the field, not the transcript", () => {
+  const PANEL = read("/components/ChatPanel.tsx");
+  const COMPOSER = read("/components/Composer.tsx");
+
+  // The draft used to be state in ChatPanel, so every character re-rendered
+  // every bubble and highlighted block in the thread.
+  expect(COMPOSER).toContain('const [text, setText] = useState("")');
+  expect(PANEL).toContain("<Composer");
+  expect(PANEL).not.toContain("value={draft}");
+  expect(PANEL).not.toContain("setDraft(");
+  expect(PANEL).not.toContain("<textarea");
+});
+
 test("the route skeleton and the in-page boundary share one shape", () => {
   expect(LOADING).toContain("<ChatSkeleton />");
 });

@@ -62,7 +62,9 @@ test("the composer warns before the server has to refuse the message", () => {
   expect(ROUTE).toContain('from "@/lib/chat-limits"');
   expect(ROUTE).not.toContain("const MAX_MESSAGE_CHARS = 20_000");
 
-  expect(PANEL).toContain('from "@/lib/chat-limits"');
-  expect(PANEL).toContain("draft.length > MESSAGE_WARN_CHARS");
-  expect(PANEL).toContain("text-danger");
+  // The field lives in <Composer>, so that is where the limit has to appear.
+  const COMPOSER = read("/components/Composer.tsx");
+  expect(COMPOSER).toContain('from "@/lib/chat-limits"');
+  expect(COMPOSER).toContain("text.length > MESSAGE_WARN_CHARS");
+  expect(COMPOSER).toContain("text-danger");
 });
