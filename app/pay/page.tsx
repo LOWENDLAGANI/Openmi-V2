@@ -6,6 +6,7 @@ import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
 import { CountryHint } from "@/components/CountryHint";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
+import { ReceiptWave } from "@/components/ReceiptWave";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
@@ -417,12 +418,14 @@ export default async function PayPage({
             </span>
           </label>
 
-          <SubmitButton
-            className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2"
-            pendingText="Uploading the receipt…"
-          >
-            Submit receipt
-          </SubmitButton>
+          <ReceiptWave>
+            <SubmitButton
+              className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2"
+              pendingText="Uploading the receipt…"
+            >
+              Submit receipt
+            </SubmitButton>
+          </ReceiptWave>
         </form>
       </section>
       )}
