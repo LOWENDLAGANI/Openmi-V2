@@ -42,7 +42,7 @@ export function AuthForm({
 
     const supabase = supabaseBrowser();
     if (!supabase) {
-      setError("Sign-in is unavailable right now. Try again in a moment.");
+      setError("Sign-in is unavailable. Try again shortly.");
       return;
     }
 
@@ -108,7 +108,7 @@ export function AuthForm({
 
     const supabase = supabaseBrowser();
     if (!supabase) {
-      setError("Sign-in is unavailable right now. Try again in a moment.");
+      setError("Sign-in is unavailable. Try again shortly.");
       return;
     }
 
@@ -147,8 +147,7 @@ export function AuthForm({
           Sign-in is unavailable
         </p>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
-          Openmi can&apos;t reach its accounts service right now. Try again in a
-          moment, or check back shortly.
+          The accounts service is unreachable right now. Try again shortly.
         </p>
       </div>
     );

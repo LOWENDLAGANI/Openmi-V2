@@ -126,7 +126,7 @@ export function FileEditor({
       }
 
       setNotice(
-        `Saved to the sandbox${typeof body?.bytes === "number" ? ` (${body.bytes} bytes)` : ""}. GitHub is unchanged.`
+        `Saved to the sandbox${typeof body?.bytes === "number" ? ` (${body.bytes} bytes)` : ""}.`
       );
     } catch {
       setOriginal(before);
@@ -222,8 +222,8 @@ export function FileEditor({
 
       {open ? (
         <p className="border-t border-line px-3 py-2 text-[10.5px] leading-relaxed text-low">
-          A save writes to this chat&apos;s sandbox. It becomes a version on the
-          next turn, and reaches GitHub only through a change request.
+          Saves to this chat&apos;s sandbox; GitHub changes only through a change
+          request.
           {dirty ? " Unsaved changes." : ""}
         </p>
       ) : null}

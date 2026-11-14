@@ -242,8 +242,7 @@ export function ExecutionPanel({
       )}
 
       <p className="text-[10.5px] leading-relaxed text-low">
-        {run ? "Pinned commit" : "Base commit"} · no tokens, no keys, no push
-        credential.
+        {run ? "Pinned commit" : "Base commit"} · no tokens or keys, no push.
       </p>
 
       {status === "ready" && (

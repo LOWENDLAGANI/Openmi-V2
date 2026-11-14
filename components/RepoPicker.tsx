@@ -37,8 +37,8 @@ export function RepoPicker({
       <section className="panel mb-4 p-4">
         <p className="eyebrow">start from a template</p>
         <p className="mt-1.5 text-[12px] leading-relaxed text-mid">
-          Creates a private repository in your account with one commit, then
-          opens a chat pinned to it. Nothing is published.
+          A private repository with one commit, opened in a pinned chat. Nothing
+          is published.
         </p>
 
         <form

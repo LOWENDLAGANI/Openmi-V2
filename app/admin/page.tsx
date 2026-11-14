@@ -138,9 +138,8 @@ export default async function AdminPage({
           Service role required
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Reading every receipt and every balance needs SUPABASE_SERVICE_ROLE_KEY
-          on the server. The role check already passed; this key is the missing
-          piece.
+          The role check passed; reading every receipt also needs
+          SUPABASE_SERVICE_ROLE_KEY on the server.
         </p>
       </main>
     );
@@ -500,7 +499,7 @@ export default async function AdminPage({
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
             <p className="max-w-md text-[10.5px] leading-relaxed text-low">
               Showing {accountRows.length} of {accountTotal}. The rest load on
-              request, so a large account list never slows this page.
+              request.
             </p>
 
             {accountShown < ACCOUNT_PAGE_MAX ? (
@@ -545,8 +544,7 @@ export default async function AdminPage({
 
         {pending.length === 0 ? (
           <p className="mt-3 text-[12px] leading-relaxed text-mid">
-            Nothing waiting. Uploads from the plans page arrive here with their
-            proof attached.
+            Uploads from the plans page arrive here with their proof attached.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
@@ -659,9 +657,8 @@ export default async function AdminPage({
             Top up a balance
           </h2>
           <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-            Adds Dew by account email and writes the same ledger row a purchase
-            would. A negative amount is an adjustment and cannot take the balance
-            below zero.
+            Writes the ledger row a purchase would. A negative amount is an
+            adjustment and cannot go below zero.
           </p>
 
           <form action={grantDew} className="mt-3 space-y-2">
@@ -888,17 +885,15 @@ export default async function AdminPage({
           Configuration &amp; probes
         </summary>
         <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-mid">
-          The deployment report: which keys are present, whether the schema
-          matches this checkout, and which live services answer. It used to be a
-          public page; only operators see it now.
+          Keys, schema and live probes. Operators only.
         </p>
         <SetupReport />
       </details>
 
       <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
-        Every action here re-checks the operator role on the server, and the SQL
-        functions check it again. The hidden logo gesture reveals this page&apos;s
-        entry point; it never grants access on its own.
+        Every action re-checks the operator role on the server; the SQL functions
+        check it again. The logo gesture reveals this page&apos;s entry point,
+        never access.
       </p>
     </main>
   );

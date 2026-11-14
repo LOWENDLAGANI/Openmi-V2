@@ -134,10 +134,7 @@ export async function SetupReport() {
                     <StatusPill tone="missing">required</StatusPill>
                   )}
                 </td>
-                <td className="px-5 py-3 text-mid">
-                  Chat answers. Without one, the composer explains the gap
-                  instead of inventing a reply.
-                </td>
+                <td className="px-5 py-3 text-mid">Chat answers.</td>
               </tr>
             </tbody>
           </table>
@@ -238,9 +235,7 @@ export async function SetupReport() {
           <span className="font-mono text-mid">
             supabase link --project-ref &lt;ref&gt; &amp;&amp; supabase db push
           </span>
-          . Checksums are compared over normalized SQL, so reformatting is not
-          drift but changing a statement is. Migrations run before the deploy
-          that depends on them; Vercel does not apply them.
+          , before the deploy that needs them. Vercel does not apply them.
         </p>
       </section>
 
@@ -266,10 +261,8 @@ export async function SetupReport() {
         </div>
 
         <p className="mt-2 text-[12px] leading-relaxed text-mid">
-          These are read-only requests made on this page load. Each probe reports
-          its own failure, and none of them prints a key. The provider probe asks
-          for a model list, so it confirms authentication rather than a specific
-          model.
+          Read-only, run on this page load. No probe prints a key; the provider
+          probe confirms the key authenticates, not that a model works.
         </p>
 
         <ul className="mt-4 space-y-2">
@@ -325,8 +318,7 @@ export async function SetupReport() {
           </ul>
           <p className="mt-4 text-[12px] leading-relaxed text-low">
             Set these in <span className="font-mono text-mid">.env.local</span>{" "}
-            for development, or in Vercel under Project → Settings →
-            Environment Variables for Preview and Production separately.
+            or in Vercel under Project → Settings → Environment Variables.
             GITHUB_TOKEN_KEY is 32 random bytes, base64:{" "}
             <span className="font-mono text-mid">openssl rand -base64 32</span>.
           </p>

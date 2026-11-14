@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { DEW_PER_HOUR, LOW_BALANCE_DEW, formatDew, isLowBalance } from "@/lib/dew";
+import { DEW_PER_HOUR, formatDew, isLowBalance } from "@/lib/dew";
 
 /** The balance the chat stream publishes the moment a charge lands. */
 export const DEW_EVENT = "openmi:dew";
@@ -58,7 +58,7 @@ export function DewChip({
   return (
     <Link
       href="/activity"
-      title={`An hour of chat costs ${DEW_PER_HOUR} Dew. Wallet credit ${formatDew(wallet)}; low balance shows amber below ${LOW_BALANCE_DEW}.`}
+      title={`${DEW_PER_HOUR} Dew per hour. Wallet ${formatDew(wallet)}.`}
       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
         low ? "border-warn/35 bg-warn/8 text-warn" : "border-line bg-card text-low"
       }`}

@@ -213,9 +213,9 @@ export default async function ActivityPage({
           </span>
         </p>
         <p className="mt-3 text-[12.5px] leading-relaxed text-mid">
-          An hour of chat costs {DEW_PER_HOUR} Dew, or nothing on Auto, charged
-          before the provider is called. The daily allowance is {dailyAllowance(profile.paidActive)} Dew,
-          settled at local midnight in {profile.timezone}.
+          An hour costs {DEW_PER_HOUR} Dew; Auto is free. The daily allowance is{" "}
+          {dailyAllowance(profile.paidActive)} Dew, refilled at midnight in{" "}
+          {profile.timezone}.
         </p>
 
         {profile.paidUntil && (
@@ -286,9 +286,7 @@ export default async function ActivityPage({
 
         {ledger.length === 0 ? (
           <p className="px-5 pb-5 text-[12px] text-mid">
-            No Dew activity yet. The trial credit appears here the first time
-            this account sends a message, unless the address has already used
-            one.
+            No Dew activity yet. Trial credit appears after your first message.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -341,8 +339,7 @@ export default async function ActivityPage({
             Recent per-chat usage
           </h2>
           <p className="text-[10.5px] text-low">
-            Token estimates from the last 1,000 messages. Dew is charged per
-            hour, not per token.
+            Last 1,000 messages. Dew is charged per hour, not per token.
           </p>
         </div>
 
@@ -367,8 +364,7 @@ export default async function ActivityPage({
           Daily refill timezone
         </h2>
         <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-          The refill happens at local midnight in this zone, and a day that is
-          ahead of it never refills.
+          Local midnight in this zone. A day ahead of it never refills.
         </p>
 
         <form action={saveTimezone} className="mt-3 flex flex-wrap gap-2">

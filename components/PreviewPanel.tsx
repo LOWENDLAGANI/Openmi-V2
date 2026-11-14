@@ -225,25 +225,22 @@ export function PreviewPanel({
               sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
             />
             <p className="px-1 pt-2 text-[10.5px] leading-relaxed text-low">
-              While this runs, anyone with its link can open it. Stop it when you
-              are done.
+              Anyone with this link can open it while it runs.
             </p>
           </div>
         ) : (
           <div className="border-t border-line px-3 py-2.5 text-[11px] leading-relaxed text-mid">
             {state === "starting" ? (
               <p>
-                Starting the repository&apos;s own dev script in the sandbox. A
-                first start can take a minute.
+                A first start can take a minute.
               </p>
             ) : state === "failed" ? (
               <p className="text-danger">
-                The dev server did not start. Its last output is below.
+                Its last output is below.
               </p>
             ) : (
               <p>
-                Nothing is running. Start the preview to serve this chat&apos;s
-                workspace on a sandbox port.
+                Start it to serve this chat&apos;s workspace on a sandbox port.
               </p>
             )}
           </div>

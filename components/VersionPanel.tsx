@@ -230,8 +230,7 @@ export function VersionPanel({
             <p className="px-3 py-2.5 text-[11px] text-mid">Reading versions…</p>
           ) : versions.length === 0 ? (
             <p className="px-3 py-2.5 text-[11px] leading-relaxed text-mid">
-              No versions yet. One is made after each turn that changes a file,
-              and you can save one by hand.
+              No versions yet. One is made after a turn that changes a file.
             </p>
           ) : (
             <ul className="divide-y divide-line">

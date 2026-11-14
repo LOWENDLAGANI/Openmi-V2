@@ -92,7 +92,6 @@ export function ChargeDialog({
         aria-labelledby="charge-heading"
         className="w-full max-w-sm rounded-3xl border border-line bg-card p-5 shadow-[0_28px_60px_-30px_rgba(0,0,0,0.65)]"
       >
-        <p className="eyebrow">how to pay</p>
         <h2
           id="charge-heading"
           className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-hi"

@@ -220,8 +220,8 @@ export default async function PayPage({
 
         <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-mid">
           {TOPUP_PAUSED
-            ? "Checkout is paused while the payment path is tested, so no new payment is accepted and the upload form is closed. The plans below are the ones that exist; a redeem code still adds Dew."
-            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, then upload it below. Approval adds the pass's Dew and starts or extends the paid daily allowance."}
+            ? "Checkout is paused while the payment path is tested. No payment is accepted and the upload form is closed; a redeem code still adds Dew."
+            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, upload it below. Approval adds the Dew and starts or extends the pass."}
         </p>
 
         {profile?.paidUntil && (
@@ -243,8 +243,8 @@ export default async function PayPage({
             </p>
           </div>
           <p className="max-w-xs text-[10.5px] leading-relaxed text-low">
-            Spent only after the daily balance cannot cover a charge, and only
-            when the two together can.
+            Spent only when the daily balance and the wallet together cover a
+            charge.
           </p>
         </div>
 
@@ -322,10 +322,10 @@ export default async function PayPage({
 
         <p className="mt-2 text-[10.5px] leading-relaxed text-low">
           {localPrices
-            ? `Prices above are an estimate in ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges ringgit, and the ringgit amount on your receipt is the one that counts. `
+            ? `≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges ringgit; your receipt is what counts. `
             : ""}
-          The hosted page is the only place money changes hands. This app never
-          asks for card details.
+          Money changes hands on the hosted page only. This app never asks for
+          card details.
         </p>
       </section>
 
@@ -342,8 +342,7 @@ export default async function PayPage({
           Upload a receipt
         </h2>
         <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-          One request per payment. It stays here with a pending, approved or
-          rejected status, so you can follow it from submission to approval.
+          One per payment. Follow it here from pending to approved.
         </p>
 
         <form action={submitReceipt} className="mt-4 grid gap-3 sm:grid-cols-2">
