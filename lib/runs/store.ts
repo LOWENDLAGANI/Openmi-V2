@@ -218,11 +218,16 @@ export async function updateRun(
     ended_at?: string | null;
     heartbeat_at?: string | null;
   },
-  options: { onlyWhileRunning?: boolean; workerId?: string } = {}
+  options: {
+    onlyWhileRunning?: boolean;
+    onlyWhileQueued?: boolean;
+    workerId?: string;
+  } = {}
 ): Promise<void> {
   let query = admin.from("runs").update(patch).eq("id", runId);
 
   if (options.onlyWhileRunning) query = query.eq("status", "running");
+  if (options.onlyWhileQueued) query = query.eq("status", "queued");
   if (options.workerId) query = query.eq("worker_id", options.workerId);
 
   await query;
@@ -557,12 +562,36 @@ export async function readSnapshot(
 }
 
 /**
+ * Settles the account's runs that nothing is going to finish.
+ *
+ * The one-live-run index refuses every new run while a leftover row sits in it,
+ * so a dead worker used to lock an account out of chatting permanently. This
+ * asks the database to age out that account's stalls before new work is queued:
+ * a queued run nobody claimed, a running run whose heartbeat stopped. Returns
+ * how many were settled. Never throws — a failure here must not refuse a chat.
+ */
+export async function settleStalledRuns(
+  admin: Client,
+  owner: string
+): Promise<number> {
+  const { data, error } = await admin.rpc("settle_stalled_runs", {
+    p_owner: owner,
+  });
+
+  if (error) return 0;
+  return Array.isArray(data) ? data.length : 0;
+}
+
+/**
  * A run whose worker stopped reporting is not running any more.
  *
  * The reaper is a safety net for a worker crash, and it runs from the worker's
  * own start and from the cron route. A run that was mid-sandbox is marked
  * failed; the orphan sweep destroys the box, because the provider deadline is
  * a backstop rather than a plan.
+ *
+ * A run left in `queued` is settled too: no worker ever claimed it, so it is
+ * not work in progress — it is a row holding the one-live-run index.
  */
 export async function reapStaleRuns(
   admin: Client,
@@ -570,16 +599,34 @@ export async function reapStaleRuns(
 ): Promise<string[]> {
   const cutoff = new Date(Date.now() - olderThanMs).toISOString();
 
-  const { data } = await admin
-    .from("runs")
-    .select("id, owner")
-    .eq("status", "running")
-    .lt("heartbeat_at", cutoff)
-    .limit(50);
+  const [runningResult, queuedResult] = await Promise.all([
+    admin
+      .from("runs")
+      .select("id, owner")
+      .eq("status", "running")
+      // A heartbeat is written the moment a run is claimed, so a null one is a
+      // row that never really started; without this branch it was immortal.
+      .or(`heartbeat_at.is.null,heartbeat_at.lt.${cutoff}`)
+      .lt("created_at", cutoff)
+      .limit(50),
+    admin
+      .from("runs")
+      .select("id, owner")
+      .eq("status", "queued")
+      .lt("created_at", cutoff)
+      .limit(50),
+  ]);
 
-  const stale = (data ?? []) as Array<{ id: string; owner: string }>;
+  const running = (runningResult.data ?? []) as Array<{
+    id: string;
+    owner: string;
+  }>;
+  const queued = (queuedResult.data ?? []) as Array<{
+    id: string;
+    owner: string;
+  }>;
 
-  for (const run of stale) {
+  for (const run of running) {
     await updateRun(
       admin,
       run.id,
@@ -600,7 +647,27 @@ export async function reapStaleRuns(
     });
   }
 
-  return stale.map((run) => run.id);
+  for (const run of queued) {
+    await updateRun(
+      admin,
+      run.id,
+      {
+        status: "failed",
+        stop_reason: "error",
+        error: "No worker picked this run up. Start it again.",
+        ended_at: new Date().toISOString(),
+      },
+      { onlyWhileQueued: true }
+    );
+
+    await appendEvent(admin, run.id, "run.error", {
+      code: "never-claimed",
+      message: "No worker picked this run up. Start it again.",
+      retryable: true,
+    });
+  }
+
+  return [...running, ...queued].map((run) => run.id);
 }
 
 /** Runs stuck in `queued` are handed back to the queue by age, not deleted. */

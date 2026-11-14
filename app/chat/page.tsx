@@ -359,11 +359,22 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     loadChangesets(session.supabase, chat.id),
     // A turn keeps running after the tab closes. Reading the flag here is what
     // turns "the answer will arrive" into something the page can show.
+    //
+    // Bounded by the same ages the server settles stalls with: a row left by a
+    // dead worker is not a turn in progress, and reading it as one left the chat
+    // spinning "working" forever. The next message settles it for real.
     session.supabase
       .from("runs")
       .select("id")
       .eq("chat_id", chat.id)
       .in("status", ["queued", "running"])
+      .or(
+        `and(status.eq.queued,created_at.gte.${new Date(
+          Date.now() - 20 * 60_000
+        ).toISOString()}),and(status.eq.running,heartbeat_at.gte.${new Date(
+          Date.now() - 5 * 60_000
+        ).toISOString()})`
+      )
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),

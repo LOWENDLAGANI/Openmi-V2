@@ -13,7 +13,12 @@ import {
   RUN_MAX_CONCURRENT,
   checkRunQuota,
 } from "@/lib/runs/limits";
-import { createRun, listRuns, readQuota } from "@/lib/runs/store";
+import {
+  createRun,
+  listRuns,
+  readQuota,
+  settleStalledRuns,
+} from "@/lib/runs/store";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -120,6 +125,10 @@ export async function POST(request: Request) {
     ? (body.model as string)
     : firstAvailableModel(catalogue);
 
+  // A leftover row from a dead worker would hold the one-live-run index and
+  // refuse this account forever, so settle its stalls before reading the quota.
+  await settleStalledRuns(admin, session.user.id);
+
   // Quota is checked before the row exists, so a refusal costs nothing and
   // leaves nothing behind. The unique index on live runs is the second guard:
   // two requests racing here cannot both win.
@@ -135,8 +144,8 @@ export async function POST(request: Request) {
 
   const runId = randomUUID();
 
-  try {
-    const run = await createRun(admin, {
+  const queueRun = () =>
+    createRun(admin, {
       id: runId,
       owner: session.user.id,
       chatId,
@@ -145,6 +154,11 @@ export async function POST(request: Request) {
       prompt,
       model,
     });
+
+  let run: Awaited<ReturnType<typeof queueRun>>;
+
+  try {
+    run = await queueRun();
 
     return json(
       {
@@ -163,14 +177,44 @@ export async function POST(request: Request) {
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "The run could not be queued.";
 
-    // The one-active-run index is the authority when two requests race.
+    // The one-active-run index is the authority when two requests race. A
+    // second settlement distinguishes a leftover row from a live run.
     if (/duplicate key|unique/i.test(message)) {
+      await settleStalledRuns(admin, session.user.id);
+
+      try {
+        run = await queueRun();
+      } catch (retry) {
+        const again =
+          retry instanceof Error ? retry.message : "The run could not be queued.";
+
+        if (!/duplicate key|unique/i.test(again)) {
+          return json({ error: again }, 500);
+        }
+
+        return json(
+          {
+            error:
+              "You already have a run in progress. Wait for it to finish, or cancel it first.",
+            code: "concurrency",
+          },
+          409
+        );
+      }
+
       return json(
         {
-          error: "You already have a run in progress. Wait for it to finish, or cancel it first.",
-          code: "concurrency",
+          runId: run.id,
+          status: run.status,
+          model: run.model,
+          quota: { ...quota, active: quota.active + 1 },
+          limits: {
+            concurrent: RUN_MAX_CONCURRENT,
+            dailyRuns: RUN_DAILY_RUNS,
+            dailyTokens: RUN_DAILY_TOKENS,
+          },
         },
-        409
+        202
       );
     }
 

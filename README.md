@@ -643,8 +643,11 @@ the browser is a view, and nothing it does executes agent work.
 
 Vercel does not run the worker: point a small VM or container at
 `bun run worker`. `GET /api/cron/run-sweep` (bearer `CRON_SECRET`) reaps a run
-whose heartbeat stopped and destroys sandboxes no live row claims, so a crashed
-worker does not leave a run waiting forever.
+whose heartbeat stopped, fails one that sat `queued` for twenty minutes, and
+destroys sandboxes no live row claims, so a crashed worker does not leave a run
+waiting forever. The same settlement runs when a chat is opened for a new turn,
+so an account is never locked out of chatting by a row nothing will finish — and
+stopping a run that was never claimed settles it on the spot.
 
 The contract, the phase map, the sandbox facts (including why the workspace is
 `/home/user/work` rather than `/work`) and what still needs a real key to verify

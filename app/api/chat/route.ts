@@ -22,6 +22,7 @@ import {
   createRun,
   readEventsSince,
   readQuota,
+  settleStalledRuns,
   readRun,
   type RunRow,
 } from "@/lib/runs/store";
@@ -322,6 +323,12 @@ export async function POST(request: Request) {
 
   if (!userMessage) return json({ error: "The message was not saved." }, 500);
 
+  // A worker that died — or a deployment with no worker at all — leaves its run
+  // in the one-live-run index, which would refuse every new chat with "you
+  // already have a run in progress" for good. Age the account's leftovers out
+  // before asking the quota, so a leftover is not a permanent lockout.
+  await settleStalledRuns(admin, session.user.id);
+
   const quota = await readQuota(admin, session.user.id);
   const decision = checkRunQuota(quota);
 
@@ -335,10 +342,8 @@ export async function POST(request: Request) {
   const runId = randomUUID();
   const history = recentHistory(await listMessages(session.supabase, chatId));
 
-  let run: RunRow;
-
-  try {
-    run = await createRun(admin, {
+  const queueRun = () =>
+    createRun(admin, {
       id: runId,
       owner: session.user.id,
       chatId,
@@ -348,11 +353,34 @@ export async function POST(request: Request) {
       model,
       dewSessionId: dew.session.sessionId,
     });
+
+  let run: RunRow;
+
+  try {
+    run = await queueRun();
   } catch (caught) {
     const message =
       caught instanceof Error ? caught.message : "The message could not be queued.";
 
-    if (/duplicate key|unique/i.test(message)) {
+    if (!/duplicate key|unique/i.test(message)) {
+      return json({ error: message }, 500);
+    }
+
+    // The row holding the index may itself have gone stale between the check
+    // above and this insert. Settle again and retry once: if the retry is also
+    // refused, the other run really is live and the 409 is the truth.
+    await settleStalledRuns(admin, session.user.id);
+
+    try {
+      run = await queueRun();
+    } catch (retry) {
+      const again =
+        retry instanceof Error ? retry.message : "The message could not be queued.";
+
+      if (!/duplicate key|unique/i.test(again)) {
+        return json({ error: again }, 500);
+      }
+
       if (firstSignalIn(`run-concurrency:${session.user.id}`, 10 * 60_000)) {
         void recordRiskSignal({
           userId: session.user.id,
@@ -366,14 +394,13 @@ export async function POST(request: Request) {
 
       return json(
         {
-          error: "You already have a run in progress. Wait for it to finish, or stop it first.",
+          error:
+            "You already have a run in progress. Wait for it to finish, or stop it first.",
           code: "concurrency",
         },
         409
       );
     }
-
-    return json({ error: message }, 500);
   }
 
   // The conversation behind the message travels with the run: the worker builds
