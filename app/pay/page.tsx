@@ -421,6 +421,7 @@ export default async function PayPage({
           <ReceiptWave>
             <SubmitButton
               className="btn btn-primary py-2.5 text-[12.5px] sm:col-span-2"
+              optimisticText="Sent for review"
               pendingText="Uploading the receipt…"
             >
               Submit receipt

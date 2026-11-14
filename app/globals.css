@@ -354,6 +354,14 @@ html.ink {
     opacity: 0.45;
   }
 
+  /* A control holding a request is not an unavailable one: it is showing the
+     result it was pressed for, so it keeps its contrast and says so with the
+     cursor instead of fading out like a disabled button. */
+  .btn[aria-busy="true"] {
+    opacity: 1;
+    cursor: progress;
+  }
+
   .btn-primary {
     border-color: transparent;
     background-color: var(--accent);
@@ -1096,6 +1104,28 @@ html.ink .mark-on-light {
 
 .drawer-in {
   animation: drawer-in 0.26s cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+/* A failed action puts its control back the way it was. The 240ms nudge is the
+   only sign the reader gets that the result on screen was undone, and it runs
+   once — the class stays, the animation does not repeat. */
+@keyframes snap-back {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  60% {
+    transform: translateX(2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.snap-back {
+  animation: snap-back 0.24s cubic-bezier(0.22, 0.8, 0.2, 1);
 }
 
 .fade-in {

@@ -375,7 +375,7 @@ export default async function ActivityPage({
               </option>
             ))}
           </select>
-          <SubmitButton className="btn px-3 py-1.5 text-[12px]" pendingText="Saving…">
+          <SubmitButton className="btn px-3 py-1.5 text-[12px]" optimisticText="Saved">
             Save timezone
           </SubmitButton>
         </form>

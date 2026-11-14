@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useSnapBack } from "@/components/useOptimisticAction";
 import { isLivePublishState, type PublishState } from "@/lib/publish/plan";
 
 /**
@@ -27,6 +28,7 @@ export function PublishButton({ chatId }: { chatId: string }) {
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { snapped, snap } = useSnapBack();
 
   const load = useCallback(async () => {
     try {
@@ -70,7 +72,12 @@ export function PublishButton({ chatId }: { chatId: string }) {
 
   const live = deployment ? isLivePublishState(deployment.state) : false;
 
+  // The press takes the lock and says so at once; the deployment card then
+  // reports what the provider is actually doing. A refused request puts the
+  // button back with the provider's reason, not a silent "Publish" again.
   async function publish() {
+    if (busy) return;
+
     setBusy(true);
     setError(null);
 
@@ -82,11 +89,13 @@ export function PublishButton({ chatId }: { chatId: string }) {
 
       if (!response.ok) {
         setError(body?.error ?? "The app could not be published.");
+        snap();
       }
 
       await load();
     } catch {
       setError("The publish request did not reach the server.");
+      snap();
     } finally {
       setBusy(false);
     }
@@ -112,8 +121,9 @@ export function PublishButton({ chatId }: { chatId: string }) {
         type="button"
         onClick={publish}
         disabled={busy || live}
+        aria-busy={busy || live}
         title={reason ?? "Deploy the branch head. Later changes need another press."}
-        className="btn px-2.5 py-1 text-[11px]"
+        className={`btn px-2.5 py-1 text-[11px] ${snapped ? "snap-back" : ""}`}
       >
         {busy || live ? "Publishing…" : "Publish"}
       </button>

@@ -187,10 +187,11 @@ export function AuthForm({
         type="button"
         onClick={google}
         disabled={busy}
+        aria-busy={busy}
         className="btn mt-4 w-full gap-2 py-2.5 text-[13px]"
       >
         <GoogleMark />
-        Continue with Google
+        {busy ? "Opening Google" : "Continue with Google"}
       </button>
 
       <div className="my-4 flex items-center gap-3" aria-hidden="true">
@@ -276,10 +277,13 @@ export function AuthForm({
         <button
           type="submit"
           disabled={busy}
+          aria-busy={busy}
           className="btn btn-primary w-full py-2.5 text-[13px]"
         >
           {busy
-            ? "Working…"
+            ? mode === "signin"
+              ? "Signed in"
+              : "Account created"
             : mode === "signin"
               ? "Sign in"
               : "Create account"}

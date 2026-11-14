@@ -627,6 +627,7 @@ export default async function AdminPage({
                         name="decision"
                         value="approved"
                         className="btn btn-primary flex-1 px-3 py-1.5 text-[11.5px] sm:flex-none"
+                        optimisticText="Approved"
                         pendingText="Approving…"
                       >
                         Approve
@@ -635,6 +636,7 @@ export default async function AdminPage({
                         name="decision"
                         value="rejected"
                         className="btn flex-1 px-3 py-1.5 text-[11.5px] sm:flex-none"
+                        optimisticText="Rejected"
                         pendingText="Rejecting…"
                       >
                         Reject
@@ -691,6 +693,7 @@ export default async function AdminPage({
             </Field>
             <SubmitButton
               className="btn btn-primary w-full py-2 text-[12px]"
+              optimisticText="Added"
               pendingText="Adding Dew…"
             >
               Add Dew
@@ -742,6 +745,7 @@ export default async function AdminPage({
             </Field>
             <SubmitButton
               className="btn btn-primary w-full py-2 text-[12px]"
+              optimisticText="Minted"
               pendingText="Minting codes…"
             >
               Create codes
@@ -793,7 +797,7 @@ export default async function AdminPage({
               aria-label="Email to grant admin"
               className="field min-w-0 flex-1 py-1.5 text-[12px]"
             />
-            <SubmitButton className="btn px-3 py-1.5 text-[11.5px]" pendingText="Granting…">
+            <SubmitButton className="btn px-3 py-1.5 text-[11.5px]" optimisticText="Granted">
               Grant
             </SubmitButton>
           </form>
@@ -822,6 +826,7 @@ export default async function AdminPage({
                     <input type="hidden" name="userId" value={row.user_id} />
                     <SubmitButton
                       className="text-[10.5px] text-danger hover:underline"
+                      optimisticText="Revoked"
                       pendingText="Revoking…"
                     >
                       Revoke

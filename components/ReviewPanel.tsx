@@ -155,7 +155,7 @@ export function ReviewPanel({
                     />
                     <SubmitButton
                       className="btn px-3 py-1 text-[10.5px]"
-                      pendingText="Saving…"
+                      optimisticText="Saved"
                     >
                       Turn off
                     </SubmitButton>
@@ -190,7 +190,7 @@ export function ReviewPanel({
                             <input type="hidden" name="fileId" value={file.id} />
                             <SubmitButton
                               className="btn px-3 py-0.5 text-[10.5px]"
-                              pendingText="Saving…"
+                              optimisticText="Saved"
                             >
                               {file.accepted ? "Reject" : "Accept"}
                             </SubmitButton>
@@ -253,7 +253,7 @@ export function ReviewPanel({
 
                         <SubmitButton
                           className="btn px-4 py-1.5 text-[11.5px]"
-                          pendingText="Trying again…"
+                          optimisticText="Retrying…"
                         >
                           Try again
                         </SubmitButton>
@@ -306,7 +306,7 @@ export function ReviewPanel({
                       <input type="hidden" name="chatId" value={chatId} />
                       <SubmitButton
                         className="btn px-3 py-1 text-[10.5px]"
-                        pendingText="Undoing…"
+                        optimisticText="Undone"
                       >
                         Undo
                       </SubmitButton>

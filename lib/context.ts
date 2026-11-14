@@ -1,10 +1,11 @@
 /**
  * Context assembly for one turn.
  *
- * The budget is a character count rather than a token estimate because it has
- * to be explainable: the UI shows characters used against characters allowed,
- * and the notes say exactly what was trimmed. A token guess would make the
- * meter a decoration.
+ * The budget is a character count because that is the one figure the assembler
+ * can count exactly: every character it includes is a character it can name in
+ * a note. The composer shows the same budget in tokens, because that is the
+ * unit a model is metered in — but as a labelled estimate, not a second source
+ * of truth, since only the provider's tokenizer knows the real number.
  *
  * The rule that matters: the file the user has open is never trimmed away. It
  * is the thing they are asking about. If it alone exceeds the budget, it is
@@ -12,6 +13,22 @@
  */
 
 export const MAX_CONTEXT_CHARS = 60_000;
+
+/**
+ * Four characters per token is the rule-of-thumb English/code ratio every
+ * provider publishes; it is an estimate and is shown as one. A real tokenizer
+ * would add a dependency and still be the wrong tokenizer for whichever model
+ * the reader picked.
+ */
+export const CHARS_PER_TOKEN = 4;
+
+export function estimateTokens(chars: number): number {
+  if (!Number.isFinite(chars) || chars <= 0) return 0;
+  return Math.ceil(chars / CHARS_PER_TOKEN);
+}
+
+/** The composer's headline figure: what the budget is worth in tokens. */
+export const MAX_CONTEXT_TOKENS = estimateTokens(MAX_CONTEXT_CHARS);
 export const MAX_TREE_PATHS = 400;
 
 export type ContextFile = { path: string; text: string };

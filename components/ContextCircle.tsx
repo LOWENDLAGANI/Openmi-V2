@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { estimateTokens } from "@/lib/context";
+
 /**
  * The context budget as one ring.
  *
@@ -30,6 +32,11 @@ export function ContextCircle({
   const ratio = budgetChars > 0 ? Math.min(Math.max(usedChars / budgetChars, 0), 1) : 0;
   const percent = Math.round(ratio * 100);
   const full = percent >= 100;
+
+  // The arc is drawn from the exact character count the assembler produced;
+  // the figures beside it are the token estimate that same count implies.
+  const usedTokens = estimateTokens(usedChars);
+  const budgetTokens = estimateTokens(budgetChars);
 
   const size = 26;
   const stroke = 3;
@@ -63,8 +70,8 @@ export function ContextCircle({
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-label={`Context: ${percent}% of ${budgetChars.toLocaleString()} characters used`}
-        title={`${usedChars.toLocaleString()} of ${budgetChars.toLocaleString()} characters of repository context`}
+        aria-label={`Context: ${percent}% of about ${budgetTokens.toLocaleString()} tokens used`}
+        title={`About ${usedTokens.toLocaleString()} of ${budgetTokens.toLocaleString()} tokens of repository context`}
         className="lift grid size-9 place-items-center rounded-full border border-line bg-card hover:border-line-strong"
       >
         <span className="relative grid place-items-center">
@@ -116,8 +123,8 @@ export function ContextCircle({
           </div>
 
           <p className="mt-2 font-mono text-[11.5px] text-hi">
-            {usedChars.toLocaleString()}
-            <span className="text-low"> / {budgetChars.toLocaleString()} chars</span>
+            ≈ {usedTokens.toLocaleString()}
+            <span className="text-low"> / {budgetTokens.toLocaleString()} tokens</span>
           </p>
 
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-chip">
@@ -128,7 +135,8 @@ export function ContextCircle({
           </div>
 
           <p className="mt-2.5 text-[10.5px] leading-relaxed text-low">
-            Characters of repository context sent with the last turn.
+            Tokens of repository context sent with the last turn, estimated from
+            its characters at four characters per token.
           </p>
 
           {notes.length > 0 && (

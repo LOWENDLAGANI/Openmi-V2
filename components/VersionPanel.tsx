@@ -35,7 +35,9 @@ export function VersionPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<Checkpoint[] | null>(null);
-  const [busy, setBusy] = useState(false);
+  // Which action holds the panel: "save", the sha being restored, or nothing.
+  // One flag for both made every Restore button read "Restored" during a save.
+  const [busy, setBusy] = useState<"save" | string | null>(null);
   const [pulling, setPulling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -70,10 +72,15 @@ export function VersionPanel({
 
   const count = versions?.length ?? 0;
 
+  // A save is a snapshot the panel can name before the server answers, so the
+  // notice appears on the click and is corrected — or withdrawn — when the
+  // response lands. A failed save leaves no claim behind.
   async function save() {
-    setBusy(true);
+    if (busy !== null) return;
+
+    setBusy("save");
     setError(null);
-    setNotice(null);
+    setNotice("Saved a version of the workspace.");
 
     try {
       const response = await fetch(`/api/checkpoints/${chatId}`, {
@@ -86,24 +93,24 @@ export function VersionPanel({
         | null;
 
       if (!response.ok) {
+        setNotice(null);
         setError(body?.error ?? "The version could not be saved.");
-      } else {
-        setNotice(
-          body?.created
-            ? "Saved a version of the workspace."
-            : "Nothing changed since the last version."
-        );
+      } else if (!body?.created) {
+        setNotice("Nothing changed since the last version.");
       }
 
       await refresh();
     } catch {
+      setNotice(null);
       setError("The version request did not reach the server.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function restore(sha: string) {
+    if (busy !== null) return;
+
     if (
       !window.confirm(
         "Restore this version? Uncommitted changes in the sandbox are discarded. GitHub is not affected."
@@ -112,9 +119,9 @@ export function VersionPanel({
       return;
     }
 
-    setBusy(true);
+    setBusy(sha);
     setError(null);
-    setNotice(null);
+    setNotice(`The workspace is at ${sha.slice(0, 7)}.`);
 
     try {
       const response = await fetch(`/api/checkpoints/${chatId}`, {
@@ -127,23 +134,26 @@ export function VersionPanel({
         | null;
 
       if (!response.ok) {
+        setNotice(null);
         setError(body?.error ?? "That version could not be restored.");
       } else {
         setNotice(`The workspace is at ${body?.head?.slice(0, 7) ?? "that version"}.`);
       }
     } catch {
+      setNotice(null);
       setError("The restore request did not reach the server.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function pull() {
+    if (pulling) return;
     if (!window.confirm(PULL_CONFIRMATION)) return;
 
     setPulling(true);
     setError(null);
-    setNotice(null);
+    setNotice("Pulling the branch head into this workspace…");
 
     try {
       const response = await fetch(`/api/sync/${chatId}`, { method: "POST" });
@@ -152,6 +162,7 @@ export function VersionPanel({
         | null;
 
       if (!response.ok) {
+        setNotice(null);
         setError(body?.error ?? "The branch could not be pulled.");
       } else if (body?.verdict === "up-to-date") {
         setNotice("This workspace is already at the branch head.");
@@ -162,6 +173,7 @@ export function VersionPanel({
         router.refresh();
       }
     } catch {
+      setNotice(null);
       setError("The pull request did not reach the server.");
     } finally {
       setPulling(false);
@@ -191,19 +203,21 @@ export function VersionPanel({
             type="button"
             onClick={pull}
             disabled={pulling}
+            aria-busy={pulling}
             title="Move this chat's pin to the branch head. The workspace is reseeded on the next turn."
             className="btn px-2 py-0.5 text-[10.5px]"
           >
-            {pulling ? "Pulling…" : "Pull latest"}
+            {pulling ? "Pulled" : "Pull latest"}
           </button>
 
           <button
             type="button"
             onClick={save}
-            disabled={busy}
+            disabled={busy !== null}
+            aria-busy={busy === "save"}
             className="btn px-2 py-0.5 text-[10.5px]"
           >
-            Save version
+            {busy === "save" ? "Saved" : "Save version"}
           </button>
 
           <PublishButton chatId={chatId} />
@@ -237,10 +251,11 @@ export function VersionPanel({
                   <button
                     type="button"
                     onClick={() => restore(version.sha)}
-                    disabled={busy}
+                    disabled={busy !== null}
+                    aria-busy={busy === version.sha}
                     className="btn ml-auto px-2 py-0.5 text-[10.5px]"
                   >
-                    Restore
+                    {busy === version.sha ? "Restored" : "Restore"}
                   </button>
                 </li>
               ))}

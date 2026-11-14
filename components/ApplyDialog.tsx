@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { applyNow, markReviewed, rejectChangeset } from "@/app/chat/actions";
+import { useOptimisticAction } from "@/components/useOptimisticAction";
 
 /**
  * The question an AI change asks before it touches the code.
@@ -48,18 +49,29 @@ export function ApplyDialog({
 
   if (!open) return null;
 
+  // The chosen option answers the click at once — its label says what it was
+  // asked to do — and the dialog only closes when the action confirmed it. A
+  // failure re-enables every option with the server's sentence beside them.
   async function choose(choice: Choice) {
+    if (pending !== null) return;
+
     setPending(choice);
     setError(null);
 
     let result: ActionResult;
 
-    if (choice === "apply") {
-      result = await applyNow(changesetId, remember);
-    } else if (choice === "review") {
-      result = await markReviewed(changesetId);
-    } else {
-      result = await rejectChangeset(changesetId);
+    try {
+      if (choice === "apply") {
+        result = await applyNow(changesetId, remember);
+      } else if (choice === "review") {
+        result = await markReviewed(changesetId);
+      } else {
+        result = await rejectChangeset(changesetId);
+      }
+    } catch {
+      setPending(null);
+      setError("That did not reach the server. Try again.");
+      return;
     }
 
     setPending(null);
@@ -107,7 +119,7 @@ export function ApplyDialog({
             className="lift w-full rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-left disabled:opacity-60"
           >
             <span className="block text-[12.5px] font-semibold text-hi">
-              {pending === "apply" ? "Applying…" : "Apply now"}
+              {pending === "apply" ? "Applied" : "Apply now"}
             </span>
             <span className="mt-1 block text-[11px] leading-relaxed text-mid">
               Adds the change to your code. If your code has changed since the
@@ -122,7 +134,7 @@ export function ApplyDialog({
             className="w-full rounded-2xl border border-line bg-raised px-4 py-3 text-left hover:bg-hover disabled:opacity-60"
           >
             <span className="block text-[12.5px] font-semibold text-hi">
-              {pending === "review" ? "Opening…" : "Review first"}
+              {pending === "review" ? "Showing" : "Review first"}
             </span>
             <span className="mt-1 block text-[11px] leading-relaxed text-mid">
               Shows the change again so you can look it over. Nothing is applied
@@ -137,7 +149,7 @@ export function ApplyDialog({
             className="w-full rounded-2xl border border-line bg-card px-4 py-3 text-left hover:bg-hover disabled:opacity-60"
           >
             <span className="block text-[12.5px] font-semibold text-hi">
-              {pending === "cancel" ? "Discarding…" : "Cancel"}
+              {pending === "cancel" ? "Discarded" : "Cancel"}
             </span>
             <span className="mt-1 block text-[11px] leading-relaxed text-mid">
               Discards this suggestion. The AI can propose again later.
@@ -169,10 +181,22 @@ export function ApplyControl({
 }) {
   const [open, setOpen] = useState(false);
   const [remember, setRemember] = useState(false);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function start() {
+  // The click paints "Applied" and takes the lock in the same frame. The card
+  // itself changes when the action revalidates; if the write is refused, the
+  // label snaps back to "Apply changes" next to the reason it was refused.
+  const apply = useOptimisticAction<"idle" | "applied">({
+    value: "idle",
+    optimistic: "applied",
+    action: async () => {
+      const result = await applyNow(changesetId, remember);
+      if (!result.ok) setError(result.error);
+      return result;
+    },
+  });
+
+  function start() {
     setError(null);
 
     if (confirmFirst) {
@@ -180,11 +204,7 @@ export function ApplyControl({
       return;
     }
 
-    setPending(true);
-    const result = await applyNow(changesetId, remember);
-    setPending(false);
-
-    if (!result.ok) setError(result.error);
+    apply.run();
   }
 
   return (
@@ -224,12 +244,12 @@ export function ApplyControl({
         {acceptedCount > 0 && (
           <button
             type="button"
-            disabled={pending}
-            aria-busy={pending}
-            onClick={() => void start()}
-            className="btn btn-primary px-4 py-1.5 text-[11.5px] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={apply.pending}
+            aria-busy={apply.pending}
+            onClick={start}
+            className={`btn btn-primary px-4 py-1.5 text-[11.5px] disabled:cursor-not-allowed ${apply.snapped ? "snap-back" : ""}`}
           >
-            {pending ? "Applying…" : "Apply changes"}
+            {apply.state === "applied" ? "Applied" : "Apply changes"}
           </button>
         )}
       </div>

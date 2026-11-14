@@ -179,6 +179,7 @@ export function AboutLogoGate() {
                 type="button"
                 onClick={() => void verify()}
                 disabled={busy}
+                aria-busy={busy}
                 className="btn btn-primary mt-3 w-full gap-2 py-2 text-[12px]"
               >
                 <svg

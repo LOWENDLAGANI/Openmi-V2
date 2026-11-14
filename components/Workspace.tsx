@@ -172,7 +172,7 @@ export function Workspace(props: WorkspaceProps) {
                 </option>
               ))}
             </select>
-            <SubmitButton className="btn px-3 py-1.5 text-[12px]" pendingText="Switching…">
+            <SubmitButton className="btn px-3 py-1.5 text-[12px]" optimisticText="Switched">
               Switch
             </SubmitButton>
           </form>
@@ -267,7 +267,7 @@ export function Workspace(props: WorkspaceProps) {
               aria-label="Search code"
               className="field px-3 py-1.5 text-[12px]"
             />
-            <SubmitButton className="btn w-full py-1.5 text-[12px]" pendingText="Searching GitHub…">
+            <SubmitButton className="btn w-full py-1.5 text-[12px]" optimisticText="Searching…">
               Search code
             </SubmitButton>
           </form>

@@ -1,18 +1,12 @@
 import Link from "next/link";
 
+import { ChatList } from "@/components/ChatList";
 import { HourCountdown } from "@/components/HourCountdown";
 import { OpenmiMark } from "@/components/OpenmiMark";
 import { SearchLauncher } from "@/components/SearchLauncher";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import type { Chat, Folder } from "@/lib/types";
-import {
-  createFolder,
-  deleteFolder,
-  moveChatToFolder,
-  renameFolder,
-  trashChat,
-} from "@/app/chat/actions";
 
 /**
  * The sidebar is a list, not a control panel.
@@ -23,6 +17,10 @@ import {
  * or into the account bar at the bottom, where the three small controls live as
  * icons. Rows are tall enough to hit on a phone, and the type is the same
  * grotesk the rest of the product uses.
+ *
+ * The list itself is `ChatList`, a client component, because trashing a chat or
+ * moving it between folders should change the list on the click rather than
+ * after the server answers.
  */
 
 const GLYPHS = {
@@ -63,7 +61,6 @@ const GLYPHS = {
       <path d="M10 8.5 6.5 12l3.5 3.5M6.5 12H15" />
     </>
   ),
-  plus: <path d="M12 5.5v13M5.5 12h13" />,
 } as const;
 
 type GlyphName = keyof typeof GLYPHS;
@@ -89,108 +86,6 @@ function Glyph({
     >
       {GLYPHS[name]}
     </svg>
-  );
-}
-
-function NavRow({
-  href,
-  label,
-  icon,
-  active = false,
-  badge,
-}: {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  active?: boolean;
-  badge?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className="rail-row flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px]"
-    >
-      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {badge && (
-        <span className="shrink-0 rounded-full bg-accent-soft px-2 py-[3px] font-mono text-[9px] uppercase tracking-[0.1em] text-accent-text">
-          {badge}
-        </span>
-      )}
-    </Link>
-  );
-}
-
-function ChatRow({
-  chat,
-  active,
-  folders,
-}: {
-  chat: Chat;
-  active: boolean;
-  folders: Folder[];
-}) {
-  return (
-    <div
-      data-active={active}
-      className="rail-row group relative flex items-center rounded-xl"
-    >
-      <Link
-        href={`/chat?chat=${chat.id}`}
-        aria-current={active ? "page" : undefined}
-        title={chat.title}
-        className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-1"
-      >
-        <span
-          className={`min-w-0 flex-1 truncate text-[13px] ${active ? "font-medium" : ""}`}
-        >
-          {chat.title}
-        </span>
-      </Link>
-
-      <details className="relative shrink-0 pr-1.5">
-        <summary
-          className="grid size-7 cursor-pointer list-none place-items-center rounded-full text-[14px] leading-none text-low opacity-0 transition-opacity hover:bg-canvas hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
-          aria-label={`Options for ${chat.title}`}
-        >
-          ⋯
-        </summary>
-        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-line bg-card p-1.5 shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
-          <form action={moveChatToFolder} className="flex gap-1.5">
-            <input type="hidden" name="chatId" value={chat.id} />
-            <select
-              name="folderId"
-              defaultValue={chat.folder_id ?? ""}
-              aria-label="Folder"
-              className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
-            >
-              <option value="">No folder</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-            <SubmitButton className="btn px-2 py-1 text-[11px]" pendingText="Moving…">
-              Move
-            </SubmitButton>
-          </form>
-
-          <form action={trashChat} className="mt-1.5 border-t border-line pt-1.5">
-            <input type="hidden" name="chatId" value={chat.id} />
-            <SubmitButton
-              className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-mid hover:bg-hover hover:text-hi"
-              pendingText="Moving to trash…"
-            >
-              Move to trash
-            </SubmitButton>
-          </form>
-        </div>
-      </details>
-    </div>
   );
 }
 
@@ -223,10 +118,6 @@ export function Sidebar({
   const newChatHref = repo
     ? `/chat?new=1&repo=${encodeURIComponent(repo.fullName)}&branch=${encodeURIComponent(repo.branch)}&sha=${encodeURIComponent(repo.sha)}`
     : "/chat?new=1";
-
-  const ungrouped = chats.filter((chat) => !chat.folder_id);
-  const inFolder = (folderId: string) =>
-    chats.filter((chat) => chat.folder_id === folderId);
 
   const initial = email.trim().charAt(0).toUpperCase() || "?";
 
@@ -316,123 +207,7 @@ export function Sidebar({
         </Link>
       </div>
 
-      <nav aria-label="Chats" className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        <p className="px-3 pb-1.5 pt-2 font-mono text-[9.5px] uppercase tracking-[0.14em] text-low">
-          Chats
-        </p>
-
-        {ungrouped.length === 0 ? (
-          <p className="px-3 pb-1.5 text-[11.5px] leading-relaxed text-low">
-            Nothing here yet.
-          </p>
-        ) : (
-          <div className="space-y-0.5">
-            {ungrouped.map((chat) => (
-              <ChatRow
-                key={chat.id}
-                chat={chat}
-                active={chat.id === activeChatId}
-                folders={folders}
-              />
-            ))}
-          </div>
-        )}
-
-        {folders.map((folder) => {
-          const items = inFolder(folder.id);
-
-          return (
-            <details key={folder.id} open className="mt-1">
-              <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 hover:bg-hover">
-                <span
-                  aria-hidden="true"
-                  className="grid size-8 shrink-0 place-items-center text-low"
-                >
-                  <Glyph name="folder" className="size-[17px]" />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-body">
-                  {folder.name}
-                </span>
-                <span className="shrink-0 font-mono text-[10px] text-low">
-                  {items.length}
-                </span>
-              </summary>
-
-              <div className="space-y-0.5 pl-2">
-                {items.length === 0 ? (
-                  <p className="px-3 py-1 text-[11px] text-low">Empty folder.</p>
-                ) : (
-                  items.map((chat) => (
-                    <ChatRow
-                      key={chat.id}
-                      chat={chat}
-                      active={chat.id === activeChatId}
-                      folders={folders}
-                    />
-                  ))
-                )}
-
-                <details className="mt-0.5">
-                  <summary className="cursor-pointer list-none px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-low hover:text-hi">
-                    settings
-                  </summary>
-
-                  <form action={renameFolder} className="mt-1 flex gap-1.5 px-2">
-                    <input type="hidden" name="folderId" value={folder.id} />
-                    <input
-                      name="name"
-                      defaultValue={folder.name}
-                      required
-                      maxLength={60}
-                      aria-label={`Rename ${folder.name}`}
-                      className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
-                    />
-                    <SubmitButton className="btn px-2 py-1 text-[11px]" pendingText="Saving…">
-                      Save
-                    </SubmitButton>
-                  </form>
-
-                  <form action={deleteFolder} className="px-2 pb-1 pt-1.5">
-                    <input type="hidden" name="folderId" value={folder.id} />
-                    <SubmitButton
-                      className="text-[11px] text-danger hover:underline"
-                      pendingText="Deleting…"
-                    >
-                      Delete folder (chats kept)
-                    </SubmitButton>
-                  </form>
-                </details>
-              </div>
-            </details>
-          );
-        })}
-
-        <details className="mt-1">
-          <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 text-[12.5px] text-mid hover:bg-hover hover:text-hi">
-            <span
-              aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center text-low"
-            >
-              <Glyph name="plus" className="size-[17px]" />
-            </span>
-            New folder
-          </summary>
-
-          <form action={createFolder} className="mt-1 flex gap-1.5 px-2 pb-2">
-            <input
-              name="name"
-              required
-              maxLength={60}
-              placeholder="Folder name"
-              aria-label="New folder name"
-              className="field min-w-0 flex-1 px-3 py-1.5 text-[11px]"
-            />
-            <SubmitButton className="btn px-3 py-1.5 text-[11px]" pendingText="Adding…">
-              Add
-            </SubmitButton>
-          </form>
-        </details>
-      </nav>
+      <ChatList chats={chats} folders={folders} activeChatId={activeChatId} />
 
       <div className="safe-bottom border-t border-line px-4 pb-4 pt-3">
         <div className="flex items-center gap-2.5">

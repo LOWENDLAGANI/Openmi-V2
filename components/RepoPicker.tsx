@@ -67,7 +67,7 @@ export function RepoPicker({
             </select>
           </label>
 
-          <SubmitButton className="btn px-4 py-1.5 text-[12px]" pendingText="Creating…">
+          <SubmitButton className="btn px-4 py-1.5 text-[12px]" optimisticText="Created">
             Create
           </SubmitButton>
         </form>
@@ -122,7 +122,7 @@ export function RepoPicker({
               <form action={attachRepo}>
                 <input type="hidden" name="repo" value={repo.fullName} />
                 {chatId && <input type="hidden" name="chat" value={chatId} />}
-                <SubmitButton className="btn px-4 py-1.5 text-[12px]" pendingText="Opening…">
+                <SubmitButton className="btn px-4 py-1.5 text-[12px]" optimisticText="Opened">
                   Open
                 </SubmitButton>
               </form>

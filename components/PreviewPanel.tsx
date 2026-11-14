@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useSnapBack } from "@/components/useOptimisticAction";
+
 /**
  * The app a chat is building, shown beside the transcript.
  *
@@ -46,9 +48,13 @@ export function PreviewPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
-  const [busy, setBusy] = useState(false);
+  // Which action is in flight, so the optimistic state is the one that was
+  // asked for: a press of Stop must not paint the panel as starting.
+  const [pending, setPending] = useState<"start" | "stop" | null>(null);
+  const busy = pending !== null;
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const { snapped, snap } = useSnapBack();
 
   const refresh = useCallback(async () => {
     try {
@@ -90,12 +96,21 @@ export function PreviewPanel({
 
   if (!enabled) return null;
 
-  const state = busy ? "starting" : (status?.state ?? "stopped");
+  const state =
+    pending === "start"
+      ? "starting"
+      : pending === "stop"
+        ? "stopped"
+        : (status?.state ?? "stopped");
   const url = status?.url ?? null;
   const detail = error ?? status?.failure ?? null;
 
+  // The press flips the panel to the state it was asked for in the same frame;
+  // the server's answer either confirms it or puts it back with its own error.
   async function act(action: "start" | "stop") {
-    setBusy(true);
+    if (pending !== null) return;
+
+    setPending(action);
     setError(null);
 
     try {
@@ -111,13 +126,15 @@ export function PreviewPanel({
 
       if (!response.ok) {
         setError(body?.error ?? "The preview could not be changed.");
+        snap();
       }
 
       if (action === "start") setOpen(true);
     } catch {
       setError("The preview request did not reach the server.");
+      snap();
     } finally {
-      setBusy(false);
+      setPending(null);
       await refresh();
     }
   }
@@ -172,23 +189,25 @@ export function PreviewPanel({
             </button>
           ) : null}
 
-          {state === "ready" || state === "starting" ? (
+          {state === "ready" || state === "starting" || pending === "stop" ? (
             <button
               type="button"
               onClick={() => act("stop")}
               disabled={busy}
-              className="btn px-2 py-0.5 text-[10.5px]"
+              aria-busy={busy}
+              className={`btn px-2 py-0.5 text-[10.5px] ${snapped ? "snap-back" : ""}`}
             >
-              Stop
+              {pending === "stop" ? "Stopped" : "Stop"}
             </button>
           ) : (
             <button
               type="button"
               onClick={() => act("start")}
               disabled={busy}
-              className="btn px-2 py-0.5 text-[10.5px]"
+              aria-busy={busy}
+              className={`btn px-2 py-0.5 text-[10.5px] ${snapped ? "snap-back" : ""}`}
             >
-              Start preview
+              {pending === "start" ? "Started" : "Start preview"}
             </button>
           )}
         </div>

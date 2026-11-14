@@ -95,33 +95,41 @@ export function FileEditor({
     }
   }
 
+  // The save is optimistic: the editor stops being dirty on the click, so the
+  // reader can keep working instead of watching a button. A failure puts the
+  // unsaved state back, which is the snap back the reader needs to see.
   async function save() {
-    if (!selected) return;
+    if (!selected || saving) return;
+
+    const before = original;
+    const written = text;
 
     setSaving(true);
     setError(null);
     setNotice(null);
+    setOriginal(written);
 
     try {
       const response = await fetch(`/api/files/${chatId}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ path: selected, text }),
+        body: JSON.stringify({ path: selected, text: written }),
       });
       const body = (await response.json().catch(() => null)) as
         | { bytes?: number; error?: string }
         | null;
 
       if (!response.ok) {
+        setOriginal(before);
         setError(body?.error ?? "The file could not be saved.");
         return;
       }
 
-      setOriginal(text);
       setNotice(
         `Saved to the sandbox${typeof body?.bytes === "number" ? ` (${body.bytes} bytes)` : ""}. GitHub is unchanged.`
       );
     } catch {
+      setOriginal(before);
       setError("The save did not reach the server.");
     } finally {
       setSaving(false);
@@ -166,9 +174,10 @@ export function FileEditor({
             type="button"
             onClick={save}
             disabled={!dirty || saving}
+            aria-busy={saving}
             className="btn px-2 py-0.5 text-[10.5px]"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Saved" : "Save"}
           </button>
         </div>
       </div>

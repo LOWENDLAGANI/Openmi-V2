@@ -167,7 +167,9 @@ export function ExecutionPanel({
             <PendingButton
               onAction={cancel}
               disabled={cancelling}
+              optimisticText="Stopped"
               pendingText="Stopping…"
+              onError={setError}
               className="btn px-3 py-0.5 text-[10.5px]"
             >
               Stop run
@@ -178,7 +180,9 @@ export function ExecutionPanel({
             <PendingButton
               onAction={start}
               disabled={starting || payload?.configured === false}
+              optimisticText="Started"
               pendingText="Starting…"
+              onError={setError}
               title={
                 payload?.configured === false
                   ? "Execution isn't available right now."

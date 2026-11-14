@@ -8,6 +8,7 @@ import { SandboxDock } from "@/components/SandboxDock";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { DewChip } from "@/components/DewChip";
 import { SubmitButton } from "@/components/SubmitButton";
+import { TrashList } from "@/components/TrashList";
 import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
 import { ReviewPanel } from "@/components/ReviewPanel";
@@ -38,7 +39,6 @@ import { filesEnabled } from "@/lib/files/plan";
 import { previewEnabled } from "@/lib/execution/preview/plan";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
-import { emptyTrash, purgeChat, restoreChat } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +107,7 @@ function TokenForm() {
       />
       <SubmitButton
         className="btn btn-primary w-full py-2.5 text-[13px]"
+        optimisticText="Connected"
         pendingText="Connecting to GitHub…"
       >
         Seal and connect
@@ -163,70 +164,6 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
           <TokenForm />
         </>
       )}
-    </div>
-  );
-}
-
-function TrashList({ chats }: { chats: Chat[] }) {
-  if (chats.length === 0) {
-    return (
-      <div className="mx-auto max-w-md py-20 text-center">
-        <p className="eyebrow">trash</p>
-        <h2 className="mt-2 text-[20px] font-semibold tracking-[-0.02em] text-hi">
-          Trash is empty
-        </h2>
-        <Link href="/chat" className="btn mt-6">
-          Back to chats
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto w-full max-w-2xl">
-      <ul className="panel mt-5 divide-y divide-line overflow-hidden">
-        {chats.map((chat) => (
-          <li
-            key={chat.id}
-            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-medium text-hi">{chat.title}</p>
-              <p className="mt-0.5 font-mono text-[10.5px] text-low">
-                deleted {chat.deleted_at?.slice(0, 10) ?? "—"}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <form action={restoreChat}>
-                <input type="hidden" name="chatId" value={chat.id} />
-                <SubmitButton className="btn px-3 py-1 text-[11px]" pendingText="Restoring…">
-                  Restore
-                </SubmitButton>
-              </form>
-
-              <form action={purgeChat}>
-                <input type="hidden" name="chatId" value={chat.id} />
-                <ConfirmSubmit
-                  message="Permanently delete this chat and its messages?"
-                  className="rounded-full border border-danger/30 bg-danger/8 px-3 py-1 text-[11px] text-danger hover:opacity-90"
-                >
-                  Delete forever
-                </ConfirmSubmit>
-              </form>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <form action={emptyTrash} className="mt-4">
-        <ConfirmSubmit
-          message="Permanently delete every chat in the trash?"
-          className="btn px-4 py-1.5 text-[12px]"
-        >
-          Empty trash
-        </ConfirmSubmit>
-      </form>
     </div>
   );
 }
@@ -345,7 +282,8 @@ async function RepoSurface({
 
           <form action={disconnectGithub}>
             <ConfirmSubmit
-                                message="Disconnect GitHub? The sealed token is deleted, an OAuth grant is revoked on GitHub, and the workspace stops reading repositories."
+              message="Disconnect GitHub? The sealed token is deleted, an OAuth grant is revoked on GitHub, and the workspace stops reading repositories."
+              optimisticText="Disconnected"
               className="btn px-3 py-1.5 text-[11.5px]"
             >
               Disconnect
