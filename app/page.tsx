@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Beam } from "@/components/Beam";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
@@ -198,62 +199,64 @@ export default async function HomePage() {
           {/* The actual shape of a turn: your message, the commands with the
               exit codes they returned, and the diff that came back. */}
           <figure className="min-w-0 lg:mt-2">
-            <div className="rounded-3xl border border-line bg-card p-3 shadow-[var(--card-shadow)]">
-              <div className="rounded-xl bg-canvas p-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate font-mono text-[11px] text-mid">
-                    lowendlagani/openmi-v2
-                  </span>
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-low">
-                    9f2c1a
-                  </span>
-                </div>
-
-                <div className="mt-3 flex justify-end">
-                  <p className="max-w-[85%] rounded-[18px] bg-bubble px-3.5 py-2 text-[13px] leading-snug text-bubble-text">
-                    Install and build this, then fix what fails.
-                  </p>
-                </div>
-
-                <ul className="mt-4 space-y-2">
-                  {TURN.map((row, index) => (
-                    <li
-                      key={`${row.command}-${index}`}
-                      className="flex items-baseline gap-2 border-t border-line pt-2 first:border-0 first:pt-0"
-                    >
-                      <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-body">
-                        <span className="mr-1.5 text-low">$</span>
-                        {row.command}
-                      </span>
-                      <span
-                        className={`shrink-0 font-mono text-[11px] tabular-nums ${
-                          row.ok ? "text-accent-text" : "text-danger"
-                        }`}
-                      >
-                        {row.state}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                <p className="mt-4 border-t border-line pt-3 text-pretty text-[13.5px] leading-relaxed text-body">
-                  The build failed on a missing export in{" "}
-                  <span className="rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[12px] text-accent-text">lib/agent/run.ts</span>. I added it and re-ran the same command.
-                </p>
-
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
-                  <span className="text-[12px] tabular-nums text-mid">
-                    3 files changed · +18 −6
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-3 py-1 text-[11.5px] font-medium text-body">
-                    Review diff
-                    <span aria-hidden="true" className="leading-none">
-                      →
+            <Beam>
+              <div className="rounded-3xl border border-line bg-card p-3 shadow-[var(--card-shadow)]">
+                <div className="rounded-xl bg-canvas p-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="truncate font-mono text-[11px] text-mid">
+                      lowendlagani/openmi-v2
                     </span>
-                  </span>
+                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-low">
+                      9f2c1a
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex justify-end">
+                    <p className="max-w-[85%] rounded-[18px] bg-bubble px-3.5 py-2 text-[13px] leading-snug text-bubble-text">
+                      Install and build this, then fix what fails.
+                    </p>
+                  </div>
+
+                  <ul className="mt-4 space-y-2">
+                    {TURN.map((row, index) => (
+                      <li
+                        key={`${row.command}-${index}`}
+                        className="flex items-baseline gap-2 border-t border-line pt-2 first:border-0 first:pt-0"
+                      >
+                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-body">
+                          <span className="mr-1.5 text-low">$</span>
+                          {row.command}
+                        </span>
+                        <span
+                          className={`shrink-0 font-mono text-[11px] tabular-nums ${
+                            row.ok ? "text-accent-text" : "text-danger"
+                          }`}
+                        >
+                          {row.state}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className="mt-4 border-t border-line pt-3 text-pretty text-[13.5px] leading-relaxed text-body">
+                    The build failed on a missing export in{" "}
+                    <span className="rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[12px] text-accent-text">lib/agent/run.ts</span>. I added it and re-ran the same command.
+                  </p>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+                    <span className="text-[12px] tabular-nums text-mid">
+                      3 files changed · +18 −6
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-3 py-1 text-[11.5px] font-medium text-body">
+                      Review diff
+                      <span aria-hidden="true" className="leading-none">
+                        →
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </Beam>
 
             <figcaption className="mt-3 px-1 text-[11.5px] text-low">
               An example turn. Exit codes and the diff are what the workspace

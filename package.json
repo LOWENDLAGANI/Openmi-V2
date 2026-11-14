@@ -19,6 +19,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.45.0",
+    "border-beam": "^1.4.1",
     "e2b": "^2.63.0",
     "gsap": "^3.15.1",
     "next": "^15.5.0",
