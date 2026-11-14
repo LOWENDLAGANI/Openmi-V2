@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
+import { Beam } from "@/components/Beam";
 import { ChargeDialog } from "@/components/ChargeDialog";
 import { DEW_EVENT } from "@/components/DewChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
@@ -1026,66 +1027,68 @@ export function ChatPanel({
               </div>
             </div>
 
-            <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
-              <textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    beginSend(draft);
+            <Beam>
+              <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
+                <textarea
+                  ref={textareaRef}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      beginSend(draft);
+                    }
+                  }}
+                  rows={1}
+                  placeholder={
+                    providerReady ? "Ask anything…" : "Chat is unavailable right now."
                   }
-                }}
-                rows={1}
-                placeholder={
-                  providerReady ? "Ask anything…" : "Chat is unavailable right now."
-                }
-                className="composer-input max-h-[168px] min-h-[40px] flex-1 px-2 py-2.5 text-[15px] leading-snug focus:outline-none"
-              />
+                  className="composer-input max-h-[168px] min-h-[40px] flex-1 px-2 py-2.5 text-[15px] leading-snug focus:outline-none"
+                />
 
-              <div className="flex shrink-0 items-center gap-1.5">
-                  {streaming && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                    {streaming && (
+                      <button
+                        type="button"
+                        onClick={stop}
+                        disabled={stopping}
+                        aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
+                        title={stopping ? "Stopping…" : "Stop"}
+                        className="lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`size-3 rounded-[3px] bg-current ${stopping ? "animate-blink" : ""}`}
+                        />
+                      </button>
+                    )}
+
                     <button
-                      type="button"
-                      onClick={stop}
-                      disabled={stopping}
-                      aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
-                      title={stopping ? "Stopping…" : "Stop"}
-                      className="lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
+                      type="submit"
+                      disabled={streaming || draft.trim().length === 0}
+                      aria-label="Send message"
+                      className={`lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
+                        streaming || draft.trim().length === 0
+                          ? "send-idle"
+                          : "bg-accent text-on-accent"
+                      }`}
                     >
-                      <span
+                      <svg
                         aria-hidden="true"
-                        className={`size-3 rounded-[3px] bg-current ${stopping ? "animate-blink" : ""}`}
-                      />
+                        viewBox="0 0 24 24"
+                        className="size-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 19V5M6 11l6-6 6 6" />
+                      </svg>
                     </button>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={streaming || draft.trim().length === 0}
-                    aria-label="Send message"
-                    className={`lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
-                      streaming || draft.trim().length === 0
-                        ? "send-idle"
-                        : "bg-accent text-on-accent"
-                    }`}
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="size-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 19V5M6 11l6-6 6 6" />
-                    </svg>
-                  </button>
+                  </div>
                 </div>
-              </div>
+            </Beam>
 
             {/* The send button refuses an over-cap message, so the count appears
                 before the press instead of as an error after it. */}
