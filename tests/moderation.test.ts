@@ -209,10 +209,17 @@ test("the app records signals where the decision is made, and enforces the ban a
   expect(loop).toContain("sandbox-egress");
   expect(loop).toContain("recordRiskSignal(");
 
-  // The panel shows who, what and where, and offers the stop.
+  // The panel shows who, what and where, and offers the stop — from a signal
+  // and from the account search, so an operator does not need a signal first.
   expect(page).toContain("Risk signals");
-  expect(page).toContain("banUser");
   expect(page).toContain("bannedRows");
+  expect(page).toContain("BanControl");
+  expect(page).toContain("banned_at, ban_expires_at, ban_reason");
+
+  const control = read("app/admin/BanControl.tsx");
+  expect(control).toContain("banUser");
+  expect(control).toContain("unbanUser");
+  expect(control).toContain('name="reason"');
 
   // The database enforces it even if the app were bypassed.
   expect(migrate).toContain("create table if not exists public.risk_events");

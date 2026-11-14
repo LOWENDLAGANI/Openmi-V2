@@ -6,6 +6,8 @@ import { SetupReport } from "@/components/SetupReport";
 import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { BanControl } from "./BanControl";
+
 import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
@@ -86,6 +88,9 @@ type ProfileRow = {
 type AccountRow = ProfileRow & {
   handle: string | null;
   created_at: string;
+  banned_at: string | null;
+  ban_expires_at: string | null;
+  ban_reason: string | null;
 };
 
 /** How many accounts the panel renders before "See more". */
@@ -289,9 +294,10 @@ export default async function AdminPage({
 
   let accountQuery = admin
     .from("profiles")
-    .select("id, email, handle, dew_balance, paid_until, created_at", {
-      count: "exact",
-    });
+    .select(
+      "id, email, handle, dew_balance, paid_until, created_at, banned_at, ban_expires_at, ban_reason",
+      { count: "exact" }
+    );
 
   if (accountSearch.length > 0) {
     accountQuery = accountQuery.ilike("email", `%${accountSearch}%`);
@@ -489,6 +495,10 @@ export default async function AdminPage({
             {accountRows.map((member) => {
               const active = paidActive(member.paid_until);
               const pass = passLabel(member.paid_until);
+              const stopped =
+                member.banned_at !== null &&
+                (member.ban_expires_at === null ||
+                  new Date(member.ban_expires_at).getTime() > Date.now());
 
               return (
                 <li
@@ -515,6 +525,11 @@ export default async function AdminPage({
                     <StatusPill tone={active ? "ok" : "optional"}>
                       {active ? "paid" : "free"}
                     </StatusPill>
+                    {stopped && (
+                      <span className="rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-danger">
+                        stopped
+                      </span>
+                    )}
                   </div>
 
                   {member.email && (
@@ -551,6 +566,17 @@ export default async function AdminPage({
                       )}
                     </form>
                   )}
+
+                  {/* A ban is a moderation decision, so it is one control away
+                      from the account it is about — not only from a signal. */}
+                  <BanControl
+                    userId={member.id}
+                    banned={
+                      stopped
+                        ? { until: member.ban_expires_at }
+                        : null
+                    }
+                  />
                 </li>
               );
             })}
