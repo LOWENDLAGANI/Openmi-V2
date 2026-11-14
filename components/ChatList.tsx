@@ -7,6 +7,7 @@ import {
   createFolder,
   deleteFolder,
   moveChatToFolder,
+  renameChat,
   renameFolder,
   trashChat,
 } from "@/app/chat/actions";
@@ -32,6 +33,7 @@ import type { Chat, Folder } from "@/lib/types";
 type Change =
   | { kind: "trash"; chatId: string }
   | { kind: "move"; chatId: string; folderId: string | null }
+  | { kind: "rename"; chatId: string; title: string }
   | { kind: "delete-folder"; folderId: string };
 
 type Board = { chats: Chat[]; folders: Folder[] };
@@ -51,6 +53,15 @@ function apply(board: Board, change: Change): Board {
         chat.id === change.chatId
           ? { ...chat, folder_id: change.folderId }
           : chat
+      ),
+    };
+  }
+
+  if (change.kind === "rename") {
+    return {
+      ...board,
+      chats: board.chats.map((chat) =>
+        chat.id === change.chatId ? { ...chat, title: change.title } : chat
       ),
     };
   }
@@ -86,6 +97,14 @@ function ChatRow({
     await trashChat(formData);
   }
 
+  async function rename(formData: FormData) {
+    const title = String(formData.get("title") ?? "").trim();
+    if (title.length > 0) {
+      onChange({ kind: "rename", chatId: chat.id, title });
+    }
+    await renameChat(formData);
+  }
+
   return (
     <div
       data-active={active}
@@ -112,7 +131,22 @@ function ChatRow({
           ⋯
         </summary>
         <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-line bg-card p-1.5 shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
-          <form action={move} className="flex gap-1.5">
+          <form action={rename} className="flex gap-1.5">
+            <input type="hidden" name="chatId" value={chat.id} />
+            <input
+              name="title"
+              defaultValue={chat.title}
+              required
+              maxLength={60}
+              aria-label={`Rename ${chat.title}`}
+              className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
+            />
+            <SubmitButton className="btn px-2 py-1 text-[11px]" optimisticText="Renamed">
+              Rename
+            </SubmitButton>
+          </form>
+
+          <form action={move} className="mt-1.5 flex gap-1.5 border-t border-line pt-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <select
               name="folderId"

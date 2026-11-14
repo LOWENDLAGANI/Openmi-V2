@@ -5,6 +5,7 @@ import { AdBlockGate } from "@/components/AdBlockGate";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NavProgress } from "@/components/NavProgress";
+import { ServiceWorker } from "@/components/ServiceWorker";
 import "./globals.css";
 
 /**
@@ -63,6 +64,7 @@ export default function RootLayout({
         <CommandPalette />
         <AdBlockGate />
         {children}
+        <ServiceWorker />
         <CookieConsent />
       </body>
     </html>

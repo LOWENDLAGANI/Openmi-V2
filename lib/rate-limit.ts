@@ -36,6 +36,30 @@ export const RATE_LIMITS = {
   publish: { max: 6, windowMs: RATE_LIMIT_WINDOW_MS },
 } as const;
 
+/**
+ * The refusal sentence's shape, shared by the routes that produce it and the
+ * components that show it. Keeping the split here means the live countdown and
+ * the message cannot disagree about which number is the wait.
+ */
+const RETRY_TAIL = /^([\s\S]*?)\s*Try again in (\d+) seconds\.?\s*$/;
+
+export function splitRetryNotice(message: string): {
+  text: string;
+  seconds: number | null;
+} {
+  const match = RETRY_TAIL.exec(message.trim());
+
+  if (!match) return { text: message, seconds: null };
+
+  const seconds = Number(match[2]);
+
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return { text: message, seconds: null };
+  }
+
+  return { text: match[1].trim() || "Too many requests.", seconds };
+}
+
 export type RateLimitKind = keyof typeof RATE_LIMITS;
 export type RateLimitSource = "upstash" | "postgres" | "degraded";
 

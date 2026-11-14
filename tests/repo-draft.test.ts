@@ -38,5 +38,5 @@ test("the chat row is created with a server-resolved pin", () => {
   expect(ROUTE).toContain("repo_base_sha: requestedSha");
   expect(ROUTE).toContain("resolveBranchSha");
   // Still created on the first message, not when the button is pressed.
-  expect(ROUTE).toContain('insert({ owner: session.user.id, title: "New chat"');
+  expect(ROUTE).toContain("title: titleFromMessage(content)");
 });

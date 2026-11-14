@@ -6,6 +6,7 @@ import { useOptimistic } from "react";
 import { emptyTrash, purgeChat, restoreChat } from "@/app/chat/actions";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { SubmitButton } from "@/components/SubmitButton";
+import { TRASH_RETENTION_DAYS } from "@/lib/trash";
 import type { Chat } from "@/lib/types";
 
 /**
@@ -60,7 +61,12 @@ export function TrashList({ chats }: { chats: Chat[] }) {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <ul className="panel mt-5 divide-y divide-line overflow-hidden">
+      <p className="mt-5 text-[11.5px] leading-relaxed text-low">
+        Chats stay here until you restore them, delete them, or{" "}
+        {TRASH_RETENTION_DAYS} days pass.
+      </p>
+
+      <ul className="panel mt-3 divide-y divide-line overflow-hidden">
         {rows.map((chat) => (
           <li
             key={chat.id}

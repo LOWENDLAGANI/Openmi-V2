@@ -66,7 +66,9 @@ export function SubmitButton({
       className={`${className} disabled:cursor-not-allowed`}
       onClick={() => setPressed(true)}
     >
-      {pending && pressed ? (optimisticText ?? pendingText) : children}
+      {pending && pressed && (optimisticText ?? pendingText)
+        ? (optimisticText ?? pendingText)
+        : children}
     </button>
   );
 }

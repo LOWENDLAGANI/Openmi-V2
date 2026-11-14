@@ -52,7 +52,9 @@ export function ConfirmSubmit({
         setPressed(true);
       }}
     >
-      {pending && pressed ? (optimisticText ?? pendingText) : children}
+      {pending && pressed && (optimisticText ?? pendingText)
+        ? (optimisticText ?? pendingText)
+        : children}
     </button>
   );
 }

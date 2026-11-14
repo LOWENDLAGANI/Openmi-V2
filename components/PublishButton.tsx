@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { RetryNotice } from "@/components/RetryNotice";
 import { useSnapBack } from "@/components/useOptimisticAction";
 import { isLivePublishState, type PublishState } from "@/lib/publish/plan";
 
@@ -133,7 +134,7 @@ export function PublishButton({ chatId }: { chatId: string }) {
           className="max-w-[16rem] truncate text-[10.5px] text-danger"
           title={reason}
         >
-          {reason}
+          <RetryNotice message={reason} />
         </span>
       ) : null}
     </span>

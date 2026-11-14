@@ -23,6 +23,7 @@ import {
   wipeChatSandboxes,
 } from "@/lib/execution/chat-env/destroy";
 import { serverEnv } from "@/lib/env";
+import { CHAT_TITLE_MAX } from "@/lib/chat-title";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -123,6 +124,38 @@ export async function moveChatToFolder(formData: FormData) {
 
   revalidatePath("/chat");
   redirect("/chat");
+}
+
+/**
+ * Rename a chat in place.
+ *
+ * No redirect: the row menu is where the rename happened, and sending the reader
+ * away from a chat because they named it is the kind of navigation that makes a
+ * list feel unreliable. `revalidatePath` repaints the sidebar with the new name.
+ */
+export async function renameChat(formData: FormData) {
+  const { supabase, user } = await acting();
+  const chatId = field(formData, "chatId");
+  const title = field(formData, "title")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, CHAT_TITLE_MAX);
+
+  if (!chatId) fail("That chat no longer exists.");
+  if (title.length === 0) fail("A chat needs a name.");
+
+  const { data: renamed, error } = await supabase
+    .from("chats")
+    .update({ title })
+    .eq("id", chatId)
+    .eq("owner", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) fail(error.message);
+  if (!renamed) fail("That chat no longer exists.");
+
+  revalidatePath("/chat");
 }
 
 export async function trashChat(formData: FormData) {

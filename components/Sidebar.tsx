@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ChatList } from "@/components/ChatList";
 import { HourCountdown } from "@/components/HourCountdown";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { OpenmiMark } from "@/components/OpenmiMark";
 import { SearchLauncher } from "@/components/SearchLauncher";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -226,6 +227,8 @@ export function Sidebar({
           </span>
 
           <ThemeSwitcher variant="icon" />
+
+          <InstallPrompt />
 
           <form action="/auth/signout" method="post" className="shrink-0">
             <SubmitButton

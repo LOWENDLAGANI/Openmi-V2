@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
+import { EndHourButton } from "@/components/EndHourButton";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
@@ -225,12 +226,20 @@ export default async function ActivityPage({
           </p>
         )}
 
-        {current ? (active
-          ? `An hour is running until ${utc(current.expires_at)} UTC; turns inside it are free.`
-          : `The last hour ended ${utc(current.expires_at)} UTC${
-              current.refunded_at ? " and was refunded": ""
-            }.`)
-          : "No hour has started yet."}
+        <p className="mt-3 text-[12px] leading-relaxed text-mid">
+          {current ? (active
+            ? `An hour is running until ${utc(current.expires_at)} UTC; turns inside it are free.`
+            : `The last hour ended ${utc(current.expires_at)} UTC${
+                current.refunded_at ? " and was refunded": ""
+              }.`)
+            : "No hour has started yet."}
+        </p>
+
+        {current && active ? (
+          <div className="mt-3">
+            <EndHourButton />
+          </div>
+        ) : null}
       </section>
 
       <div className="mt-5 grid gap-5 md:grid-cols-2">

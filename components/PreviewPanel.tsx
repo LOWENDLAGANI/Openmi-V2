@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { RetryNotice } from "@/components/RetryNotice";
 import { useSnapBack } from "@/components/useOptimisticAction";
 
 /**
@@ -257,7 +258,7 @@ export function PreviewPanel({
 
       {detail ? (
         <pre className="max-h-40 overflow-auto whitespace-pre-wrap border-t border-line px-3 py-2 font-mono text-[10.5px] leading-relaxed text-danger">
-          {detail}
+          <RetryNotice message={detail} />
         </pre>
       ) : null}
     </div>

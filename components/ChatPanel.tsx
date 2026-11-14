@@ -10,6 +10,7 @@ import { ChargeDialog } from "@/components/ChargeDialog";
 import { DEW_EVENT } from "@/components/DewChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
 import { ContextCircle } from "@/components/ContextCircle";
+import { RetryNotice } from "@/components/RetryNotice";
 import { MessageBody } from "@/components/MessageBody";
 import { ModelMenu } from "@/components/ModelMenu";
 import { PendingButton } from "@/components/PendingButton";
@@ -956,7 +957,9 @@ export function ChatPanel({
           role="alert"
           className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
         >
-          <span className="min-w-0 break-words">{error}</span>
+          <span className="min-w-0 break-words">
+            <RetryNotice message={error} />
+          </span>
           {lastSent.length > 0 && (
             <PendingButton
               onAction={retry}

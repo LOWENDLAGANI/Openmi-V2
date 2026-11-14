@@ -207,7 +207,7 @@ export function VersionPanel({
             title="Move this chat's pin to the branch head. The workspace is reseeded on the next turn."
             className="btn px-2 py-0.5 text-[10.5px]"
           >
-            {pulling ? "Pulled" : "Pull latest"}
+            {pulling ? "Checked" : "Pull latest"}
           </button>
 
           <button

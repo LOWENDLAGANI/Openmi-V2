@@ -72,6 +72,7 @@ import {
   streamCompletion,
   type ChatMessage,
 } from "@/lib/providers";
+import { titleFromMessage } from "@/lib/chat-title";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { streamRouted } from "@/lib/routing/pipeline";
 import { getSession } from "@/lib/session";
@@ -234,7 +235,12 @@ export async function POST(request: Request) {
 
     const { data: created, error: createError } = await session.supabase
       .from("chats")
-      .insert({ owner: session.user.id, title: "New chat", charge_mode: "hour", ...pin })
+      .insert({
+        owner: session.user.id,
+        title: titleFromMessage(content),
+        charge_mode: "hour",
+        ...pin,
+      })
       .select("id")
       .single();
 

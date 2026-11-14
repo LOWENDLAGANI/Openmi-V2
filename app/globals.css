@@ -1049,25 +1049,6 @@ html.ink .mark-on-light {
   }
 }
 
-@keyframes halo {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--accent-soft);
-  }
-  50% {
-    box-shadow: 0 0 0 7px transparent;
-  }
-}
-
-@keyframes sheen {
-  from {
-    transform: translateX(-120%);
-  }
-  to {
-    transform: translateX(220%);
-  }
-}
-
 @keyframes blink {
   0%,
   100% {
@@ -1170,14 +1151,6 @@ html.ink .mark-on-light {
 
 .animate-breathe {
   animation: breathe 2.6s ease-in-out infinite;
-}
-
-.animate-halo {
-  animation: halo 2.8s ease-in-out infinite;
-}
-
-.animate-sheen {
-  animation: sheen 4.5s ease-in-out infinite;
 }
 
 .animate-blink {

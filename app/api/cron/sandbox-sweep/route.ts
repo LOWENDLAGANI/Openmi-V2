@@ -24,7 +24,9 @@ import {
   executionConfigured,
   listChatSandboxes,
 } from "@/lib/execution/provider";
+import { wipeChatSandboxes } from "@/lib/execution/chat-env/destroy";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { trashCutoff } from "@/lib/trash";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +48,7 @@ export const maxDuration = 300;
  */
 
 type PassReport = {
-  pass: "expire" | "stop" | "reconcile";
+  pass: "expire" | "stop" | "reconcile" | "purge";
   candidates: number;
   acted: number;
   failed: number;
@@ -105,10 +107,6 @@ export async function GET(request: Request) {
     return json({ error: "Unauthorised." }, 401);
   }
 
-  if (!executionConfigured()) {
-    return json({ ok: true, skipped: "execution-not-configured" });
-  }
-
   const admin = supabaseAdmin();
 
   if (!admin) {
@@ -118,6 +116,71 @@ export async function GET(request: Request) {
   const dryRun = new URL(request.url).searchParams.get("dry") === "1";
   const now = Date.now();
   const reports: PassReport[] = [];
+
+  // Purge: a chat row does not need a container to expire, so this pass runs
+  // before the execution check. Trash is a promise with a deadline; without
+  // this, rows sat in the bin until somebody emptied it by hand.
+  const purgeStarted = Date.now();
+  const purge: PassReport = {
+    pass: "purge",
+    candidates: 0,
+    acted: 0,
+    failed: 0,
+    durationMs: 0,
+    dryRun,
+  };
+
+  try {
+    const cutoff = trashCutoff(now);
+    const { data, error } = await admin
+      .from("chats")
+      .select("id")
+      .not("deleted_at", "is", null)
+      .lt("deleted_at", cutoff)
+      .limit(50);
+
+    if (error) throw error;
+
+    const ids = ((data ?? []) as Array<{ id: string }>).map((row) =>
+      String(row.id)
+    );
+    purge.candidates = ids.length;
+
+    if (dryRun) {
+      purge.acted = ids.length;
+    } else if (ids.length > 0) {
+      // The container is destroyed before the row goes, for the same reason the
+      // manual purge does it in that order: the row is the only pointer to it.
+      await wipeChatSandboxes(ids);
+
+      const { error: deleteError } = await admin
+        .from("chats")
+        .delete()
+        .in("id", ids)
+        .not("deleted_at", "is", null)
+        .lt("deleted_at", cutoff);
+
+      if (deleteError) throw deleteError;
+      purge.acted = ids.length;
+    }
+  } catch (caught) {
+    purge.failed += 1;
+    purge.durationMs = Date.now() - purgeStarted;
+    reports.push(purge);
+
+    return json({ ok: false, error: messageOf(caught), passes: reports }, 500);
+  }
+
+  purge.durationMs = Date.now() - purgeStarted;
+  reports.push(purge);
+
+  if (!executionConfigured()) {
+    return json({
+      ok: true,
+      skipped: "execution-not-configured",
+      passes: reports,
+    });
+  }
 
   // Expire: mark wiping, destroy, delete the row only after the provider agrees.
   const expireStarted = Date.now();
