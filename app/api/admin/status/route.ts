@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { readAdminAccess } from "@/lib/admin/access";
 import { sandboxFleet } from "@/lib/execution/accounts";
 import { chatSandboxCounts } from "@/lib/execution/chat-env/store";
+import { workerFleet } from "@/lib/runs/workers";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,13 @@ export async function GET() {
 
   const admin = access.state === "admin";
   const client = admin ? supabaseAdmin() : null;
-  const [sandboxes, fleet] = client
-    ? await Promise.all([chatSandboxCounts(client), sandboxFleet(client)])
-    : [null, null];
+  const [sandboxes, fleet, workers] = client
+    ? await Promise.all([
+        chatSandboxCounts(client),
+        sandboxFleet(client),
+        workerFleet(client),
+      ])
+    : [null, null, null];
 
   return NextResponse.json(
     {
@@ -35,6 +40,7 @@ export async function GET() {
       via: access.state === "admin" ? access.via : null,
       sandboxes,
       fleet,
+      workers,
     },
     { headers: { "cache-control": "no-store" } }
   );

@@ -23,11 +23,30 @@ import { createServer } from "node:http";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { workerConcurrency } from "@/lib/runs/limits";
+import { workerIdentity } from "@/lib/runs/pool";
 import {
   createWorkerStatus,
   newWorkerId,
   runWorker,
 } from "@/lib/runs/worker";
+
+/**
+ * Where this member can be woken, when nobody said.
+ *
+ * `RUN_WORKER_HEALTH_URL` wins because an operator naming it is the clearest
+ * signal. Otherwise Render's own `RENDER_EXTERNAL_URL` is the service's public
+ * address, which is exactly what the waker needs — no second setting to keep in
+ * sync with the host. A worker elsewhere registers without a URL and is simply
+ * not woken by the fleet table; the static URL fallback still reaches it.
+ */
+function memberHealthUrl(identity: ReturnType<typeof workerIdentity>): string | null {
+  if (identity.healthUrl) return identity.healthUrl;
+
+  const external = (process.env.RENDER_EXTERNAL_URL ?? "").trim();
+  if (external.length === 0) return null;
+
+  return `${external.replace(/\/+$/, "")}/healthz`;
+}
 
 async function main(): Promise<void> {
   const admin = supabaseAdmin();
@@ -40,7 +59,10 @@ async function main(): Promise<void> {
   }
 
   const concurrency = workerConcurrency();
-  const workerId = newWorkerId();
+  // A named member keeps its identity across restarts, which is what lets the
+  // fleet row describe this machine rather than a process that has already gone.
+  const identity = workerIdentity();
+  const workerId = identity.id ?? newWorkerId();
   const status = createWorkerStatus({ workerId, concurrency });
 
   const controller = new AbortController();
@@ -100,6 +122,9 @@ async function main(): Promise<void> {
     workerId,
     status,
     concurrency,
+    label: identity.label,
+    healthUrl: memberHealthUrl(identity),
+    pool: identity.pool,
     stopSignal: controller.signal,
   });
 

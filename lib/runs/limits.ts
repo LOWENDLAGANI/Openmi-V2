@@ -191,6 +191,14 @@ export function runWallClockMs(
   return runMaxMinutes(env) * 60_000;
 }
 
+/**
+ * How often a worker says it is alive.
+ *
+ * Thirty seconds, against a five-minute stale window: twelve beats may be lost
+ * to a database blip before another machine is told the worker is gone.
+ */
+export const WORKER_HEARTBEAT_MS = 30_000;
+
 /** How many runs one worker executes at once. */
 export function workerConcurrency(
   env: Record<string, string | undefined> = process.env

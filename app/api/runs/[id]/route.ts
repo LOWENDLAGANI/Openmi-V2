@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { readRunSnapshot } from "@/lib/runs/snapshot";
+import { escalateQueuedRun } from "@/lib/runs/wake";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +40,15 @@ export async function GET(
       { error: "That run does not exist." },
       { status: 404, headers: { "cache-control": "no-store" } }
     );
+  }
+
+  // A run that is still queued gets one extra nudge from here. The tab already
+  // polls this route, so the escalation works on a deployment with no cron and
+  // no other traffic; the throttle lives on the run row, so a fast poll cannot
+  // wake a sleeping fleet on every request.
+  if (snapshot.run.status === "queued") {
+    const admin = supabaseAdmin();
+    if (admin) void escalateQueuedRun(admin, snapshot.run).catch(() => {});
   }
 
   return NextResponse.json(snapshot, {

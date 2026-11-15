@@ -11,7 +11,9 @@ import { SandboxFleet } from "./SandboxFleet";
 
 import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
+import { agoLabel } from "@/lib/execution/fleet-types";
 import { sandboxFleet } from "@/lib/execution/accounts";
+import { workerFleet } from "@/lib/runs/workers";
 import { formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -248,6 +250,7 @@ export default async function AdminPage({
   // The fleet panel's first answer, rendered on the server; the component polls
   // the same data afterwards, so the page has no loading state to show.
   const fleet = await sandboxFleet(admin, Date.now());
+  const fleetWorkers = await workerFleet(admin, Date.now());
 
   const giveawayCodes = (codesResult.data ?? []) as Array<{
     code: string;
@@ -466,6 +469,84 @@ export default async function AdminPage({
         </div>
 
         <SandboxFleet initial={fleet} />
+      </section>
+
+      <section
+        id="run-workers"
+        aria-labelledby="run-workers-heading"
+        className="panel mt-5 p-5"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2
+            id="run-workers-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
+            Run workers
+          </h2>
+          <p className="text-[10.5px] text-low">
+            {fleetWorkers.aliveCount} alive · silent after{" "}
+            {Math.round(fleetWorkers.staleMs / 60_000)}m
+          </p>
+        </div>
+
+        {fleetWorkers.workers.length === 0 ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-mid">
+            No worker has introduced itself yet. Start one with{" "}
+            <code>bun run worker</code> and give it a <code>RUN_WORKER_ID</code>{
+              " "
+            }
+            so the fleet can tell it apart from the next machine.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line">
+            {fleetWorkers.workers.map((worker) => {
+              const quiet = !worker.alive;
+              const draining = worker.state !== "active";
+
+              return (
+                <li
+                  key={worker.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-[12px] text-body">
+                        {worker.id}
+                      </span>
+                      <StatusPill
+                        tone={quiet ? "missing" : draining ? "pending" : "ok"}
+                      >
+                        {quiet ? "silent" : worker.state}
+                      </StatusPill>
+                      {worker.label && (
+                        <span className="text-[10.5px] text-low">
+                          {worker.label}
+                        </span>
+                      )}
+                      {worker.pool && (
+                        <span className="font-mono text-[10px] text-low">
+                          pool {worker.pool}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-low">
+                      last seen {agoLabel(worker.lastSeenAt)} · {worker.activeRuns}
+                      /{worker.concurrency} running{" "}
+                      {worker.lastWokenAt
+                        ? `· woken ${agoLabel(worker.lastWokenAt)}`
+                        : ""}
+                    </p>
+                  </div>
+
+                  <p className="font-mono text-[12px] text-hi">
+                    {worker.slots}
+                    <span className="text-low"> free</span>
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section

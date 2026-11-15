@@ -24,7 +24,17 @@
  * that fails leaves the run `queued`, which is exactly what the reader is told.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { RUN_WAKE_TIMEOUT_MS } from "./limits";
+import {
+  pickNextWake,
+  pickWakes,
+  staticWorkerTargets,
+  shouldEscalate,
+  type WorkerTarget,
+} from "./pool";
+import { listWorkerMembers, markWorkerWoken } from "./workers";
 
 /**
  * The worker's health URL when nothing is configured.
@@ -81,13 +91,8 @@ export function workerHealthUrl(
   return DEFAULT_RUN_WORKER_HEALTH_URL;
 }
 
-/** Pings the queue's worker once. Never throws, never blocks the caller. */
-export function wakeWorker(
-  env: Record<string, string | undefined> = process.env
-): void {
-  const url = workerHealthUrl(env);
-  if (!url) return;
-
+/** Pings one URL once. Never throws, never blocks the caller. */
+function ping(url: string): void {
   void fetch(url, {
     method: "GET",
     cache: "no-store",
@@ -102,4 +107,129 @@ export function wakeWorker(
       // A booting host may refuse the connection; the ping has landed either
       // way. The row is still queued if it did not.
     });
+}
+
+/** Pings a deployment's one static URL. Kept for the single-worker setup. */
+export function wakeWorker(
+  env: Record<string, string | undefined> = process.env
+): void {
+  const url = workerHealthUrl(env);
+  if (url) ping(url);
+}
+
+/** Never wake more than this many members at once. A wake is not a broadcast. */
+const MEMBER_WAKE_CAP = 3;
+
+/**
+ * Wakes the fleet for a queued run.
+ *
+ * The fleet table decides: a member that is awake with a free slot; a second one
+ * only when the first looks asleep; and, when nobody is eligible, a bounded ping
+ * at the first few members so a fleet that is entirely full still hears about
+ * the work. A deployment with no registered member yet falls back to the static
+ * health URLs, which is what the single-worker path always did.
+ *
+ * Fire-and-forget for the caller: a cold instance boots in tens of seconds, and
+ * the request that woke it is allowed to fail, because the wake already landed.
+ * Returns the targets pinged, for the log and for tests.
+ */
+export async function wakeQueue(
+  admin: SupabaseClient | null,
+  env: Record<string, string | undefined> = process.env
+): Promise<WorkerTarget[]> {
+  const fallback = workerHealthUrl(env);
+  if (!fallback) return [];
+
+  const members = (await listWorkerMembers(admin)).filter(
+    (member) => member.healthUrl !== null
+  );
+
+  let targets: WorkerTarget[];
+
+  if (members.length === 0) {
+    targets = staticWorkerTargets(fallback, env);
+  } else {
+    const chosen = pickWakes(members);
+    const selected =
+      chosen.length > 0 ? chosen : members.slice(0, MEMBER_WAKE_CAP);
+
+    targets = selected.map((member) => ({
+      id: member.id,
+      url: member.healthUrl as string,
+    }));
+  }
+
+  for (const target of targets) {
+    ping(target.url);
+    if (target.id) void markWorkerWoken(admin as SupabaseClient, target.id);
+  }
+
+  return targets;
+}
+
+/**
+ * One extra nudge for a run that is still waiting.
+ *
+ * Called from the run's own status read, which the open tab already polls, so the
+ * escalation needs no cron. The throttle is written before the ping, as a
+ * compare-and-set on the attempt count, so two polls a moment apart cannot both
+ * escalate and a sleeping fleet is not woken every second.
+ */
+export async function escalateQueuedRun(
+  admin: SupabaseClient | null,
+  run: {
+    id: string;
+    status: string;
+    created_at: string;
+    last_wake_at: string | null;
+    wake_attempts: number;
+  },
+  env: Record<string, string | undefined> = process.env
+): Promise<boolean> {
+  if (!admin) return false;
+  if (!wakeWorkerEnabled(env)) return false;
+
+  if (
+    !shouldEscalate({
+      status: run.status,
+      queuedAt: run.created_at,
+      lastWakeAt: run.last_wake_at,
+      wakeAttempts: run.wake_attempts,
+    })
+  ) {
+    return false;
+  }
+
+  const members = (await listWorkerMembers(admin)).filter(
+    (member) => member.healthUrl !== null && member.state === "active"
+  );
+
+  const next = pickNextWake(members);
+
+  const { data } = await admin
+    .from("runs")
+    .update({
+      wake_attempts: run.wake_attempts + 1,
+      last_wake_at: new Date().toISOString(),
+    })
+    .eq("id", run.id)
+    .eq("status", "queued")
+    .eq("wake_attempts", run.wake_attempts)
+    .select("id");
+
+  if (!Array.isArray(data) || data.length === 0) return false;
+
+  if (next) {
+    ping(next.healthUrl as string);
+    void markWorkerWoken(admin, next.id);
+    return true;
+  }
+
+  const fallback = workerHealthUrl(env);
+  if (!fallback) return false;
+
+  const [target] = staticWorkerTargets(fallback, env);
+  if (target) ping(target.url);
+
+  return true;
 }

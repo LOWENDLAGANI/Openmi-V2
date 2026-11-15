@@ -47,6 +47,12 @@ export type RunRow = {
   /** The E2B account label that can open `sandbox_id`. */
   sandbox_account: string | null;
   worker_id: string | null;
+  /** The pool the claiming worker belongs to, written with the worker id. */
+  worker_pool: string | null;
+  /** 0 until a lost worker's run is requeued once; never reset. */
+  retry_count: number;
+  last_wake_at: string | null;
+  wake_attempts: number;
   steps: number;
   input_tokens: number;
   output_tokens: number;
@@ -117,12 +123,14 @@ function normalizeRun(row: Record<string, unknown>): RunRow {
     output_tokens: Number(row.output_tokens ?? 0),
     cost_usd: Number(row.cost_usd ?? 0),
     last_event_seq: Number(row.last_event_seq ?? 0),
+    retry_count: Number(row.retry_count ?? 0),
+    wake_attempts: Number(row.wake_attempts ?? 0),
     cancel_requested: Boolean(row.cancel_requested),
   };
 }
 
 export const RUN_COLUMNS =
-  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, sandbox_account, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, dew_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
+  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, sandbox_account, worker_id, worker_pool, retry_count, last_wake_at, wake_attempts, steps, input_tokens, output_tokens, cost_usd, cancel_requested, dew_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
 
 export async function createRun(
   admin: Client,
@@ -161,13 +169,22 @@ export async function createRun(
   return normalizeRun(data as Record<string, unknown>);
 }
 
-/** Claims one queued run, or null when the queue is empty. */
+/**
+ * Claims one queued run, or null when the queue is empty.
+ *
+ * The pool is recorded in the same update as the worker id, so "which machine"
+ * and "which pool" can never disagree. A member with a pool filter only takes
+ * work addressed to it; everything else is the shared queue.
+ */
 export async function claimNextRun(
   admin: Client,
-  workerId: string
+  workerId: string,
+  pool: string | null = null
 ): Promise<RunRow | null> {
   const { data, error } = await admin.rpc("claim_next_run", {
     p_worker: workerId,
+    p_pool: pool,
+    p_pool_filter: pool,
   });
 
   if (error) throw new Error(error.message);
@@ -214,6 +231,13 @@ export async function updateRun(
     error?: string | null;
     sandbox_id?: string | null;
     sandbox_account?: string | null;
+    worker_id?: string | null;
+    worker_pool?: string | null;
+    retry_count?: number;
+    /** Reset by a requeue: the queue's age rules count from here. */
+    created_at?: string;
+    wake_attempts?: number;
+    last_wake_at?: string | null;
     steps?: number;
     input_tokens?: number;
     output_tokens?: number;
@@ -616,6 +640,9 @@ export async function reapStaleRuns(
       .from("runs")
       .select("id, owner")
       .eq("status", "queued")
+      // A run that has been claimed before is a retry waiting in the queue, not
+      // a run nobody ever picked up: its age is handled by the requeue rule.
+      .is("started_at", null)
       .lt("created_at", cutoff)
       .limit(50),
   ]);

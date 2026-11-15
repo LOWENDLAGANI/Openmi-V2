@@ -105,6 +105,8 @@ const REQUIRED_TABLES = [
   "admin_users",
   "payment_requests",
   "chat_sandboxes",
+  "sandbox_accounts",
+  "run_workers",
 ];
 
 const REQUIRED_FUNCTIONS = [
@@ -150,6 +152,11 @@ const REQUIRED_COLUMNS = [
   ["chat_sandboxes", "sandbox_account"],
   ["sandbox_accounts", "last_tried_at"],
   ["sandbox_accounts", "last_ok_at"],
+  ["runs", "worker_pool"],
+  ["runs", "retry_count"],
+  ["runs", "wake_attempts"],
+  ["run_workers", "last_seen_at"],
+  ["run_workers", "health_url"],
 ];
 
 async function schemaProblems(db) {

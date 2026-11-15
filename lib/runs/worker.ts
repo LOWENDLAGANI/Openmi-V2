@@ -6,9 +6,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { destroySandboxConfirmed } from "@/lib/execution/provider";
 import { listRunSandboxesEveryAccount } from "@/lib/execution/sandbox-inventory";
 
-import { runSandboxExpired, workerConcurrency } from "./limits";
+import {
+  WORKER_HEARTBEAT_MS,
+  runSandboxExpired,
+  workerConcurrency,
+} from "./limits";
 import { executeRun } from "./loop";
+import { workerIdentity } from "./pool";
 import { claimNextRun, reapStaleRuns } from "./store";
+import { wakeQueue } from "./wake";
+import {
+  drainWorker,
+  heartbeatWorker,
+  registerWorker,
+  requeueLostRuns,
+} from "./workers";
 
 /**
  * The worker process.
@@ -189,6 +201,11 @@ export type WorkerOptions = {
   /** Supplied by the HTTP entry point so `/healthz` and the log agree. */
   workerId?: string;
   status?: WorkerStatus;
+  /** Where this member can be woken, and what it calls itself in the panel. */
+  label?: string | null;
+  healthUrl?: string | null;
+  /** A member with a pool takes only work addressed to it. */
+  pool?: string | null;
 };
 
 export async function runWorker(options: WorkerOptions): Promise<void> {
@@ -202,11 +219,44 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
   status.workerId = id;
   status.concurrency = concurrency;
 
-  const active = new Set<Promise<void>>();
+  const identity = workerIdentity();
+  const pool = options.pool ?? identity.pool;
 
-  log(`[runs] worker ${id} starting, concurrency ${concurrency}`);
+  const active = new Set<Promise<void>>();
+  let beats: ReturnType<typeof setInterval> | null = null;
+
+  log(
+    `[runs] worker ${id} starting, concurrency ${concurrency}${
+      pool ? `, pool ${pool}` : ""
+    }`
+  );
+
+  // Introduces itself so the waker can choose this member and the panel can
+  // show it. Best effort: a fleet table that cannot be written still leaves a
+  // worker that claims work.
+  await registerWorker(admin, {
+    id,
+    label: options.label ?? identity.label,
+    healthUrl: options.healthUrl ?? identity.healthUrl,
+    pool,
+    concurrency,
+  });
+
+  // While it is running, the row says how many runs it holds. That count is what
+  // makes "this member has a free slot" answerable without asking the member.
+  beats = setInterval(() => {
+    void heartbeatWorker(admin, id, active.size);
+  }, WORKER_HEARTBEAT_MS);
 
   try {
+    // Requeue before reaping: a run whose worker died is work to hand on, not a
+    // failure, and the reaper must not settle it first.
+    const requeued = await requeueLostRuns(admin);
+    if (requeued.length > 0) {
+      log(`[runs] requeued ${requeued.length} run(s) from lost workers`);
+      void wakeQueue(admin).catch(() => {});
+    }
+
     const reaped = await reapStaleRuns(admin);
     if (reaped.length > 0) log(`[runs] reaped ${reaped.length} stale run(s)`);
 
@@ -231,7 +281,7 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
       let claimed = null;
 
       try {
-        claimed = await claimNextRun(admin, id);
+        claimed = await claimNextRun(admin, id, pool);
       } catch (caught) {
         log(
           `[runs] claim failed: ${
@@ -281,16 +331,38 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
   }
 
   log(`[runs] worker ${id} stopping, waiting for ${active.size} run(s)`);
+
+  if (beats) clearInterval(beats);
+
+  // Draining is not failure: the waker stops choosing this member, and the runs
+  // it already holds finish as they would have. Only a lost heartbeat is a
+  // reason to hand work to another machine.
+  await drainWorker(admin, id);
+
   await Promise.allSettled([...active]);
   log(`[runs] worker ${id} stopped`);
 }
 
-/** The stale-run sweep, callable from the cron route without a worker. */
+/**
+ * The safety net, callable from the cron route without a worker.
+ *
+ * Three jobs in this order: hand a dead worker's runs back to the queue (once),
+ * settle the runs nothing is going to finish, then destroy sandboxes that are
+ * orphaned or past their retention. Requeue first on purpose — the reaper must
+ * not fail a run that could still be retried.
+ */
 export async function reconcileRuns(
   admin: SupabaseClient
-): Promise<{ reaped: string[]; swept: number }> {
+): Promise<{ requeued: string[]; reaped: string[]; swept: number }> {
+  const requeued = await requeueLostRuns(admin);
+
+  if (requeued.length > 0) {
+    // A requeued run is only useful if a machine hears about it.
+    void wakeQueue(admin).catch(() => {});
+  }
+
   const reaped = await reapStaleRuns(admin);
   const swept = await sweepRunSandboxes(admin);
 
-  return { reaped, swept: swept.destroyed };
+  return { requeued, reaped, swept: swept.destroyed };
 }

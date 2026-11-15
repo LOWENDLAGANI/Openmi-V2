@@ -109,13 +109,41 @@ async function insertRun(input: {
         ? created
         : `now() - interval '${input.heartbeatMinutesAgo} minutes'`;
 
+  // A queued run has not been claimed, so it has no start time — that is what
+  // separates "nobody picked this up" from "a worker took it and vanished".
+  const started = input.status === "queued" ? "null" : created;
+
   await db.query(
     `insert into public.runs (id, owner, prompt, model, status, created_at, started_at, heartbeat_at)
-     values ($1, $2, 'test', 'auto', $3, ${created}, ${created}, ${beat})`,
+     values ($1, $2, 'test', 'auto', $3, ${created}, ${started}, ${beat})`,
     [id, input.owner, input.status]
   );
 
   return id;
+}
+
+/** The fields the retry rule turns on. */
+async function runFull(id: string) {
+  const { rows } = await db.query(
+    "select status, retry_count, started_at, created_at, ended_at, error from public.runs where id = $1",
+    [id]
+  );
+  return rows[0] as {
+    status: string;
+    retry_count: number;
+    started_at: string | null;
+    created_at: string;
+    ended_at: string | null;
+    error: string | null;
+  };
+}
+
+async function runEvents(id: string) {
+  const { rows } = await db.query(
+    "select kind, payload from public.run_events where run_id = $1 order by seq",
+    [id]
+  );
+  return rows as Array<{ kind: string; payload: Record<string, unknown> }>;
 }
 
 async function runRow(id: string) {
@@ -168,7 +196,7 @@ test("a run inside the queue window is left alone", async () => {
   expect((await runRow(fresh)).status).toBe("queued");
 });
 
-test("a silent worker's run is settled; a heartbeating one is not", async () => {
+test("a silent worker's run is handed back once, and settled if it stalls again", async () => {
   await resetRuns();
 
   const dead = await insertRun({
@@ -187,11 +215,41 @@ test("a silent worker's run is settled; a heartbeating one is not", async () => 
   await db.query("select 1 from public.settle_stalled_runs($1)", [THIRD]);
   await db.query("select 1 from public.settle_stalled_runs($1)", [FOURTH]);
 
-  expect((await runRow(dead)).status).toBe("failed");
+  // The machine vanished, so the work goes back to the queue — once.
+  const requeued = await runFull(dead);
+  expect(requeued.status).toBe("queued");
+  expect(Number(requeued.retry_count)).toBe(1);
+  expect(requeued.started_at).toBeNull();
+  expect(requeued.ended_at).toBeNull();
+
+  // It enters the queue as a new arrival, so the twenty-minute rule reads the
+  // retry's own wait rather than the original run's age.
+  expect(Date.parse(requeued.created_at)).toBeGreaterThan(Date.now() - 60_000);
+
+  // The reader is told, in the run's own log, exactly once.
+  const events = await runEvents(dead);
+  expect(events).toHaveLength(1);
+  expect(events[0]?.kind).toBe("run.warning");
+  expect(events[0]?.payload.code).toBe("worker-lost-retry");
+
+  // The run that is still reporting is untouched.
   expect((await runRow(alive)).status).toBe("running");
+
+  // Claimed again and lost again: the counter stops a second retry.
+  await db.query(
+    "update public.runs set status = 'running', started_at = now(), heartbeat_at = now() - interval '30 minutes', worker_id = 'render-a' where id = $1",
+    [dead]
+  );
+
+  await db.query("select 1 from public.settle_stalled_runs($1)", [THIRD]);
+
+  const settled = await runRow(dead);
+  expect(settled.status).toBe("failed");
+  expect(settled.error).toContain("worker stopped reporting");
+  expect(Number((await runFull(dead)).retry_count)).toBe(1);
 });
 
-test("a running row that never wrote a heartbeat is not immortal", async () => {
+test("a running row that never wrote a heartbeat is retried, then settled", async () => {
   await resetRuns();
 
   const orphan = await insertRun({
@@ -203,7 +261,42 @@ test("a running row that never wrote a heartbeat is not immortal", async () => {
 
   await db.query("select 1 from public.settle_stalled_runs($1)", [OWNER]);
 
-  expect((await runRow(orphan)).status).toBe("failed");
+  // A null heartbeat falls back to the start time, so the row is not immortal —
+  // it is work that goes back to the queue once.
+  const retried = await runFull(orphan);
+  expect(retried.status).toBe("queued");
+  expect(Number(retried.retry_count)).toBe(1);
+});
+
+test("a requeued run waiting too long is settled, not left holding the account", async () => {
+  await resetRuns();
+
+  const run = await insertRun({
+    owner: OTHER,
+    status: "running",
+    minutesAgo: 30,
+    heartbeatMinutesAgo: 12,
+  });
+
+  await db.query("select 1 from public.settle_stalled_runs($1)", [OTHER]);
+  expect((await runRow(run)).status).toBe("queued");
+
+  // Backdate the retry's own arrival past the queue window: nobody claimed it
+  // this time either, and the account must be free again.
+  await db.query(
+    "update public.runs set created_at = now() - interval '25 minutes' where id = $1",
+    [run]
+  );
+
+  const { rows } = await db.query(
+    "select status from public.settle_stalled_runs($1)",
+    [OTHER]
+  );
+  expect(rows.length).toBeGreaterThan(0);
+
+  const settled = await runRow(run);
+  expect(settled.status).toBe("failed");
+  expect(settled.error).toContain("No worker picked this run up");
 });
 
 test("stopping a queued run releases it, because no worker will read the flag", async () => {
