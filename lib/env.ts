@@ -195,6 +195,27 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Adsterra banner key; optional, reserved for inline rectangles",
   },
   {
+    key: "NEXT_PUBLIC_ADSTERRA_LEADERBOARD_SRC",
+    scope: "public",
+    required: false,
+    unlocks: "The loader URL for the leaderboard unit",
+    hint: "The exact script URL Adsterra prints for that unit; without it the key's historical host is used",
+  },
+  {
+    key: "NEXT_PUBLIC_ADSTERRA_MOBILE_SRC",
+    scope: "public",
+    required: false,
+    unlocks: "The loader URL for the 320×50 unit",
+    hint: "The exact script URL Adsterra prints for that unit; without it the key's historical host is used",
+  },
+  {
+    key: "NEXT_PUBLIC_ADSTERRA_RECTANGLE_SRC",
+    scope: "public",
+    required: false,
+    unlocks: "The loader URL for the 300×250 unit",
+    hint: "The exact script URL Adsterra prints for that unit; without it the key's historical host is used",
+  },
+  {
     key: "CUSTOM_MODELS",
     scope: "server",
     required: false,

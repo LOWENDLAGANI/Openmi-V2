@@ -11,15 +11,15 @@ import {
   AD_PROBE_CONTROL_URL,
   AD_PROBE_SIZE,
   AD_PROBE_TIMEOUT_MS,
-  AD_PROBE_URLS,
   adBlockVerdict,
   decideAdGate,
   isProbeHidden,
+  probeUrlsFor,
   type AdEvidence,
   type AdVerdict,
   type ProbeAnswer,
 } from "@/lib/adblock";
-import { adConfig } from "@/lib/ads";
+import { adConfig, adOrigins } from "@/lib/ads";
 import {
   adsAllowed,
   CONSENT_EVENT,
@@ -149,7 +149,7 @@ async function probeUrl(url: string): Promise<ProbeAnswer> {
  * only a refusal of the first while the second succeeds says anything about
  * ads. A browser that reports itself offline says nothing at all.
  */
-async function collectEvidence(): Promise<AdEvidence> {
+async function collectEvidence(urls: string[]): Promise<AdEvidence> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return {
       hiddenBaits: 0,
@@ -162,7 +162,7 @@ async function collectEvidence(): Promise<AdEvidence> {
 
   const [cosmetic, adAnswers, control] = await Promise.all([
     probeCosmetic(),
-    Promise.all(AD_PROBE_URLS.map((url) => probeUrl(url))),
+    Promise.all(urls.map((url) => probeUrl(url))),
     probeUrl(AD_PROBE_CONTROL_URL),
   ]);
 
@@ -198,6 +198,10 @@ export function AdBlockGate() {
       ),
     []
   );
+
+  // The hosts the configured units load from, so the probe watches the provider
+  // this page depends on rather than a hardcoded one.
+  const probeUrls = useMemo(() => probeUrlsFor(adOrigins()), []);
 
   const [consent, setConsent] = useState<ConsentChoice | null>(null);
   const [verdict, setVerdict] = useState<AdVerdict>("clear");
@@ -244,7 +248,7 @@ export function AdBlockGate() {
 
       let next: AdVerdict;
       try {
-        next = adBlockVerdict(await collectEvidence());
+        next = adBlockVerdict(await collectEvidence(probeUrls));
       } catch {
         // A probe that could not run is not a finding; try again on the slow
         // beat instead of leaving the loop dead.
@@ -275,7 +279,7 @@ export function AdBlockGate() {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [adsActive]);
+  }, [adsActive, probeUrls]);
 
   const decision = decideAdGate({
     adsConfigured: adsActive,
@@ -301,7 +305,7 @@ export function AdBlockGate() {
   async function checkAgain() {
     setChecking(true);
     try {
-      const next = adBlockVerdict(await collectEvidence());
+      const next = adBlockVerdict(await collectEvidence(probeUrls));
       setVerdict(next);
 
       if (next === "blocked") {

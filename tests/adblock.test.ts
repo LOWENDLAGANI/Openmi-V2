@@ -17,6 +17,7 @@ import {
   decideAdGate,
   isExemptPath,
   isProbeHidden,
+  probeUrlsFor,
   type AdEvidence,
 } from "../lib/adblock";
 
@@ -109,10 +110,22 @@ test("the probe uses several bait classes, independent hosts and bounded timings
   expect(new Set(AD_PROBE_URLS.map((url) => new URL(url).origin)).size).toBe(
     AD_PROBE_URLS.length
   );
-  // The provider this app actually serves banners from is probed directly.
-  expect(AD_PROBE_URLS.some((url) => url.includes("highperformanceformat"))).toBe(
-    true
+  // A deployment with no loader override still measures the default provider.
+  expect(probeUrlsFor([])).toEqual([...AD_PROBE_URLS]);
+
+  // The host the configured units load from is probed first: when a unit moves
+  // to another Adsterra host, a probe of the old one says nothing about it.
+  const probed = probeUrlsFor(["https://bauval.org"]);
+  expect(probed[0]).toBe("https://bauval.org/");
+  expect(new Set(probed.map((url) => new URL(url).origin)).size).toBe(
+    probed.length
   );
+  expect(probed.length).toBeGreaterThanOrEqual(2);
+
+  // The same host twice is one reading, not two.
+  const deduped = probeUrlsFor(["https://www.highperformanceformat.com"]);
+  expect(deduped).toHaveLength(AD_PROBE_URLS.length);
+  expect(deduped[0]).toBe("https://www.highperformanceformat.com/");
 
   expect(AD_PROBE_TIMEOUT_MS).toBeGreaterThan(0);
   expect(AD_PROBE_TIMEOUT_MS).toBeLessThanOrEqual(5_000);
@@ -241,7 +254,8 @@ test("the gate is mounted once in the root layout and is client-only", () => {
   expect(component).toContain("probeUrl(AD_PROBE_CONTROL_URL)");
   // Every configured host is probed, the neutral canary guards the baits, and
   // the probe stage is removed even when a measurement throws.
-  expect(component).toContain("AD_PROBE_URLS.map");
+  expect(component).toContain("probeUrlsFor");
+  expect(component).toContain("adOrigins");
   expect(component).toContain("canary");
   expect(component).toContain("getClientRects");
   expect(component).toContain("finally");

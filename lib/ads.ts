@@ -10,6 +10,12 @@
  * Adsterra's loader uses `document.write`, which must not run against this
  * document. The component renders it inside an iframe instead, so a lazy or
  * broken ad can only blank its own frame.
+ *
+ * The loader URL is per unit, not per key: Adsterra hands out a different host
+ * and path for different units (`…/<key>/invoke.js`, `https://bauval.org/22/<key>`),
+ * and a key cannot reconstruct the one it came with. So a slot takes its exact
+ * URL from configuration and falls back to the historical host and path, which
+ * is what a key from an older dashboard still expects.
  */
 
 export type AdSlotId = "leaderboard" | "mobile" | "rectangle";
@@ -31,7 +37,7 @@ export const AD_SLOTS: Record<AdSlotId, AdSlotSpec> = {
 
 export type AdConfig = AdSlotSpec & {
   key: string;
-  /** Adsterra's invoke script for this key. */
+  /** The unit's invoke script: its configured URL, or the historical one. */
   src: string;
 };
 
@@ -42,9 +48,43 @@ export function parseAdKey(value: string | null | undefined): string | null {
   return key;
 }
 
+/**
+ * The exact URL Adsterra prints for a unit, or null.
+ *
+ * It is not derived from the key, so it is configuration and gets validated
+ * like configuration: https only, a real hostname, and nothing that could close
+ * the attribute it lands in. An ad frame is never worth loading over http, and
+ * a stored value that fails here is treated as unset rather than trusted.
+ */
+export function parseAdSrc(value: string | null | undefined): string | null {
+  const src = (value ?? "").trim();
+  if (src.length === 0 || src.length > 500) return null;
+  if (/[\s"'<>]/.test(src)) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(src);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== "https:") return null;
+  if (!parsed.hostname.includes(".")) return null;
+
+  return parsed.toString();
+}
+
+/**
+ * One slot's configuration.
+ *
+ * `src` is the unit's own loader, which wins when it is set and valid. Without
+ * it the key keeps the host this app has always used, so an existing
+ * deployment does not change behaviour by upgrading.
+ */
 export function buildAdConfig(
   slot: AdSlotId,
-  key: string | null | undefined
+  key: string | null | undefined,
+  src?: string | null
 ): AdConfig | null {
   const parsed = parseAdKey(key);
   if (!parsed) return null;
@@ -52,7 +92,9 @@ export function buildAdConfig(
   return {
     ...AD_SLOTS[slot],
     key: parsed,
-    src: `https://www.highperformanceformat.com/${parsed}/invoke.js`,
+    src:
+      parseAdSrc(src) ??
+      `https://www.highperformanceformat.com/${parsed}/invoke.js`,
   };
 }
 
@@ -78,14 +120,45 @@ export function adConfig(slot: AdSlotId): AdConfig | null {
     case "leaderboard":
       return buildAdConfig(
         slot,
-        process.env.NEXT_PUBLIC_ADSTERRA_LEADERBOARD_KEY
+        process.env.NEXT_PUBLIC_ADSTERRA_LEADERBOARD_KEY,
+        process.env.NEXT_PUBLIC_ADSTERRA_LEADERBOARD_SRC
       );
     case "mobile":
-      return buildAdConfig(slot, process.env.NEXT_PUBLIC_ADSTERRA_MOBILE_KEY);
+      return buildAdConfig(
+        slot,
+        process.env.NEXT_PUBLIC_ADSTERRA_MOBILE_KEY,
+        process.env.NEXT_PUBLIC_ADSTERRA_MOBILE_SRC
+      );
     case "rectangle":
       return buildAdConfig(
         slot,
-        process.env.NEXT_PUBLIC_ADSTERRA_RECTANGLE_KEY
+        process.env.NEXT_PUBLIC_ADSTERRA_RECTANGLE_KEY,
+        process.env.NEXT_PUBLIC_ADSTERRA_RECTANGLE_SRC
       );
   }
+}
+
+/**
+ * The hosts this deployment actually loads its units from.
+ *
+ * The ad-block gate probes these first, because a filter that hides the banner
+ * on this page is the thing the gate exists to see. Reading the configured
+ * loader rather than a constant is what keeps the probe honest when a unit
+ * moves to another Adsterra host.
+ */
+export function adOrigins(): string[] {
+  const origins = new Set<string>();
+
+  for (const slot of Object.keys(AD_SLOTS) as AdSlotId[]) {
+    const config = adConfig(slot);
+    if (!config) continue;
+
+    try {
+      origins.add(new URL(config.src).origin);
+    } catch {
+      // `parseAdSrc` already refused anything that is not a URL.
+    }
+  }
+
+  return [...origins];
 }

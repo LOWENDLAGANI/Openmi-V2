@@ -36,11 +36,13 @@ export const AD_PROBE_CLASSES = [
 ] as const;
 
 /**
- * The hosts the probes ask for, one provider per entry.
+ * The default probe hosts, one provider per entry.
  *
- * The first is the banner provider this app actually loads from, so a filter
- * that blocks our revenue is observed directly. The second is a widely targeted
- * ad host, which catches lists that special-case Google. They are two
+ * The first is the banner host a key without its own loader URL still uses, so
+ * a deployment that never overrides the source observes its revenue host
+ * directly. `probeUrlsFor` puts the configured hosts ahead of this list,
+ * because a unit can be served from another host. The second is a widely
+ * targeted ad host, which catches lists that special-case Google. They are two
  * independent readings: a single host being unreachable — DNS filtering one
  * name, a provider outage — is not a pattern.
  */
@@ -48,6 +50,43 @@ export const AD_PROBE_URLS = [
   "https://www.highperformanceformat.com/",
   "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
 ] as const;
+
+/**
+ * The probe list for one deployment.
+ *
+ * The hosts the configured banner units load from come first: a unit can move
+ * to another Adsterra host, and probing the one this app no longer loads would
+ * measure the wrong provider. The default list follows as the floor, so a
+ * deployment that only set keys, or set none, is unchanged. Origins are
+ * deduplicated — the same host twice is one reading, not two.
+ */
+export function probeUrlsFor(origins: readonly string[] = []): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+
+  for (const origin of origins) {
+    let normalized: string;
+
+    try {
+      normalized = new URL(origin).origin;
+    } catch {
+      continue;
+    }
+
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    urls.push(`${normalized}/`);
+  }
+
+  for (const url of AD_PROBE_URLS) {
+    const normalized = new URL(url).origin;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    urls.push(url);
+  }
+
+  return urls;
+}
 
 /**
  * A same-origin request made beside the ad probes.
