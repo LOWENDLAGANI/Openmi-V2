@@ -2,9 +2,11 @@ import { createHash } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import { refundDewSession } from "@/lib/dew/store";
 import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
 import { refundReasonFor } from "@/lib/dew/refund";
+import { autoWriteEnabled } from "@/lib/github/autowrite";
 import { readToken } from "@/lib/github/token";
 import { AUTO_MODEL, type ModelId } from "@/lib/models";
 import {
@@ -563,6 +565,40 @@ export async function executeRun(
 
       if (!delivered.message) {
         console.error(`[runs] ${runId}: the chat answer was not written`);
+      }
+
+      // The turn is the request. A ready change is written from here rather than
+      // from a click on the card, because the signed changeset is already the
+      // reviewed thing: one `openmi/agent/` branch, one pull request, squash-
+      // merged, never forced, and a re-apply instead of a second PR. A failed
+      // write is a sentence in the transcript, not a dialog nobody opened.
+      if (delivered.changeset && status === "done" && autoWriteEnabled()) {
+        const applied = await approveChangesetAndOpenPullRequest(admin, {
+          changesetId: delivered.changeset,
+          owner: run.owner,
+          sealKey: serverEnv().githubTokenKey,
+        }).catch((caught: unknown) => ({
+          ok: false as const,
+          error:
+            caught instanceof Error ? caught.message : "The change was not written.",
+        }));
+
+        if (applied.ok) {
+          await appendEvent(admin, runId, "changeset.applied", {
+            branch: applied.branch,
+            prUrl: applied.prUrl,
+            prNumber: applied.prNumber,
+            mergeCommitSha: applied.mergeCommitSha,
+            summary: applied.prUrl
+              ? `Wrote ${applied.branch} and merged pull request #${applied.prNumber}.`
+              : `Wrote ${applied.branch}.`,
+          });
+        } else {
+          await appendEvent(admin, runId, "warning", {
+            code: "auto-write",
+            message: `The change was not written: ${applied.error}`,
+          });
+        }
       }
     }
 

@@ -358,7 +358,7 @@ test("the sandbox rebase has no write token and no way to update a ref", () => {
 
 // ── The automatic write path ─────────────────────────────────────────────────
 
-test("the worker proposes a diff, so the card always asks before anything is written", () => {
+test("the proposal layer never writes; the run does, from the signed changeset", () => {
   const worker = readFileSync(
     new URL("../lib/runs/chat.ts", import.meta.url),
     "utf8"
@@ -368,12 +368,13 @@ test("the worker proposes a diff, so the card always asks before anything is wri
     "utf8"
   );
 
-  // The run settles with a signed changeset; the write stays on the card.
+  // The run settles with a signed changeset, and writing it is one call in the
+  // run loop rather than part of building the proposal.
   expect(worker).toContain("finalizeChangeset");
   expect(worker).not.toContain("approveChangesetAndOpenPullRequest");
 
-  // Because nothing was written on the reader's behalf, the card must always
-  // offer the decision.
+  // The card still offers the decision, which is what happens with
+  // OPENMI_AUTO_WRITE=off and after a write that could not finish.
   expect(panel).toContain("<ApplyControl");
   expect(panel).not.toContain("autoWrite");
 });

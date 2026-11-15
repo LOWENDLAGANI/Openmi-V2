@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import {
   changesetContentHash,
   changesetDisplayStatus,
@@ -22,7 +24,7 @@ import {
   type ChangedFile,
   type ProposedFile,
 } from "@/lib/github/write";
-import { supabaseServer } from "@/lib/supabase/server";
+
 
 /**
  * Approval: the one path from a signed changeset to a pull request.
@@ -42,7 +44,16 @@ import { supabaseServer } from "@/lib/supabase/server";
  * marks the changeset failed and leaves the PR for inspection.
  */
 
-type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
+/**
+ * Either Supabase client works here.
+ *
+ * The routes pass the reader's request-scoped client and the worker passes the
+ * service-role one, so the type is the shared client rather than the cookie-bound
+ * one. That is also why this module does not import `next/headers`: the worker is
+ * what writes a finished turn, and a Next-only import would make it unloadable
+ * outside a request.
+ */
+type Client = SupabaseClient;
 
 export type ApprovalResult =
   | {

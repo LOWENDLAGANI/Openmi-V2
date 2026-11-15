@@ -271,12 +271,13 @@ Concretely:
   (`lib/github/branch-request.ts`). `requestedBranch`'s phrase matching is only the
   fallback when the model leaves it out: a keyword is a guess about a human.
 - The assistant does not write to GitHub. The app does, through the one write
-  module, and an automatic write counts as the review (`AUTO_WRITE_REVIEW`), so the
-  ordinary path needs no click. A named destination skips the confirmation
-  question for the same reason: asking for that branch was the decision.
-- Three facts still make it ask: the head moved since the diff, the change touches
-  more than `CONFIRM_FILE_LIMIT` files, or a path is configuration, credentials or
-  schema.
+  module, and an automatic write counts as the review (`AUTO_WRITE_REVIEW`), so a
+  finished turn writes its own `openmi/agent/` branch and pull request without a
+  click. A named destination skips the confirmation question for the same reason:
+  asking for that branch was the decision.
+- With `OPENMI_AUTO_WRITE=off` three facts make the card ask: the head moved since
+  the diff, the change touches more than `CONFIRM_FILE_LIMIT` files, or a path is
+  configuration, credentials or schema.
 - Retrying an approval reuses the recorded branch, commit and pull request; one
   approval can never produce two PRs.
 - Nothing is described as written, pushed or merged before the card says so.

@@ -23,6 +23,7 @@ export const RUN_EVENT_NAMES = [
   "usage",
   "warning",
   "preview.ready",
+  "changeset.applied",
   "run.finished",
   "run.error",
 ] as const;

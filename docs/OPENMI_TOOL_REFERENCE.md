@@ -116,10 +116,11 @@ Propose a reviewable change. **Nothing is written to GitHub by this call.**
 - **After the call** the user sees a unified diff per file and accepts or
   rejects each one. A ready change is written by the app, and the automatic
   write counts as the review (`AUTO_WRITE_REVIEW`): one `openmi/agent/
-  <changeset-id>` branch and one pull request, or the branch given as
-  `destination`. A moved head, a change over `CONFIRM_FILE_LIMIT` files, and one
-  touching configuration, credentials or the schema still ask first. The model
-  cannot write to GitHub, merge, or force a branch.
+  <changeset-id>` branch, one pull request, squash-merged, with no click in the
+  path. `OPENMI_AUTO_WRITE=off` brings the card's question back, and with it the
+  old guards: a moved head, more than `CONFIRM_FILE_LIMIT` files, or a path that
+  is configuration, credentials or schema. The model cannot write to GitHub,
+  merge, or force a branch.
 
 ### `git`
 

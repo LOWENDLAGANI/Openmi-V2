@@ -587,6 +587,19 @@ function streamRun(input: StreamInput): NextResponse {
             continue;
           }
 
+          // The write is the app's, and it happens before the run settles. The
+          // reader gets the branch and the pull request as a sentence in the
+          // transcript instead of a card they would have to click.
+          if (event.kind === "changeset.applied") {
+            const summary =
+              typeof payload.summary === "string"
+                ? payload.summary
+                : "The change was written to GitHub.";
+            send("notice", { message: summary });
+            send("changeset", {});
+            continue;
+          }
+
           if (event.kind === "run.finished") {
             terminalStatus =
               typeof payload.status === "string" ? payload.status : "done";

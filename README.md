@@ -257,14 +257,17 @@ naming one also answers the confirmation question, because asking for that branc
 was the decision. The write is still one commit, never forced, and re-applied if
 the branch moved under it.
 
-The automatic write now counts as the review (`AUTO_WRITE_REVIEW`). Before that,
-every fresh suggestion read as "nobody has reviewed it" and asked for a click, so
-the automatic path never actually ran. Two questions survive: a head that moved
-since the diff, and a change over five files or touching configuration,
-credentials or the schema. A named branch that has moved since the diff
-was computed is not a dead end — the change goes to a new `openmi/agent/` branch
-on top of the live head, unforced. Retrying after a failure reuses the recorded
-branch, commit and pull request, so one approval cannot produce two PRs.
+The automatic write counts as the review (`AUTO_WRITE_REVIEW`). With
+`OPENMI_AUTO_WRITE` on — the default — a finished turn writes its own change:
+one `openmi/agent/` branch, one pull request, squash-merged, and the reader gets
+the branch and the PR as a sentence in the transcript. There is no card to click
+in that path. Set `OPENMI_AUTO_WRITE=off` and the card asks again, with the old
+guards: a head that moved since the diff, a change over five files, or a path
+that is configuration, credentials or the schema. A named branch that has moved
+since the diff was computed is not a dead end — the change goes to a new
+`openmi/agent/` branch on top of the live head, unforced. Retrying after a
+failure reuses the recorded branch, commit and pull request, so one approval
+cannot produce two PRs.
 
 ## Dew
 
