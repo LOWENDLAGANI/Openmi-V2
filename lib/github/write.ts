@@ -1189,3 +1189,214 @@ export async function createRepositoryWithFiles(input: {
 
   return { fullName: created.full_name, branch: "main", commitSha: commit.sha };
 }
+
+// ── Repository actions ──────────────────────────────────────────────────────
+//
+// The writes a reader can ask for in words: comment, open or close an issue,
+// label it, merge a pull request. Each names its object by number, never by URL,
+// and none of them touches a branch or a commit — so the changeset rules above
+// are not weakened by their existence. The guard against a prompt-injected file
+// opening issues is the tool layer and the prompt, not a hidden token: these
+// functions only run when a model calls the tool.
+
+export const MAX_ACTION_BODY_CHARS = 4_000;
+export const MAX_ACTION_TITLE_CHARS = 300;
+export const MAX_ACTION_LABELS = 10;
+
+function requireNumber(number: number): void {
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new GithubWriteError(
+      "refused",
+      "That is not a valid issue or pull request number.",
+      403
+    );
+  }
+}
+
+function requireText(value: string, what: string, max: number): string {
+  const text = value.trim();
+
+  if (text.length === 0) {
+    throw new GithubWriteError("refused", `${what} cannot be empty.`, 403);
+  }
+
+  if (text.length > max) {
+    throw new GithubWriteError(
+      "refused",
+      `${what} is over the ${max.toLocaleString()} character cap.`,
+      403
+    );
+  }
+
+  return text;
+}
+
+function requireLabels(labels: readonly string[]): string[] {
+  if (labels.length > MAX_ACTION_LABELS) {
+    throw new GithubWriteError(
+      "refused",
+      `At most ${MAX_ACTION_LABELS} labels are written at once.`,
+      403
+    );
+  }
+
+  const clean = labels.map((label) => label.trim());
+
+  for (const label of clean) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9 _.:/-]{0,49}$/.test(label)) {
+      throw new GithubWriteError(
+        "refused",
+        `"${label}" is not a label name GitHub accepts.`,
+        403
+      );
+    }
+  }
+
+  return clean;
+}
+
+/**
+ * A comment on an issue or a pull request.
+ *
+ * GitHub treats a pull request as an issue for comments, so one call serves
+ * both and the number decides which thread is answered.
+ */
+export async function commentOnThread(input: {
+  token: string;
+  repo: string;
+  number: number;
+  body: string;
+}): Promise<{ url: string }> {
+  const repoPath = repoPathOf(input.repo);
+  requireNumber(input.number);
+
+  const body = requireText(input.body, "A comment", MAX_ACTION_BODY_CHARS);
+
+  const created = await request<{ html_url?: string }>(
+    input.token,
+    "POST",
+    `${repoPath}/issues/${input.number}/comments`,
+    { body }
+  );
+
+  return { url: created.html_url ?? "" };
+}
+
+/** A new issue: title required, body and labels optional. */
+export async function openIssue(input: {
+  token: string;
+  repo: string;
+  title: string;
+  body?: string;
+  labels?: string[];
+}): Promise<{ number: number; url: string }> {
+  const repoPath = repoPathOf(input.repo);
+  const title = requireText(input.title, "An issue title", MAX_ACTION_TITLE_CHARS);
+  const body = (input.body ?? "").trim().slice(0, MAX_ACTION_BODY_CHARS);
+  const labels = requireLabels(input.labels ?? []);
+
+  const created = await request<{ number?: number; html_url?: string }>(
+    input.token,
+    "POST",
+    `${repoPath}/issues`,
+    {
+      title,
+      ...(body.length > 0 ? { body } : {}),
+      ...(labels.length > 0 ? { labels } : {}),
+    }
+  );
+
+  if (typeof created.number !== "number") {
+    throw new GithubWriteError(
+      "unavailable",
+      "GitHub did not return the new issue's number.",
+      0
+    );
+  }
+
+  return { number: created.number, url: created.html_url ?? "" };
+}
+
+/** Close or reopen one issue. */
+export async function setIssueState(input: {
+  token: string;
+  repo: string;
+  number: number;
+  state: "open" | "closed";
+}): Promise<{ number: number; state: string }> {
+  const repoPath = repoPathOf(input.repo);
+  requireNumber(input.number);
+
+  const updated = await request<{ number?: number; state?: string }>(
+    input.token,
+    "PATCH",
+    `${repoPath}/issues/${input.number}`,
+    { state: input.state }
+  );
+
+  return { number: updated.number ?? input.number, state: updated.state ?? input.state };
+}
+
+/** Adds labels to an existing issue, leaving the ones already there. */
+export async function addIssueLabels(input: {
+  token: string;
+  repo: string;
+  number: number;
+  labels: string[];
+}): Promise<{ labels: string[] }> {
+  const repoPath = repoPathOf(input.repo);
+  requireNumber(input.number);
+
+  const labels = requireLabels(input.labels);
+
+  if (labels.length === 0) {
+    throw new GithubWriteError("refused", "Name at least one label.", 403);
+  }
+
+  const added = await request<Array<{ name?: string } | string>>(
+    input.token,
+    "POST",
+    `${repoPath}/issues/${input.number}/labels`,
+    { labels }
+  );
+
+  const names = (Array.isArray(added) ? added : [])
+    .map((label) => (typeof label === "string" ? label : (label.name ?? "")))
+    .filter((name) => name.length > 0);
+
+  return { labels: names.length > 0 ? names : labels };
+}
+
+/**
+ * Merges one pull request, by number, with an explicit method.
+ *
+ * This is the one action that lands code, so it names one pull request that
+ * already exists and never creates one. GitHub decides whether it is mergeable;
+ * a refusal is reported, not retried.
+ */
+export async function mergePullRequest(input: {
+  token: string;
+  repo: string;
+  number: number;
+  method: "merge" | "squash" | "rebase";
+}): Promise<{ sha: string; merged: true }> {
+  const repoPath = repoPathOf(input.repo);
+  requireNumber(input.number);
+
+  const result = await request<{ merged?: boolean; sha?: string; message?: string }>(
+    input.token,
+    "PUT",
+    `${repoPath}/pulls/${input.number}/merge`,
+    { merge_method: input.method }
+  );
+
+  if (result.merged !== true || typeof result.sha !== "string") {
+    throw new GithubWriteError(
+      "conflict",
+      result.message ?? "GitHub did not merge that pull request. It may be unmergeable or still running checks.",
+      405
+    );
+  }
+
+  return { sha: result.sha, merged: true };
+}

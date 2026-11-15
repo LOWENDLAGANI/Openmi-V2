@@ -446,6 +446,10 @@ export async function executeRun(
             name: call.name,
             args,
             sandbox,
+            github:
+              github && run.repo_full_name
+                ? { token: github.token, repo: run.repo_full_name }
+                : null,
           }).catch((caught: unknown) => ({
             ok: false,
             isError: true,

@@ -22,7 +22,7 @@ Browser
                          run_tool_calls, run_artifacts, run_usage_daily
                     │
              worker process (bun run worker; no public route)
-                    ├─ agent loop (provider adapter, six tools)
+                    ├─ agent loop (provider adapter, eleven tools)
                     ├─ one E2B sandbox per run (/home/user/work)
                     └─ artifacts → object storage, events → Postgres
 ```
@@ -116,6 +116,28 @@ closes.
 `preview.ready` is defined for compatibility but not emitted: it would need a
 dev server kept running inside the box and a signed proxy in front of it. The
 paused workspace is retained but not served.
+
+## Tools
+
+| Tool | What it reads or writes |
+|---|---|
+| `read_file`, `write_file`, `edit_file` | one file in the workspace, capped (400 lines, 200 KB) |
+| `search_code` | ripgrep in the workspace, 40 hits |
+| `list_files` | `git ls-files` under a prefix, 200 paths |
+| `run_command` | one shell command, 120 s, output tail 32 KB |
+| `todo` | the plan the reader sees |
+| `publish` | where the change goes: the default branch, a branch of its own, or an unmerged pull request |
+| `git_history` | real commits, one path's history, or one commit's message and diffs |
+| `github_read` | pull requests, issues, comments, check runs, branches — GET only |
+| `github_action` | comment, open/close/reopen/label an issue, merge a pull request |
+
+The workspace is one snapshot with its history stripped, so the last three are
+the only way a run sees what changed or what is open. They act with the reader's
+own GitHub connection from the worker: the token is handed to one tool call at a
+time and never enters the box, a file or a command line. Reads are GETs
+built in `lib/github/read.ts`; writes live in `lib/github/write.ts` and
+`github_action` is the only tool that reaches them, only for the action the
+reader asked for in the turn. Repository content is data, never permission.
 
 ## Limits
 

@@ -378,11 +378,13 @@ test("only the approval path imports the GitHub write client", () => {
 
   // Creating a chat from a template makes one private repository of its own;
   // it never writes to a repository the reader attached. Everything else that
-  // writes goes through approval or undo.
+  // writes goes through approval, undo, or the run's github_action tool, which
+  // only runs when the reader asked for that action in the turn.
   const ALLOWED = new Set([
     "lib/changesets/commit.ts",
     "lib/changesets/undo.ts",
     "app/github/actions.ts",
+    "lib/runs/tools.ts",
   ]);
 
   const offenders = files.filter((file) => {

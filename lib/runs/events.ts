@@ -104,6 +104,23 @@ export function toolSummary(name: string, args: Record<string, unknown> | null):
     return `running ${command.length > 80 ? `${command.slice(0, 77)}…` : command}`;
   }
   if (name === "todo") return "updating the plan";
+  if (name === "list_files") return `listing ${value("prefix") ?? "the repository"}`;
+  if (name === "git_history") {
+    return value("path") ? `reading the history of ${value("path")}` : "reading commit history";
+  }
+  if (name === "github_read") return `reading ${value("kind") ?? "GitHub"}`;
+  if (name === "github_action") {
+    const kind = value("kind") ?? "action";
+    const number = args && typeof args.number === "number" ? `#${args.number}` : "";
+
+    if (kind === "comment") return `commenting on ${number}`.trimEnd();
+    if (kind === "open_issue") return "opening an issue";
+    if (kind === "close_issue") return `closing ${number}`.trimEnd();
+    if (kind === "reopen_issue") return `reopening ${number}`.trimEnd();
+    if (kind === "label_issue") return `labelling ${number}`.trimEnd();
+    if (kind === "merge_pull") return `merging pull request ${number}`.trimEnd();
+    return `GitHub ${kind}`;
+  }
   return name;
 }
 

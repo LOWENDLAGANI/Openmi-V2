@@ -265,7 +265,11 @@ in that path. Where it goes is the model's read of the request, through the
 `publish` tool: naming the default branch writes it directly, asking for a pull
 request opens one and leaves it unmerged, and asking for a branch of its own
 writes that branch with no PR. A request that names no destination keeps the
-default — an `openmi/agent/` branch, a pull request, merged. Set
+default — an `openmi/agent/` branch, a pull request, merged. The run also has the
+repository's GitHub context that the sandbox cannot see: `git_history`,
+`github_read` (pull requests, issues, comments, checks, branches) and
+`github_action` (comment, open, close, reopen or label an issue, or merge a pull
+request) — all through your own connection, with no token in the box. Set
 `OPENMI_AUTO_WRITE=off` and the card asks again, with the old
 guards: a head that moved since the diff, a change over five files, or a path
 that is configuration, credentials or the schema. A named branch that has moved

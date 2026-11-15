@@ -368,3 +368,404 @@ export async function searchCode(
 
   return { hits, totalCount: data.total_count };
 }
+
+// ── History and context ──────────────────────────────────────────────────────
+//
+// A run's workspace is one snapshot with no history: the archive is extracted
+// and committed once, so `git log` there shows a single base commit. These reads
+// are how the agent sees what actually changed and what is open in the
+// repository, using the app's connection rather than a credential in the box.
+// Still GETs, still built here, still no URL from outside.
+
+export const MAX_HISTORY_COMMITS = 20;
+export const MAX_HISTORY_FILES = 30;
+export const MAX_PATCH_CHARS = 4_000;
+export const MAX_CONTEXT_ITEMS = 20;
+export const MAX_BODY_CHARS = 4_000;
+export const MAX_CHECK_NAMES = 20;
+
+export type CommitSummary = {
+  sha: string;
+  shortSha: string;
+  /** The first line of the message. */
+  message: string;
+  author: string;
+  date: string;
+};
+
+export type CommitFile = {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  /** The diff for this file, capped. Null for a binary or oversized diff. */
+  patch: string | null;
+};
+
+export type CommitDetail = CommitSummary & {
+  body: string;
+  files: CommitFile[];
+  totalFiles: number;
+  additions: number;
+  deletions: number;
+};
+
+export type PullSummary = {
+  number: number;
+  title: string;
+  state: string;
+  draft: boolean;
+  author: string;
+  headBranch: string;
+  baseBranch: string;
+  updatedAt: string;
+  mergedAt: string | null;
+  url: string;
+  body: string;
+};
+
+export type IssueSummary = {
+  number: number;
+  title: string;
+  state: string;
+  author: string;
+  labels: string[];
+  comments: number;
+  updatedAt: string;
+  url: string;
+  body: string;
+};
+
+export type IssueComment = {
+  author: string;
+  createdAt: string;
+  body: string;
+};
+
+export type CheckSummary = {
+  /** success, failure, pending, or none when nothing reported. */
+  state: "success" | "failure" | "pending" | "none";
+  total: number;
+  failing: string[];
+  pending: string[];
+};
+
+type WireCommit = {
+  sha: string;
+  commit: {
+    message?: string;
+    author?: { name?: string; date?: string } | null;
+  };
+  parents?: Array<{ sha: string }>;
+};
+
+type WirePull = {
+  number: number;
+  title: string;
+  state: string;
+  draft?: boolean;
+  user?: { login?: string } | null;
+  head?: { ref?: string } | null;
+  base?: { ref?: string } | null;
+  updated_at?: string;
+  merged_at?: string | null;
+  html_url?: string;
+  body?: string | null;
+  additions?: number;
+  deletions?: number;
+  changed_files?: number;
+  mergeable?: boolean | null;
+  mergeable_state?: string;
+};
+
+type WireIssue = {
+  number: number;
+  title: string;
+  state: string;
+  user?: { login?: string } | null;
+  labels?: Array<{ name?: string } | string>;
+  comments?: number;
+  updated_at?: string;
+  html_url?: string;
+  body?: string | null;
+  pull_request?: unknown;
+};
+
+function clampLimit(value: number | undefined, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return max;
+  return Math.min(max, Math.max(1, Math.trunc(value)));
+}
+
+function firstLine(text: string): string {
+  return (text.split("\n")[0] ?? "").trim().slice(0, 200);
+}
+
+function bodyOf(text: string | null | undefined): string {
+  if (typeof text !== "string") return "";
+  const rest = text.split("\n").slice(1).join("\n").trim();
+  return rest.slice(0, MAX_BODY_CHARS);
+}
+
+function toCommitSummary(commit: WireCommit): CommitSummary {
+  const message = commit.commit.message ?? "";
+
+  return {
+    sha: commit.sha,
+    shortSha: commit.sha.slice(0, 7),
+    message: firstLine(message),
+    author: commit.commit.author?.name ?? "unknown",
+    date: commit.commit.author?.date ?? "",
+  };
+}
+
+/** Recent commits, newest first, optionally for one path or ref. */
+export async function listCommits(
+  token: string,
+  fullName: string,
+  options: { path?: string; ref?: string; limit?: number } = {}
+): Promise<CommitSummary[]> {
+  const limit = clampLimit(options.limit, MAX_HISTORY_COMMITS);
+  const query = new URLSearchParams({ per_page: String(limit) });
+  if (options.path) query.set("path", options.path);
+  if (options.ref) query.set("sha", options.ref);
+
+  const { data } = await request<WireCommit[]>(
+    token,
+    `${repoBase(fullName)}/commits?${query.toString()}`
+  );
+
+  return data.slice(0, limit).map(toCommitSummary);
+}
+
+/** One commit: message, body, and its files with patches. */
+export async function getCommitDetail(
+  token: string,
+  fullName: string,
+  sha: string
+): Promise<CommitDetail> {
+  if (!isCommitSha(sha)) {
+    throw new GithubError("not-found", "That is not a commit id.");
+  }
+
+  const { data } = await request<
+    WireCommit & {
+      files?: Array<{
+        filename: string;
+        status?: string;
+        additions?: number;
+        deletions?: number;
+        patch?: string;
+      }>;
+      stats?: { additions?: number; deletions?: number };
+    }
+  >(token, `${repoBase(fullName)}/commits/${encodeURIComponent(sha)}`);
+
+  const files = (data.files ?? []).slice(0, MAX_HISTORY_FILES).map((file) => ({
+    path: file.filename,
+    status: file.status ?? "modified",
+    additions: file.additions ?? 0,
+    deletions: file.deletions ?? 0,
+    patch: typeof file.patch === "string" ? file.patch.slice(0, MAX_PATCH_CHARS) : null,
+  }));
+
+  const all = data.files ?? [];
+
+  return {
+    ...toCommitSummary(data),
+    body: bodyOf(data.commit.message),
+    files,
+    totalFiles: all.length,
+    additions:
+      data.stats?.additions ?? all.reduce((total, file) => total + (file.additions ?? 0), 0),
+    deletions:
+      data.stats?.deletions ?? all.reduce((total, file) => total + (file.deletions ?? 0), 0),
+  };
+}
+
+function toPullSummary(pull: WirePull): PullSummary {
+  return {
+    number: pull.number,
+    title: pull.title,
+    state: pull.state,
+    draft: pull.draft === true,
+    author: pull.user?.login ?? "unknown",
+    headBranch: pull.head?.ref ?? "",
+    baseBranch: pull.base?.ref ?? "",
+    updatedAt: pull.updated_at ?? "",
+    mergedAt: pull.merged_at ?? null,
+    url: pull.html_url ?? "",
+    body: (pull.body ?? "").slice(0, MAX_BODY_CHARS),
+  };
+}
+
+/** Pull requests, newest first. `all` includes closed and merged ones. */
+export async function listPulls(
+  token: string,
+  fullName: string,
+  state: "open" | "closed" | "all" = "open",
+  limit: number = MAX_CONTEXT_ITEMS
+): Promise<PullSummary[]> {
+  const count = clampLimit(limit, MAX_CONTEXT_ITEMS);
+
+  const { data } = await request<WirePull[]>(
+    token,
+    `${repoBase(fullName)}/pulls?state=${state}&per_page=${count}&sort=updated&direction=desc`
+  );
+
+  return data.slice(0, count).map(toPullSummary);
+}
+
+/** One pull request, with its size and whether GitHub can merge it. */
+export async function getPullDetail(
+  token: string,
+  fullName: string,
+  number: number
+): Promise<
+  PullSummary & {
+    additions: number;
+    deletions: number;
+    changedFiles: number;
+    mergeable: boolean | null;
+    mergeableState: string;
+  }
+> {
+  const { data } = await request<WirePull>(
+    token,
+    `${repoBase(fullName)}/pulls/${number}`
+  );
+
+  return {
+    ...toPullSummary(data),
+    additions: data.additions ?? 0,
+    deletions: data.deletions ?? 0,
+    changedFiles: data.changed_files ?? 0,
+    mergeable: data.mergeable ?? null,
+    mergeableState: data.mergeable_state ?? "unknown",
+  };
+}
+
+function toIssueSummary(issue: WireIssue): IssueSummary {
+  const labels = (issue.labels ?? [])
+    .map((label) => (typeof label === "string" ? label : (label.name ?? "")))
+    .filter((label) => label.length > 0);
+
+  return {
+    number: issue.number,
+    title: issue.title,
+    state: issue.state,
+    author: issue.user?.login ?? "unknown",
+    labels,
+    comments: issue.comments ?? 0,
+    updatedAt: issue.updated_at ?? "",
+    url: issue.html_url ?? "",
+    body: (issue.body ?? "").slice(0, MAX_BODY_CHARS),
+  };
+}
+
+/**
+ * Issues, newest first. GitHub's issues endpoint also returns pull requests, so
+ * anything carrying `pull_request` is dropped: an issue list that silently
+ * includes PRs is a list the reader cannot trust.
+ */
+export async function listIssues(
+  token: string,
+  fullName: string,
+  state: "open" | "closed" | "all" = "open",
+  limit: number = MAX_CONTEXT_ITEMS
+): Promise<IssueSummary[]> {
+  const count = clampLimit(limit, MAX_CONTEXT_ITEMS);
+
+  const { data } = await request<WireIssue[]>(
+    token,
+    `${repoBase(fullName)}/issues?state=${state}&per_page=${count}&sort=updated&direction=desc`
+  );
+
+  return data
+    .filter((issue) => issue.pull_request === undefined)
+    .slice(0, count)
+    .map(toIssueSummary);
+}
+
+/** One issue. `isPull` is true when the number is a pull request. */
+export async function getIssueDetail(
+  token: string,
+  fullName: string,
+  number: number
+): Promise<IssueSummary & { isPull: boolean }> {
+  const { data } = await request<WireIssue>(
+    token,
+    `${repoBase(fullName)}/issues/${number}`
+  );
+
+  return { ...toIssueSummary(data), isPull: data.pull_request !== undefined };
+}
+
+/** The conversation on an issue or a pull request, oldest first. */
+export async function listIssueComments(
+  token: string,
+  fullName: string,
+  number: number,
+  limit: number = MAX_CONTEXT_ITEMS
+): Promise<IssueComment[]> {
+  const count = clampLimit(limit, MAX_CONTEXT_ITEMS);
+
+  const { data } = await request<
+    Array<{ user?: { login?: string } | null; created_at?: string; body?: string | null }>
+  >(token, `${repoBase(fullName)}/issues/${number}/comments?per_page=${count}`);
+
+  return data.slice(0, count).map((comment) => ({
+    author: comment.user?.login ?? "unknown",
+    createdAt: comment.created_at ?? "",
+    body: (comment.body ?? "").slice(0, MAX_BODY_CHARS),
+  }));
+}
+
+/**
+ * Check runs for a ref, folded into one state.
+ *
+ * A failure anywhere wins over a pending run, because a red check is the fact a
+ * reader needs first. Names are capped: the count is the answer, the list is
+ * the detail.
+ */
+export async function getChecks(
+  token: string,
+  fullName: string,
+  ref: string
+): Promise<CheckSummary> {
+  const { data } = await request<{
+    total_count?: number;
+    check_runs?: Array<{ name?: string; status?: string; conclusion?: string | null }>;
+  }>(
+    token,
+    `${repoBase(fullName)}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`
+  );
+
+  const runs = data.check_runs ?? [];
+  const failing: string[] = [];
+  const pending: string[] = [];
+
+  for (const run of runs) {
+    const name = run.name ?? "unnamed";
+
+    if (run.conclusion === "failure" || run.conclusion === "timed_out" || run.conclusion === "cancelled") {
+      failing.push(name);
+    } else if (run.status !== "completed") {
+      pending.push(name);
+    }
+  }
+
+  const state = failing.length > 0
+    ? "failure"
+    : pending.length > 0
+      ? "pending"
+      : runs.length > 0
+        ? "success"
+        : "none";
+
+  return {
+    state,
+    total: data.total_count ?? runs.length,
+    failing: failing.slice(0, MAX_CHECK_NAMES),
+    pending: pending.slice(0, MAX_CHECK_NAMES),
+  };
+}
