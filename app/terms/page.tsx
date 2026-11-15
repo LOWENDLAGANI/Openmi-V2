@@ -105,11 +105,11 @@ const SECTIONS: LegalSection[] = [
   },
   {
     id: "billing",
-    title: "7. Dew, plans and refunds",
+    title: "7. Dew, plans, refunds and cancellation",
     blocks: [
       {
         kind: "p",
-        text: `Chat is billed in Dew. Each model has an hourly price, shown before you send; DeepSeek Flash is ${DEW_PER_HOUR} Dew per hour and Auto is free. The hour is charged before the model provider is called, and further turns inside that hour are included. Every charge, refund and grant is written to an append-only ledger you can read on the activity page.`,
+        text: `Chat is billed in Dew. Each model has an hourly price, shown before you send; DeepSeek Flash is ${DEW_PER_HOUR} Dew per hour and Auto is free. The hour is charged before the model provider is called, and further turns inside that hour are included. Every charge, grant and correction is written to an append-only ledger you can read on the activity page.`,
       },
       {
         kind: "p",
@@ -120,10 +120,16 @@ const SECTIONS: LegalSection[] = [
         items: [
           "Paid plans are sold through a hosted payment page operated by Sociabuzz. We never receive or store card details.",
           "A plan becomes active when a receipt you upload is approved. A redeem code issued by an operator adds Dew only; it does not start or extend a pass.",
-          "A refund is recorded when the provider fails — including when it fails after streaming part of an answer — or when you stop a turn before the first token. Stopping after text has arrived, reaching a time or step limit, or pausing a turn does not refund, because the work is kept and the turn can continue.",
+          "All sales are final. Dew, plans and passes are non-refundable and cannot be cancelled, exchanged or credited — including for unused Dew, unused time on a pass, a change of mind, or an account you stop using. The refunds and cancellation policy published at /refunds forms part of these terms.",
+          "A pass runs for the number of days shown at purchase and ends by itself; it does not renew automatically, so there is nothing to cancel. Closing your account does not refund an unexpired pass or an unspent balance.",
+          "If the model provider returns no answer for an hour at all, that hour is released back to your balance automatically. The release is how the meter is corrected; it is not a discretionary refund. Stopping after text has arrived, reaching a time or step limit, or pausing a turn keeps the hour charged, because the work is kept and the turn can continue.",
           "Dew has no cash value, is not transferable, and may not be resold. A balance is a licence to use the service, not a deposit, and it is not redeemable for money.",
           "Prices and allowances may change. A change applies to hours started after it is announced in the product.",
         ],
+      },
+      {
+        kind: "p",
+        text: "Nothing in this section removes a right you have under a law that cannot be excluded. If you believe such a right applies to a purchase, section 8 of the refunds and cancellation policy at /refunds says how to raise it.",
       },
     ],
   },
@@ -225,7 +231,7 @@ const SECTIONS: LegalSection[] = [
     blocks: [
       {
         kind: "p",
-        text: "You may stop using the service at any time and ask us to close your account using the address in section 20. We may suspend or terminate an account for a material breach of these terms, to comply with the law, or to protect the service or other users. Where it is reasonable, we will give notice and a chance to retrieve your data first.",
+        text: "You may stop using the service at any time and delete your account yourself at /account/delete, or ask us to close it using the address in section 20. We may suspend or terminate an account for a material breach of these terms, to comply with the law, or to protect the service or other users. Where it is reasonable, we will give notice and a chance to retrieve your data first.",
       },
       {
         kind: "p",

@@ -326,7 +326,11 @@ export default async function PayPage({
             ? `≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges ringgit; your receipt is what counts. `
             : ""}
           Money changes hands on the hosted page only. This app never asks for
-          card details.
+          card details.{" "}
+          <Link href="/refunds" className="text-accent-text underline-offset-2 hover:underline">
+            All sales are final
+          </Link>
+          : read the refund and cancellation policy before you pay.
         </p>
       </section>
 

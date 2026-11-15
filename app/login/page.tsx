@@ -22,7 +22,7 @@ function safeNext(value: string | undefined): string {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; deleted?: string }>;
 }) {
   const params = await searchParams;
   const next = safeNext(params.next);
@@ -43,6 +43,16 @@ export default async function LoginPage({
           </Link>
         </div>
       </header>
+
+      {params.deleted === "1" && (
+        <p
+          role="status"
+          className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] leading-relaxed text-accent-text"
+        >
+          Your account and the data we held for it have been deleted. You can
+          create a new account at any time.
+        </p>
+      )}
 
       <div className="grid flex-1 content-start items-start gap-10 py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:content-center lg:items-center">
         <section className="max-w-lg">

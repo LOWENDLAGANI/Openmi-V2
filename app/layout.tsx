@@ -46,8 +46,12 @@ export const viewport: Viewport = {
  * The theme is a class on <html>, resolved before the first paint so a reader
  * who chose Carbon or Ink never sees a frame of the paper canvas. No class means
  * paper, the default; "paper", "dark" and "ink" are the only values stored.
+ *
+ * The script is a static file in public/, not an inline string rendered with
+ * dangerouslySetInnerHTML: a render-blocking tag in <head> still runs before
+ * the first paint, and the document ends up with no inline script for a scan to
+ * report. public/theme-boot.js owns the logic and the storage key.
  */
-const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem("openmi-theme");if(t!=="paper"&&t!=="dark"&&t!=="ink")t="paper";var d=document.documentElement;d.classList.remove("light","dark","ink");if(t!=="paper")d.classList.add(t);}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -55,7 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script src="/theme-boot.js" />
       </head>
       <body className="app-surface min-h-dvh bg-canvas text-body antialiased">
         <Suspense fallback={null}>

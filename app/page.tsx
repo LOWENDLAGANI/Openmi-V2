@@ -409,6 +409,9 @@ export default async function HomePage() {
             <Link href="/privacy" className="block text-mid hover:text-hi">
               Privacy
             </Link>
+            <Link href="/refunds" className="block text-mid hover:text-hi">
+              Refunds
+            </Link>
             <Link href="/privacy#cookies" className="block text-mid hover:text-hi">
               Cookies
             </Link>
@@ -428,6 +431,9 @@ export default async function HomePage() {
             <a href="#how" className="block text-mid hover:text-hi">
               How it works
             </a>
+            <Link href="/account/delete" className="block text-mid hover:text-hi">
+              Delete account
+            </Link>
           </nav>
         </div>
 
@@ -441,6 +447,10 @@ export default async function HomePage() {
               ·{" "}
               <Link href="/privacy" className="hover:text-hi">
                 Privacy
+              </Link>{" "}
+              ·{" "}
+              <Link href="/refunds" className="hover:text-hi">
+                Refunds
               </Link>
             </p>
             <p>GitHub sign-in · no card on file</p>

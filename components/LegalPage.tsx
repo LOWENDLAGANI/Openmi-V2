@@ -124,12 +124,18 @@ export function LegalPage({
 
       <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
         <p className="text-[11.5px] text-low">© 2026 Openmi</p>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link href="/terms" className="eyebrow hover:text-hi">
             terms
           </Link>
           <Link href="/privacy" className="eyebrow hover:text-hi">
             privacy
+          </Link>
+          <Link href="/refunds" className="eyebrow hover:text-hi">
+            refunds
+          </Link>
+          <Link href="/account/delete" className="eyebrow hover:text-hi">
+            delete my data
           </Link>
           <Link href="/" className="eyebrow hover:text-hi">
             home

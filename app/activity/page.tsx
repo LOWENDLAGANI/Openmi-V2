@@ -389,10 +389,14 @@ export default async function ActivityPage({
       </section>
 
       <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
-        Refunds are recorded when a provider fails or a turn is stopped before
-        the first token. An hour that produced part of an answer is not
-        refunded. Operator corrections are the only other path, and they appear
-        in the ledger as adjustments.
+        An hour the provider never answered is released back to your balance
+        automatically; that is a metering correction, not a refund. Purchases are
+        final and a pass does not renew. Operator corrections appear in the
+        ledger as adjustments, and{" "}
+        <Link href="/refunds" className="text-accent-text underline-offset-2 hover:underline">
+          the refund and cancellation policy
+        </Link>{" "}
+        states the terms.
       </p>
     </main>
   );

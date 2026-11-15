@@ -145,14 +145,20 @@ export default function AboutPage() {
           accounts per inviter.
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          A refund is recorded when the provider fails — including after it has
-          streamed part of an answer — or when a turn is stopped before the first
-          token. Stopping once text has arrived is not refunded, because the turn
-          is kept and can be continued. Everything is an append-only ledger row on{" "}
+          Every purchase is final: Dew, plans and passes are not refundable and
+          cannot be cancelled. A pass ends on its own and never renews. If the
+          provider never returns an answer at all, that hour is released back to
+          your balance by the meter — a correction, not a refund — and a turn
+          stopped after text arrived keeps its hour, because the answer is kept.
+          Everything is an append-only ledger row on{" "}
           <Link href="/activity" className="text-accent-text underline-offset-2 hover:underline">
             the activity page
           </Link>
-          .
+          ; the{" "}
+          <Link href="/refunds" className="text-accent-text underline-offset-2 hover:underline">
+            refund and cancellation policy
+          </Link>{" "}
+          states the terms.
         </p>
       </section>
 
@@ -183,6 +189,9 @@ export default function AboutPage() {
           </Link>
           <Link href="/privacy" className="eyebrow hover:text-hi">
             privacy
+          </Link>
+          <Link href="/refunds" className="eyebrow hover:text-hi">
+            refunds
           </Link>
           <Link href="/" className="eyebrow hover:text-hi">
             back to the start
