@@ -558,7 +558,6 @@ export async function createSandbox(
  * against a real sandbox in the launch checklist, not assumed.
  */
 export const RUN_EGRESS_DENY: readonly string[] = [
-  "0.0.0.0/8",
   "10.0.0.0/8",
   "100.64.0.0/10",
   "127.0.0.0/8",
