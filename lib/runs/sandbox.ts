@@ -321,7 +321,11 @@ export async function seedRunWorkspace(input: {
 
   const extracted = await input.sandbox.exec(
     [
-      "tar xzf src.tgz",
+      // GitHub's tarball wraps everything in `owner-repo-sha/`. Stripping it is
+      // what makes a path in the workspace the path in the repository: without
+      // this, every diff was `owner-repo-sha/README.md` and the changeset wrote
+      // a nested copy instead of editing the file.
+      `tar xzf src.tgz --strip-components=1`,
       "rm -f src.tgz",
       "rm -rf node_modules .next dist build out vendor target .git",
       "find . -maxdepth 2 -name '.env*' -delete",

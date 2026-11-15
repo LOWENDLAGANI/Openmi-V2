@@ -314,7 +314,7 @@ test("an existing branch at the pinned base is fast-forwarded, never forced", as
   );
 });
 
-test("a named branch that has moved gets a new branch on the live head", async () => {
+test("a named branch that has moved is written on the live head, unforced", async () => {
   const calls = stubFetch((method, path) => {
     if (method === "GET" && path.endsWith("/git/ref/heads/release")) {
       return { body: { object: { sha: "newer-commit" } } };
@@ -322,13 +322,19 @@ test("a named branch that has moved gets a new branch on the live head", async (
     if (method === "GET" && path.endsWith("/git/commits/newer-commit")) {
       return { body: { tree: { sha: "tree-newer" } } };
     }
+    if (method === "PATCH" && path.endsWith("/git/refs/heads/release")) {
+      return { body: { object: { sha: "commit-1" } } };
+    }
     return happyPath(method, path);
   });
 
   const outcome = await commitProposal({ ...BASE, targetBranch: "release" });
 
-  expect(outcome.branch).toBe("openmi/agent/changeset-1");
-  expect(outcome.prNumber).toBe(7);
+  // The reader named this branch, so it is still where the change goes: the
+  // reviewed content is committed on the live head and fast-forwarded, instead
+  // of arriving as a pull request they did not ask for.
+  expect(outcome.branch).toBe("release");
+  expect(outcome.prNumber).toBeNull();
 
   const tree = calls.find(
     (call) => call.method === "POST" && call.path.endsWith("/git/trees")
@@ -340,7 +346,45 @@ test("a named branch that has moved gets a new branch on the live head", async (
   );
   expect(commit?.body?.parents).toEqual(["newer-commit"]);
 
-  expect(calls.some((call) => call.method === "PATCH")).toBe(false);
+  const patch = calls.find((call) => call.method === "PATCH");
+  expect(patch?.path).toBe("/repos/octocat/hello/git/refs/heads/release");
+  expect(patch?.body).toEqual({ sha: "commit-1", force: false });
+  expect(calls.some((call) => call.path.endsWith("/pulls"))).toBe(false);
+});
+
+test("push to main still lands on main when main moved since the diff", async () => {
+  const calls = stubFetch((method, path) => {
+    if (method === "GET" && path.endsWith("/git/ref/heads/main")) {
+      return { body: { object: { sha: "newer-commit" } } };
+    }
+    if (method === "GET" && path.endsWith("/git/commits/newer-commit")) {
+      return { body: { tree: { sha: "tree-newer" } } };
+    }
+    if (method === "PATCH" && path.endsWith("/git/refs/heads/main")) {
+      return { body: { object: { sha: "commit-1" } } };
+    }
+    return happyPath(method, path);
+  });
+
+  const outcome = await commitProposal({
+    ...BASE,
+    targetBranch: "main",
+    allowDefaultBranch: true,
+  });
+
+  expect(outcome).toEqual({
+    branch: "main",
+    baseBranch: "main",
+    commitSha: "commit-1",
+    prUrl: null,
+    prNumber: null,
+  });
+
+  const commit = calls.find(
+    (call) => call.method === "POST" && call.path.endsWith("/git/commits")
+  );
+  expect(commit?.body?.parents).toEqual(["newer-commit"]);
+  expect(calls.some((call) => call.path.endsWith("/pulls"))).toBe(false);
 });
 
 test("a branch name git would refuse is refused before any request", async () => {

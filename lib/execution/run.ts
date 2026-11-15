@@ -519,7 +519,7 @@ async function seed(
 
   const extracted = await sandbox.exec(
     [
-      "tar xzf src.tgz",
+      "tar xzf src.tgz --strip-components=1",
       "rm -f src.tgz",
       "rm -rf node_modules .next dist build vendor target .git",
       "find . -maxdepth 2 -name '.env*' -delete",

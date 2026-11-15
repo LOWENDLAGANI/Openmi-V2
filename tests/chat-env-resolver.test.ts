@@ -87,7 +87,7 @@ test("the store owns the lifecycle columns and claims leases conditionally", () 
 });
 
 test("the seed writes a marker outside the workspace and refuses a missing one", () => {
-  expect(seed).toContain(".openmi/env.json");
+  expect(seed).toContain(".openmi/env.v2.json");
   expect(seed).toContain("fetchRepoArchive");
   expect(seed).toContain("test -d ${MISSION_WORKDIR}/.git");
   expect(seed).toContain("-name '.env*'");

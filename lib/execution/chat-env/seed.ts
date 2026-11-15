@@ -24,7 +24,14 @@ export type SeedResult =
   | { ok: true }
   | { ok: false; failure: SeedFailure; detail: string };
 
-const MARKER_PATH = ".openmi/env.json";
+/**
+ * Bumped when the layout inside the workspace changes.
+ *
+ * A marker at a new path is what makes an existing box reseed: `chatWorkspaceIntact`
+ * looks for this one, and a workspace seeded before the layout changed does not
+ * have it, so it is replaced rather than trusted.
+ */
+const MARKER_PATH = ".openmi/env.v2.json";
 
 export async function seedChatWorkspace(input: {
   sandbox: SandboxHandle;
@@ -87,7 +94,10 @@ export async function seedChatWorkspace(input: {
 
   const extracted = await input.sandbox.exec(
     [
-      "tar xzf src.tgz",
+      // `--strip-components=1` drops GitHub's `owner-repo-sha/` wrapper, so the
+      // workspace root is the repository root. The v2 marker above rebuilds the
+      // boxes seeded with the wrapper still in place.
+      "tar xzf src.tgz --strip-components=1",
       "rm -f src.tgz",
       "rm -rf node_modules .next dist build vendor target .git",
       "find . -maxdepth 2 -name '.env*' -delete",

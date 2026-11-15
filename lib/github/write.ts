@@ -369,12 +369,24 @@ export async function commitProposal({
       branchHead !== baseSha &&
       branchHead !== existingCommitSha
     ) {
-      direct = false;
-      branch = agentBranchName(changesetId);
-      writeBase = branchHead;
-      branchHead = null;
+      if (existingCommitSha) {
+        // A commit recorded by an earlier attempt sits on the old base, so it
+        // cannot fast-forward the live head. That one still falls back to the
+        // agent branch rather than rewriting the branch by force.
+        direct = false;
+        branch = agentBranchName(changesetId);
+        writeBase = branchHead;
+        branchHead = null;
 
-      await onProgress?.({ branch });
+        await onProgress?.({ branch });
+      } else {
+        // The branch moved since the diff was reviewed, and a branch the reader
+        // named is still where the change goes. Every proposed file is whole
+        // content, so the commit is built on the live head and lands as an
+        // ordinary fast-forward instead of becoming a pull request nobody
+        // asked for — which is what "push to main" kept getting.
+        writeBase = branchHead;
+      }
     }
   }
 
@@ -398,7 +410,9 @@ export async function commitProposal({
     });
 
     const commit = await request<{ sha: string }>(token, "POST", `${repoPath}/git/commits`, {
-      message: `Openmi: propose ${files.length} file(s)\n\nChangeset ${changesetId}, approved in the app. The default branch was not modified.`,
+      message: direct
+        ? `Openmi: ${files.length} file(s) applied to ${branch}\n\nChangeset ${changesetId}, approved in the app.`
+        : `Openmi: propose ${files.length} file(s)\n\nChangeset ${changesetId}, approved in the app. The default branch was not modified.`,
       tree: tree.sha,
       parents: [writeBase],
     });
