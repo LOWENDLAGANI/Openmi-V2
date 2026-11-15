@@ -147,6 +147,9 @@ const REQUIRED_COLUMNS = [
   ["chat_sandboxes", "chat_id"],
   ["chat_sandboxes", "delete_after"],
   ["chat_sandboxes", "lease_until"],
+  ["chat_sandboxes", "sandbox_account"],
+  ["sandbox_accounts", "last_tried_at"],
+  ["sandbox_accounts", "last_ok_at"],
 ];
 
 async function schemaProblems(db) {

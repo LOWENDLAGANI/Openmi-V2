@@ -30,6 +30,7 @@ import {
   markSandboxAccountHealthy,
   setAsideSandboxAccount,
   shouldFailOver,
+  touchSandboxAccountTried,
   type SandboxAccount,
 } from "./accounts";
 
@@ -266,6 +267,13 @@ async function createWithFailover(input: {
       // Pinned, out of attempts, or not this account's fault: the reader gets
       // the error the rest of the product already knows how to explain.
       if (!shouldFailOver(failure.failure) || attempt + 1 >= attempts) {
+        // Still worth writing down: the panel's "last tried" is an observation
+        // about the fleet, not a claim that the account is at fault.
+        await touchSandboxAccountTried({
+          id: account.id,
+          failure: failure.message,
+        });
+
         throw failure;
       }
 

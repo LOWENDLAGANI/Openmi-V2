@@ -7,9 +7,11 @@ import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { BanControl } from "./BanControl";
+import { SandboxFleet } from "./SandboxFleet";
 
 import { readAdminAccess } from "@/lib/admin/access";
 import { planById } from "@/lib/billing/plans";
+import { sandboxFleet } from "@/lib/execution/accounts";
 import { formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -243,6 +245,10 @@ export default async function AdminPage({
       .limit(12),
   ]);
 
+  // The fleet panel's first answer, rendered on the server; the component polls
+  // the same data afterwards, so the page has no loading state to show.
+  const fleet = await sandboxFleet(admin, Date.now());
+
   const giveawayCodes = (codesResult.data ?? []) as Array<{
     code: string;
     dew_amount: number | string;
@@ -440,6 +446,26 @@ export default async function AdminPage({
             </p>
           </div>
         ))}
+      </section>
+
+      <section
+        id="sandbox-fleet"
+        aria-labelledby="sandbox-fleet-heading"
+        className="panel mt-5 p-5"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2
+            id="sandbox-fleet-heading"
+            className="text-[15px] font-semibold tracking-[-0.02em] text-hi"
+          >
+            Sandbox accounts
+          </h2>
+          <p className="text-[10.5px] text-low">
+            which one is working, and when each was last tried
+          </p>
+        </div>
+
+        <SandboxFleet initial={fleet} />
       </section>
 
       <section

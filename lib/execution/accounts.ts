@@ -12,6 +12,10 @@ import {
   type SandboxAccount,
   type SandboxAccountState,
 } from "./account-pool";
+import type {
+  SandboxFleetAccount,
+  SandboxFleetReport,
+} from "./fleet-types";
 
 /**
  * The server half of the E2B account pool: live counts, and the choice for a
@@ -133,11 +137,50 @@ export async function setAsideSandboxAccount(input: {
         set_aside_until: until,
         last_failure: input.reason ? input.reason.slice(0, 200) : null,
         last_failure_at: new Date().toISOString(),
+        last_tried_at: new Date().toISOString(),
       },
       { onConflict: "id" }
     );
   } catch {
     // The workspace error is the one the reader needs to see.
+  }
+
+  clearSandboxAccountCaches();
+}
+
+/**
+ * Records that a new sandbox was attempted on an account.
+ *
+ * Written even when the attempt failed for a reason that is not the account's
+ * fault: the admin panel's question is "when was this last tried, and what did
+ * it say", which is a different question from "may we use it". Only the last
+ * fifty characters are kept, and only of the message — never the key.
+ */
+export async function touchSandboxAccountTried(input: {
+  id: string;
+  failure?: string | null;
+  admin?: ReturnType<typeof supabaseAdmin>;
+}): Promise<void> {
+  if (parseSandboxAccounts().length < 2) return;
+
+  const admin = input.admin ?? supabaseAdmin();
+  if (!admin) return;
+
+  const at = new Date().toISOString();
+
+  try {
+    await admin.from("sandbox_accounts").upsert(
+      {
+        id: input.id,
+        last_tried_at: at,
+        ...(input.failure
+          ? { last_failure: input.failure.slice(0, 200), last_failure_at: at }
+          : {}),
+      },
+      { onConflict: "id" }
+    );
+  } catch {
+    // The panel showing a stale time is not worth failing a workspace over.
   }
 
   clearSandboxAccountCaches();
@@ -153,12 +196,22 @@ export async function markSandboxAccountHealthy(
   if (parseSandboxAccounts().length < 2) return;
   if (!admin) return;
 
+  const at = new Date().toISOString();
+
   try {
-    await admin
-      .from("sandbox_accounts")
-      .update({ state: "active", set_aside_until: null })
-      .eq("id", id)
-      .neq("state", "active");
+    // An upsert that names only these columns: the previous failure message is
+    // left in place as history, because "worked 2m ago, last complained 3h ago"
+    // is exactly what an operator needs to read.
+    await admin.from("sandbox_accounts").upsert(
+      {
+        id,
+        state: "active",
+        set_aside_until: null,
+        last_ok_at: at,
+        last_tried_at: at,
+      },
+      { onConflict: "id" }
+    );
   } catch {
     // A stale "cooling" row only costs one skipped account for a few minutes.
   }
@@ -280,4 +333,141 @@ export async function chooseSandboxAccount(
     cap: sandboxAccountCap(),
     seed: input.seed ?? null,
   });
+}
+
+function asText(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * The whole fleet, for the admin panel.
+ *
+ * One row per account the deployment has now, plus one for every label the table
+ * still remembers — a key that was removed leaves its history behind, and seeing
+ * "default · not configured · 40h ago" is how an operator knows the old key can
+ * finally be dropped.
+ *
+ * Counting is done here rather than with a SQL aggregate so it stays inside the
+ * same column names the sweep uses, and so a missing service-role client degrades
+ * to an empty breakdown rather than an error. It is a read-only view: nothing in
+ * this function changes an account's state.
+ */
+export async function sandboxFleet(
+  admin: ReturnType<typeof supabaseAdmin> = supabaseAdmin(),
+  now: number = Date.now()
+): Promise<SandboxFleetReport> {
+  const configured = parseSandboxAccounts();
+  const cap = sandboxAccountCap();
+
+  const counts: Record<string, { chat: number; runs: number; executions: number }> = {};
+  const stored = new Map<string, Record<string, unknown>>();
+
+  if (admin) {
+    const [rows, chats, runs, executions] = await Promise.all([
+      admin
+        .from("sandbox_accounts")
+        .select(
+          "id, state, set_aside_until, last_tried_at, last_ok_at, last_failure, last_failure_at"
+        )
+        .limit(200),
+      admin
+        .from("chat_sandboxes")
+        .select("sandbox_account")
+        .in("state", LIVE_CHAT_STATES)
+        .limit(2_000),
+      admin
+        .from("runs")
+        .select("sandbox_account")
+        .not("sandbox_id", "is", null)
+        .in("status", LIVE_RUN_STATUSES)
+        .limit(2_000),
+      admin
+        .from("execution_runs")
+        .select("sandbox_account")
+        .not("sandbox_id", "is", null)
+        .in("status", LIVE_EXECUTION_STATUSES)
+        .limit(2_000),
+    ]);
+
+    for (const row of (rows.data ?? []) as Array<Record<string, unknown>>) {
+      stored.set(String(row.id), row);
+    }
+
+    const bump = (
+      source: Array<Record<string, unknown>>,
+      kind: "chat" | "runs" | "executions"
+    ) => {
+      for (const row of source) {
+        const id = asText(row.sandbox_account) ?? LEGACY_SANDBOX_ACCOUNT;
+        const entry = (counts[id] ??= { chat: 0, runs: 0, executions: 0 });
+        entry[kind] += 1;
+      }
+    };
+
+    bump((chats.data ?? []) as Array<Record<string, unknown>>, "chat");
+    bump((runs.data ?? []) as Array<Record<string, unknown>>, "runs");
+    bump((executions.data ?? []) as Array<Record<string, unknown>>, "executions");
+  }
+
+  const states: Record<string, SandboxAccountState> = {};
+  for (const [id, row] of stored) {
+    const state = String(row.state ?? "active");
+    states[id] = {
+      state: state === "cooling" || state === "disabled" ? state : "active",
+      setAsideUntil: asText(row.set_aside_until),
+    };
+  }
+
+  const usable = new Set(
+    availableAccounts(configured, states, now).map((account) => account.id)
+  );
+
+  const ids = new Set<string>([
+    ...configured.map((account) => account.id),
+    ...stored.keys(),
+  ]);
+
+  const accounts: SandboxFleetAccount[] = [...ids]
+    .sort((a, b) => {
+      // Accounts in use first, then remembered ones; stable and alphabetical
+      // inside each group so a row does not jump while someone is reading it.
+      const aLive = configured.some((account) => account.id === a) ? 0 : 1;
+      const bLive = configured.some((account) => account.id === b) ? 0 : 1;
+      return aLive - bLive || a.localeCompare(b);
+    })
+    .map((id) => {
+      const row = stored.get(id);
+      const known = counts[id] ?? { chat: 0, runs: 0, executions: 0 };
+      const state = String(row?.state ?? "active");
+      const present = configured.some((account) => account.id === id);
+
+      return {
+        id,
+        configured: present,
+        state: state === "cooling" || state === "disabled" ? state : "active",
+        setAsideUntil: asText(row?.set_aside_until),
+        lastTriedAt: asText(row?.last_tried_at),
+        lastOkAt: asText(row?.last_ok_at),
+        lastFailure: asText(row?.last_failure),
+        lastFailureAt: asText(row?.last_failure_at),
+        live: known.chat + known.runs + known.executions,
+        chat: known.chat,
+        runs: known.runs,
+        executions: known.executions,
+        cap,
+        acceptingNew: present && usable.has(id),
+      };
+    });
+
+  return {
+    accounts,
+    totals: {
+      configured: configured.length,
+      live: accounts.reduce((sum, account) => sum + account.live, 0),
+      cooling: accounts.filter((account) => account.state === "cooling").length,
+      disabled: accounts.filter((account) => account.state === "disabled").length,
+      acceptingNew: accounts.filter((account) => account.acceptingNew).length,
+    },
+    checkedAt: new Date(now).toISOString(),
+  };
 }

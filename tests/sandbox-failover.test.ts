@@ -155,8 +155,9 @@ test("a pool of one keeps its old behaviour and remembers nothing", () => {
   const accounts = read("/lib/execution/accounts.ts");
 
   // No extra write per creation, and no row a later second account would
-  // inherit from a deployment that had nothing to switch to.
-  expect(accounts.match(/if \(parseSandboxAccounts\(\)\.length < 2\) return;/g)?.length).toBe(2);
+  // inherit from a deployment that had nothing to switch to. Every writer of
+  // `sandbox_accounts` opts out: set-aside, the try record and the success mark.
+  expect(accounts.match(/if \(parseSandboxAccounts\(\)\.length < 2\) return;/g)?.length).toBe(3);
 });
 
 test("a workspace that cannot be opened is rebuilt, and the reader is told where it went", () => {
