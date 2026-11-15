@@ -2,7 +2,8 @@ edit after countless failing
 
 # Openmi
 
-A chat client welded to a GitHub repository. It reads code at a pinned commit,
+A chat client welded to a GitHub repository — the house where a change is
+written, read and reviewed. It reads code at a pinned commit,
 answers with `path:line` citations, and proposes edits as a diff you can review.
 A ready change is written to its own branch and applied as one pull request; the
 default branch is only ever the base unless you name it as the destination. It
@@ -569,4 +570,3 @@ cannot start (D6.4) — are answered in
 - A new table gets RLS enabled in the migration that creates it.
 - A new limit is a named constant with a test that reads it.
 - Do not claim verification the product does not perform.
-- House style: one change per branch, and the diff is the review.
