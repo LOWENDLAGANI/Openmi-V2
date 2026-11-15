@@ -54,53 +54,6 @@ the admin panel under **Configuration & probes**; it is not a public page.
 - Set `CRON_SECRET`; without it the sandbox sweep answers 503 and E2B's own idle
   and expiry timers are the only backstop.
 
-### Turning the admin panel off
-
-`OPENMI_ADMIN_PANEL=off` — in Vercel, Settings → Environment Variables, then
-**Redeploy**; a deployment keeps the environment it was built with — makes
-`readAdminAccess()` answer `forbidden` before it consults the allowlist or
-`is_admin()`. That is one choke point, and every admin surface goes through it:
-`/admin` and `/setup` 404, every admin action redirects to `/chat`, and
-`/api/admin/status` says `admin: false`. No session, cookie, URL or database role
-outranks it, and nothing in the product can turn it back on. Unset or blank is
-the default and means on.
-
-Postgres cannot read the host's environment, so the switch is mirrored into the
-database: `admin_control` holds one row, the service role writes it (at boot via
-`instrumentation.ts`, and again on the first admin request), and `is_admin()`
-returns false while it says off. Every admin RPC starts with
-`if not public.is_admin()`, so a stolen admin token calling `admin_grant_dew`,
-`admin_set_admin`, `review_payment_request`, the Dew-code functions or
-`admin_set_pass` straight against PostgREST is refused too — that request never
-reaches this app, and it no longer has to. A session cannot flip the row back:
-`admin_set_disabled` is executable by the service role only.
-
-Deleting the role row remains the belt to that braces, and is worth doing once
-the incident is contained:
-
-```sql
-delete from public.admin_users where user_id = '<the account id>';
-```
-
-### Risk signals and bans
-
-The app records what looks wrong while it happens, and the panel opens with that
-feed. A row lands in `risk_events` when a sandbox command names an internal
-address and is refused (high), when the chat rate limit is tripped and refusals
-continue (medium), and when an account starts a second run while one is live
-(low). Each row keeps the email and handle the account had at the time, the
-route that saw it, and a capped detail object. The account a signal is about
-cannot read it — there is no policy and no grant — because knowing what tripped
-the alarm is a hint for the next attempt. Repeats inside ten minutes collapse to
-one row, so the feed stays readable.
-
-**Stop account** on a signal bans it: reason (shown to the account) plus a
-duration (24 hours, 7 days or permanent). The ban lives on `profiles.banned_at`
-and is enforced three times over — `getSession()` resolves to `banned`, so every
-page and route refuses; `claim_next_run` skips the owner, so a queued run cannot
-start; and the RPC cancels runs already live. The account lands on `/banned` with
-the reason and the end date. "Lift ban" restores it; nothing is deleted.
-
 ## Sign in
 
 Email and password through Supabase Auth. The session lives in an httpOnly
@@ -257,26 +210,14 @@ naming one also answers the confirmation question, because asking for that branc
 was the decision. The write is still one commit, never forced, and re-applied if
 the branch moved under it.
 
-The automatic write counts as the review (`AUTO_WRITE_REVIEW`). With
-`OPENMI_AUTO_WRITE` on — the default — a finished turn writes its own change:
-one `openmi/agent/` branch, one pull request, squash-merged, and the reader gets
-the branch and the PR as a sentence in the transcript. There is no card to click
-in that path. Where it goes is the model's read of the request, through the
-`publish` tool: naming the default branch writes it directly, asking for a pull
-request opens one and leaves it unmerged, and asking for a branch of its own
-writes that branch with no PR. A request that names no destination keeps the
-default — an `openmi/agent/` branch, a pull request, merged. The run also has the
-repository's GitHub context that the sandbox cannot see: `git_history`,
-`github_read` (pull requests, issues, comments, checks, branches) and
-`github_action` (comment, open, close, reopen or label an issue, or merge a pull
-request) — all through your own connection, with no token in the box. Set
-`OPENMI_AUTO_WRITE=off` and the card asks again, with the old
-guards: a head that moved since the diff, a change over five files, or a path
-that is configuration, credentials or the schema. A named branch that has moved
-since the diff was computed is not a dead end — the change goes to a new
-`openmi/agent/` branch on top of the live head, unforced. Retrying after a
-failure reuses the recorded branch, commit and pull request, so one approval
-cannot produce two PRs.
+The automatic write now counts as the review (`AUTO_WRITE_REVIEW`). Before that,
+every fresh suggestion read as "nobody has reviewed it" and asked for a click, so
+the automatic path never actually ran. Two questions survive: a head that moved
+since the diff, and a change over five files or touching configuration,
+credentials or the schema. A named branch that has moved since the diff
+was computed is not a dead end — the change goes to a new `openmi/agent/` branch
+on top of the live head, unforced. Retrying after a failure reuses the recorded
+branch, commit and pull request, so one approval cannot produce two PRs.
 
 ## Dew
 
@@ -618,62 +559,6 @@ The four decisions this depends on — what may run (D6.1), what a minute costs
 cannot start (D6.4) — are answered in
 [docs/EXECUTION_ENVIRONMENT_PLAN.md](docs/EXECUTION_ENVIRONMENT_PLAN.md).
 
-## Web agent runs
-
-A chat message is a run. The conversation at `/chat` is the only agent surface:
-the browser is a view, and nothing it does executes agent work.
-
-- `POST /api/chat` authenticates, checks the per-account quota and rate limit,
-  writes the question to the transcript, queues a `runs` row with the chat's
-  recent history and streams that run's events in the protocol the transcript
-  already speaks. It never calls a provider.
-- `bun run worker` starts the long-lived worker. It claims a run with
-  `for update skip locked`, executes the loop in one E2B sandbox, and appends
-  every step, tool call and event to Postgres before the next model call.
-- When the run settles, the worker appends the answer to `messages` (so the
-  transcript is the same on every device) and proposes the diff as the chat's
-  changeset, which is what the review card and its pull-request button act on.
-- `POST /api/chat/stop` sets a flag. The loop reads it at each step and tool
-  boundary and lets the tool in flight finish. A stop before any text refunds
-  the hour; a failed run refunds it too.
-- `POST /api/runs`, `GET /api/runs/:id`, `GET /api/runs/:id/stream` and
-  `POST /api/runs/:id/cancel` remain as the same runtime's API, for tooling and
-  for the tests; the product does not need them.
-- The diff and changed files are also collected as artifacts
-  (`RUN_ARTIFACT_DIR`, or an S3-compatible bucket) before the sandbox pauses.
-
-| Limit | Value |
-|---|---|
-| Steps per run | 40 |
-| Tokens per run (estimated) | 120,000 |
-| Wall clock | 15 min |
-| Sandbox paused | 15 min (compute released, disk kept) |
-| Sandbox destroyed | 48 h after the run settles |
-| Concurrent runs per account | 1 |
-| Runs per day | 20 |
-| Tokens per day | 400,000 |
-
-Vercel does not run the worker: point a small VM or container at
-`bun run worker`. `GET /api/cron/run-sweep` (bearer `CRON_SECRET`) reaps a run
-whose heartbeat stopped, fails one that sat `queued` for twenty minutes, and
-destroys sandboxes no live row claims, so a crashed worker does not leave a run
-waiting forever. The same settlement runs when a chat is opened for a new turn,
-so an account is never locked out of chatting by a row nothing will finish — and
-stopping a run that was never claimed settles it on the spot.
-
-The contract, the phase map, the sandbox facts (including why the workspace is
-`/home/user/work` rather than `/work`) and what still needs a real key to verify
-are in [docs/WEB_AGENT_RUNS.md](docs/WEB_AGENT_RUNS.md). The chat's engine is the
-run runtime; the transcript is its event log made readable.
-
-For Render, the repository carries `Dockerfile.worker` and `render.yaml`. The
-Blueprint creates a **free Web Service** — the type Render gives away — which is
-why the worker also answers `GET /healthz` on `$PORT`; the run queue is polled
-behind it. Free Web Services sleep after 15 minutes without traffic, so ping
-`/healthz` every five minutes if runs should start immediately. A run's
-artifacts need the `RUN_ARTIFACTS_*` bucket there: a free instance has no disk
-and the web app runs elsewhere.
-
 ## Rules for contributors
 
 - Pushes are authored as **`Openmi`** — see
@@ -684,3 +569,4 @@ and the web app runs elsewhere.
 - A new table gets RLS enabled in the migration that creates it.
 - A new limit is a named constant with a test that reads it.
 - Do not claim verification the product does not perform.
+- House style: one change per branch, and the diff is the review.
