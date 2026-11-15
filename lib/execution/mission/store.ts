@@ -29,7 +29,7 @@ import type { MissionCommandRow, MissionRow } from "./status";
 type Admin = NonNullable<ReturnType<typeof supabaseAdmin>>;
 
 const MISSION_COLUMNS =
-  "id, owner, chat_id, status, stage, goal, autonomy, model, repo_full_name, base_sha, failure_code, failure_detail, sandbox_id, commands_count, changed_files, diff_bytes, reserved_dew, charged_dew, started_at, deadline_at, last_tick_at, ended_at, heartbeat_at, result_changeset_id";
+  "id, owner, chat_id, status, stage, goal, autonomy, model, repo_full_name, base_sha, failure_code, failure_detail, sandbox_id, sandbox_account, commands_count, changed_files, diff_bytes, reserved_dew, charged_dew, started_at, deadline_at, last_tick_at, ended_at, heartbeat_at, result_changeset_id";
 
 function toMission(row: Record<string, unknown>): MissionRow {
   return {
@@ -46,6 +46,7 @@ function toMission(row: Record<string, unknown>): MissionRow {
     failure_code: (row.failure_code as MissionRow["failure_code"]) ?? null,
     failure_detail: row.failure_detail ? String(row.failure_detail) : null,
     sandbox_id: row.sandbox_id ? String(row.sandbox_id) : null,
+    sandbox_account: row.sandbox_account ? String(row.sandbox_account) : null,
     commands_count: Number(row.commands_count ?? 0),
     changed_files: row.changed_files === null ? null : Number(row.changed_files),
     diff_bytes: row.diff_bytes === null ? null : Number(row.diff_bytes),
@@ -137,6 +138,7 @@ export async function updateMission(
     status?: MissionRow["status"];
     stage?: MissionRow["stage"];
     sandbox_id?: string | null;
+    sandbox_account?: string | null;
     failure_code?: MissionRow["failure_code"];
     failure_detail?: string | null;
     changed_files?: number | null;
@@ -292,13 +294,20 @@ export async function readMissionMessages(
   return ((data ?? []) as Array<{ seq: number; message: Record<string, unknown> }>).reverse();
 }
 
-export async function destroySandbox(sandboxId: string | null): Promise<void> {
+export async function destroySandbox(
+  sandboxId: string | null,
+  accountId: string | null
+): Promise<void> {
   if (!sandboxId) return;
 
   const { attachSandbox } = await import("../provider");
+  const { recordedAccountId } = await import("../accounts");
 
   try {
-    const sandbox: SandboxHandle = await attachSandbox(sandboxId);
+    const sandbox: SandboxHandle = await attachSandbox(
+      sandboxId,
+      recordedAccountId(accountId)
+    );
     await sandbox.destroy();
   } catch {
     // TTL is the backstop; a mission that already has a result must not fail

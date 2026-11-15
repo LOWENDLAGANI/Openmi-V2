@@ -14,6 +14,7 @@ import {
 } from "@/lib/providers";
 import type { supabaseAdmin } from "@/lib/supabase/admin";
 
+import { recordedAccountId } from "../accounts";
 import { fetchRepoArchive } from "../archive";
 import {
   attachSandbox,
@@ -142,6 +143,7 @@ async function provision(
 
   await updateMission(admin, mission.id, {
     sandbox_id: sandbox.id,
+    sandbox_account: sandbox.accountId,
     stage: "seed",
   });
 
@@ -230,7 +232,10 @@ export async function runMissionTick(input: {
       : 0;
 
     await settleExecutionDew(admin, owner, runId, charged);
-    await destroySandbox(sandbox?.id ?? mission.sandbox_id);
+    await destroySandbox(
+      sandbox?.id ?? mission.sandbox_id,
+      sandbox?.accountId ?? mission.sandbox_account
+    );
   };
 
   const end = async (patch: {
@@ -259,7 +264,10 @@ export async function runMissionTick(input: {
     // Reattach or provision. The workspace outlives a tick; the handle does not.
     if (mission.sandbox_id) {
       try {
-        sandbox = await attachSandbox(mission.sandbox_id);
+        sandbox = await attachSandbox(
+          mission.sandbox_id,
+          recordedAccountId(mission.sandbox_account)
+        );
       } catch {
         return await end({
           status: "failed",

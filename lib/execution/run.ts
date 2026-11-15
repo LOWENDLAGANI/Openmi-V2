@@ -318,7 +318,10 @@ export async function executeRun(input: {
       return;
     }
 
-    await updateRun(input.admin, input.runId, { sandbox_id: sandbox.id });
+    await updateRun(input.admin, input.runId, {
+      sandbox_id: sandbox.id,
+      sandbox_account: sandbox.accountId,
+    });
     await event("observation", `sandbox ${sandbox.id} started`);
 
     await stage("seed");

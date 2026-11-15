@@ -181,6 +181,7 @@ describe("mission description", () => {
     failure_code: null,
     failure_detail: null,
     sandbox_id: "sandbox",
+    sandbox_account: "default",
     commands_count: 4,
     changed_files: 2,
     diff_bytes: 1200,

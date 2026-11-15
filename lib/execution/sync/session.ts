@@ -65,7 +65,7 @@ async function countDirty(admin: Admin, chatId: string): Promise<number> {
   if (!row) return 0;
 
   try {
-    const handle = await attachSandbox(row.sandboxId);
+    const handle = await attachSandbox(row.sandboxId, row.sandboxAccount);
     await handle.start(90);
     const status = await handle.exec("git status --porcelain", REPO_DIR, 20_000);
 

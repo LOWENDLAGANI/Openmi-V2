@@ -40,7 +40,9 @@ test("wiping happens before stopping, and both before reconciliation", () => {
   expect(at(sweep, 'pass: "expire"')).toBeLessThan(at(sweep, 'pass: "stop"'));
   expect(at(sweep, 'pass: "stop"')).toBeLessThan(at(sweep, 'pass: "reconcile"'));
 
-  expect(at(sweep, "destroySandboxConfirmed(row.sandboxId)")).toBeLessThan(
+  expect(
+    at(sweep, "destroySandboxConfirmed(row.sandboxId, row.sandboxAccount)")
+  ).toBeLessThan(
     at(sweep, "deleteChatSandboxRow(admin, row.id)")
   );
   expect(at(sweep, "deleteChatSandboxRow(admin, row.id)")).toBeLessThan(

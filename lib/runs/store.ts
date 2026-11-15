@@ -44,6 +44,8 @@ export type RunRow = {
   stop_reason: string | null;
   error: string | null;
   sandbox_id: string | null;
+  /** The E2B account label that can open `sandbox_id`. */
+  sandbox_account: string | null;
   worker_id: string | null;
   steps: number;
   input_tokens: number;
@@ -120,7 +122,7 @@ function normalizeRun(row: Record<string, unknown>): RunRow {
 }
 
 export const RUN_COLUMNS =
-  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, dew_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
+  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, sandbox_account, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, dew_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
 
 export async function createRun(
   admin: Client,
@@ -211,6 +213,7 @@ export async function updateRun(
     stop_reason?: string | null;
     error?: string | null;
     sandbox_id?: string | null;
+    sandbox_account?: string | null;
     steps?: number;
     input_tokens?: number;
     output_tokens?: number;

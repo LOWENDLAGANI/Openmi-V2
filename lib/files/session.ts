@@ -81,7 +81,7 @@ async function openWorkspace(input: {
   }
 
   try {
-    const handle = await attachSandbox(row.sandboxId);
+    const handle = await attachSandbox(row.sandboxId, row.sandboxAccount);
     await handle.start(90);
     return { ok: true, row, handle };
   } catch (caught) {

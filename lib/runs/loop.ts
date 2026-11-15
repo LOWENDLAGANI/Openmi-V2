@@ -185,7 +185,10 @@ export async function executeRun(
     // row, so recording the id here would claim a disk the next message is
     // supposed to find.
     if (!opened.shared) {
-      await updateRun(admin, runId, { sandbox_id: sandbox.id });
+      await updateRun(admin, runId, {
+        sandbox_id: sandbox.id,
+        sandbox_account: sandbox.accountId,
+      });
     }
 
     // A chat turn arrives with the conversation behind it, already written to

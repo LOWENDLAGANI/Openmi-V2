@@ -63,7 +63,7 @@ export async function trashChatSandbox(chatId: string): Promise<void> {
   if (!executionConfigured() || isLeaseLive(row.leaseUntil, now)) return;
 
   try {
-    const handle = await attachSandbox(row.sandboxId);
+    const handle = await attachSandbox(row.sandboxId, row.sandboxAccount);
     await handle.stop({ force: false });
   } catch {
     // Missing is fine; the sweep will confirm and remove the row.
@@ -88,7 +88,7 @@ export async function wipeChatSandbox(chatId: string): Promise<void> {
   if (!executionConfigured()) return;
 
   try {
-    await destroySandboxConfirmed(row.sandboxId);
+    await destroySandboxConfirmed(row.sandboxId, row.sandboxAccount);
     await deleteChatSandboxRow(admin, row.id);
   } catch {
     // Kept for the sweep: the row outlives the chat, the container is retried.

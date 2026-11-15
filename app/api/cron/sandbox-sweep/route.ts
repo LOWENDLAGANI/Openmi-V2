@@ -22,8 +22,8 @@ import {
   attachSandbox,
   destroySandboxConfirmed,
   executionConfigured,
-  listChatSandboxes,
 } from "@/lib/execution/provider";
+import { listChatSandboxesEveryAccount } from "@/lib/execution/sandbox-inventory";
 import { wipeChatSandboxes } from "@/lib/execution/chat-env/destroy";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { trashCutoff } from "@/lib/trash";
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
       });
 
       try {
-        await destroySandboxConfirmed(row.sandboxId);
+        await destroySandboxConfirmed(row.sandboxId, row.sandboxAccount);
         await deleteChatSandboxRow(admin, row.id);
         expire.acted += 1;
       } catch (caught) {
@@ -266,7 +266,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        const handle = await attachSandbox(row.sandboxId);
+        const handle = await attachSandbox(row.sandboxId, row.sandboxAccount);
         const state = await handle.state();
 
         if (state === "started" || state === "stopping") {
@@ -330,7 +330,7 @@ export async function GET(request: Request) {
   };
 
   try {
-    const remote = await listChatSandboxes();
+    const remote = await listChatSandboxesEveryAccount();
     const known = await listChatSandboxIds(admin);
     const orphans = remote.filter((sandbox) => !known.has(sandbox.id));
     reconcile.candidates = orphans.length;
@@ -351,7 +351,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await destroySandboxConfirmed(sandbox.id);
+        await destroySandboxConfirmed(sandbox.id, sandbox.account);
         reconcile.acted += 1;
       } catch {
         reconcile.failed += 1;

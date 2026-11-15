@@ -241,7 +241,21 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "Sandbox verification (install + build on a real Linux workspace)",
-    hint: "E2B dashboard → API keys; runs stay off until this is set",
+    hint: "E2B dashboard → API keys; runs stay off until this is set or E2B_ACCOUNTS is",
+  },
+  {
+    key: "E2B_ACCOUNTS",
+    scope: "server",
+    required: false,
+    unlocks: "More than one sandbox account, spread and recorded per workspace",
+    hint: 'Labelled keys as "acct-1:key,acct-2:key". E2B_API_KEY still works and becomes account "default"',
+  },
+  {
+    key: "E2B_ACCOUNT_MAX_SANDBOXES",
+    scope: "server",
+    required: false,
+    unlocks: "A per-account ceiling for live sandboxes",
+    hint: "Optional; unset means uncapped. The cap steers new workspaces only",
   },
   {
     key: "EXECUTION_ENABLED",
@@ -533,8 +547,13 @@ export function readEnvReport(
 export function executionConfigured(
   env: Record<string, string | undefined> = process.env
 ): boolean {
-  const key = (env.E2B_API_KEY ?? "").trim();
-  if (key.length === 0) return false;
+  // Either form configures sandboxes: the single `E2B_API_KEY` (which resolves
+  // as the account labelled "default") or the multi-account list. Reading the
+  // list here rather than importing the resolver keeps this module free of the
+  // database client, which is why the chat prompt can ask this without one.
+  const single = (env.E2B_API_KEY ?? "").trim();
+  const list = (env.E2B_ACCOUNTS ?? "").trim();
+  if (single.length === 0 && list.length === 0) return false;
 
   const flag = (env.EXECUTION_ENABLED ?? "on").trim().toLowerCase();
   return flag !== "off" && flag !== "false" && flag !== "0";

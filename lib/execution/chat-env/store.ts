@@ -30,6 +30,8 @@ export type ChatSandboxRow = {
   chatId: string | null;
   owner: string;
   sandboxId: string;
+  /** The E2B account label that can open `sandboxId`. */
+  sandboxAccount: string;
   state: ChatSandboxState;
   repoFullName: string;
   baseSha: string;
@@ -49,6 +51,7 @@ export type ChatSandboxPatch = {
   chat_id?: string | null;
   state?: ChatSandboxState;
   sandbox_id?: string;
+  sandbox_account?: string;
   workspace_seeded_at?: string | null;
   last_active_at?: string;
   lease_until?: string | null;
@@ -61,7 +64,7 @@ export type ChatSandboxPatch = {
 };
 
 const COLUMNS =
-  "id, chat_id, owner, sandbox_id, state, repo_full_name, base_sha, workspace_seeded_at, last_active_at, lease_until, stopped_at, archived_at, delete_after, wipe_attempts, failure_code, failure_detail, created_at";
+  "id, chat_id, owner, sandbox_id, sandbox_account, state, repo_full_name, base_sha, workspace_seeded_at, last_active_at, lease_until, stopped_at, archived_at, delete_after, wipe_attempts, failure_code, failure_detail, created_at";
 
 function toRow(raw: Record<string, unknown>): ChatSandboxRow {
   return {
@@ -69,6 +72,7 @@ function toRow(raw: Record<string, unknown>): ChatSandboxRow {
     chatId: raw.chat_id ? String(raw.chat_id) : null,
     owner: String(raw.owner),
     sandboxId: String(raw.sandbox_id),
+    sandboxAccount: String(raw.sandbox_account ?? "default"),
     state: raw.state as ChatSandboxState,
     repoFullName: String(raw.repo_full_name),
     baseSha: String(raw.base_sha),
@@ -124,6 +128,8 @@ export async function insertChatSandbox(
     chatId: string;
     owner: string;
     sandboxId: string;
+    /** The account that created the box; without it the id cannot be opened. */
+    sandboxAccount: string;
     repoFullName: string;
     baseSha: string;
     leaseUntil: string;
@@ -137,6 +143,7 @@ export async function insertChatSandbox(
       chat_id: input.chatId,
       owner: input.owner,
       sandbox_id: input.sandboxId,
+      sandbox_account: input.sandboxAccount,
       state: "provisioning",
       repo_full_name: input.repoFullName,
       base_sha: input.baseSha,

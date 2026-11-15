@@ -42,6 +42,8 @@ export type MissionRow = {
   failure_code: FailureCode | null;
   failure_detail: string | null;
   sandbox_id: string | null;
+  /** The E2B account label that can open `sandbox_id`. */
+  sandbox_account: string | null;
   commands_count: number;
   changed_files: number | null;
   diff_bytes: number | null;

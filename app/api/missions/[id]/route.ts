@@ -136,7 +136,7 @@ export async function DELETE(
     { onlyWhileLive: true }
   );
 
-  await destroySandbox(mission.sandbox_id);
+  await destroySandbox(mission.sandbox_id, mission.sandbox_account);
 
   return NextResponse.json(
     { cancelled: true, chargedDew: settledDew },

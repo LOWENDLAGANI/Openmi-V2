@@ -247,12 +247,15 @@ async function probeExecution(): Promise<Probe> {
   const base = { id: "execution", label: "Sandbox verification" } as const;
 
   const key = process.env.E2B_API_KEY?.trim() ?? "";
-  if (key.length === 0) {
+  const accounts = process.env.E2B_ACCOUNTS?.trim() ?? "";
+
+  if (key.length === 0 && accounts.length === 0) {
     return {
       ...base,
       state: "unconfigured",
-      detail: "E2B_API_KEY is not set, so runs cannot start and the card says so.",
-      fix: "Create an API key in the E2B dashboard and add E2B_API_KEY.",
+      detail:
+        "No sandbox account is configured, so runs cannot start and the card says so.",
+      fix: "Create an API key in the E2B dashboard and add E2B_API_KEY, or labelled keys as E2B_ACCOUNTS.",
     };
   }
 
@@ -270,7 +273,7 @@ async function probeExecution(): Promise<Probe> {
     ...base,
     state: "ok",
     detail:
-      "An E2B key is present. Runs start on demand; this probe does not create one.",
+      "At least one E2B account is present. Runs start on demand; this probe does not create one.",
   };
 }
 

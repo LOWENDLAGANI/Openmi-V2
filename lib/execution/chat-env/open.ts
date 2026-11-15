@@ -129,7 +129,7 @@ async function retireRow(admin: Admin, row: ChatSandboxRow): Promise<void> {
   });
 
   try {
-    const handle = await attachSandbox(row.sandboxId);
+    const handle = await attachSandbox(row.sandboxId, row.sandboxAccount);
     await handle.destroy();
   } catch {
     // Missing or already deleted is the desired outcome.
@@ -181,6 +181,7 @@ async function provision(
       chatId: input.chatId,
       owner: input.owner,
       sandboxId: handle.id,
+      sandboxAccount: handle.accountId,
       repoFullName: input.repo,
       baseSha: input.sha,
       leaseUntil: lease,
@@ -254,7 +255,7 @@ async function resume(
 
   let handle: SandboxHandle;
   try {
-    handle = await attachSandbox(claimed.sandboxId);
+    handle = await attachSandbox(claimed.sandboxId, claimed.sandboxAccount);
   } catch (caught) {
     const failure = failureOf(caught);
     await markChatSandboxFailed(input.admin, row.id, {

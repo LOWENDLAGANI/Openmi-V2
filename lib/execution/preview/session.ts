@@ -159,7 +159,7 @@ async function logTail(
 async function attachChatBox(
   row: ChatSandboxRow
 ): Promise<SandboxHandle> {
-  const handle = await attachSandbox(row.sandboxId);
+  const handle = await attachSandbox(row.sandboxId, row.sandboxAccount);
   await handle.start(90);
   return handle;
 }

@@ -3,10 +3,8 @@ import { hostname } from "node:os";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  destroySandboxConfirmed,
-  listRunSandboxes,
-} from "@/lib/execution/provider";
+import { destroySandboxConfirmed } from "@/lib/execution/provider";
+import { listRunSandboxesEveryAccount } from "@/lib/execution/sandbox-inventory";
 
 import { runSandboxExpired, workerConcurrency } from "./limits";
 import { executeRun } from "./loop";
@@ -100,10 +98,12 @@ export function createWorkerStatus(input: {
 export async function sweepRunSandboxes(
   admin: SupabaseClient
 ): Promise<{ destroyed: number; kept: number }> {
-  let boxes: Awaited<ReturnType<typeof listRunSandboxes>>;
+  let boxes: Awaited<ReturnType<typeof listRunSandboxesEveryAccount>>;
 
   try {
-    boxes = await listRunSandboxes(200);
+    // Across every account: a box created under one key is invisible to a list
+    // made with another, and each summary carries the key that can destroy it.
+    boxes = await listRunSandboxesEveryAccount(200);
   } catch {
     return { destroyed: 0, kept: 0 };
   }
@@ -144,7 +144,7 @@ export async function sweepRunSandboxes(
 
     if (!row) {
       try {
-        await destroySandboxConfirmed(box.id);
+        await destroySandboxConfirmed(box.id, box.account);
         destroyed += 1;
       } catch {
         kept += 1;
@@ -163,12 +163,12 @@ export async function sweepRunSandboxes(
     }
 
     try {
-      await destroySandboxConfirmed(box.id);
+      await destroySandboxConfirmed(box.id, box.account);
       destroyed += 1;
 
       await admin
         .from("runs")
-        .update({ sandbox_id: null })
+        .update({ sandbox_id: null, sandbox_account: null })
         .eq("id", row.id)
         .eq("sandbox_id", box.id);
     } catch {

@@ -113,6 +113,7 @@ export async function updateRun(
     failure_code?: FailureCode | null;
     failure_detail?: string | null;
     sandbox_id?: string | null;
+    sandbox_account?: string | null;
     install_command?: string | null;
     build_command?: string | null;
     exit_code?: number | null;

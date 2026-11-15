@@ -23,6 +23,12 @@ import {
   tailOf,
 } from "./commands";
 import { EXEC_MAX_MINUTES } from "./cost";
+import {
+  accountById,
+  chooseSandboxAccount,
+  sandboxAccounts,
+  type SandboxAccount,
+} from "./accounts";
 
 /**
  * The only module that imports the sandbox SDK.
@@ -134,16 +140,62 @@ function networkOption():
 }
 
 /**
- * Credentials, per call.
+ * Credentials for one account, per call.
  *
- * Passed explicitly rather than relying on the process-wide default, so a
- * process that also uses the E2B CLI or another agent never inherits a
- * different client. The key is `E2B_API_KEY` and should be a team key scoped to
- * sandboxes: a leaked key with no project scope cannot deploy anything.
+ * There is no ambient key any more. A sandbox id is scoped to the team that
+ * created it, so opening one with another account's key answers 404 — which the
+ * sweep would read as "already deleted" and leave the box billing. Making the
+ * account a required argument is what prevents that: every call that touches an
+ * existing box names the account recorded beside its id.
  */
-function clientOptions(): { apiKey?: string } {
-  const apiKey = process.env.E2B_API_KEY?.trim() ?? "";
-  return apiKey.length > 0 ? { apiKey } : {};
+function clientOptionsFor(account: SandboxAccount): { apiKey: string } {
+  return { apiKey: account.key };
+}
+
+/**
+ * The account a recorded box belongs to.
+ *
+ * A missing account is reported as `missing`, not as a configuration error: a
+ * key that was rotated out means this deployment can no longer see the box, and
+ * the caller's existing recovery path — rebuild a chat workspace, clear a run's
+ * sandbox id — is the right answer.
+ */
+function configuredAccount(accountId: string): SandboxAccount {
+  const account = accountById(accountId);
+
+  if (!account) {
+    throw new SandboxStartError(
+      "missing",
+      `The E2B account "${accountId}" that owns this sandbox is not configured on this deployment.`
+    );
+  }
+
+  return account;
+}
+
+/**
+ * The account a box about to be created should use.
+ *
+ * One configured account returns without a database read, so a deployment with
+ * a single key behaves exactly as it did before the pool existed. With several,
+ * the least-loaded wins (see `lib/execution/accounts.ts`).
+ */
+async function accountForNewSandbox(input: {
+  accountId?: string | null;
+  seed?: string | null;
+} = {}): Promise<SandboxAccount> {
+  if (input.accountId) return configuredAccount(input.accountId);
+
+  const chosen = await chooseSandboxAccount({ seed: input.seed ?? null });
+
+  if (!chosen) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  return chosen;
 }
 
 /**
@@ -248,6 +300,13 @@ function normalizeState(value: unknown): SandboxState {
 
 export type SandboxHandle = {
   id: string;
+  /**
+   * The E2B account label that can open this box.
+   *
+   * Persisted next to the id by every caller. In memory only — the handle is
+   * never serialized and the key is never on it.
+   */
+  accountId: string;
   exec: (command: string, cwd?: string, timeoutMs?: number) => Promise<ExecResult>;
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
   /** Reads a workspace file for a repair pass or a mission's diff. */
@@ -364,7 +423,11 @@ function classifyStartError(
  * `current` is mutable on purpose: connecting may hand back a box on a different
  * host, so every later call has to go through the newest instance.
  */
-function handleFor(initial: Sandbox, id: string): SandboxHandle {
+function handleFor(
+  initial: Sandbox,
+  id: string,
+  account: SandboxAccount
+): SandboxHandle {
   let current = initial;
 
   const combined = (stdout: string, stderr: string): string =>
@@ -376,6 +439,7 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
 
   return {
     id,
+    accountId: account.id,
     host(port) {
       return current.getHost(port);
     },
@@ -474,7 +538,7 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
 
         // Connecting to a paused sandbox resumes it, so a message that arrives
         // after a night of silence does not have to know it was parked.
-        current = await Sandbox.connect(id, clientOptions());
+        current = await Sandbox.connect(id, clientOptionsFor(account));
       } catch (caught) {
         throw classifyStartError(caught, "attach");
       }
@@ -514,7 +578,12 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
  */
 export async function createSandbox(
   runId: string,
-  options: { ttlMinutes?: number; labels?: Record<string, string> } = {}
+  options: {
+    ttlMinutes?: number;
+    labels?: Record<string, string>;
+    /** Pins the account; absent means the least-loaded one is chosen. */
+    accountId?: string;
+  } = {}
 ): Promise<SandboxHandle> {
   if (!executionConfigured()) {
     throw new SandboxStartError(
@@ -524,6 +593,10 @@ export async function createSandbox(
   }
 
   const ttl = Math.max(5, Math.trunc(options.ttlMinutes ?? EXEC_MAX_MINUTES + 5));
+  const account = await accountForNewSandbox({
+    accountId: options.accountId,
+    seed: runId,
+  });
 
   let sandbox: Sandbox;
   try {
@@ -534,13 +607,13 @@ export async function createSandbox(
       lifecycle: { onTimeout: "kill", autoResume: false },
       metadata: { app: "openmi", run: runId, ...(options.labels ?? {}) },
       ...networkOption(),
-      ...clientOptions(),
+      ...clientOptionsFor(account),
     });
   } catch (caught) {
     throw classifyStartError(caught, "create");
   }
 
-  return handleFor(sandbox, sandbox.sandboxId);
+  return handleFor(sandbox, sandbox.sandboxId, account);
 }
 
 /**
@@ -618,6 +691,7 @@ export async function createRunSandbox(runId: string): Promise<SandboxHandle> {
   }
 
   const idle = Math.max(1, Math.trunc(RUN_SANDBOX_IDLE_MINUTES));
+  const account = await accountForNewSandbox({ seed: runId });
 
   let sandbox: Sandbox;
   try {
@@ -628,17 +702,18 @@ export async function createRunSandbox(runId: string): Promise<SandboxHandle> {
       lifecycle: { onTimeout: "pause", autoResume: true },
       metadata: { app: "openmi", kind: "run", run: runId },
       ...runNetworkOption(),
-      ...clientOptions(),
+      ...clientOptionsFor(account),
     });
   } catch (caught) {
     throw classifyStartError(caught, "create");
   }
 
-  return handleFor(sandbox, sandbox.sandboxId);
+  return handleFor(sandbox, sandbox.sandboxId, account);
 }
 
 /** Run sandboxes the provider knows about, for the orphan sweep. */
 export async function listRunSandboxes(
+  accountId: string,
   limit = 200
 ): Promise<RemoteSandboxSummary[]> {
   if (!executionConfigured()) {
@@ -649,16 +724,19 @@ export async function listRunSandboxes(
   }
 
   try {
+    const account = configuredAccount(accountId);
+
     const paginator = Sandbox.list({
       query: { metadata: { app: "openmi", kind: "run" } },
       limit,
-      ...clientOptions(),
+      ...clientOptionsFor(account),
     });
 
     const found = paginator.hasNext ? await paginator.nextItems() : [];
 
     return found.slice(0, limit).map((sandbox) => ({
       id: sandbox.sandboxId,
+      account: account.id,
       labels: sandbox.metadata ?? {},
       createdAt:
         sandbox.startedAt instanceof Date ? sandbox.startedAt.toISOString() : null,
@@ -724,6 +802,10 @@ export async function createChatSandbox(
   const autoDelete = Math.max(idle + 1, Math.trunc(options.autoDeleteMinutes));
   const ttl = Math.max(autoDelete, Math.trunc(options.ttlMinutes));
 
+  // Seeded with the chat id: a chat that has to be rebuilt lands on the same
+  // account it used before, while two chats spread.
+  const account = await accountForNewSandbox({ seed: options.chatId });
+
   const create = (timeoutMs: number) =>
     Sandbox.create({
       template: executionTemplate(),
@@ -736,7 +818,7 @@ export async function createChatSandbox(
         owner: options.owner.slice(0, 8),
       },
       ...networkOption(),
-      ...clientOptions(),
+      ...clientOptionsFor(account),
     });
 
   const requested = boundedTimeoutMs(ttl * 60);
@@ -766,7 +848,7 @@ export async function createChatSandbox(
     }
   }
 
-  return handleFor(sandbox, sandbox.sandboxId);
+  return handleFor(sandbox, sandbox.sandboxId, account);
 }
 
 /**
@@ -777,7 +859,10 @@ export async function createChatSandbox(
  * same box. Connecting also resumes a paused box, so a resumed tick needs no
  * special case.
  */
-export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
+export async function attachSandbox(
+  sandboxId: string,
+  accountId: string
+): Promise<SandboxHandle> {
   if (!executionConfigured()) {
     throw new SandboxStartError(
       "not_configured",
@@ -785,14 +870,16 @@ export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
     );
   }
 
+  const account = configuredAccount(accountId);
+
   let sandbox: Sandbox;
   try {
-    sandbox = await Sandbox.connect(sandboxId, clientOptions());
+    sandbox = await Sandbox.connect(sandboxId, clientOptionsFor(account));
   } catch (caught) {
     throw classifyStartError(caught, "attach");
   }
 
-  return handleFor(sandbox, sandbox.sandboxId ?? sandboxId);
+  return handleFor(sandbox, sandbox.sandboxId ?? sandboxId, account);
 }
 
 /**
@@ -804,7 +891,8 @@ export async function attachSandbox(sandboxId: string): Promise<SandboxHandle> {
  * kill stays visible and is retried instead of leaking a snapshot.
  */
 export async function destroySandboxConfirmed(
-  sandboxId: string
+  sandboxId: string,
+  accountId: string
 ): Promise<"deleted" | "missing"> {
   if (!executionConfigured()) {
     throw new SandboxStartError(
@@ -813,9 +901,11 @@ export async function destroySandboxConfirmed(
     );
   }
 
+  const account = configuredAccount(accountId);
+
   let sandbox: Sandbox;
   try {
-    sandbox = await Sandbox.connect(sandboxId, clientOptions());
+    sandbox = await Sandbox.connect(sandboxId, clientOptionsFor(account));
   } catch (caught) {
     const error = classifyStartError(caught, "attach");
     if (error.failure === "missing") return "missing";
@@ -831,7 +921,7 @@ export async function destroySandboxConfirmed(
     // A refused kill can mean "already gone" as easily as "not now". Ask the
     // provider which one it is before failing a wipe that may have worked.
     try {
-      await Sandbox.getInfo(sandboxId, clientOptions());
+      await Sandbox.getInfo(sandboxId, clientOptionsFor(account));
     } catch (again) {
       if (classifyStartError(again, "attach").failure === "missing") {
         return "missing";
@@ -846,6 +936,8 @@ export async function destroySandboxConfirmed(
 
 export type RemoteSandboxSummary = {
   id: string;
+  /** The account that listed it — the only key that can open or destroy it. */
+  account: string;
   labels: Record<string, string>;
   createdAt: string | null;
 };
@@ -859,6 +951,7 @@ export type RemoteSandboxSummary = {
  * whole account's estate.
  */
 export async function listChatSandboxes(
+  accountId: string,
   limit = 200
 ): Promise<RemoteSandboxSummary[]> {
   if (!executionConfigured()) {
@@ -869,21 +962,22 @@ export async function listChatSandboxes(
   }
 
   try {
+        const account = configuredAccount(accountId);
+
     const paginator = Sandbox.list({
       query: { metadata: { app: "openmi", kind: "chat" } },
       limit,
-      ...clientOptions(),
+      ...clientOptionsFor(account),
     });
 
     const found = paginator.hasNext ? await paginator.nextItems() : [];
 
     return found.slice(0, limit).map((sandbox) => ({
       id: sandbox.sandboxId,
+      account: account.id,
       labels: sandbox.metadata ?? {},
       createdAt:
-        sandbox.startedAt instanceof Date
-          ? sandbox.startedAt.toISOString()
-          : null,
+        sandbox.startedAt instanceof Date ? sandbox.startedAt.toISOString() : null,
     }));
   } catch (caught) {
     throw classifyStartError(caught, "attach");
