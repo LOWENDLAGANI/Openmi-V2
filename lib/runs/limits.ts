@@ -139,6 +139,25 @@ export const RUN_COMPACT_TARGET_CHARS = Math.floor(
 /** Milliseconds a run may be silent before the reaper calls it crashed. */
 export const RUN_STALE_AFTER_MS = RUN_WALL_CLOCK_MS + 5 * 60_000;
 
+/**
+ * When a run stops being "in progress" for the reader.
+ *
+ * A queued row older than this was never claimed — a full fifteen-minute run,
+ * plus the queue behind it, fits inside twenty — and a running row whose
+ * heartbeat is older than five minutes has lost its worker. The migration that
+ * settles stalls, the page that reads the spinner, the poll that ends a
+ * reloaded tab's wait and the stream that reports it all use these two ages, so
+ * they cannot drift apart.
+ */
+export const RUN_QUEUE_WAIT_MS = 20 * 60_000;
+export const RUN_HEARTBEAT_STALE_MS = 5 * 60_000;
+
+/**
+ * A queued run says so after this long with no claim, instead of staying silent
+ * until the queue's own twenty-minute rule fails it.
+ */
+export const RUN_QUEUE_NOTICE_MS = 20_000;
+
 /** `RUN_MAX_MINUTES` is an operator knob, clamped so a typo cannot buy an hour. */
 export function runMaxMinutes(
   env: Record<string, string | undefined> = process.env

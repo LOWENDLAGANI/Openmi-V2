@@ -133,6 +133,9 @@ export function ChatPanel({
   // headroom, not a loop.
   const continuedRef = useRef(0);
   const stopTimerRef = useRef<number | null>(null);
+  // Whether the reader asked for this turn to stop, so a closed stream is not
+  // mistaken for a turn that is still running elsewhere.
+  const stoppedRef = useRef(false);
 
   /**
    * Hands text to the composer: an edited message, or an empty field after a
@@ -170,10 +173,15 @@ export function ChatPanel({
         cache: "no-store",
       })
         .then((response) => (response.ok ? response.json() : null))
-        .then((payload: { running?: boolean } | null) => {
+        .then((payload: { running?: boolean; error?: string | null } | null) => {
           if (cancelled || !payload) return;
           if (payload.running) return;
           setBackgroundRunning(false);
+          // The poll is also where a run nothing finished is settled, so it is
+          // where the reason arrives. Without it the wait ended in silence.
+          if (typeof payload.error === "string" && payload.error.length > 0) {
+            setError(payload.error);
+          }
           router.refresh();
         })
         .catch(() => {
@@ -309,6 +317,7 @@ export function ChatPanel({
     // read or nothing at all is the model's call, and the sandbox it would use
     // is provisioned inside that call, not before it.
     busyRef.current = true;
+    stoppedRef.current = false;
     setStreaming(true);
     setStopping(false);
     if (stopTimerRef.current) {
@@ -326,6 +335,9 @@ export function ChatPanel({
     let assembled = "";
     let thinkingText = "";
     let sawDone = false;
+    // The server accepted a run for this turn, so a stream that ends without
+    // "done" is a turn still out there rather than a request that was refused.
+    let attached = false;
     // True once a transcript message owns this turn's steps, so the live console
     // below can be cleared without losing them.
     let stepsCarried = false;
@@ -413,6 +425,8 @@ export function ChatPanel({
         }
         return;
       }
+
+      attached = true;
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -678,6 +692,15 @@ export function ChatPanel({
       setSteps(stepsCarried ? [] : [...stepLog]);
       setPending("");
       setThinking("");
+
+      // The stream can end without the turn ending: a dropped connection, or the
+      // continuation budget running out. A turn the server accepted is still in
+      // the queue or the worker, so hand it to the poll — that is the half which
+      // either reports the answer or ends the wait with its reason. A refused
+      // request and a stop the reader asked for have nothing to follow.
+      if (attached && !sawDone && !stoppedRef.current) {
+        setBackgroundRunning(true);
+      }
     }
 
     // A paused turn is continued once, with the signed token the server issued.
@@ -691,6 +714,7 @@ export function ChatPanel({
   function stop() {
     if (!streaming || stopping) return;
 
+    stoppedRef.current = true;
     setStopping(true);
     setBackgroundRunning(false);
 

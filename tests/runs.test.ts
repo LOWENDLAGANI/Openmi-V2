@@ -8,8 +8,11 @@ import { putArtifact, readArtifact } from "../lib/runs/artifacts";
 import {
   RUN_DAILY_RUNS,
   RUN_DAILY_TOKENS,
+  RUN_HEARTBEAT_STALE_MS,
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
+  RUN_QUEUE_NOTICE_MS,
+  RUN_QUEUE_WAIT_MS,
   checkRunQuota,
   compactMessages,
   estimateTokens,
@@ -54,6 +57,12 @@ describe("run limits", () => {
     expect(RUN_MAX_TOKENS).toBe(120_000);
     expect(RUN_DAILY_RUNS).toBe(20);
     expect(RUN_DAILY_TOKENS).toBe(400_000);
+
+    // The reader stops believing a run is in progress at the same ages the
+    // database settles it, so a dead row cannot spin "working" forever.
+    expect(RUN_QUEUE_WAIT_MS).toBe(20 * 60_000);
+    expect(RUN_HEARTBEAT_STALE_MS).toBe(5 * 60_000);
+    expect(RUN_QUEUE_NOTICE_MS).toBe(20_000);
   });
 
   test("a mis-set minute value cannot buy an hour", () => {

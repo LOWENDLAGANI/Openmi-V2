@@ -249,6 +249,7 @@ test("the app settles before queuing, and the read that drives the spinner agree
   const runs = read("app/api/runs/route.ts");
   const page = read("app/chat/page.tsx");
   const store = read("lib/runs/store.ts");
+  const turn = read("app/api/chat/turn/route.ts");
 
   // Before the quota read — otherwise the leftover is what the quota counts.
   const settleAt = chat.indexOf("await settleStalledRuns(admin, session.user.id)");
@@ -267,4 +268,15 @@ test("the app settles before queuing, and the read that drives the spinner agree
   // The reaper covers both stalls and the null-heartbeat branch.
   expect(store).toContain("heartbeat_at.is.null");
   expect(store).toContain('eq("status", "queued")');
+
+  // An open tab polls this route while it waits. It settles the same leftover
+  // and applies the same ages, or "working on the server" never ends.
+  expect(turn).toContain("settleStalledRuns(admin, session.user.id)");
+  expect(turn).toContain("RUN_QUEUE_WAIT_MS");
+  expect(turn).toContain("RUN_HEARTBEAT_STALE_MS");
+
+  // The stream is the only reader left when the tab is still open, so it
+  // settles its own stale row and reports the reason instead of going quiet.
+  expect(chat).toContain("stalledFor(");
+  expect(chat).toContain("settleStalledRuns(admin, session.user.id)");
 });

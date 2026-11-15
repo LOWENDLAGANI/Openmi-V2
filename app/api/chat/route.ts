@@ -16,7 +16,12 @@ import { firstAvailableModel, hasModel, type ModelId } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { checkRunQuota } from "@/lib/runs/limits";
+import {
+  RUN_HEARTBEAT_STALE_MS,
+  RUN_QUEUE_NOTICE_MS,
+  RUN_QUEUE_WAIT_MS,
+  checkRunQuota,
+} from "@/lib/runs/limits";
 import {
   appendRunMessage,
   createRun,
@@ -52,6 +57,10 @@ export const maxDuration = 300;
 /** Stop well before the 300 s ceiling and hand the reader the run's id. */
 const WINDOW_MS = 240_000;
 const POLL_MS = 250;
+/** How many idle polls between re-reads of the run row: six seconds. */
+const ROW_CHECK_TICKS = 24;
+/** Idle polls before a never-claimed run is admitted: twenty seconds. */
+const NOTICE_TICKS = Math.ceil(RUN_QUEUE_NOTICE_MS / POLL_MS);
 
 type ChatRequest = {
   chatId?: unknown;
@@ -82,6 +91,29 @@ function sleep(ms: number): Promise<void> {
 
 function terminal(status: string): boolean {
   return status !== "queued" && status !== "running";
+}
+
+/**
+ * True when the row has outlived the queue's own rule.
+ *
+ * The page bounds its spinner with the same two ages, and the poll that drives
+ * a reloaded tab settles with them. This is the stream's copy: without it a run
+ * nothing will claim stays "in progress" for as long as the reader is willing
+ * to wait, which is the whole of forever.
+ */
+function stalledFor(run: RunRow): boolean {
+  const created = Date.parse(run.created_at);
+  const beat = Date.parse(run.heartbeat_at ?? run.started_at ?? run.created_at);
+
+  if (run.status === "queued") {
+    return Number.isFinite(created) && Date.now() - created >= RUN_QUEUE_WAIT_MS;
+  }
+
+  if (run.status === "running") {
+    return Number.isFinite(beat) && Date.now() - beat >= RUN_HEARTBEAT_STALE_MS;
+  }
+
+  return false;
 }
 
 export async function POST(request: Request) {
@@ -456,6 +488,10 @@ function streamRun(input: StreamInput): NextResponse {
       let cursor = input.cursor;
       let terminalStatus: string | null = null;
       let sawError = false;
+      /** The row read, when the stream ends on a settled run rather than an event. */
+      let settled: RunRow | null = null;
+      let toldAboutQueue = false;
+      let settleTried = false;
       const summaries = new Map<string, string>();
 
       const send = (event: string, data: unknown) => {
@@ -572,15 +608,42 @@ function streamRun(input: StreamInput): NextResponse {
 
         if (terminalStatus) break;
 
-        // A worker that died leaves the row running until the reaper settles it;
-        // the start log is the authority on that, not this stream's patience.
+        // A worker that died leaves the row in the queue until something
+        // settles it; the row is the authority on that, not this stream's
+        // patience. It is re-read every six idle seconds, and a row past the
+        // queue's own age is settled here — the same service-role call the chat
+        // route makes before it queues work — so the wait ends with a reason.
         if (events.length === 0) {
           idle += 1;
-          if (idle % 24 === 0) {
-            const fresh = await readRun(admin, run.id).catch(() => null);
+
+          if (idle % ROW_CHECK_TICKS === 0) {
+            let fresh = await readRun(admin, run.id).catch(() => null);
+
+            if (fresh && !terminal(fresh.status) && stalledFor(fresh) && !settleTried) {
+              settleTried = true;
+              await settleStalledRuns(admin, session.user.id);
+              fresh = await readRun(admin, run.id).catch(() => null);
+            }
+
+            // Silence after twenty seconds is not "thinking": no worker has
+            // claimed the run. Saying so beats a spinner that will not move,
+            // and the composer's Stop settles a queued run on the spot.
+            if (
+              fresh?.status === "queued" &&
+              !toldAboutQueue &&
+              idle >= NOTICE_TICKS
+            ) {
+              toldAboutQueue = true;
+              send("notice", {
+                message: `Queued — no worker has picked this run up yet. It is failed automatically after ${Math.round(
+                  RUN_QUEUE_WAIT_MS / 60_000
+                )} minutes; Stop ends it now.`,
+              });
+            }
 
             if (fresh && terminal(fresh.status) && cursor >= fresh.last_event_seq) {
               terminalStatus = fresh.status;
+              settled = fresh;
               break;
             }
           }
@@ -616,7 +679,21 @@ function streamRun(input: StreamInput): NextResponse {
             ? "partial"
             : undefined;
 
-      if (!sawError || row?.id) {
+      // A run settled by the reaper has no terminal event of its own, so its
+      // reason is read from the row. Sending `done` instead put an empty answer
+      // on screen and left the reader without the one fact that mattered: that
+      // nothing had run.
+      const settledMessage =
+        settled === null
+          ? null
+          : (settled.error ??
+            (settled.status === "failed"
+              ? "The run failed before it answered."
+              : null));
+
+      if (settledMessage) {
+        send("error", { message: settledMessage });
+      } else if (!sawError || row?.id) {
         send("done", {
           id: row?.id ?? `assistant-${run.id}`,
           seq: typeof row?.seq === "number" ? row.seq : null,

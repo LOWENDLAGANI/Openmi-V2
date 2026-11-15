@@ -39,6 +39,7 @@ import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
 import { filesEnabled } from "@/lib/files/plan";
 import { previewEnabled } from "@/lib/execution/preview/plan";
+import { RUN_HEARTBEAT_STALE_MS, RUN_QUEUE_WAIT_MS } from "@/lib/runs/limits";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
 
@@ -370,9 +371,9 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .in("status", ["queued", "running"])
       .or(
         `and(status.eq.queued,created_at.gte.${new Date(
-          Date.now() - 20 * 60_000
+          Date.now() - RUN_QUEUE_WAIT_MS
         ).toISOString()}),and(status.eq.running,heartbeat_at.gte.${new Date(
-          Date.now() - 5 * 60_000
+          Date.now() - RUN_HEARTBEAT_STALE_MS
         ).toISOString()})`
       )
       .order("created_at", { ascending: false })
