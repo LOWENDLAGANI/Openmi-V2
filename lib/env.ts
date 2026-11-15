@@ -258,6 +258,20 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Optional; unset means uncapped. The cap steers new workspaces only",
   },
   {
+    key: "E2B_ACCOUNT_COOLDOWN_MINUTES",
+    scope: "server",
+    required: false,
+    unlocks: "How long a full account is skipped before new workspaces try it again",
+    hint: "Optional; defaults to 15 minutes. A rejected key waits for an operator instead",
+  },
+  {
+    key: "E2B_FAILOVER",
+    scope: "server",
+    required: false,
+    unlocks: "One automatic retry on another account when a limit or key stops a new sandbox",
+    hint: 'Optional; on by default. "off" pins every workspace to the account it was assigned',
+  },
+  {
     key: "EXECUTION_ENABLED",
     scope: "server",
     required: false,

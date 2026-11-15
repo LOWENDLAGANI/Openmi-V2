@@ -102,6 +102,63 @@ export function sandboxAccountCap(
   return Math.min(1_000, Math.max(1, Math.trunc(raw)));
 }
 
+/**
+ * What the fleet remembers about an account between requests.
+ *
+ * `cooling` comes back by itself at `setAsideUntil`; `disabled` waits for an
+ * operator, because a rejected key does not start working again on a timer.
+ */
+export type SandboxAccountState = {
+  state: "active" | "cooling" | "disabled";
+  setAsideUntil: string | null;
+};
+
+/** `E2B_ACCOUNT_COOLDOWN_MINUTES`, clamped to 1..1440; defaults to 15. */
+export function accountCooldownMinutes(
+  env: Record<string, string | undefined> = process.env
+): number {
+  const raw = Number((env.E2B_ACCOUNT_COOLDOWN_MINUTES ?? "").trim());
+  if (!Number.isFinite(raw) || raw <= 0) return 15;
+  return Math.min(1_440, Math.max(1, Math.trunc(raw)));
+}
+
+/**
+ * The accounts a new box may use right now.
+ *
+ * A disabled account is out until an operator clears it. A cooling account is
+ * out until its timer expires — the timer is the only thing that brings it back,
+ * so a failed key cannot flap between "set aside" and "tried again" on every
+ * request. An unknown label is usable: the table only ever holds accounts that
+ * have already failed.
+ */
+export function availableAccounts(
+  accounts: SandboxAccount[],
+  states: Record<string, SandboxAccountState> = {},
+  now: number = Date.now()
+): SandboxAccount[] {
+  return accounts.filter((account) => {
+    const known = states[account.id];
+    if (!known) return true;
+    if (known.state === "disabled") return false;
+    if (known.state !== "cooling") return true;
+
+    const until = known.setAsideUntil ? Date.parse(known.setAsideUntil) : NaN;
+    return Number.isFinite(until) ? now >= until : false;
+  });
+}
+
+/**
+ * Whether a failed create is worth trying on another account.
+ *
+ * Only two failures are account-specific: a plan limit or rate limit (`quota`),
+ * and a key the provider rejects (`not_configured`). A refused template or a
+ * seed failure fails the same way everywhere, so retrying it on a second
+ * account doubles the wait and teaches nothing.
+ */
+export function shouldFailOver(failure: string): boolean {
+  return failure === "quota" || failure === "not_configured";
+}
+
 /** FNV-1a, only to give a stable starting point inside the account list. */
 function stableSeed(value: string): number {
   let hash = 0x811c9dc5;

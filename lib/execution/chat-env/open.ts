@@ -84,6 +84,16 @@ type OpenInput = {
 const WAIT_MESSAGE =
   "This chat's workspace is being prepared in another tab. Try again in a moment.";
 
+/**
+ * Said when a chat's workspace had to be rebuilt somewhere else.
+ *
+ * The replacement is a fresh download of the pinned commit, not the old disk, so
+ * saying it plainly is the honest thing: a file the reader edited inside the
+ * sandbox is gone, and the project itself is exactly where it was.
+ */
+const SWITCHED_MESSAGE =
+  "This chat's workspace was rebuilt on another sandbox because the account it was on could not be used. The project was downloaded again at this chat's commit; anything uncommitted inside the old workspace is gone.";
+
 function messageOf(caught: unknown): string {
   return caught instanceof Error && caught.message.length > 0
     ? caught.message
@@ -153,7 +163,9 @@ async function evictForCap(input: OpenInput): Promise<void> {
 
 async function provision(
   input: OpenInput,
-  lease: string
+  lease: string,
+  /** The account the replaced row was on, when there was one. */
+  replacedFrom?: string | null
 ): Promise<OpenChatSandboxResult> {
   await evictForCap(input);
 
@@ -234,6 +246,10 @@ async function provision(
     },
     resumed: false,
     recreated: true,
+    notice:
+      replacedFrom && replacedFrom !== handle.accountId
+        ? SWITCHED_MESSAGE
+        : undefined,
   };
 }
 
@@ -368,11 +384,17 @@ export async function openChatSandbox(
 
     if (opened.ok) return opened;
 
-    // A box the provider has forgotten is replaced once. A quota refusal or a
-    // failed start that is not a 404 is reported, not retried in a loop.
-    if (opened.failure === "missing") {
+    // A box that cannot be opened is replaced once, on whichever account the
+    // pool now prefers. `missing` is a box the provider forgot; `not_configured`
+    // here is a key the provider rejected, which makes the box just as
+    // unreachable. A quota refusal or a failed start is reported, not retried in
+    // a loop.
+    if (
+      opened.failure === "missing" ||
+      opened.failure === "not_configured"
+    ) {
       await retireRow(input.admin, row);
-      return provision(input, lease);
+      return provision(input, lease, row.sandboxAccount);
     }
 
     return opened;
@@ -383,7 +405,7 @@ export async function openChatSandbox(
     await retireRow(input.admin, row);
   }
 
-  return provision(input, lease);
+  return provision(input, lease, row?.sandboxAccount ?? null);
 }
 
 /**

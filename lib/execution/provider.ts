@@ -25,8 +25,11 @@ import {
 import { EXEC_MAX_MINUTES } from "./cost";
 import {
   accountById,
+  accountsConfigured,
   chooseSandboxAccount,
-  sandboxAccounts,
+  markSandboxAccountHealthy,
+  setAsideSandboxAccount,
+  shouldFailOver,
   type SandboxAccount,
 } from "./accounts";
 
@@ -173,29 +176,109 @@ function configuredAccount(accountId: string): SandboxAccount {
   return account;
 }
 
+/** What a reader sees when no account can take a new box. */
+const NO_CAPACITY_MESSAGE =
+  "Every sandbox account is at its limit or set aside right now, so nothing was started. Try again in a few minutes.";
+
 /**
- * The account a box about to be created should use.
+ * Whether one box may be tried on a second account.
  *
- * One configured account returns without a database read, so a deployment with
- * a single key behaves exactly as it did before the pool existed. With several,
- * the least-loaded wins (see `lib/execution/accounts.ts`).
+ * On by default, because the alternative is a chat that cannot open while
+ * another account sits idle. `E2B_FAILOVER=off` pins every box to the account the
+ * choice rule named, for a deployment that would rather fail than spread.
  */
-async function accountForNewSandbox(input: {
+function failoverEnabled(): boolean {
+  return (process.env.E2B_FAILOVER ?? "").trim().toLowerCase() !== "off";
+}
+
+/**
+ * The account for the next attempt at creating a box.
+ *
+ * A pinned account is used as given — an operator who names one means it. An
+ * empty answer from the choice rule is reported as no capacity, not as an
+ * unconfigured deployment: the key exists, every account behind it is full or
+ * set aside, and those two sentences tell a reader different things.
+ */
+async function nextSandboxAccount(input: {
   accountId?: string | null;
   seed?: string | null;
-} = {}): Promise<SandboxAccount> {
+  exclude?: string[];
+}): Promise<SandboxAccount> {
   if (input.accountId) return configuredAccount(input.accountId);
 
-  const chosen = await chooseSandboxAccount({ seed: input.seed ?? null });
-
-  if (!chosen) {
+  if (!accountsConfigured()) {
     throw new SandboxStartError(
       "not_configured",
       "Execution is not configured on this deployment."
     );
   }
 
+  const chosen = await chooseSandboxAccount({
+    seed: input.seed ?? null,
+    exclude: input.exclude ?? [],
+  });
+
+  if (!chosen) {
+    throw new SandboxStartError("quota", NO_CAPACITY_MESSAGE);
+  }
+
   return chosen;
+}
+
+/**
+ * Creates one box, moving it to another account once if the first refuses.
+ *
+ * Bounded at two attempts on purpose. A plan limit or a rejected key is about
+ * the account, so the account is set aside (`cooling` for a limit, `disabled`
+ * for a key) and the box is tried once more elsewhere; anything else — a
+ * refused template, a network error — fails the same way on every account, so
+ * retrying it only doubles the wait. The handle that comes back names the
+ * account that actually holds the box, which is what the caller records.
+ */
+async function createWithFailover(input: {
+  accountId?: string | null;
+  seed: string;
+  create: (account: SandboxAccount) => Promise<Sandbox>;
+}): Promise<{ sandbox: Sandbox; account: SandboxAccount }> {
+  const attempted: string[] = [];
+  const attempts = input.accountId || !failoverEnabled() ? 1 : 2;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const account = await nextSandboxAccount({
+      accountId: input.accountId,
+      seed: input.seed,
+      exclude: attempted,
+    });
+
+    attempted.push(account.id);
+
+    try {
+      const sandbox = await input.create(account);
+
+      // A box that was made on an account remembered as cooling is evidence
+      // that the window has passed; clearing it keeps the next choice honest.
+      await markSandboxAccountHealthy(account.id);
+
+      return { sandbox, account };
+    } catch (caught) {
+      const failure = classifyStartError(caught, "create");
+
+      // Pinned, out of attempts, or not this account's fault: the reader gets
+      // the error the rest of the product already knows how to explain.
+      if (!shouldFailOver(failure.failure) || attempt + 1 >= attempts) {
+        throw failure;
+      }
+
+      await setAsideSandboxAccount({
+        id: account.id,
+        kind: failure.failure === "quota" ? "cooling" : "disabled",
+        reason: failure.message,
+      });
+    }
+  }
+
+  // Unreachable: the loop returns a box or throws. Present for the type.
+  throw new SandboxStartError("quota", NO_CAPACITY_MESSAGE);
 }
 
 /**
@@ -374,6 +457,10 @@ function classifyStartError(
   caught: unknown,
   context: "create" | "attach" = "create"
 ): SandboxStartError {
+  // Already classified further in — re-reading an explanation as an English
+  // string would lose the code that says what to do about it.
+  if (caught instanceof SandboxStartError) return caught;
+
   const message =
     caught instanceof Error ? caught.message : "The sandbox could not be started.";
 
@@ -593,25 +680,21 @@ export async function createSandbox(
   }
 
   const ttl = Math.max(5, Math.trunc(options.ttlMinutes ?? EXEC_MAX_MINUTES + 5));
-  const account = await accountForNewSandbox({
+
+  const { sandbox, account } = await createWithFailover({
     accountId: options.accountId,
     seed: runId,
+    create: (account) =>
+      Sandbox.create({
+        template: executionTemplate(),
+        timeoutMs: boundedTimeoutMs(ttl * 60),
+        // One run, one box: the deadline kills it.
+        lifecycle: { onTimeout: "kill", autoResume: false },
+        metadata: { app: "openmi", run: runId, ...(options.labels ?? {}) },
+        ...networkOption(),
+        ...clientOptionsFor(account),
+      }),
   });
-
-  let sandbox: Sandbox;
-  try {
-    sandbox = await Sandbox.create({
-      template: executionTemplate(),
-      timeoutMs: boundedTimeoutMs(ttl * 60),
-      // One run, one box: the deadline kills it.
-      lifecycle: { onTimeout: "kill", autoResume: false },
-      metadata: { app: "openmi", run: runId, ...(options.labels ?? {}) },
-      ...networkOption(),
-      ...clientOptionsFor(account),
-    });
-  } catch (caught) {
-    throw classifyStartError(caught, "create");
-  }
 
   return handleFor(sandbox, sandbox.sandboxId, account);
 }
@@ -691,22 +774,20 @@ export async function createRunSandbox(runId: string): Promise<SandboxHandle> {
   }
 
   const idle = Math.max(1, Math.trunc(RUN_SANDBOX_IDLE_MINUTES));
-  const account = await accountForNewSandbox({ seed: runId });
 
-  let sandbox: Sandbox;
-  try {
-    sandbox = await Sandbox.create({
-      template: executionTemplate(),
-      timeoutMs: boundedTimeoutMs(idle * 60),
-      // Pause, never kill: the disk is the run's workspace and outlives it.
-      lifecycle: { onTimeout: "pause", autoResume: true },
-      metadata: { app: "openmi", kind: "run", run: runId },
-      ...runNetworkOption(),
-      ...clientOptionsFor(account),
-    });
-  } catch (caught) {
-    throw classifyStartError(caught, "create");
-  }
+  const { sandbox, account } = await createWithFailover({
+    seed: runId,
+    create: (account) =>
+      Sandbox.create({
+        template: executionTemplate(),
+        timeoutMs: boundedTimeoutMs(idle * 60),
+        // Pause, never kill: the disk is the run's workspace and outlives it.
+        lifecycle: { onTimeout: "pause", autoResume: true },
+        metadata: { app: "openmi", kind: "run", run: runId },
+        ...runNetworkOption(),
+        ...clientOptionsFor(account),
+      }),
+  });
 
   return handleFor(sandbox, sandbox.sandboxId, account);
 }
@@ -802,51 +883,50 @@ export async function createChatSandbox(
   const autoDelete = Math.max(idle + 1, Math.trunc(options.autoDeleteMinutes));
   const ttl = Math.max(autoDelete, Math.trunc(options.ttlMinutes));
 
+  const requested = boundedTimeoutMs(ttl * 60);
+  const freeCeiling = EXEC_FREE_TIER_TIMEOUT_SECONDS * 1000;
+
   // Seeded with the chat id: a chat that has to be rebuilt lands on the same
   // account it used before, while two chats spread.
-  const account = await accountForNewSandbox({ seed: options.chatId });
+  const { sandbox, account } = await createWithFailover({
+    seed: options.chatId,
+    create: async (account) => {
+      const create = (timeoutMs: number) =>
+        Sandbox.create({
+          template: executionTemplate(),
+          timeoutMs,
+          lifecycle: { onTimeout: "pause", autoResume: true },
+          metadata: {
+            app: "openmi",
+            kind: "chat",
+            chat: options.chatId,
+            owner: options.owner.slice(0, 8),
+          },
+          ...networkOption(),
+          ...clientOptionsFor(account),
+        });
 
-  const create = (timeoutMs: number) =>
-    Sandbox.create({
-      template: executionTemplate(),
-      timeoutMs,
-      lifecycle: { onTimeout: "pause", autoResume: true },
-      metadata: {
-        app: "openmi",
-        kind: "chat",
-        chat: options.chatId,
-        owner: options.owner.slice(0, 8),
-      },
-      ...networkOption(),
-      ...clientOptionsFor(account),
-    });
+      try {
+        return await create(requested);
+      } catch (caught) {
+        const failure = classifyStartError(caught, "create");
 
-  const requested = boundedTimeoutMs(ttl * 60);
+        // A Hobby key caps a sandbox at one hour. Asking for two days is still
+        // the right default for everyone else, so a refusal that is not an auth
+        // failure is retried once at the ceiling every tier accepts — on this
+        // account, before the box is moved anywhere.
+        if (failure.failure === "not_configured" || requested <= freeCeiling) {
+          throw failure;
+        }
 
-  let sandbox: Sandbox;
-  try {
-    sandbox = await create(requested);
-  } catch (caught) {
-    const failure = classifyStartError(caught, "create");
-    const freeCeiling = EXEC_FREE_TIER_TIMEOUT_SECONDS * 1000;
-
-    // A Hobby key caps a sandbox at one hour. Asking for two days is still the
-    // right default for everyone else, so a refusal that is not an auth failure
-    // is retried once at the ceiling every tier accepts rather than leaving
-    // chat workspaces unusable on a fresh account.
-    if (
-      failure.failure === "not_configured" ||
-      requested <= freeCeiling
-    ) {
-      throw failure;
-    }
-
-    try {
-      sandbox = await create(freeCeiling);
-    } catch (retried) {
-      throw classifyStartError(retried, "create");
-    }
-  }
+        try {
+          return await create(freeCeiling);
+        } catch (retried) {
+          throw classifyStartError(retried, "create");
+        }
+      }
+    },
+  });
 
   return handleFor(sandbox, sandbox.sandboxId, account);
 }
@@ -876,7 +956,20 @@ export async function attachSandbox(
   try {
     sandbox = await Sandbox.connect(sandboxId, clientOptionsFor(account));
   } catch (caught) {
-    throw classifyStartError(caught, "attach");
+    const failure = classifyStartError(caught, "attach");
+
+    // A key the provider rejects is not coming back on a timer, so the account
+    // is marked for an operator and new boxes avoid it. The box itself is not
+    // moved here: only the caller knows whether it can be rebuilt.
+    if (failure.failure === "not_configured") {
+      await setAsideSandboxAccount({
+        id: account.id,
+        kind: "disabled",
+        reason: failure.message,
+      });
+    }
+
+    throw failure;
   }
 
   return handleFor(sandbox, sandbox.sandboxId ?? sandboxId, account);
