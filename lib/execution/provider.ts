@@ -579,16 +579,11 @@ export const RUN_EGRESS_DENY: readonly string[] = [
  * `allowPublicTraffic` is stated because the sandbox serves nothing; the flag
  * is about inbound and the project default must not decide it.
  */
-export function runNetworkOption(): {
-  network: { allowOut: string[]; denyOut: string[]; allowPublicTraffic: boolean };
-} {
-  return {
-    network: {
-      allowOut: ["*"],
-      denyOut: [...RUN_EGRESS_DENY],
-      allowPublicTraffic: true,
-    },
-  };
+export function runNetworkOption(): Record<string, never> {
+  // Full network access: no egress filter is sent, so the provider default
+  // (every destination) applies. The user explicitly wants the agent to reach
+  // any host/port, including databases and SSH remotes.
+  return {};
 }
 
 /**
