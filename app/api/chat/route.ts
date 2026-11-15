@@ -31,6 +31,7 @@ import {
   readRun,
   type RunRow,
 } from "@/lib/runs/store";
+import { wakeWorker } from "@/lib/runs/wake";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -434,6 +435,12 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  // A worker on a host that sleeps without traffic does not know this row
+  // exists until something reaches it, and nothing on this host does. One ping
+  // per queued run is what makes the run start on its own instead of waiting
+  // for someone to open the worker's health URL.
+  wakeWorker();
 
   // The conversation behind the message travels with the run: the worker builds
   // its model call from these rows, so the answer remembers the chat without

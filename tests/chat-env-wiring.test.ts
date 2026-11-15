@@ -52,6 +52,28 @@ test("the route hands the owner and the chat to the run, and can reattach to it"
   expect(route).not.toContain("onNotice:");
 });
 
+test("a run reuses its chat's workspace instead of creating a new box", () => {
+  const runSandbox = readFileSync("lib/runs/sandbox.ts", "utf8");
+  const loop = readFileSync("lib/runs/loop.ts", "utf8");
+
+  // The chat's box is opened before any provider create, so a chat turn never
+  // pays for a second filesystem, and the kill switch is honoured.
+  expect(at(runSandbox, "openChatWorkspace(")).toBeLessThan(
+    at(runSandbox, "createProviderSandbox(")
+  );
+  expect(runSandbox).toContain("chatSandboxesEnabled");
+  expect(runSandbox).toContain("releaseChatSandbox");
+
+  // The run tools keep one root: `work` is linked at the chat's directory.
+  expect(runSandbox).toContain("MISSION_WORKDIR");
+
+  // The loop gives the workspace back the way it was lent: released for a
+  // chat's box, paused only for a run's own.
+  expect(loop).toContain("releaseWorkspace");
+  expect(loop).toContain("pauseRunWorkspace");
+  expect(loop).toContain("shared");
+});
+
 test("only a persistent workspace is described to the model as persistent", () => {
   const base = {
     repo: "openmi/v2",

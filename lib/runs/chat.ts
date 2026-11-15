@@ -72,6 +72,15 @@ export async function appendChatAnswer(
  * whole-file write: the sandbox has the finished file, and reconstructing a
  * patch from two texts is the changeset layer's job, not the worker's.
  */
+/**
+ * The changeset a turn produced, or the sentence that says why there is none.
+ *
+ * A null changeset used to be the whole answer, and the reader was left with a
+ * model that had said its destination was recorded and an app that had silently
+ * done nothing. Every early return here names its cause instead.
+ */
+export type ChangesetProposal = { id: string | null; reason: string | null };
+
 export async function proposeChatChangeset(input: {
   admin: SupabaseClient;
   run: RunRow;
@@ -79,13 +88,23 @@ export async function proposeChatChangeset(input: {
   files: string[];
   token: string;
   sealKey: string | null;
-}): Promise<string | null> {
+}): Promise<ChangesetProposal> {
   const { admin, run, sandbox, token, sealKey } = input;
 
-  if (!run.chat_id || !run.repo_full_name || !run.base_sha) return null;
+  if (!run.chat_id || !run.repo_full_name || !run.base_sha) {
+    return {
+      id: null,
+      reason: "this chat has no repository at a pinned commit",
+    };
+  }
 
   const paths = input.files.slice(0, MAX_PROPOSED_FILES);
-  if (paths.length === 0) return null;
+  if (paths.length === 0) {
+    return {
+      id: null,
+      reason: "this turn changed no files in the workspace",
+    };
+  }
 
   const edits: EditRequest[] = [];
 
@@ -105,7 +124,12 @@ export async function proposeChatChangeset(input: {
     }
   }
 
-  if (edits.length === 0) return null;
+  if (edits.length === 0) {
+    return {
+      id: null,
+      reason: "the changed files could not be read back from the workspace",
+    };
+  }
 
   const created = await createChangeset(admin as never, {
     owner: run.owner,
@@ -115,7 +139,7 @@ export async function proposeChatChangeset(input: {
     baseSha: run.base_sha,
   });
 
-  if (!created.ok) return null;
+  if (!created.ok) return { id: null, reason: created.error };
 
   const added = await addEdits(admin as never, {
     changesetId: created.id,
@@ -126,7 +150,7 @@ export async function proposeChatChangeset(input: {
     edits,
   });
 
-  if (!added.ok) return null;
+  if (!added.ok) return { id: null, reason: added.error };
 
   const finalized = await finalizeChangeset(admin as never, {
     changesetId: created.id,
@@ -134,12 +158,23 @@ export async function proposeChatChangeset(input: {
     sealKey,
   });
 
-  return finalized.status === "ready" ? created.id : null;
+  if (finalized.status !== "ready") {
+    return {
+      id: null,
+      reason: sealKey
+        ? `the diff was recorded but could not be marked ready (${finalized.status})`
+        : "GITHUB_TOKEN_KEY is not set on the worker, so the diff cannot be signed",
+    };
+  }
+
+  return { id: created.id, reason: null };
 }
 
 export type ChatDelivery = {
   message: boolean;
   changeset: string | null;
+  /** Why there is no changeset, when one was expected. Null when there is one. */
+  reason: string | null;
 };
 
 export async function deliverChatTurn(input: {
@@ -154,7 +189,7 @@ export async function deliverChatTurn(input: {
 }): Promise<ChatDelivery> {
   const { run } = input;
 
-  if (!run.chat_id) return { message: false, changeset: null };
+  if (!run.chat_id) return { message: false, changeset: null, reason: null };
 
   const message = await appendChatAnswer(
     input.admin,
@@ -163,18 +198,44 @@ export async function deliverChatTurn(input: {
     input.tokens
   ).catch(() => false);
 
-  if (!input.sandbox || !input.token || input.files.length === 0) {
-    return { message, changeset: null };
+  if (!input.sandbox) {
+    return {
+      message,
+      changeset: null,
+      reason: "this turn had no workspace to diff",
+    };
   }
 
-  const changeset = await proposeChatChangeset({
+  if (!input.token) {
+    return {
+      message,
+      changeset: null,
+      reason: "the worker had no GitHub token for this account",
+    };
+  }
+
+  if (input.files.length === 0) {
+    return {
+      message,
+      changeset: null,
+      reason: "this turn changed no files in the workspace",
+    };
+  }
+
+  const proposed = await proposeChatChangeset({
     admin: input.admin,
     run,
     sandbox: input.sandbox,
     files: input.files,
     token: input.token,
     sealKey: input.sealKey,
-  }).catch(() => null);
+  }).catch((caught: unknown) => ({
+    id: null,
+    reason:
+      caught instanceof Error
+        ? caught.message
+        : "the diff could not be recorded",
+  }));
 
-  return { message, changeset };
+  return { message, changeset: proposed.id, reason: proposed.reason };
 }

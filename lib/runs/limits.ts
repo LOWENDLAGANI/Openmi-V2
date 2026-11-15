@@ -102,6 +102,15 @@ export const RUN_STREAM_MAX_MS = 10 * 60_000;
 
 /** Events carry previews, not archives. The full result is in the snapshot. */
 export const RUN_EVENT_PREVIEW_CHARS = 400;
+
+/**
+ * How much of a run's event log a reloaded tab reads to rebuild its progress.
+ *
+ * Steps and answer text arrive as separate events, so this caps both: it is
+ * comfortably more than a forty-step run flushes, and a run that outgrew it
+ * still shows every step it took and the answer it had written so far.
+ */
+export const RUN_PROGRESS_EVENTS = 600;
 export const RUN_EVENT_MAX_BYTES = 16_000;
 
 /** Tool caps. A refusal names the number; nothing is silently truncated. */
@@ -157,6 +166,15 @@ export const RUN_HEARTBEAT_STALE_MS = 5 * 60_000;
  * until the queue's own twenty-minute rule fails it.
  */
 export const RUN_QUEUE_NOTICE_MS = 20_000;
+
+/**
+ * How long the queue's wake-up ping waits for a first byte.
+ *
+ * The worker's host counts the request as traffic the moment it arrives, so an
+ * instance that is still booting is already awake; waiting for its reply buys
+ * nothing and would hold the turn open for the whole cold start.
+ */
+export const RUN_WAKE_TIMEOUT_MS = 1_500;
 
 /** `RUN_MAX_MINUTES` is an operator knob, clamped so a typo cannot buy an hour. */
 export function runMaxMinutes(

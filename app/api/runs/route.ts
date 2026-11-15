@@ -19,6 +19,7 @@ import {
   readQuota,
   settleStalledRuns,
 } from "@/lib/runs/store";
+import { wakeWorker } from "@/lib/runs/wake";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -159,6 +160,10 @@ export async function POST(request: Request) {
 
   try {
     run = await queueRun();
+
+    // A worker that sleeps without traffic is woken by this one request, so the
+    // row is claimed without a reader opening the health URL by hand.
+    wakeWorker();
 
     return json(
       {

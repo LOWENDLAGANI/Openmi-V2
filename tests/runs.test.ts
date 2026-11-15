@@ -11,8 +11,10 @@ import {
   RUN_HEARTBEAT_STALE_MS,
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
+  RUN_PROGRESS_EVENTS,
   RUN_QUEUE_NOTICE_MS,
   RUN_QUEUE_WAIT_MS,
+  RUN_WAKE_TIMEOUT_MS,
   checkRunQuota,
   compactMessages,
   estimateTokens,
@@ -39,6 +41,11 @@ import {
 } from "../lib/runs/redact";
 import { formatTree } from "../lib/runs/prompt";
 import { internalTargetIn, safeRunPath } from "../lib/runs/tools";
+import {
+  DEFAULT_RUN_WORKER_HEALTH_URL,
+  wakeWorkerEnabled,
+  workerHealthUrl,
+} from "../lib/runs/wake";
 
 /**
  * The rules the run runtime must keep, without a sandbox or a provider.
@@ -63,6 +70,8 @@ describe("run limits", () => {
     expect(RUN_QUEUE_WAIT_MS).toBe(20 * 60_000);
     expect(RUN_HEARTBEAT_STALE_MS).toBe(5 * 60_000);
     expect(RUN_QUEUE_NOTICE_MS).toBe(20_000);
+    // A reloaded tab replays this much of the log to show the work done so far.
+    expect(RUN_PROGRESS_EVENTS).toBe(600);
   });
 
   test("a mis-set minute value cannot buy an hour", () => {
@@ -71,6 +80,37 @@ describe("run limits", () => {
     expect(runMaxMinutes({ RUN_MAX_MINUTES: "0" })).toBe(15);
     expect(runMaxMinutes({ RUN_MAX_MINUTES: "nonsense" })).toBe(15);
     expect(runMaxMinutes({ RUN_MAX_MINUTES: "10" })).toBe(10);
+  });
+
+  test("the queue's wake-up ping is on by default and only goes to a real URL", () => {
+    expect(RUN_WAKE_TIMEOUT_MS).toBe(1_500);
+
+    // On unless switched off, and the blueprint's own health route is the
+    // default so a fresh deployment wakes its worker with nothing configured.
+    expect(wakeWorkerEnabled({})).toBe(true);
+    expect(wakeWorkerEnabled({ RUN_WAKE_WORKER: "off" })).toBe(false);
+    expect(wakeWorkerEnabled({ RUN_WAKE_WORKER: "no" })).toBe(false);
+    expect(wakeWorkerEnabled({ RUN_WAKE_WORKER: "on" })).toBe(true);
+    expect(workerHealthUrl({})).toBe(DEFAULT_RUN_WORKER_HEALTH_URL);
+    expect(workerHealthUrl({ RUN_WORKER_HEALTH_URL: "   " })).toBe(
+      DEFAULT_RUN_WORKER_HEALTH_URL
+    );
+    expect(workerHealthUrl({ RUN_WAKE_WORKER: "off" })).toBeNull();
+
+    // A base URL gets the health path; an exact URL is used as written.
+    expect(workerHealthUrl({ RUN_WORKER_URL: "https://runs.example.com/" })).toBe(
+      "https://runs.example.com/healthz"
+    );
+    expect(
+      workerHealthUrl({ RUN_WORKER_HEALTH_URL: "https://openmi-runs.onrender.com/healthz" })
+    ).toBe("https://openmi-runs.onrender.com/healthz");
+
+    // A configured value that cannot be a ref is inert, not a fetch at a guess
+    // and not a fallback that sends traffic to a host nobody named.
+    expect(
+      workerHealthUrl({ RUN_WORKER_HEALTH_URL: "openmi-runs.onrender.com/healthz" })
+    ).toBeNull();
+    expect(workerHealthUrl({ RUN_WORKER_HEALTH_URL: "ftp://host/healthz" })).toBeNull();
   });
 
   test("worker concurrency is bounded", () => {

@@ -43,6 +43,17 @@ type UiMessage = {
  */
 type StepLine = AgentStep;
 
+/**
+ * What `GET /api/chat/turn` answers while a run this tab is not streaming is
+ * still going: the run ids, and the work already written to its event log.
+ */
+type TurnPoll = {
+  running?: boolean;
+  error?: string | null;
+  steps?: StepLine[];
+  text?: string;
+};
+
 /** One screenshot, exactly as the sandbox returned it. */
 type Shot = {
   mime: string;
@@ -168,15 +179,33 @@ export function ChatPanel({
 
     let cancelled = false;
 
-    const timer = window.setInterval(() => {
-      void fetch(`/api/chat/turn?chatId=${encodeURIComponent(activeChatId)}`, {
+    // The run lives in the worker, not in this tab, so the poll asks for the
+    // work it has already done and shows that instead of one sentence that
+    // says nothing. A reload therefore lands on the steps the run has taken
+    // and the answer as far as it has been written.
+    const tick = () =>
+      fetch(`/api/chat/turn?chatId=${encodeURIComponent(activeChatId)}`, {
         cache: "no-store",
       })
         .then((response) => (response.ok ? response.json() : null))
-        .then((payload: { running?: boolean; error?: string | null } | null) => {
+        .then((payload: TurnPoll | null) => {
           if (cancelled || !payload) return;
-          if (payload.running) return;
+
+          if (payload.running) {
+            if (Array.isArray(payload.steps) && payload.steps.length > 0) {
+              setSteps(payload.steps);
+            }
+            if (typeof payload.text === "string" && payload.text.length > 0) {
+              setPending(payload.text);
+            }
+            return;
+          }
+
           setBackgroundRunning(false);
+          // Settled: the refreshed transcript carries the steps and the answer
+          // both, so the live copy goes rather than sitting under the answer.
+          setSteps([]);
+          setPending("");
           // The poll is also where a run nothing finished is settled, so it is
           // where the reason arrives. Without it the wait ended in silence.
           if (typeof payload.error === "string" && payload.error.length > 0) {
@@ -187,7 +216,11 @@ export function ChatPanel({
         .catch(() => {
           // A failed poll is not a failed turn; the next tick retries.
         });
-    }, 2_500);
+
+    // Once now, so the first frame after a reload already has the work on
+    // screen rather than waiting 2.5s for it.
+    void tick();
+    const timer = window.setInterval(() => void tick(), 2_500);
 
     return () => {
       cancelled = true;

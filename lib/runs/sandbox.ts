@@ -1,4 +1,10 @@
 import { fetchRepoArchive } from "@/lib/execution/archive";
+import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
+import {
+  openChatSandbox,
+  releaseChatSandbox,
+} from "@/lib/execution/chat-env/open";
+import { MISSION_WORKDIR } from "@/lib/execution/mission/budget";
 import {
   createRunSandbox as createProviderSandbox,
   type SandboxHandle,
@@ -24,15 +30,53 @@ import { RUN_WORKDIR } from "./tools";
 export { RUN_WORKDIR };
 
 export type OpenWorkspaceResult =
-  | { ok: true; sandbox: SandboxHandle; seeded: boolean; notice: string | null }
+  | {
+      ok: true;
+      sandbox: SandboxHandle;
+      seeded: boolean;
+      notice: string | null;
+      /** True when the box is the chat's own workspace, owned by its row. */
+      shared: boolean;
+      /**
+       * How this run gives the workspace back. A chat's box is released (the
+       * next message must find it); a run's own box is paused.
+       */
+      release: () => Promise<void>;
+    }
   | { ok: false; message: string };
 
-export async function openRunWorkspace(input: {
+type ChatAdmin = Parameters<typeof openChatSandbox>[0]["admin"];
+
+export type OpenWorkspaceInput = {
   runId: string;
   repo: string | null;
   sha: string | null;
   token: string | null;
-}): Promise<OpenWorkspaceResult> {
+  /** The chat this run answers, when it answers one. */
+  chatId?: string | null;
+  owner?: string | null;
+  /** Needed for the chat's workspace row; absent means a run box. */
+  admin?: ChatAdmin | null;
+};
+
+/**
+ * The workspace a run works in.
+ *
+ * A chat turn reuses the workspace that chat already owns, so a message after
+ * it finds the same disk: installed packages, built output and uncommitted
+ * files are still there, and the turn does not pay for a cold box and a fresh
+ * seed every time. That box belongs to the chat (`chat_sandboxes`), so it is
+ * released, never paused or destroyed here.
+ *
+ * A run with no chat — or one whose chat workspace cannot be opened — falls back
+ * to a box of its own, which is what every run used to get.
+ */
+export async function openRunWorkspace(
+  input: OpenWorkspaceInput
+): Promise<OpenWorkspaceResult> {
+  const chat = await openChatWorkspace(input);
+  if (chat) return chat;
+
   let sandbox: SandboxHandle;
 
   try {
@@ -65,7 +109,14 @@ export async function openRunWorkspace(input: {
     const initialised = await seedEmptyWorkspace(sandbox);
 
     return initialised.ok
-      ? { ok: true, sandbox, seeded: false, notice: null }
+      ? {
+          ok: true,
+          sandbox,
+          seeded: false,
+          notice: null,
+          shared: false,
+          release: () => pauseRunWorkspace(sandbox),
+        }
       : { ok: false, message: initialised.detail };
   }
 
@@ -81,7 +132,126 @@ export async function openRunWorkspace(input: {
     return { ok: false, message: seeded.detail };
   }
 
-  return { ok: true, sandbox, seeded: true, notice: null };
+  return {
+    ok: true,
+    sandbox,
+    seeded: true,
+    notice: null,
+    shared: false,
+    release: () => pauseRunWorkspace(sandbox),
+  };
+}
+
+/**
+ * The chat's own workspace, when this run answers one.
+ *
+ * Null means "not this path": no chat, no repository to seed, the chat env
+ * switched off, or no admin client to read the row. A refusal from the resolver
+ * is an error with its own sentence, because a chat that cannot open its
+ * workspace should say so rather than silently start a second one.
+ */
+async function openChatWorkspace(
+  input: OpenWorkspaceInput
+): Promise<OpenWorkspaceResult | null> {
+  if (!chatSandboxesEnabled()) return null;
+  if (!input.admin || !input.chatId || !input.owner) return null;
+  if (!input.repo || !input.sha || !input.token) return null;
+
+  const admin = input.admin;
+
+  const opened = await openChatSandbox({
+    admin,
+    chatId: input.chatId,
+    owner: input.owner,
+    repo: input.repo,
+    sha: input.sha,
+    token: input.token,
+  });
+
+  if (!opened.ok) {
+    return {
+      ok: false,
+      message: `This chat's workspace could not be opened: ${opened.message}`,
+    };
+  }
+
+  // The run tools work in `work`; a chat's workspace is `openmi-workspace`. One
+  // relative link makes both names the same disk, so no tool needs a second
+  // root and no file is copied.
+  const linked = await linkRunWorkdir(opened.handle);
+
+  if (!linked.ok) {
+    await releaseChatSandbox({
+      admin,
+      rowId: opened.row.id,
+      handle: opened.handle,
+    }).catch(() => {});
+
+    return { ok: false, message: linked.message };
+  }
+
+  // Start the turn from a committed workspace, so the diff this run publishes is
+  // its own work: earlier messages may have left uncommitted files behind, and
+  // they are not this turn's change.
+  await markTurnBase(opened.handle, input.runId).catch(() => {});
+
+  return {
+    ok: true,
+    sandbox: opened.handle,
+    seeded: opened.recreated,
+    notice: opened.notice ?? null,
+    shared: true,
+    release: async () => {
+      await releaseChatSandbox({
+        admin,
+        rowId: opened.row.id,
+        handle: opened.handle,
+      });
+    },
+  };
+}
+
+/** Points the run's own workspace path at the chat's directory. */
+async function linkRunWorkdir(
+  sandbox: SandboxHandle
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const result = await sandbox.exec(
+    [
+      `if [ ! -e ${RUN_WORKDIR} ]; then ln -s ${MISSION_WORKDIR} ${RUN_WORKDIR}; fi`,
+      `test -d ${RUN_WORKDIR}/.git`,
+    ].join(" && "),
+    ".",
+    30_000
+  );
+
+  return result.exitCode === 0
+    ? { ok: true }
+    : {
+        ok: false,
+        message: `The chat's workspace could not be reached: ${
+          result.output.trim() || "no reason reported"
+        }`,
+      };
+}
+
+/**
+ * Commits whatever the previous turn left behind, so this turn's diff is its own.
+ *
+ * Local only: a commit inside the workspace is not a push, and the write to
+ * GitHub still goes through the changeset path.
+ */
+async function markTurnBase(
+  sandbox: SandboxHandle,
+  runId: string
+): Promise<void> {
+  await sandbox.exec(
+    [
+      "git add -A >/dev/null 2>&1",
+      `if ! git diff --cached --quiet; then git -c commit.gpgsign=false commit -qm "openmi: workspace before run ${runId}"; fi`,
+    ].join("; "),
+    RUN_WORKDIR,
+    60_000
+  );
 }
 
 async function seedEmptyWorkspace(

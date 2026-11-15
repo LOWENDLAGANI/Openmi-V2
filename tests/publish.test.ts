@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { planWrite } from "../lib/changesets/destination";
+import {
+  destinationFromPrompt,
+  planWrite,
+} from "../lib/changesets/destination";
 import { RUN_TOOL_SPECS, parsePublishDestination } from "../lib/runs/tools";
 
 const read = (path: string) =>
@@ -9,6 +12,27 @@ const read = (path: string) =>
 
 const AGENT = "openmi/agent/abc";
 const DEFAULT = "main";
+
+test("a branch the reader named is honoured when the model declared none", () => {
+  // "push to main" is a destination, and answering it with a pull request is
+  // answering a question the reader did not ask.
+  expect(destinationFromPrompt("push to main", DEFAULT)).toEqual({
+    kind: "default-branch",
+    branch: null,
+  });
+
+  expect(
+    destinationFromPrompt("commit straight to the develop branch", DEFAULT)
+  ).toEqual({ kind: "new-branch", branch: "develop" });
+
+  // A pull request names its base, so the ordinary destination stands — for the
+  // default branch and for any other one a PR sentence happens to name.
+  expect(destinationFromPrompt("open a pull request to main", DEFAULT)).toBeNull();
+  expect(destinationFromPrompt("open a PR against develop", DEFAULT)).toBeNull();
+  expect(destinationFromPrompt("raise a pull-request targeting release/2.0", DEFAULT)).toBeNull();
+  // A request that names no branch is not a destination.
+  expect(destinationFromPrompt("make the build pass", DEFAULT)).toBeNull();
+});
 
 test("the model's destination is validated before it is stored", () => {
   expect(parsePublishDestination({ destination: "default-branch" })).toEqual({

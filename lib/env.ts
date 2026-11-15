@@ -388,6 +388,29 @@ export const ENV_SPEC: EnvSpec[] = [
     hint: "Defaults to 2, clamped to 1..8; per-account concurrency is a separate limit of 1",
   },
   {
+    key: "RUN_WORKER_HEALTH_URL",
+    scope: "server",
+    required: false,
+    unlocks:
+      "Waking a sleeping worker when a run is queued, instead of waiting for someone to open its health URL",
+    hint: "Optional: the worker's own https://<host>/healthz. Unset means the blueprint's openmi-runs health URL",
+  },
+  {
+    key: "RUN_WORKER_URL",
+    scope: "server",
+    required: false,
+    unlocks:
+      "Waking the worker through its base URL, with /healthz appended to it",
+    hint: "Optional: for example https://openmi-runs.onrender.com. RUN_WORKER_HEALTH_URL wins when both are set",
+  },
+  {
+    key: "RUN_WAKE_WORKER",
+    scope: "server",
+    required: false,
+    unlocks: "Turning off the one ping a queued run sends to the worker's health URL",
+    hint: 'On by default; set to "off" for a deployment whose worker the default URL does not reach',
+  },
+  {
     key: "RUN_SANDBOX_IDLE_MINUTES",
     scope: "server",
     required: false,

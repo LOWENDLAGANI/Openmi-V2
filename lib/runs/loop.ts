@@ -115,6 +115,8 @@ export async function executeRun(
   const runId = run.id;
 
   let sandbox: SandboxHandle | null = null;
+  /** How this run gives its workspace back; set once the box is open. */
+  let releaseWorkspace: (() => Promise<void>) | null = null;
   let status: RunStatus = "failed";
   let stopReason = "error";
   let failure: string | null = null;
@@ -165,6 +167,9 @@ export async function executeRun(
 
     const opened = await openRunWorkspace({
       runId,
+      admin,
+      owner: run.owner,
+      chatId: run.chat_id,
       repo: run.repo_full_name,
       sha: run.base_sha,
       token: github?.token ?? null,
@@ -173,7 +178,15 @@ export async function executeRun(
     if (!opened.ok) throw new Error(opened.message);
 
     sandbox = opened.sandbox;
-    await updateRun(admin, runId, { sandbox_id: sandbox.id });
+    releaseWorkspace = opened.release;
+
+    // A chat's workspace belongs to its `chat_sandboxes` row, not to this run.
+    // The run sweep lists only `kind: "run"` boxes and the chat sweep reads the
+    // row, so recording the id here would claim a disk the next message is
+    // supposed to find.
+    if (!opened.shared) {
+      await updateRun(admin, runId, { sandbox_id: sandbox.id });
+    }
 
     // A chat turn arrives with the conversation behind it, already written to
     // run_messages by the route. A run started without history is seeded with
@@ -573,10 +586,35 @@ export async function executeRun(
         token: chatToken,
         sealKey: serverEnv().githubTokenKey,
         tokens: inputTokens + outputTokens,
-      }).catch(() => ({ message: false, changeset: null }));
+      }).catch((caught: unknown) => ({
+        message: false,
+        changeset: null,
+        reason: `the chat delivery failed: ${
+          caught instanceof Error ? caught.message : String(caught)
+        }`,
+      }));
 
       if (!delivered.message) {
         console.error(`[runs] ${runId}: the chat answer was not written`);
+      }
+
+      // A change that was recorded and never written is the one outcome the
+      // reader cannot infer: the model says where it went, the app says nothing.
+      // A plain answer that changed no files is not this case, so it stays quiet.
+      if (
+        !delivered.changeset &&
+        status === "done" &&
+        autoWriteEnabled() &&
+        (changedFiles.length > 0 || publishDestination !== null)
+      ) {
+        await appendEvent(admin, runId, "warning", {
+          code: "auto-write",
+          message: `The change was not written: ${
+            changedFiles.length === 0
+              ? "this turn changed no files in the workspace, so there was no diff to write"
+              : (delivered.reason ?? "the diff could not be recorded")
+          }`,
+        });
       }
 
       // The turn is the request. A ready change is written from here rather than
@@ -591,6 +629,9 @@ export async function executeRun(
           owner: run.owner,
           sealKey: serverEnv().githubTokenKey,
           destination: publishDestination,
+          // The model's `publish` call decides; this is only what the reader
+          // wrote, read when the model left the destination out.
+          requested: run.prompt,
         }).catch((caught: unknown) => ({
           ok: false as const,
           error:
@@ -642,7 +683,10 @@ export async function executeRun(
       }
     }
 
-    if (sandbox) await pauseRunWorkspace(sandbox);
+    // A chat's workspace is released so the next message finds it; a run's own
+    // box is paused, which releases compute and keeps the disk for its TTL.
+    if (releaseWorkspace) await releaseWorkspace().catch(() => {});
+    else if (sandbox) await pauseRunWorkspace(sandbox);
 
     const cost = runCostUsd(inputTokens, outputTokens);
 

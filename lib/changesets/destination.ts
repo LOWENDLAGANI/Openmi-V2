@@ -1,3 +1,5 @@
+import { requestedBranch } from "../github/branch-request";
+
 /**
  * Where a turn's change is written, as the model declared it.
  *
@@ -31,6 +33,35 @@ export type WritePlan = {
    */
   merge: boolean;
 };
+
+/**
+ * The destination the reader's own sentence asks for, when the model declared
+ * none.
+ *
+ * The model's reading is the destination; this is only the fallback for a turn
+ * that left it out. A branch the reader names is the permission to write it,
+ * the default branch included — a request for `main` answered with a pull
+ * request is an answer to a different question. "Open a pull request to main"
+ * names a base rather than a destination, so `requestedBranch` returns null and
+ * the pull request stands.
+ */
+export function destinationFromPrompt(
+  message: string,
+  defaultBranch: string
+): PublishDestination | null {
+  // A sentence that asks for a pull request is asking for a pull request, even
+  // when it names the branch that request is based on. "Open a PR against
+  // develop" names a base, and writing develop directly would be the opposite
+  // of what it said.
+  if (/\b(?:pull[\s-]?request|pr)\b/i.test(message)) return null;
+
+  const named = requestedBranch(message, defaultBranch);
+  if (!named) return null;
+
+  return named === defaultBranch
+    ? { kind: "default-branch", branch: null }
+    : { kind: "new-branch", branch: named };
+}
 
 /**
  * The write a destination implies.

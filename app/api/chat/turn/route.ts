@@ -1,12 +1,90 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { RUN_HEARTBEAT_STALE_MS, RUN_QUEUE_WAIT_MS } from "@/lib/runs/limits";
-import { settleStalledRuns } from "@/lib/runs/store";
+import {
+  RUN_HEARTBEAT_STALE_MS,
+  RUN_PROGRESS_EVENTS,
+  RUN_QUEUE_WAIT_MS,
+} from "@/lib/runs/limits";
+import { readEventsSince, settleStalledRuns } from "@/lib/runs/store";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { AgentStep } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * What a live run has already done, rebuilt from its own event log.
+ *
+ * A tab that reloaded is not reading the stream, so without this the wait is one
+ * sentence — "still working on the server" — for a run that may already have
+ * read six files and written half its answer. These are the same rows the stream
+ * replays from `Last-Event-ID`, so what the reload shows is the run, not a
+ * description of it.
+ */
+async function readRunProgress(
+  admin: SupabaseClient,
+  runId: string
+): Promise<{ text: string; steps: AgentStep[] }> {
+  const events = await readEventsSince(
+    admin,
+    runId,
+    0,
+    RUN_PROGRESS_EVENTS
+  ).catch(() => []);
+
+  const steps: AgentStep[] = [];
+  // `tool.finished` names the tool, not the sentence its start carried, so the
+  // pair is joined by name — exactly as the streaming tab joins them.
+  const summaries = new Map<string, string>();
+  let text = "";
+
+  for (const event of events) {
+    const payload = event.payload;
+
+    if (event.kind === "message.delta") {
+      if (typeof payload.text === "string") text += payload.text;
+      continue;
+    }
+
+    if (event.kind === "tool.started") {
+      const tool = typeof payload.name === "string" ? payload.name : "tool";
+      const detail =
+        typeof payload.summary === "string" ? payload.summary : tool;
+      summaries.set(tool, detail);
+      steps.push({ tool, detail, state: "start" });
+      continue;
+    }
+
+    if (event.kind === "tool.finished") {
+      const tool = typeof payload.name === "string" ? payload.name : "tool";
+      const detail = summaries.get(tool) ?? tool;
+      const finished: AgentStep = {
+        tool,
+        detail,
+        state: payload.isError === true ? "error" : "done",
+        output:
+          typeof payload.resultPreview === "string"
+            ? payload.resultPreview
+            : undefined,
+      };
+
+      let index = -1;
+      for (let i = steps.length - 1; i >= 0; i -= 1) {
+        if (steps[i].state === "start" && steps[i].tool === tool) {
+          index = i;
+          break;
+        }
+      }
+
+      if (index >= 0) steps[index] = { ...steps[index], ...finished };
+      else steps.push(finished);
+    }
+  }
+
+  return { text, steps };
+}
 
 /**
  * Whether this chat still has a run being answered.
@@ -68,11 +146,18 @@ export async function GET(request: Request) {
   const row = data as { id?: string; status?: string } | null;
 
   if (row?.id) {
+    // The work so far, so a reload shows the steps and the answer in progress
+    // instead of a spinner that says nothing about what the run is doing.
+    const progress = admin
+      ? await readRunProgress(admin, row.id)
+      : { text: "", steps: [] };
+
     return NextResponse.json(
       {
         running: true,
         turnId: row.id,
         status: row.status ?? null,
+        ...progress,
       },
       { headers: { "cache-control": "no-store" } }
     );

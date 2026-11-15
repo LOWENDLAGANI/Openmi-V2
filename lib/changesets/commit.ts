@@ -15,7 +15,11 @@ import { rebaseChangeset } from "@/lib/sandbox/rebase";
 import { readToken } from "@/lib/github/token";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 
-import { planWrite, type PublishDestination } from "./destination";
+import {
+  destinationFromPrompt,
+  planWrite,
+  type PublishDestination,
+} from "./destination";
 import {
   GithubWriteError,
   agentBranchName,
@@ -186,6 +190,16 @@ export async function approveChangesetAndOpenPullRequest(
      * agent branch, one pull request, merged.
      */
     destination?: PublishDestination | null;
+    /**
+     * The sentence this change answers.
+     *
+     * Read when the model declared no destination, or deferred to a pull
+     * request: a reader who wrote "push to main" and got a pull request was
+     * answered a different question than the one they asked. A sentence that
+     * asks for a pull request never overrides one, and neither does a model that
+     * named a branch. With no sentence the ordinary destination stands.
+     */
+    requested?: string | null;
   }
 ): Promise<ApprovalResult> {
   if (!input.sealKey) {
@@ -331,8 +345,19 @@ export async function approveChangesetAndOpenPullRequest(
     };
   }
 
+  // The model's decision stands, with one exception: a turn that deferred to a
+  // pull request while the reader's own sentence asked for a branch. That is the
+  // case the reader reports as "I asked for main and got a PR". `publish` naming
+  // a branch is already the reader's decision, so it is never second-guessed.
+  const declared = input.destination ?? null;
+
+  const fromTheSentence =
+    input.requested && (declared === null || declared.kind === "pull-request")
+      ? destinationFromPrompt(input.requested, defaultBranch)
+      : null;
+
   const planned = planWrite({
-    destination: input.destination ?? null,
+    destination: fromTheSentence ?? declared,
     agentBranch: agentBranchName(row.id),
     defaultBranch,
   });
