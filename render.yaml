@@ -23,11 +23,11 @@ services:
     plan: free
     healthCheckPath: /healthz
     autoDeploy: true
-    # A run may take up to RUN_MAX_MINUTES. Render sends SIGTERM and waits this
-    # long (max 300) before killing the process; the worker stops claiming and
-    # lets in-flight runs finish inside that window. Free instances may use a
-    # shorter grace period than the value requested here.
-    maxShutdownDelaySeconds: 300
+    # NOTE: maxShutdownDelaySeconds is NOT supported on Render's free tier, so
+    # it is omitted here. On a free instance Render uses its own (shorter) grace
+    # period on SIGTERM; in-flight runs killed by that window are settled as
+    # `failed` by the reaper while their sandboxes stay paused for 48 h. Upgrade
+    # to a paid instance to set a longer shutdown delay (up to 300s).
     envVars:
       # ── Required ───────────────────────────────────────────────────────────
       - key: NEXT_PUBLIC_SUPABASE_URL
