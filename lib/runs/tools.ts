@@ -26,6 +26,10 @@ import { previewText, redactSecrets, tailBytes } from "./redact";
  * four-megabyte file gets a typed refusal it can read, not a quiet truncation.
  */
 
+import { safeBranchName } from "@/lib/github/branch-request";
+
+import type { PublishDestination } from "@/lib/changesets/destination";
+
 export const RUN_WORKDIR = "work";
 
 export type RunToolName =
@@ -34,7 +38,8 @@ export type RunToolName =
   | "edit_file"
   | "search_code"
   | "run_command"
-  | "todo";
+  | "todo"
+  | "publish";
 
 export const RUN_TOOL_NAMES: readonly RunToolName[] = [
   "read_file",
@@ -43,6 +48,7 @@ export const RUN_TOOL_NAMES: readonly RunToolName[] = [
   "search_code",
   "run_command",
   "todo",
+  "publish",
 ];
 
 export const RUN_TOOL_SPECS: AgentToolDefinition[] = [
@@ -145,6 +151,28 @@ export const RUN_TOOL_SPECS: AgentToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "publish",
+    description:
+      "Say where this turn's change should be written, in the words the reader used. default-branch commits straight to the repository's default branch; new-branch commits to a branch of its own and opens no pull request; pull-request opens a pull request and leaves it unmerged. Call it once, after the edits, when the reader asked for the change to land somewhere (\"push to main\", \"open a PR\", \"just a branch\"). It writes nothing itself: the app commits this run's changed files when the run settles.",
+    parameters: {
+      type: "object",
+      properties: {
+        destination: {
+          type: "string",
+          enum: ["default-branch", "new-branch", "pull-request"],
+          description: "Where the change goes.",
+        },
+        branch: {
+          type: "string",
+          description:
+            "The branch the reader named, for new-branch. Omit it when they named none.",
+        },
+      },
+      required: ["destination"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export function isRunTool(name: string): name is RunToolName {
@@ -208,6 +236,8 @@ export type RunToolResult = {
   text: string;
   /** A short line for the event stream. */
   preview: string;
+  /** Set by `publish`: the destination this turn asks for. */
+  publish?: PublishDestination;
 };
 
 function failure(message: string): RunToolResult {
@@ -215,13 +245,18 @@ function failure(message: string): RunToolResult {
   return { ok: false, isError: true, text, preview: previewText(text, 400) };
 }
 
-function success(text: string, preview?: string): RunToolResult {
+function success(
+  text: string,
+  preview?: string,
+  publish?: PublishDestination
+): RunToolResult {
   const clean = redactSecrets(text);
   return {
     ok: true,
     isError: false,
     text: clean,
     preview: preview ?? previewText(clean, 400),
+    ...(publish ? { publish } : {}),
   };
 }
 
@@ -245,6 +280,50 @@ async function exec(
   timeoutMs: number
 ) {
   return sandbox.exec(command, cwd, timeoutMs);
+}
+
+const PUBLISH_KINDS: readonly PublishDestination["kind"][] = [
+  "default-branch",
+  "new-branch",
+  "pull-request",
+];
+
+/**
+ * The destination a `publish` call asks for, validated before it is stored.
+ *
+ * A branch argument is checked structurally (`safeBranchName`), not for
+ * existence: the branch may not exist yet, which is the normal case for a new
+ * one. Pure so the rules are testable without a sandbox.
+ */
+export function parsePublishDestination(
+  args: Record<string, unknown> | null
+): { ok: true; destination: PublishDestination } | { ok: false; error: string } {
+  if (args === null) {
+    return { ok: false, error: "bad-input: arguments were not a JSON object" };
+  }
+
+  if (!onlyKeys(args, ["destination", "branch"])) {
+    return { ok: false, error: "bad-input: unexpected argument" };
+  }
+
+  const kind = PUBLISH_KINDS.find((value) => value === args.destination);
+
+  if (!kind) {
+    return {
+      ok: false,
+      error:
+        "bad-input: destination must be default-branch, new-branch or pull-request",
+    };
+  }
+
+  if (args.branch === undefined) {
+    return { ok: true, destination: { kind, branch: null } };
+  }
+
+  const branch = safeBranchName(args.branch);
+  if (!branch) return { ok: false, error: "bad-input: branch must be a branch name" };
+
+  return { ok: true, destination: { kind, branch } };
 }
 
 export async function executeRunTool(input: {
@@ -282,6 +361,26 @@ export async function executeRunTool(input: {
     return success(
       `Plan updated: ${done}/${items.length} done.\n${rendered}`,
       `plan ${done}/${items.length}`
+    );
+  }
+
+  if (name === "publish") {
+    const parsed = parsePublishDestination(args);
+    if (!parsed.ok) return failure(parsed.error);
+
+    const { kind, branch } = parsed.destination;
+
+    const where =
+      kind === "default-branch"
+        ? "the repository's default branch, directly"
+        : kind === "new-branch"
+          ? `a branch of its own${branch ? ` (${branch})` : ""}, with no pull request`
+          : "a pull request on an openmi/agent branch, left unmerged";
+
+    return success(
+      `Destination recorded: ${where}. Nothing has been written yet — the app commits this run's changed files when it settles.`,
+      `publish to ${kind}`,
+      parsed.destination
     );
   }
 

@@ -14,6 +14,8 @@ import { getRepo, resolveBranchSha } from "@/lib/github/read";
 import { rebaseChangeset } from "@/lib/sandbox/rebase";
 import { readToken } from "@/lib/github/token";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
+
+import { planWrite, type PublishDestination } from "./destination";
 import {
   GithubWriteError,
   agentBranchName,
@@ -178,6 +180,12 @@ export async function approveChangesetAndOpenPullRequest(
      * nobody asked about by name.
      */
     target?: { branch: string; explicit?: boolean };
+    /**
+     * Where the turn asked for the change to go, as the model declared it with
+     * the `publish` tool. Absent keeps the ordinary destination: one derived
+     * agent branch, one pull request, merged.
+     */
+    destination?: PublishDestination | null;
   }
 ): Promise<ApprovalResult> {
   if (!input.sealKey) {
@@ -323,10 +331,30 @@ export async function approveChangesetAndOpenPullRequest(
     };
   }
 
-  const branch = input.target ? input.target.branch.trim() : agentBranchName(row.id);
+  const planned = planWrite({
+    destination: input.destination ?? null,
+    agentBranch: agentBranchName(row.id),
+    defaultBranch,
+  });
+
+  if (!planned.ok) return { ok: false, error: planned.error };
+
+  const plan = planned.plan;
+
+  // The card's explicit branch wins over the plan the model declared.
+  const branch = input.target ? input.target.branch.trim() : plan.branch;
+  const targetBranch = input.target ? input.target.branch.trim() : plan.targetBranch;
+  const allowDefaultBranch = input.target
+    ? defaultBranchWritesAllowed() || input.target.explicit === true
+    : plan.allowDefaultBranch;
+  const merge = input.target ? true : plan.merge;
 
   try {
-    if (input.target) {
+    if (
+      input.target ||
+      plan.target === "new-branch" ||
+      plan.target === "default-branch"
+    ) {
       assertSafeBranch(branch);
     } else {
       assertAgentBranch(branch, defaultBranch);
@@ -402,9 +430,8 @@ export async function approveChangesetAndOpenPullRequest(
       files,
       changesetId: row.id,
       existingCommitSha: row.commit_sha ?? undefined,
-      targetBranch: input.target?.branch.trim(),
-      allowDefaultBranch:
-        defaultBranchWritesAllowed() || input.target?.explicit === true,
+      targetBranch,
+      allowDefaultBranch,
       onProgress: async (progress) => {
         // Persisted before the next request so a partial write is resumable.
         await supabase
@@ -422,7 +449,9 @@ export async function approveChangesetAndOpenPullRequest(
 
     // The PR exists; applying it is the rest of the approval. A suggestion that
     // can no longer be re-applied is closed by `mergeProposal` itself.
-    if (outcome.prUrl && typeof outcome.prNumber === "number") {
+    // A pull request the reader asked for is left open, and a branch they named
+    // is not turned into a merge: the merge is the part they did not ask for.
+    if (merge && outcome.prUrl && typeof outcome.prNumber === "number") {
       const merged = await mergeProposal({
         token: github.token,
         repo: row.repo_full_name,

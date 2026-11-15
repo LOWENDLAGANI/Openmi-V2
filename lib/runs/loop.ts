@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
+import type { PublishDestination } from "@/lib/changesets/destination";
 import { refundDewSession } from "@/lib/dew/store";
 import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
 import { refundReasonFor } from "@/lib/dew/refund";
@@ -129,6 +130,11 @@ export async function executeRun(
   let collectedText = "";
   let changedFiles: string[] = [];
   let chatToken: string | null = null;
+
+  // Where the reader asked this change to go, as the model declared it with
+  // `publish`. Null means the reader did not say, which keeps the ordinary
+  // destination: a derived agent branch, one pull request, merged.
+  let publishDestination: PublishDestination | null = null;
 
   const startedAt = Date.now();
   const deadline = startedAt + runWallClockMs();
@@ -450,6 +456,8 @@ export async function executeRun(
 
         const durationMs = Date.now() - toolStartedAt;
 
+        if (result.publish) publishDestination = result.publish;
+
         // An attempt to reach loopback, a private range or the metadata service
         // is the one tool failure that is about intent rather than a bad
         // command. One signal per run: the operator needs to know it happened,
@@ -569,14 +577,16 @@ export async function executeRun(
 
       // The turn is the request. A ready change is written from here rather than
       // from a click on the card, because the signed changeset is already the
-      // reviewed thing: one `openmi/agent/` branch, one pull request, squash-
-      // merged, never forced, and a re-apply instead of a second PR. A failed
-      // write is a sentence in the transcript, not a dialog nobody opened.
+      // reviewed thing: one branch, one commit, never forced, and a re-apply
+      // instead of a second PR. Where it lands is the model's read of the
+      // reader's sentence (`publish`); a failed write is a sentence in the
+      // transcript, not a dialog nobody opened.
       if (delivered.changeset && status === "done" && autoWriteEnabled()) {
         const applied = await approveChangesetAndOpenPullRequest(admin, {
           changesetId: delivered.changeset,
           owner: run.owner,
           sealKey: serverEnv().githubTokenKey,
+          destination: publishDestination,
         }).catch((caught: unknown) => ({
           ok: false as const,
           error:
@@ -589,9 +599,11 @@ export async function executeRun(
             prUrl: applied.prUrl,
             prNumber: applied.prNumber,
             mergeCommitSha: applied.mergeCommitSha,
-            summary: applied.prUrl
+            summary: applied.mergeCommitSha
               ? `Wrote ${applied.branch} and merged pull request #${applied.prNumber}.`
-              : `Wrote ${applied.branch}.`,
+              : applied.prUrl
+                ? `Wrote ${applied.branch} and opened pull request #${applied.prNumber}, unmerged.`
+                : `Wrote ${applied.branch}.`,
           });
         } else {
           await appendEvent(admin, runId, "warning", {

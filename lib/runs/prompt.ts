@@ -40,7 +40,9 @@ export const RUN_TOOLS_CLAUSE = [
   "- search_code: ripgrep the workspace, up to 40 hits.",
   "- run_command: run one shell command and read its exit code and output tail.",
   "- todo: record the plan the reader sees. It changes nothing in the workspace.",
+  "- publish: say where this turn's change goes — `default-branch` for the repository's default branch, `new-branch` for a branch of its own with no pull request, `pull-request` for a PR left unmerged. It writes nothing itself; the app commits this run's changed files when the run settles.",
   "Paths are relative to the workspace root. Work through the files, then verify by running the project's own check or build command when it has one.",
+  "Read the destination from the reader's own sentence: \"push to main\" is default-branch, \"open a PR\" is pull-request, \"just a branch\" is new-branch. Call publish once, after the edits, when they asked for the change to land somewhere; do not call it when they only asked for the change itself.",
 ].join("\n");
 
 /** Instruction files worth reading, in priority order. */

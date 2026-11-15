@@ -261,7 +261,12 @@ The automatic write counts as the review (`AUTO_WRITE_REVIEW`). With
 `OPENMI_AUTO_WRITE` on — the default — a finished turn writes its own change:
 one `openmi/agent/` branch, one pull request, squash-merged, and the reader gets
 the branch and the PR as a sentence in the transcript. There is no card to click
-in that path. Set `OPENMI_AUTO_WRITE=off` and the card asks again, with the old
+in that path. Where it goes is the model's read of the request, through the
+`publish` tool: naming the default branch writes it directly, asking for a pull
+request opens one and leaves it unmerged, and asking for a branch of its own
+writes that branch with no PR. A request that names no destination keeps the
+default — an `openmi/agent/` branch, a pull request, merged. Set
+`OPENMI_AUTO_WRITE=off` and the card asks again, with the old
 guards: a head that moved since the diff, a change over five files, or a path
 that is configuration, credentials or the schema. A named branch that has moved
 since the diff was computed is not a dead end — the change goes to a new

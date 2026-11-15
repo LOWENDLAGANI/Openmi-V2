@@ -287,7 +287,11 @@ export function ReviewPanel({
               {status === "committed" && (
                 <div className="space-y-2 border-t border-line pt-3">
                   <p className="flex flex-wrap items-center gap-2 text-[11px] leading-relaxed text-mid">
-                    <span className="font-medium text-hi">Changes applied</span>
+                    <span className="font-medium text-hi">
+                      {changeset.pr_url && !changeset.merge_commit_sha
+                        ? "Pull request open"
+                        : "Changes applied"}
+                    </span>
                     {appliedHref && (
                       <a
                         href={appliedHref}
