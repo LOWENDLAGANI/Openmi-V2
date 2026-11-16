@@ -1390,30 +1390,37 @@ function ThinkingBlock({ text, live = false }: { text: string; live?: boolean })
 }
 
 /**
- * One step, with its terminal.
+ * One step, with its terminal folded away.
  *
- * A step that ran a command opens with that command and its output in view.
- * The transcript is the only place the sandbox's work survives the turn, and a
- * row that folds itself shut the moment it completes is why a finished run
- * looked like it had done nothing. Collapsing stays the reader's call, and the
- * open state is local so a re-render does not force it back open.
+ * A step starts collapsed and stays collapsed when it finishes: the command and
+ * its output are one tap away, not something the transcript grows by on its
+ * own. Opening a row is the reader's decision, and the open state is local so a
+ * re-render — or the step settling — cannot force it back open and push the
+ * conversation down while they are reading it.
+ *
+ * A finished step shows a check, a failed one a cross, and the running one a
+ * dotted line: the row itself is the signal that the command is done.
  */
 function StepRow({ step }: { step: StepLine }) {
-  const hasConsole = Boolean(step.command || step.output);
-  const [open, setOpen] = useState(hasConsole);
+  const [open, setOpen] = useState(false);
+  const stateLabel =
+    step.state === "start"
+      ? "running"
+      : step.state === "error"
+        ? "failed"
+        : "done";
 
   return (
     <li className="agent-step" data-state={step.state}>
       <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary>
-          <span aria-hidden="true" className="agent-step-icon">
-            {step.state === "start"
-              ? "…"
-              : step.state === "error"
-                ? "✕"
-                : hasConsole
-                  ? "›_"
-                  : "·"}
+          <span
+            className="agent-step-icon"
+            role="img"
+            aria-label={stateLabel}
+            title={stateLabel}
+          >
+            {step.state === "start" ? "…" : step.state === "error" ? "✕" : "✓"}
           </span>
           <span className="agent-step-title">{step.detail}</span>
           <span aria-hidden="true" className="agent-step-chevron">

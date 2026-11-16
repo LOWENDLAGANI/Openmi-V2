@@ -573,8 +573,33 @@ html.ink {
     color: var(--text-low);
   }
 
+  /* A finished command says so: the check is the signal that the row is
+     settled, and it arrives with a short pop so the end of a step is visible
+     without reading the output. A failed step keeps the cross. */
+  .agent-step[data-state="done"] .agent-step-icon {
+    color: var(--accent-text);
+    animation: step-done 320ms ease-out;
+  }
+
   .agent-step[data-state="error"] .agent-step-icon {
     color: var(--danger);
+  }
+
+  @keyframes step-done {
+    from {
+      opacity: 0.2;
+      transform: scale(0.7);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .agent-step[data-state="done"] .agent-step-icon {
+      animation: none;
+    }
   }
 
   .agent-step-title {

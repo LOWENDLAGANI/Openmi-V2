@@ -396,7 +396,7 @@ export async function runMissionTick(input: {
               // working out. Skipping it keeps a thought from being stored as a
               // tool call, which is what the branch below would do with it.
               continue;
-            } else {
+            } else if (event.type === "tool") {
               const existing = fragments.get(event.index) ?? { id: "", name: "", args: "" };
               fragments.set(event.index, {
                 id: event.id ?? existing.id,

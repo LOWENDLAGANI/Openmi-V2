@@ -194,7 +194,7 @@ export async function runAgent(options: RunOptions): Promise<AgentResult> {
             // the answer: it is what the model was weighing, not what it says.
             stepReasoning += event.text;
             options.emitReasoning(event.text);
-          } else {
+          } else if (event.type === "tool") {
             const existing = fragments.get(event.index) ?? { id: "", name: "", args: "" };
             fragments.set(event.index, {
               id: event.id ?? existing.id,

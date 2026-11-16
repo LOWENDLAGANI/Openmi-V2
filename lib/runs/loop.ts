@@ -318,6 +318,9 @@ export async function executeRun(
       const fragments = new Map<number, ToolCall>();
       let completed = false;
       let stepFailure: Error | null = null;
+      // Why the provider stopped writing. `"length"` means the reply hit the
+      // token budget mid-sentence, which is not the model finishing its answer.
+      let stepFinish: string | null = null;
 
       for (const provider of chain) {
         try {
@@ -337,6 +340,8 @@ export async function executeRun(
               // Recorded for the provider that requires it echoed back, never
               // streamed: the reader sees tool summaries, not chain-of-thought.
               stepReasoning += event.text;
+            } else if (event.type === "finish") {
+              stepFinish = event.reason;
             } else {
               const existing = fragments.get(event.index) ?? {
                 id: "",
@@ -406,11 +411,48 @@ export async function executeRun(
         );
       }
 
+      // A reply cut off at the reply budget is not an answer that ended: the
+      // model was still writing when it ran out of room, so the turn used to
+      // stop mid-sentence and look finished. Ask it to carry on from the seam
+      // instead, and only settle the run when it says something complete. The
+      // loop's own step and token caps bound how long that continuation can go.
+      const truncated = stepFinish === "length" && stepText.trim().length > 0;
+
+      if (
+        truncated &&
+        calls.length === 0 &&
+        Date.now() < deadline &&
+        steps < RUN_MAX_STEPS &&
+        inputTokens + outputTokens < RUN_MAX_TOKENS
+      ) {
+        await finishStep(admin, runId, idx, {
+          input_tokens: stepInput,
+          output_tokens: estimateTokens(stepText),
+          finish_reason: "length",
+          tool_names: [],
+          duration_ms: Date.now() - stepStartedAt,
+        });
+
+        await appendEvent(admin, runId, "warning", {
+          code: "reply-limit",
+          message: "The answer reached the reply limit, so it is continuing.",
+        });
+
+        messages.push({ role: "assistant", content: stepText });
+        messages.push({
+          role: "user",
+          content:
+            "Your last reply was cut off by the reply length limit. Continue from exactly where it stopped, without repeating what you already wrote.",
+        });
+
+        continue loop;
+      }
+
       if (calls.length === 0) {
         await finishStep(admin, runId, idx, {
           input_tokens: stepInput,
           output_tokens: estimateTokens(stepText),
-          finish_reason: "stop",
+          finish_reason: stepFinish ?? "stop",
           tool_names: [],
           duration_ms: Date.now() - stepStartedAt,
         });
@@ -612,7 +654,11 @@ export async function executeRun(
         admin,
         run,
         sandbox,
-        text: status === "done" ? answerText : collectedText,
+        // Everything the model wrote is the answer, not only the last stretch
+        // it wrote. A turn that narrated, ran a tool and carried on is one
+        // answer, and storing just its tail is what made a reloaded transcript
+        // look like the reply had been cut off halfway.
+        text: collectedText.length > 0 ? collectedText : answerText,
         steps: stepLog,
         files: changedFiles,
         token: chatToken,

@@ -510,7 +510,15 @@ export type ChatEvent =
       id?: string;
       name?: string;
       argumentsDelta?: string;
-    };
+    }
+  /**
+   * The stream ended, and why the provider stopped writing.
+   *
+   * `"length"` means the reply was cut off by the token budget, not finished by
+   * the model: a caller that treats it as an answer shows half a sentence and
+   * calls it done, which is what "it suddenly stops" looked like.
+   */
+  | { type: "finish"; reason: string | null };
 
 /**
  * One streamed completion that can also ask for tools.
@@ -682,4 +690,7 @@ async function* streamChatOnce({
   }
 
   assertAnswer({ sawAnswer, sawReasoning, finishReason });
+  // Why writing stopped: a reply cut off by the reply budget is not a finished
+  // answer, and the loop carries it on instead of settling the turn there.
+  yield { type: "finish", reason: finishReason };
 }
