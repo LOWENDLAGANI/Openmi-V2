@@ -16,7 +16,7 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   {
     key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
   },
   // Two years, every name under the domain, and preload-eligible. A downgrade
   // to http on any subdomain is refused for that window, which is the point;
