@@ -47,7 +47,8 @@ export async function appendChatAnswer(
   run: RunRow,
   text: string,
   tokens: number,
-  steps: AgentStep[] = []
+  steps: AgentStep[] = [],
+  thinking: string | null = null
 ): Promise<boolean> {
   if (!run.chat_id || text.trim().length === 0) return false;
 
@@ -58,7 +59,10 @@ export async function appendChatAnswer(
     p_content: text.slice(0, 40_000),
     p_model: run.model,
     p_tokens: tokens,
-    p_thinking: null,
+    // The run's own reasoning, so the fold survives a reload. It was written as
+    // null when the run runtime replaced the chat loop, which is why the
+    // thinking section disappeared from every stored answer.
+    p_thinking: thinking && thinking.trim().length > 0 ? thinking : null,
     // The console the run took travels with its answer. A stored `[]` here is
     // what made a reloaded transcript lose every step the tab had watched.
     p_steps: steps,
@@ -188,6 +192,8 @@ export async function deliverChatTurn(input: {
   text: string;
   /** What the run did before it answered, stored with the answer. */
   steps: AgentStep[];
+  /** The chain of thought behind the answer, when the model streamed one. */
+  thinking: string;
   files: string[];
   token: string | null;
   sealKey: string | null;
@@ -202,7 +208,8 @@ export async function deliverChatTurn(input: {
     run,
     input.text,
     input.tokens,
-    input.steps
+    input.steps,
+    input.thinking
   ).catch(() => false);
 
   if (!input.sandbox) {

@@ -111,6 +111,41 @@ export function formatTree(paths: readonly string[]): string {
   return text.trimEnd();
 }
 
+/**
+ * What a resumed run is told about the attempt that was cut off.
+ *
+ * A worker restart kills the loop, not the workspace: the edits, the install and
+ * any branch are still on disk. What is gone is the conversation's working
+ * memory — the tool output it had already read. Replaying every call would spend
+ * the second attempt's steps on work already done, so the run is told where it
+ * stopped and what it last ran, and asked to check the workspace rather than
+ * assume.
+ */
+export function resumeInstruction(input: {
+  steps: number;
+  recent: Array<{ name: string; detail: string; failed?: boolean }>;
+}): string {
+  const lines = [
+    `Your previous attempt at this request was cut off when the machine running it was restarted, after ${input.steps} step${
+      input.steps === 1 ? "" : "s"
+    }. The workspace still holds everything it changed, and the transcript above is what it had already said.`,
+  ];
+
+  if (input.recent.length > 0) {
+    lines.push(
+      `What it did last:\n${input.recent
+        .map((call) => `- ${call.failed ? "failed: " : ""}${call.detail}`)
+        .join("\n")}`
+    );
+  }
+
+  lines.push(
+    "Continue from where it stopped. Do not redo finished work: read the workspace to see a file's current contents instead of applying the same edit again, and re-run a command only when the workspace has changed since it ran. When the request is finished, answer as usual."
+  );
+
+  return lines.join("\n\n");
+}
+
 export function buildRunSystemPrompt(input: {
   repo: string | null;
   sha: string | null;

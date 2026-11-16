@@ -39,6 +39,7 @@ import {
   RUN_AGENT_ID,
   buildRunSystemPrompt,
   readProjectInstructions,
+  resumeInstruction,
 } from "./prompt";
 import {
   appendEvent,
@@ -49,6 +50,7 @@ import {
   finishStep,
   heartbeat,
   listRunMessages,
+  listRunToolCalls,
   readRun,
   recordRunUsage,
   updateRun,
@@ -130,9 +132,11 @@ export async function executeRun(
 
   // What the chat gets back when this settles. `answerText` is the step that
   // ended without a tool call; `collectedText` is everything the model wrote,
-  // which is what a cancelled or failed run has to show.
+  // which is what a cancelled or failed run has to show. `reasoningText` is the
+  // chain of thought behind it, kept so a reloaded answer still has its fold.
   let answerText = "";
   let collectedText = "";
+  let reasoningText = "";
   // The console the answer is stored with. The live tab reads the same work
   // from `run_events`; without this copy the steps vanished the moment the
   // transcript was reloaded, so a stored answer looked like it had done nothing.
@@ -187,6 +191,11 @@ export async function executeRun(
           ).catch(() => null)
         : null;
 
+    // A run handed back to the queue after its worker vanished is a second
+    // attempt at the same request, not a new one: the workspace it left is
+    // reattached and the transcript it wrote is continued rather than replayed.
+    const resumed = run.retry_count > 0 || run.steps > 0;
+
     const opened = await openRunWorkspace({
       runId,
       admin,
@@ -195,6 +204,9 @@ export async function executeRun(
       repo: run.repo_full_name,
       sha: run.base_sha,
       token: github?.token ?? null,
+      // The box a previous attempt recorded, so its edits survive the restart.
+      sandboxId: run.sandbox_id,
+      sandboxAccount: run.sandbox_account,
     });
 
     if (!opened.ok) throw new Error(opened.message);
@@ -239,6 +251,33 @@ export async function executeRun(
 
     let messages: WireMessage[] = [{ role: "system", content: system }, ...history];
 
+    // What a resumed run cannot see is the tool output it had read: the messages
+    // were kept, the results were not. Telling it where it stopped, and what it
+    // last ran, is what keeps the second attempt from starting over.
+    if (resumed) {
+      const recent = (await listRunToolCalls(admin, runId).catch(() => [])).slice(-8);
+
+      messages = [
+        ...messages,
+        {
+          role: "user",
+          content: resumeInstruction({
+            steps: run.steps,
+            recent: recent.map((call) => ({
+              name: call.name,
+              detail: toolSummary(call.name, call.argsJson),
+              failed: call.isError,
+            })),
+          }),
+        },
+      ];
+
+      await appendEvent(admin, runId, "run.warning", {
+        code: "run-resumed",
+        message: `Resumed after a restart at step ${run.steps}, on the workspace the first attempt left.`,
+      });
+    }
+
     chatToken = github?.token ?? null;
 
     const chain =
@@ -253,17 +292,35 @@ export async function executeRun(
     }
 
     let deltaBuffer = "";
+    let reasoningBuffer = "";
     let lastFlush = 0;
 
     const flushDeltas = async (force = false) => {
-      if (deltaBuffer.length === 0) return;
-      if (!force && deltaBuffer.length < MAX_DELTA_BUFFER && Date.now() - lastFlush < DELTA_FLUSH_MS) {
+      if (deltaBuffer.length === 0 && reasoningBuffer.length === 0) return;
+      if (
+        !force &&
+        deltaBuffer.length < MAX_DELTA_BUFFER &&
+        reasoningBuffer.length < MAX_DELTA_BUFFER &&
+        Date.now() - lastFlush < DELTA_FLUSH_MS
+      ) {
         return;
       }
 
+      lastFlush = Date.now();
+
+      // Reasoning rides its own channel. The transcript folds it away behind
+      // one tap, so the reader who wants it can open it and the reader who does
+      // not never sees it in the answer.
+      if (reasoningBuffer.length > 0) {
+        const thinking = reasoningBuffer;
+        reasoningBuffer = "";
+        await appendEvent(admin, runId, "message.reasoning", { text: thinking });
+      }
+
+      if (deltaBuffer.length === 0) return;
+
       const text = deltaBuffer;
       deltaBuffer = "";
-      lastFlush = Date.now();
       await appendEvent(admin, runId, "message.delta", { text });
     };
 
@@ -382,9 +439,13 @@ export async function executeRun(
               outputTokens += estimateTokens(event.text);
               await flushDeltas();
             } else if (event.type === "reasoning") {
-              // Recorded for the provider that requires it echoed back, never
-              // streamed: the reader sees tool summaries, not chain-of-thought.
+              // Kept for the provider that requires it echoed back, and sent on
+              // its own channel so the transcript can fold it away instead of
+              // printing it as the answer.
               stepReasoning += event.text;
+              reasoningText += event.text;
+              reasoningBuffer += event.text;
+              await flushDeltas();
             } else if (event.type === "finish") {
               stepFinish = event.reason;
             } else {
@@ -723,6 +784,9 @@ export async function executeRun(
         files: changedFiles,
         token: chatToken,
         sealKey: serverEnv().githubTokenKey,
+        // Without this the stored answer had no `thinking` column and the fold
+        // vanished on the first reload.
+        thinking: reasoningText,
         tokens: inputTokens + outputTokens,
       }).catch((caught: unknown) => ({
         message: false,

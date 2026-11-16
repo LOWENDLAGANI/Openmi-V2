@@ -6,6 +6,7 @@ import {
 } from "@/lib/execution/chat-env/open";
 import { MISSION_WORKDIR } from "@/lib/execution/mission/budget";
 import {
+  attachSandbox,
   createRunSandbox as createProviderSandbox,
   type SandboxHandle,
 } from "@/lib/execution/provider";
@@ -57,6 +58,10 @@ export type OpenWorkspaceInput = {
   owner?: string | null;
   /** Needed for the chat's workspace row; absent means a run box. */
   admin?: ChatAdmin | null;
+  /** The box a previous attempt recorded, when this run is a retry. */
+  sandboxId?: string | null;
+  /** The E2B account that can open `sandboxId`. */
+  sandboxAccount?: string | null;
 };
 
 /**
@@ -76,6 +81,12 @@ export async function openRunWorkspace(
 ): Promise<OpenWorkspaceResult> {
   const chat = await openChatWorkspace(input);
   if (chat) return chat;
+
+  // A retry picks up the disk its first attempt was using. Creating a second box
+  // is what made a resumed run start from the seeded commit, with every edit the
+  // first attempt made thrown away.
+  const resumed = await resumeRecordedWorkspace(input);
+  if (resumed) return resumed;
 
   let sandbox: SandboxHandle;
 
@@ -137,6 +148,51 @@ export async function openRunWorkspace(
     sandbox,
     seeded: true,
     notice: null,
+    shared: false,
+    release: () => pauseRunWorkspace(sandbox),
+  };
+}
+
+/**
+ * The box this run already had, reattached.
+ *
+ * A run's workspace is paused when it settles and kept for its TTL, so a run
+ * handed back to the queue after its worker vanished can pick up the same disk:
+ * the edits it made, the packages it installed, the branch it started.
+ *
+ * Null means "not resumable" — no recorded box, a box the provider no longer
+ * has, or one whose workspace directory is gone — and the caller makes a fresh
+ * box instead. A box that cannot be used is destroyed rather than left to bill.
+ */
+async function resumeRecordedWorkspace(
+  input: OpenWorkspaceInput
+): Promise<OpenWorkspaceResult | null> {
+  if (!input.sandboxId || !input.sandboxAccount) return null;
+
+  let sandbox: SandboxHandle;
+
+  try {
+    sandbox = await attachSandbox(input.sandboxId, input.sandboxAccount);
+  } catch {
+    // Gone or unreadable: the run starts again on a new box, which is the only
+    // other way it can start at all.
+    return null;
+  }
+
+  const probe = await sandbox
+    .exec(`cd ${RUN_WORKDIR} && git status --porcelain | head -n 1`, ".", 30_000)
+    .catch(() => null);
+
+  if (!probe || probe.exitCode !== 0) {
+    await sandbox.destroy().catch(() => {});
+    return null;
+  }
+
+  return {
+    ok: true,
+    sandbox,
+    seeded: true,
+    notice: "resumed this run's existing workspace",
     shared: false,
     release: () => pauseRunWorkspace(sandbox),
   };

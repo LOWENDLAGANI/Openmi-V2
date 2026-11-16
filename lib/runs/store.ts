@@ -346,6 +346,43 @@ export async function listRunMessages(
   return out;
 }
 
+/**
+ * The tools a run has already used, in order.
+ *
+ * A resumed run gets the transcript it wrote but not the results it read — those
+ * lived in the model messages, not in a column. This is the other half: what it
+ * ran, so it can check the workspace instead of running it all again.
+ */
+export async function listRunToolCalls(
+  admin: Client,
+  runId: string
+): Promise<
+  Array<{
+    stepIdx: number;
+    idx: number;
+    name: string;
+    argsJson: Record<string, unknown> | null;
+    isError: boolean;
+  }>
+> {
+  const { data, error } = await admin
+    .from("run_tool_calls")
+    .select("step_idx, idx, name, args_json, is_error")
+    .eq("run_id", runId)
+    .order("step_idx", { ascending: true })
+    .order("idx", { ascending: true });
+
+  if (error || !data) return [];
+
+  return (data as Record<string, unknown>[]).map((row) => ({
+    stepIdx: Number(row.step_idx ?? 0),
+    idx: Number(row.idx ?? 0),
+    name: String(row.name ?? "tool"),
+    argsJson: (row.args_json ?? null) as Record<string, unknown> | null,
+    isError: row.is_error === true,
+  }));
+}
+
 export async function appendRunMessage(
   admin: Client,
   runId: string,

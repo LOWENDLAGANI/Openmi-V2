@@ -101,6 +101,13 @@ worse than a slow cancel. A provider that sends nothing for `PROVIDER_IDLE_MS`
 (120 s) is treated as gone, and the step fails with that reason instead of
 holding the run open in silence.
 
+A run whose heartbeat stops is handed back to the queue once, and the second
+attempt resumes it: `executeRun` reattaches the box recorded on the row (its edits,
+installs and branch are on that disk) and continues the stored transcript, with a
+note saying where it stopped and what it last ran. A retry that no worker claims
+within two minutes is failed instead, so it cannot hold the account's one-live-run
+slot.
+
 A run whose heartbeat stops is marked failed by `reapStaleRuns`, called on
 worker start and from `GET /api/cron/run-sweep` with `CRON_SECRET`. The same
 sweep reconciles sandboxes: a box with no row is destroyed as an orphan, a live
@@ -109,7 +116,7 @@ closes.
 
 ## Event protocol
 
-`run.started`, `message.delta`, `message.done`, `tool.started`, `tool.finished`,
+`run.started`, `message.delta`, `message.reasoning`, `message.done`, `tool.started`, `tool.finished`,
 `usage`, `warning`, `preview.ready`, `run.finished`, `run.error`.
 
 - SSE over `fetch` with a manual reader, not `EventSource`.
