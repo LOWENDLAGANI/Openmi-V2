@@ -16,6 +16,7 @@ import { RepoPicker } from "@/components/RepoPicker";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { Workspace } from "@/components/Workspace";
+import { WorkspaceOverlay } from "@/components/WorkspaceOverlay";
 import {
   MAX_PATH_INDEX,
   describeGithubError,
@@ -753,6 +754,8 @@ export default async function ChatPage({
   // The workspace is a second view of the same chat, not a second page: a
   // citation opens the file beside the conversation, and the URL says which.
   const workspaceView = params.view === "files" || params.view === "repos";
+  // The file browser is a dialog over the chat now; the picker stays a page.
+  const filesView = params.view === "files";
 
   let body: React.ReactNode;
   if (trashView) {
@@ -761,7 +764,7 @@ export default async function ChatPage({
     body = <ConnectPanel oauthEnabled={oauthConfigured()} />;
   } else if (draft) {
     body = <DraftChat repo={draftRepo} />;
-  } else if (activeChat && !workspaceView) {
+  } else if (activeChat && (!workspaceView || filesView)) {
     // The conversation streams into a boundary of its own instead of holding
     // the page. Awaiting it here made every GitHub read part of the first byte:
     // the sidebar and header could not paint until the tree for citation links
@@ -827,9 +830,9 @@ export default async function ChatPage({
           {activeChat?.repo_full_name && activeChat.repo_base_sha && (
             <Link
               href={`/chat?chat=${activeChat.id}&repo=${encodeURIComponent(activeChat.repo_full_name)}&branch=${encodeURIComponent(activeChat.repo_branch ?? "")}&sha=${activeChat.repo_base_sha}&view=files`}
-              className="btn hidden px-3 py-1.5 text-[11.5px] sm:inline-flex"
+              className="btn px-3 py-1.5 text-[11.5px]"
             >
-              Files
+              Workspace
             </Link>
           )}
 
@@ -839,6 +842,20 @@ export default async function ChatPage({
       }
     >
       {body}
+
+      {filesView && activeChat && (
+        <WorkspaceOverlay closeHref={`/chat?chat=${activeChat.id}`}>
+          <Suspense
+            fallback={
+              <p className="py-16 text-center text-[12px] text-mid">
+                Loading the repository…
+              </p>
+            }
+          >
+            <RepoSurface session={session} params={params} chat={activeChat} />
+          </Suspense>
+        </WorkspaceOverlay>
+      )}
 
     </AppShell>
   );
