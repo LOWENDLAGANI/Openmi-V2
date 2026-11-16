@@ -477,19 +477,9 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* The sandbox sits above the transcript rather than beside it: the
-            chat column is the page's one column at every width, and a second
-            pane would have to compete with it on a phone. Its three panels
-            share one dock so they read as one control, not three cards. */}
-        {repo ? (
-          <SandboxDock
-            chatId={chat.id}
-            files={filesEnabled()}
-            versions={checkpointsEnabled()}
-            preview={previewEnabled()}
-          />
-        ) : null}
-
+        {/* The sandbox panels live behind the header's Workspace button with the
+            repository browser; nothing sits between the reader and the
+            transcript. */}
         <div className="min-h-0 flex-1">
           <ChatPanel
             chatId={chat.id}
@@ -852,7 +842,15 @@ export default async function ChatPage({
               </p>
             }
           >
-            <RepoSurface session={session} params={params} chat={activeChat} />
+            <SandboxDock
+              chatId={activeChat.id}
+              files={filesEnabled()}
+              versions={checkpointsEnabled()}
+              preview={previewEnabled()}
+              repository={
+                <RepoSurface session={session} params={params} chat={activeChat} />
+              }
+            />
           </Suspense>
         </WorkspaceOverlay>
       )}
