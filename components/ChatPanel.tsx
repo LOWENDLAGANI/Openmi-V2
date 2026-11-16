@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { AiThinking } from "@/components/AiThinking";
@@ -17,6 +23,7 @@ import { RetryNotice } from "@/components/RetryNotice";
 import { MessageBody } from "@/components/MessageBody";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
+import { interleaveAnswer } from "@/lib/chat/interleave";
 import {
   modelHourDew,
   modelName,
@@ -554,8 +561,12 @@ export function ChatPanel({
     const shotLog: Shot[] = resume ? [...resume.shots] : [];
 
     const recordStep = (next: StepLine) => {
+      // Where in the answer this happened. The text already on screen is what
+      // the reader has read, so the step belongs after it, not above it.
+      const at = assembled.length;
+
       if (next.state === "start") {
-        stepLog.push(next);
+        stepLog.push({ ...next, at });
       } else {
         let index = -1;
         for (let i = stepLog.length - 1; i >= 0; i -= 1) {
@@ -564,8 +575,10 @@ export function ChatPanel({
             break;
           }
         }
-        if (index >= 0) stepLog[index] = next;
-        else stepLog.push(next);
+        // A finished step keeps where it started: that is the point in the
+        // text the reader watched it begin at.
+        if (index >= 0) stepLog[index] = { ...next, at: stepLog[index].at ?? at };
+        else stepLog.push({ ...next, at });
       }
       setSteps([...stepLog]);
     };
@@ -1128,14 +1141,12 @@ export function ChatPanel({
                   </div>
                   <div className="msg-ai-card">
                     {message.thinking && <ThinkingBlock text={message.thinking} />}
-                    {message.steps && message.steps.length > 0 && (
-                      <StepList steps={message.steps} />
-                    )}
                     {message.shots && message.shots.length > 0 && (
                       <ShotStrip shots={message.shots} />
                     )}
-                    <MessageBody
+                    <AnswerWithSteps
                       content={message.content}
+                      steps={message.steps}
                       repo={repo}
                       validPaths={validPaths}
                       chatId={activeChatId ?? ""}
@@ -1154,25 +1165,31 @@ export function ChatPanel({
 
                 {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
-                {/* `live` follows the turn, not the panel: a console kept after
-                    a failure must not still claim to be running. */}
-                {steps.length > 0 && <StepList steps={steps} live={streaming} />}
-
                 {shots.length > 0 && <ShotStrip shots={shots} />}
 
                 {pending.length === 0 ? (
-                  // Only while a turn is in flight. A console kept from a failed
-                  // turn must not put a "thinking" pill back on screen.
-                  (streaming || backgroundRunning) && (
-                    <AiThinking
-                      steps={steps}
-                      streaming={streaming}
-                      backgroundRunning={backgroundRunning}
-                    />
-                  )
+                  <>
+                    {/* Nothing written yet, so the work is the whole turn so
+                        far. `live` follows the turn, not the panel: a console
+                        kept after a failure must not claim to be running. */}
+                    {steps.length > 0 && (
+                      <StepList steps={steps} live={streaming} />
+                    )}
+                    {/* Only while a turn is in flight. A console kept from a
+                        failed turn must not put a "thinking" pill back. */}
+                    {(streaming || backgroundRunning) && (
+                      <AiThinking
+                        steps={steps}
+                        streaming={streaming}
+                        backgroundRunning={backgroundRunning}
+                      />
+                    )}
+                  </>
                 ) : (
-                  <MessageBody
+                  <AnswerWithSteps
                     content={pending}
+                    steps={steps}
+                    live={streaming}
                     repo={repo}
                     validPaths={validPaths}
                     chatId={activeChatId ?? ""}
@@ -1409,6 +1426,50 @@ function StepRow({ step }: { step: StepLine }) {
         )}
       </details>
     </li>
+  );
+}
+
+/**
+ * The answer with its steps where they happened.
+ *
+ * A console pinned above the text claims the work came first, which is wrong
+ * the moment the model narrates, runs a tool, and keeps writing. Steps are cut
+ * into the text at the paragraph that was on screen when they ran, so reading
+ * top to bottom reads in the order it happened.
+ */
+function AnswerWithSteps({
+  content,
+  steps,
+  live = false,
+  repo,
+  validPaths,
+  chatId,
+}: {
+  content: string;
+  steps?: StepLine[] | null;
+  live?: boolean;
+  repo: RepoRef;
+  validPaths: string[];
+  chatId: string;
+}) {
+  return (
+    <>
+      {interleaveAnswer(content, steps).map((segment, index) => (
+        <Fragment key={index}>
+          {segment.text.trim().length > 0 && (
+            <MessageBody
+              content={segment.text}
+              repo={repo}
+              validPaths={validPaths}
+              chatId={chatId}
+            />
+          )}
+          {segment.steps.length > 0 && (
+            <StepList steps={segment.steps} live={live} />
+          )}
+        </Fragment>
+      ))}
+    </>
   );
 }
 

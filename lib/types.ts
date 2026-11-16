@@ -31,6 +31,15 @@ export type AgentStep = {
   state: "start" | "done" | "error";
   command?: string;
   output?: string;
+  /**
+   * Characters of the answer already written when this step ran.
+   *
+   * Recorded by the tab watching the turn, so the console can sit inside the
+   * text where it happened instead of above an answer it interrupts. Stored
+   * rows do not carry it: the answer kept for a finished run is only the last
+   * stretch the model wrote, so a step's place in it is the top.
+   */
+  at?: number;
 };
 
 export type Message = {
