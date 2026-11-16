@@ -70,6 +70,8 @@ type ChatRequest = {
   path?: unknown;
   /** A continuation: the run the client is already watching. */
   turn?: unknown;
+  /** The last event sequence the continuing tab actually read. */
+  cursor?: unknown;
   repo?: unknown;
   branch?: unknown;
   sha?: unknown;
@@ -221,12 +223,22 @@ export async function POST(request: Request) {
       return json({ error: "That run does not exist." }, 404);
     }
 
+    // The tab says where it stopped reading. Resuming at the row's latest event
+    // instead skipped everything the worker wrote between the window closing
+    // and this request — the gap a long answer showed as a cut. The clamp keeps
+    // a forged cursor from skipping the log, and the row is still the ceiling.
+    const requested = Number(body.cursor);
+    const cursor =
+      Number.isFinite(requested) && requested >= 0
+        ? Math.min(Math.trunc(requested), run.last_event_seq)
+        : run.last_event_seq;
+
     return streamRun({
       admin,
       session,
       chatId,
       run,
-      cursor: run.last_event_seq,
+      cursor,
       greeting: null,
     });
   }
@@ -318,6 +330,27 @@ export async function POST(request: Request) {
       : null;
   const sha = typeof chat.repo_base_sha === "string" ? chat.repo_base_sha : null;
 
+  // A second message while a run is live used to be refused after it had been
+  // charged for its hour and written into the transcript, so refusing left a
+  // question with no answer and a turn nobody could see. The gate comes before
+  // the charge and before the row now: a refused send writes nothing.
+  //
+  // A worker that died — or a deployment with no worker at all — leaves its run
+  // in the one-live-run index, which would refuse every new chat with "you
+  // already have a run in progress" for good. Age the account's leftovers out
+  // before asking the quota, so a leftover is not a permanent lockout.
+  await settleStalledRuns(admin, session.user.id);
+
+  const quota = await readQuota(admin, session.user.id);
+  const decision = checkRunQuota(quota);
+
+  if (!decision.allowed) {
+    return json(
+      { error: decision.message, code: decision.code, quota },
+      decision.code === "concurrency" ? 409 : 402
+    );
+  }
+
   const sealKey = serverEnv().githubTokenKey;
 
   // Trial Dew is granted here, not at signup: this is the first point in the
@@ -355,22 +388,6 @@ export async function POST(request: Request) {
   }
 
   if (!userMessage) return json({ error: "The message was not saved." }, 500);
-
-  // A worker that died — or a deployment with no worker at all — leaves its run
-  // in the one-live-run index, which would refuse every new chat with "you
-  // already have a run in progress" for good. Age the account's leftovers out
-  // before asking the quota, so a leftover is not a permanent lockout.
-  await settleStalledRuns(admin, session.user.id);
-
-  const quota = await readQuota(admin, session.user.id);
-  const decision = checkRunQuota(quota);
-
-  if (!decision.allowed) {
-    return json(
-      { error: decision.message, code: decision.code, quota },
-      decision.code === "concurrency" ? 409 : 402
-    );
-  }
 
   const runId = randomUUID();
   const history = recentHistory(await listMessages(session.supabase, chatId));
@@ -671,7 +688,9 @@ function streamRun(input: StreamInput): NextResponse {
         }
 
         if (Date.now() > deadline) {
-          send("paused", { turn: run.id });
+          // The cursor is the seam: the next window resumes from here, so no
+          // event is skipped and none is replayed.
+          send("paused", { turn: run.id, cursor });
           close();
           return;
         }

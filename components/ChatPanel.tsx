@@ -61,6 +61,26 @@ type Shot = {
   caption: string;
 };
 
+/**
+ * Where a stream stopped and what it had written when it did.
+ *
+ * A window closes at four minutes and the run keeps going, so the next window
+ * is a continuation of the same answer, not a new one. The text, the console
+ * and the cursor travel together: without the cursor the resume skipped every
+ * event the worker wrote in between, and without the text the answer restarted
+ * at the seam.
+ */
+type ResumeState = {
+  cursor: number | null;
+  assembled: string;
+  thinking: string;
+  steps: StepLine[];
+  shots: Shot[];
+};
+
+/** Windows one answer may span: six is headroom over a fifteen-minute run. */
+const MAX_CONTINUATIONS = 6;
+
 export function ChatPanel({
   chatId,
   repo,
@@ -113,6 +133,10 @@ export function ChatPanel({
   const [lastSent, setLastSent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
+  // The balances the charge dialog reads. They start at the page's read and are
+  // re-read when a charge lands or the day turns; the profile row is the truth,
+  // and a value frozen at page load is what made a refilled balance look empty.
+  const [balances, setBalances] = useState(dew);
 
   // A stored run can outlive the tab that started it. When the server says one
   // is live — on a reload, or on the refresh after a dropped stream — polling
@@ -120,6 +144,13 @@ export function ChatPanel({
   useEffect(() => {
     if (initialRunning) setBackgroundRunning(true);
   }, [initialRunning]);
+
+  // A refresh re-reads the profile; adopt it rather than keep a balance the
+  // database has already moved past.
+  useEffect(() => {
+    setBalances({ balance: dew.balance, wallet: dew.wallet });
+  }, [dew.balance, dew.wallet]);
+
   const [atBottom, setAtBottom] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId);
   // The first message of a new chat waits here until the hour is confirmed.
@@ -143,6 +174,8 @@ export function ChatPanel({
   // window. A run is bounded at fifteen minutes and a window is four, so six is
   // headroom, not a loop.
   const continuedRef = useRef(0);
+  // What the next window continues with. Set by `paused`, consumed by `send`.
+  const resumeRef = useRef<ResumeState | null>(null);
   const stopTimerRef = useRef<number | null>(null);
   // Whether the reader asked for this turn to stop, so a closed stream is not
   // mistaken for a turn that is still running elsewhere.
@@ -228,6 +261,59 @@ export function ChatPanel({
     };
   }, [backgroundRunning, streaming, activeChatId, router]);
 
+  /**
+   * Adopts the transcript the server just re-read.
+   *
+   * `initialMessages` is a prop, but the state above is seeded once, on mount.
+   * A refresh after a turn — or after a run this tab was only watching —
+   * therefore arrived with the stored answer and the component kept the list it
+   * already had, so the answer and its console were missing until a hard
+   * reload. This is the half that makes `router.refresh()` mean something.
+   *
+   * The stream wins while it is running: the text being written lives in
+   * `pending`, not in the server list, and adopting a list written before the
+   * answer would delete it.
+   */
+  const serverSignature = initialMessages
+    .map((message) => `${message.id}:${message.seq}:${message.content.length}`)
+    .join("|");
+  const adoptedSignatureRef = useRef(serverSignature);
+
+  useEffect(() => {
+    if (adoptedSignatureRef.current === serverSignature) return;
+    if (busyRef.current || backgroundRunning) return;
+
+    adoptedSignatureRef.current = serverSignature;
+
+    // Screenshots are not stored with the answer, so a message this tab already
+    // holds keeps the pictures it took even as the text is replaced by the row.
+    setMessages((current) => {
+      const shotsById = new Map<string, Shot[]>();
+      for (const message of current) {
+        if (message.shots && message.shots.length > 0) {
+          shotsById.set(message.id, message.shots);
+        }
+      }
+
+      return initialMessages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        seq: Number(message.seq),
+        model: message.model,
+        thinking: message.thinking ?? undefined,
+        steps: Array.isArray(message.steps) ? message.steps : undefined,
+        shots: shotsById.get(message.id),
+      }));
+    });
+
+    // The refreshed rows carry the console and the answer both, so the live
+    // copies go rather than sitting under the message twice.
+    setPending("");
+    setThinking("");
+    setSteps([]);
+  }, [serverSignature, initialMessages, backgroundRunning, streaming]);
+
   // Follow the transcript only while the reader is already at the end. A
   // tween per token is a stutter, so streaming jumps and a finished message is
   // the one arrival that eases. The reader can still scroll away: autoKill in
@@ -306,18 +392,67 @@ export function ChatPanel({
   }
 
   /**
+   * Settles the daily allowance before a charge is judged.
+   *
+   * The allowance is renewed at local midnight, but the page that read the
+   * balance may have been open since yesterday: the dialog then said "Not
+   * enough Dew" for an account the server would have topped up on the spot, and
+   * there was no way forward but a reload. Asking the server at the moment the
+   * money matters is what turns a stale number into the real balance.
+   */
+  async function ensureDew(price: number): Promise<{ balance: number; wallet: number }> {
+    if (balances.balance + balances.wallet >= price) return balances;
+
+    try {
+      const response = await fetch("/api/dew/refill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+        cache: "no-store",
+      });
+
+      if (!response.ok) return balances;
+
+      const payload = (await response.json()) as {
+        balance?: unknown;
+        wallet?: unknown;
+      };
+
+      const balance = Number(payload.balance);
+      const wallet = Number(payload.wallet);
+
+      if (!Number.isFinite(balance)) return balances;
+
+      const next = {
+        balance,
+        wallet: Number.isFinite(wallet) ? wallet : balances.wallet,
+      };
+
+      setBalances(next);
+      window.dispatchEvent(new CustomEvent(DEW_EVENT, { detail: next }));
+      return next;
+    } catch {
+      return balances;
+    }
+  }
+
+  /**
    * A new chat asks how to pay before anything is sent; an existing chat already
    * has an answer, stored on its row. Typing must never cost Dew silently.
    */
-  function beginSend(content: string) {
+  async function beginSend(content: string) {
     if (busyRef.current) return;
     if (content.trim().length === 0) return;
+    // A turn is already running: the composer says so, and the server would
+    // refuse a second one after writing the message. Nothing is sent.
+    if (backgroundRunning) return;
 
     // A new chat confirms the hour before it spends anything; an existing chat
     // is already paid for, so its messages go straight out. A free hour has
     // nothing to confirm, so it goes straight out too — and still starts the
     // session server-side, because the hour scopes the chat, not the charge.
     if (activeChatId === null && modelHourDew(model, models) > 0) {
+      await ensureDew(modelHourDew(model, models));
       setChargeFor(content);
       return;
     }
@@ -358,15 +493,29 @@ export function ChatPanel({
       stopTimerRef.current = null;
     }
     setError(null);
-    setPending("");
-    setThinking("");
-    setSteps([]);
-    setShots([]);
     setNotices([]);
 
+    // A continuation keeps what the previous window wrote; a fresh turn starts
+    // from an empty column.
+    const resume = continuation ? resumeRef.current : null;
+    if (continuation) resumeRef.current = null;
+
+    if (resume) {
+      setPending(resume.assembled);
+      setThinking(resume.thinking);
+      setSteps([...resume.steps]);
+      setShots([...resume.shots]);
+    } else {
+      setPending("");
+      setThinking("");
+      setSteps([]);
+      setShots([]);
+    }
+
     let pausedToken: string | null = null;
-    let assembled = "";
-    let thinkingText = "";
+    let pausedCursor: number | null = null;
+    let assembled = resume?.assembled ?? "";
+    let thinkingText = resume?.thinking ?? "";
     let sawDone = false;
     // The server accepted a run for this turn, so a stream that ends without
     // "done" is a turn still out there rather than a request that was refused.
@@ -379,8 +528,8 @@ export function ChatPanel({
     // Steps belong to the answer they produced, so they are collected here and
     // stored on the message when it lands. A finished answer keeps its fold;
     // live progress is cleared the moment the turn ends.
-    const stepLog: StepLine[] = [];
-    const shotLog: Shot[] = [];
+    const stepLog: StepLine[] = resume ? [...resume.steps] : [];
+    const shotLog: Shot[] = resume ? [...resume.shots] : [];
 
     const recordStep = (next: StepLine) => {
       if (next.state === "start") {
@@ -419,7 +568,13 @@ export function ChatPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           continuation
-            ? { chatId: activeChatId, turn: turnToken }
+            ? {
+                chatId: activeChatId,
+                turn: turnToken,
+                // Where this tab stopped reading, so the next window resumes at
+                // the seam instead of at the worker's latest event.
+                cursor: resume?.cursor ?? undefined,
+              }
             : {
                 chatId: activeChatId ?? undefined,
                 content,
@@ -450,6 +605,13 @@ export function ChatPanel({
             chatId: payload.activeChatId ?? null,
             message: payload?.error ?? "An hour of chat is already running.",
           });
+        }
+
+        // Another tab (or an earlier one) still owns a run. The transcript is
+        // stale here, so hand the wait to the poll instead of leaving the
+        // reader with a dead error and no way to watch the answer arrive.
+        if (payload?.code === "concurrency") {
+          setBackgroundRunning(true);
         }
 
         if (optimisticId) {
@@ -523,6 +685,10 @@ export function ChatPanel({
           const wallet = Number(payload.wallet);
 
           if (Number.isFinite(balance)) {
+            setBalances((current) => ({
+              balance,
+              wallet: Number.isFinite(wallet) ? wallet : current.wallet,
+            }));
             window.dispatchEvent(
               new CustomEvent(DEW_EVENT, {
                 detail: {
@@ -599,6 +765,8 @@ export function ChatPanel({
 
         if (event === "paused") {
           pausedToken = typeof payload.turn === "string" ? payload.turn : null;
+          const cursor = Number(payload.cursor);
+          pausedCursor = Number.isFinite(cursor) ? cursor : null;
           return;
         }
 
@@ -664,6 +832,12 @@ export function ChatPanel({
           sawDone = true;
           // The steps stay: a failed turn has no message to carry them, and
           // the command output is the only evidence of what went wrong.
+          //
+          // The worker stores what the model had written before it failed, and
+          // this is the read that brings it onto the screen. Clearing `pending`
+          // without this was the "sudden stop": the partial answer vanished
+          // and looked like it had never been written.
+          router.refresh();
         }
       };
 
@@ -698,10 +872,27 @@ export function ChatPanel({
         stopTimerRef.current = null;
       }
 
+      // The window closed on a turn that is still running: hand the text and
+      // the cursor to the next window rather than settling the turn here. A
+      // pause is not a stop, and appending a "stopped" note for one is what put
+      // a finished-looking answer in the transcript mid-run.
+      const willContinue =
+        Boolean(pausedToken) && continuedRef.current < MAX_CONTINUATIONS;
+
+      if (willContinue) {
+        resumeRef.current = {
+          cursor: pausedCursor,
+          assembled,
+          thinking: thinkingText,
+          steps: [...stepLog],
+          shots: [...shotLog],
+        };
+      }
+
       // A stopped turn is not a lost answer. If the stream ended without the
       // server's final "done", the part already on screen becomes a message
       // instead of vanishing with the composer state.
-      if (!sawDone && assembled.trim().length > 0) {
+      if (!sawDone && !willContinue && assembled.trim().length > 0) {
         stepsCarried = true;
         setMessages((current) => [
           ...current,
@@ -722,30 +913,52 @@ export function ChatPanel({
       // keeps the console on screen: that output is the only record of what the
       // sandbox did, and clearing it is what made a failed run impossible to
       // diagnose.
-      setSteps(stepsCarried ? [] : [...stepLog]);
-      setPending("");
-      setThinking("");
+      if (!willContinue) {
+        setSteps(stepsCarried ? [] : [...stepLog]);
+        setPending("");
+        setThinking("");
+      }
 
       // The stream can end without the turn ending: a dropped connection, or the
       // continuation budget running out. A turn the server accepted is still in
       // the queue or the worker, so hand it to the poll — that is the half which
       // either reports the answer or ends the wait with its reason. A refused
       // request and a stop the reader asked for have nothing to follow.
-      if (attached && !sawDone && !stoppedRef.current) {
+      if (attached && !sawDone && !stoppedRef.current && !willContinue) {
         setBackgroundRunning(true);
       }
     }
 
-    // A paused turn is continued once, with the signed token the server issued.
-    // If that continuation also pauses, the reader is told instead of looping.
-    if (pausedToken && continuedRef.current < 6) {
+    // A paused turn continues with the signed token the server issued and the
+    // cursor this tab reached. If the continuation budget runs out, the poll
+    // above takes over instead of looping.
+    if (pausedToken && continuedRef.current < MAX_CONTINUATIONS) {
       continuedRef.current += 1;
       await send("", pausedToken);
     }
   }
 
   function stop() {
-    if (!streaming || stopping) return;
+    if ((!streaming && !backgroundRunning) || stopping) return;
+
+    // A turn this tab is only watching has no open stream; the stop is a request
+    // to the worker, and the poll is what notices it settle.
+    if (!streaming) {
+      stoppedRef.current = true;
+      setStopping(true);
+
+      void fetch("/api/chat/stop", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chatId: activeChatId }),
+      })
+        .catch(() => null)
+        .finally(() => {
+          window.setTimeout(() => setStopping(false), 8_000);
+        });
+
+      return;
+    }
 
     stoppedRef.current = true;
     setStopping(true);
@@ -785,6 +998,7 @@ export function ChatPanel({
   function retry() {
     // Return the promise so the button holds its pending state until the turn
     // it started actually settles.
+    if (backgroundRunning) return;
     if (lastSent.length > 0) return send(lastSent);
   }
 
@@ -845,7 +1059,7 @@ export function ChatPanel({
                   key={suggestion.label}
                   type="button"
                   onClick={() => beginSend(suggestion.prompt)}
-                  disabled={streaming}
+                  disabled={streaming || backgroundRunning}
                   className="motion-chip group flex items-center gap-2 rounded-full border border-line-strong bg-card px-4 py-2 text-[12px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
                 >
                   <span
@@ -1048,7 +1262,7 @@ export function ChatPanel({
             onModelChange={(id) => setModel(id as ModelId)}
             meter={meter}
             activeChatId={activeChatId}
-            streaming={streaming}
+            streaming={streaming || backgroundRunning}
             stopping={stopping}
             providerReady={providerReady}
             command={composer}
@@ -1060,8 +1274,8 @@ export function ChatPanel({
 
       <ChargeDialog
         open={chargeFor !== null}
-        balance={dew.balance}
-        wallet={dew.wallet}
+        balance={balances.balance}
+        wallet={balances.wallet}
         hourPrice={modelHourDew(model, models)}
         pending={streaming}
         onCancel={() => setChargeFor(null)}

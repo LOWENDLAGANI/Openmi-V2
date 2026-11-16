@@ -19,6 +19,7 @@ import {
 } from "@/lib/providers";
 import type { SandboxHandle } from "@/lib/execution/provider";
 import { serverEnv } from "@/lib/env";
+import type { AgentStep } from "@/lib/types";
 
 import { collectRunArtifacts } from "./artifacts";
 import { deliverChatTurn } from "./chat";
@@ -130,6 +131,10 @@ export async function executeRun(
   // which is what a cancelled or failed run has to show.
   let answerText = "";
   let collectedText = "";
+  // The console the answer is stored with. The live tab reads the same work
+  // from `run_events`; without this copy the steps vanished the moment the
+  // transcript was reloaded, so a stored answer looked like it had done nothing.
+  const stepLog: AgentStep[] = [];
   let changedFiles: string[] = [];
   let chatToken: string | null = null;
 
@@ -440,11 +445,14 @@ export async function executeRun(
         }
 
         const args = parseArgs(call.args);
+        const detail = toolSummary(call.name, args);
         toolNames.push(call.name);
+
+        stepLog.push({ tool: call.name, detail, state: "start" });
 
         await appendEvent(admin, runId, "tool.started", {
           name: call.name,
-          summary: toolSummary(call.name, args),
+          summary: detail,
         });
 
         const toolStartedAt = Date.now();
@@ -518,12 +526,32 @@ export async function executeRun(
           durationMs,
         });
 
+        const preview = previewText(result.text, 400);
+
         await appendEvent(admin, runId, "tool.finished", {
           name: call.name,
           isError: result.isError,
           durationMs,
-          resultPreview: previewText(result.text, 400),
+          resultPreview: preview,
         });
+
+        const finishedStep: AgentStep = {
+          tool: call.name,
+          detail,
+          state: result.isError ? "error" : "done",
+          output: preview,
+        };
+
+        let startedAt = -1;
+        for (let index = stepLog.length - 1; index >= 0; index -= 1) {
+          if (stepLog[index].state === "start" && stepLog[index].tool === call.name) {
+            startedAt = index;
+            break;
+          }
+        }
+
+        if (startedAt >= 0) stepLog[startedAt] = finishedStep;
+        else stepLog.push(finishedStep);
 
         messages.push({
           role: "tool",
@@ -585,6 +613,7 @@ export async function executeRun(
         run,
         sandbox,
         text: status === "done" ? answerText : collectedText,
+        steps: stepLog,
         files: changedFiles,
         token: chatToken,
         sealKey: serverEnv().githubTokenKey,

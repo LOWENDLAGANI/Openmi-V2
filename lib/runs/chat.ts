@@ -9,6 +9,7 @@ import {
   finalizeChangeset,
 } from "@/lib/changesets/store";
 import type { SandboxHandle } from "@/lib/execution/provider";
+import type { AgentStep } from "@/lib/types";
 
 import { RUN_READ_MAX_BYTES } from "./limits";
 import type { RunRow } from "./store";
@@ -45,7 +46,8 @@ export async function appendChatAnswer(
   admin: SupabaseClient,
   run: RunRow,
   text: string,
-  tokens: number
+  tokens: number,
+  steps: AgentStep[] = []
 ): Promise<boolean> {
   if (!run.chat_id || text.trim().length === 0) return false;
 
@@ -57,7 +59,9 @@ export async function appendChatAnswer(
     p_model: run.model,
     p_tokens: tokens,
     p_thinking: null,
-    p_steps: [],
+    // The console the run took travels with its answer. A stored `[]` here is
+    // what made a reloaded transcript lose every step the tab had watched.
+    p_steps: steps,
   });
 
   return !error;
@@ -182,6 +186,8 @@ export async function deliverChatTurn(input: {
   run: RunRow;
   sandbox: SandboxHandle | null;
   text: string;
+  /** What the run did before it answered, stored with the answer. */
+  steps: AgentStep[];
   files: string[];
   token: string | null;
   sealKey: string | null;
@@ -195,7 +201,8 @@ export async function deliverChatTurn(input: {
     input.admin,
     run,
     input.text,
-    input.tokens
+    input.tokens,
+    input.steps
   ).catch(() => false);
 
   if (!input.sandbox) {

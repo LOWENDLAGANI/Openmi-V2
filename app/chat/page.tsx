@@ -472,6 +472,10 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
 
         <div className="min-h-0 flex-1">
           <ChatPanel
+            // A different conversation is a different panel. Without this the
+            // state seeded on mount stayed behind when the reader switched
+            // chats, and the previous transcript showed until a reload.
+            key={chat.id}
             chatId={chat.id}
             repo={repo}
             models={models}
@@ -497,22 +501,70 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
  * Failure is an empty list, not an error: a transcript whose citations stay
  * plain text is still a transcript, and a GitHub outage should not blank a
  * conversation that is already stored.
+ *
+ * It is bounded and cached because it is the one GitHub round trip in the chat
+ * column: a recursive tree for a large repository is seconds of latency, and
+ * the transcript and its composer wait behind this promise. A slow read now
+ * degrades to plain-text citations instead of holding the page open, and a
+ * refresh seconds after the last one reuses what was already read.
  */
+const CITATION_INDEX_TIMEOUT_MS = 1_500;
+const CITATION_INDEX_TTL_MS = 60_000;
+const citationIndex = new Map<string, { at: number; paths: string[] }>();
+
+function withDeadline<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+
+    void work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
 async function readCitationPaths(
   session: SignedIn,
   fullName: string,
   sha: string
 ): Promise<string[]> {
+  const key = `${fullName}@${sha}`;
+  const cached = citationIndex.get(key);
+
+  if (cached && Date.now() - cached.at < CITATION_INDEX_TTL_MS) {
+    return cached.paths;
+  }
+
   try {
     const github = await readToken(session.supabase, session.user.id);
     if (!github) return [];
 
-    const tree = await getTree(github.token, fullName, sha);
+    const tree = await withDeadline(
+      getTree(github.token, fullName, sha),
+      CITATION_INDEX_TIMEOUT_MS,
+      null
+    );
 
-    return tree.entries
+    // A read that missed its deadline is not cached: the next render may be the
+    // one that has the tree.
+    if (!tree) return [];
+
+    const paths = tree.entries
       .filter((entry) => entry.type === "blob")
       .map((entry) => entry.path)
       .slice(0, MAX_PATH_INDEX);
+
+    // One entry per open chat, not one per refresh.
+    if (citationIndex.size > 16) citationIndex.clear();
+    citationIndex.set(key, { at: Date.now(), paths });
+
+    return paths;
   } catch {
     return [];
   }
@@ -552,6 +604,7 @@ async function DraftChat({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatPanel
+        key="draft"
         chatId={null}
         repo={repo}
         models={models}
