@@ -342,9 +342,19 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   // The citation index is a GitHub round trip, so it is started before the
   // first await and settled alongside the database reads. Sequenced after them,
   // it added its whole latency to the transcript for no reason.
+  //
+  // It is also bounded twice: the read gives up on a huge tree on its own, and
+  // this is how long the *transcript* is willing to wait for links. Past it the
+  // citations stay plain for this view while the read finishes and caches, so
+  // the next open has them instantly — a link that arrives a second later is
+  // worth less than the answer that is already written.
   const citationPaths =
     chat.repo_full_name && chat.repo_base_sha
-      ? readCitationPaths(session, chat.repo_full_name, chat.repo_base_sha)
+      ? withDeadline(
+          readCitationPaths(session, chat.repo_full_name, chat.repo_base_sha),
+          TRANSCRIPT_CITATION_WAIT_MS,
+          [] as string[]
+        )
       : Promise.resolve<string[]>([]);
 
   const [
@@ -524,6 +534,13 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
  */
 const CITATION_INDEX_TIMEOUT_MS = 1_500;
 const CITATION_INDEX_TTL_MS = 60_000;
+
+/**
+ * How long a transcript waits for its citation links before drawing without
+ * them. A cache hit returns instantly; a cold tree read usually lands inside
+ * this, and a slow one stops holding the answer back.
+ */
+const TRANSCRIPT_CITATION_WAIT_MS = 600;
 const citationIndex = new Map<string, { at: number; paths: string[] }>();
 
 function withDeadline<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -674,9 +691,11 @@ export default async function ChatPage({
   const { supabase, user } = session;
   const trashView = params.trash === "1";
 
-  // The daily allowance is settled before anything is rendered, so the chip
-  // shows the balance the next turn will actually use.
-  await refillDailyDew(supabase);
+  // The daily allowance is settled before its own balance is read, so the chip
+  // shows the balance the next turn will actually use — but not before the rest
+  // of the page. Awaiting the refill on its own line put a write in front of
+  // every read, and the sidebar and transcript waited for it to land.
+  const refilled = refillDailyDew(supabase);
 
   const [foldersResult, chatsResult, connection, profileResult, hourResult] = await Promise.all([
     supabase.from("folders").select("id, name, created_at").order("name"),
@@ -687,11 +706,15 @@ export default async function ChatPage({
       )
       .order("updated_at", { ascending: false }),
     readConnection(supabase, user.id),
-    supabase
-      .from("profiles")
-      .select("dew_balance, wallet_dew")
-      .eq("id", user.id)
-      .maybeSingle(),
+    // Chained to the refill, not serialized behind it: this is the one read
+    // that has to see the renewal, and everything else carries on beside it.
+    refilled.then(() =>
+      supabase
+        .from("profiles")
+        .select("dew_balance, wallet_dew")
+        .eq("id", user.id)
+        .maybeSingle()
+    ),
     // The running hour, read with the same predicate `start_hour_session` uses
     // to reuse one: a session is live while `expires_at` is still ahead.
     supabase

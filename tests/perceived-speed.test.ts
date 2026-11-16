@@ -39,6 +39,28 @@ test("independent reads start before the first await", () => {
   expect(PAGE).toContain("    citationPaths,");
 });
 
+test("the daily refill runs beside the page's reads, not ahead of them", () => {
+  // It used to be its own `await` above the batch, which put a write in front
+  // of the sidebar's first read on every chat open.
+  const start = PAGE.indexOf("const refilled = refillDailyDew(supabase)");
+  const batch = PAGE.indexOf("await Promise.all([", start);
+
+  expect(start).toBeGreaterThan(-1);
+  expect(batch).toBeGreaterThan(start);
+  expect(PAGE).not.toContain("await refillDailyDew(supabase)");
+  // The one read that must see the renewal waits for it; the rest do not.
+  expect(PAGE).toContain("refilled.then(() =>");
+});
+
+test("the transcript does not wait on GitHub past its budget", () => {
+  const budget = PAGE.indexOf("TRANSCRIPT_CITATION_WAIT_MS = ");
+  const use = PAGE.indexOf("withDeadline(", budget);
+
+  expect(budget).toBeGreaterThan(-1);
+  expect(use).toBeGreaterThan(budget);
+  expect(PAGE).toContain("TRANSCRIPT_CITATION_WAIT_MS,\n          [] as string[]");
+});
+
 test("the skeleton reserves the composer's height", () => {
   // A skeleton that changes size on arrival is a layout shift with extra steps.
   expect(SKELETON).toContain('aria-busy="true"');
