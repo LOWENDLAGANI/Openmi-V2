@@ -243,10 +243,6 @@ export default async function PayPage({
               </span>
             </p>
           </div>
-          <p className="max-w-xs text-[10.5px] leading-relaxed text-low">
-            Spent only when the daily balance and the wallet together cover a
-            charge.
-          </p>
         </div>
 
         <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
@@ -314,24 +310,15 @@ export default async function PayPage({
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
                 {plan.days} days
               </p>
-              <p className="mt-2 text-[11px] leading-relaxed text-mid">
-                {plan.blurb}
-              </p>
             </div>
           ))}
         </div>
 
-        <p className="mt-2 text-[10.5px] leading-relaxed text-low">
-          {localPrices
-            ? `≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges ringgit; your receipt is what counts. `
-            : ""}
-          Money changes hands on the hosted page only. This app never asks for
-          card details.{" "}
-          <Link href="/refunds" className="text-accent-text underline-offset-2 hover:underline">
-            All sales are final
-          </Link>
-          : read the refund and cancellation policy before you pay.
-        </p>
+        {localPrices ? (
+          <p className="mt-2 text-[10.5px] leading-relaxed text-low">
+            {`≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges ringgit; your receipt is what counts.`}
+          </p>
+        ) : null}
       </section>
 
 
@@ -512,11 +499,6 @@ export default async function PayPage({
         )}
       </section>
 
-      <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
-        Approval is recorded against your receipt, and the Dew moves through the
-        same ledger as every other balance change. A rejected receipt
-        keeps its note and can be resubmitted with a corrected reference.
-      </p>
     </main>
   );
 }
