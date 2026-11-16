@@ -6,7 +6,11 @@
  * so a display name can be public while the routing stays on the server.
  */
 
-export type RouteProvider = "openrouter" | "straitly" | "deepseek";
+export type RouteProvider =
+  | "openrouter"
+  | "straitly"
+  | "deepseek"
+  | "experiential";
 
 export type ModelRoute = { provider: RouteProvider; upstream: string };
 
@@ -130,6 +134,10 @@ export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
   // The paid-only model. One provider, no fallback: a request that fails here
   // fails, rather than silently answering on something the reader did not buy.
   "claude-haiku": { provider: "straitly", upstream: "claude-haiku-4-5" },
+  // The operator-only model. Its id is the gateway's own model id, so the
+  // upstream string is the same as the picker's — the gateway does the routing,
+  // and there is no fallback to a model the operator did not choose.
+  "gpt-6-luna": { provider: "experiential", upstream: "gpt-6-luna" },
 };
 
 export type CustomRouteInput = {

@@ -2,12 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { readAdminAccess } from "@/lib/admin/access";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { readDewProfile } from "@/lib/dew/store";
 import { isSameOrigin } from "@/lib/http/origin";
 import {
+  adminOnlyRefusal,
   firstAvailableModel,
   hasModel,
+  modelRequiresAdmin,
   modelRequiresPaid,
   paidOnlyRefusal,
 } from "@/lib/models";
@@ -139,6 +142,15 @@ export async function POST(request: Request) {
     const refusal = paidOnlyRefusal(model, profile?.paidActive === true, catalogue);
 
     if (refusal) return json(refusal, 402);
+  }
+
+  // The operator-only model is refused here as well as in the chat route: a run
+  // is a second way into the same models.
+  if (modelRequiresAdmin(model, catalogue)) {
+    const access = await readAdminAccess();
+    const refusal = adminOnlyRefusal(model, access.state === "admin", catalogue);
+
+    if (refusal) return json(refusal, 403);
   }
 
   // A leftover row from a dead worker would hold the one-live-run index and

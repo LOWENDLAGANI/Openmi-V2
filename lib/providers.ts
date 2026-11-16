@@ -32,13 +32,21 @@ import {
  * paths.
  */
 
-export type ProviderId = "openrouter" | "straitly" | "deepseek";
+export type ProviderId =
+  | "openrouter"
+  | "straitly"
+  | "deepseek"
+  | "experiential";
 
 export type Provider = {
   id: ProviderId;
   endpoint: string;
   model: string;
-  keyName: "OPENROUTER_API_KEY" | "STRAITLY_API_KEY" | "DEEPSEEK_API_KEY";
+  keyName:
+    | "OPENROUTER_API_KEY"
+    | "STRAITLY_API_KEY"
+    | "DEEPSEEK_API_KEY"
+    | "EXPLABS_API_KEY";
   /**
    * The vendor reasons before it answers unless the request says otherwise.
    *
@@ -82,6 +90,22 @@ const DEEPSEEK: Provider = {
   model: "deepseek-flash",
   keyName: "DEEPSEEK_API_KEY",
   thinksByDefault: true,
+};
+
+/**
+ * The Experiential gateway: OpenAI-compatible, so it is a base URL and a key.
+ *
+ * It serves `gpt-6-luna`, an operator-only model. The endpoint is the gateway's
+ * chat-completions path — the same streaming, tool-call and reasoning shape as
+ * every other provider here — and the key is the operator's own, read from
+ * `EXPLABS_API_KEY`. No key means the model is offered but unavailable, never
+ * silently answered by a different vendor.
+ */
+const EXPERIENTIAL: Provider = {
+  id: "experiential",
+  endpoint: "https://api.experientiallabs.ai/v1/chat/completions",
+  model: "gpt-6-luna",
+  keyName: "EXPLABS_API_KEY",
 };
 
 // Frame parsing and the reasoning toggle are pure, so they live in
@@ -168,6 +192,9 @@ export function providersFor(
     return chain;
   }
 
+  // The operator-only model is one gateway route and one upstream id. There is
+  // no second vendor to fall back to: answering from it on another model is the
+  // thing the operator did not ask for.
   const route = routeForModel(model, custom);
   if (!route) return [];
 
@@ -283,7 +310,7 @@ export function providersConfigured(
 
 /** Every provider, for the setup page to probe each configured key. */
 export function providerCatalogue(): Provider[] {
-  return [OPENROUTER, STRAITLY, DEEPSEEK];
+  return [OPENROUTER, STRAITLY, DEEPSEEK, EXPERIENTIAL];
 }
 
 /**

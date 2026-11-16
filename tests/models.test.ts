@@ -5,12 +5,15 @@ import { DEW_PER_HOUR } from "../lib/dew";
 import {
   DEFAULT_MODEL,
   MODELS,
+  adminOnlyRefusal,
   hasModel,
   isModelAllowed,
   isModelId,
   modelHourDew,
   modelName,
+  modelRequiresAdmin,
   modelRequiresPaid,
+  modelsForReader,
   paidOnlyRefusal,
 } from "../lib/models";
 
@@ -28,12 +31,14 @@ test("the picker offers Auto and the one model this deployment serves", () => {
     "auto",
     "deepseek-flash",
     "claude-haiku",
+    "gpt-6-luna",
   ]);
   expect(DEFAULT_MODEL).toBe("deepseek-flash");
   expect(MODELS.map((model) => model.name)).toEqual([
     "Auto",
     "DeepSeek V4.1 flash",
     "Claude Haiku 4.5",
+    "GPT-6 Luna",
   ]);
   expect(modelName("auto")).toBe("Auto");
   expect(modelName("deepseek-flash")).toBe("DeepSeek V4.1 flash");
@@ -125,6 +130,40 @@ test("the paid-only model is marked, priced, and refused without a pass", () => 
   const refusal = paidOnlyRefusal("claude-haiku", false);
   expect(refusal?.code).toBe("paid-only");
   expect(refusal?.error).toContain("paid plan");
+});
+
+test("the operator-only model is hidden from readers and refused on the server", () => {
+  const luna = MODELS.find((model) => model.id === "gpt-6-luna");
+
+  expect(luna?.adminOnly).toBe(true);
+  expect(luna?.dewPerHour).toBe(DEW_PER_HOUR);
+
+  // One model is operator-only; the rest are not.
+  for (const model of MODELS) {
+    if (model.id === "gpt-6-luna") continue;
+    expect(model.adminOnly).not.toBe(true);
+  }
+
+  expect(modelRequiresAdmin("gpt-6-luna")).toBe(true);
+  expect(modelRequiresAdmin("deepseek-flash")).toBe(false);
+  expect(modelRequiresAdmin("not-a-model")).toBe(false);
+
+  // A reader's picker does not contain it; an operator's does.
+  expect(modelsForReader(MODELS, false).map((model) => model.id)).toEqual([
+    "auto",
+    "deepseek-flash",
+    "claude-haiku",
+  ]);
+  expect(modelsForReader(MODELS, true).map((model) => model.id)).toContain(
+    "gpt-6-luna"
+  );
+
+  expect(adminOnlyRefusal("gpt-6-luna", true)).toBeNull();
+  expect(adminOnlyRefusal("deepseek-flash", false)).toBeNull();
+
+  const refusal = adminOnlyRefusal("gpt-6-luna", false);
+  expect(refusal?.code).toBe("admin-only");
+  expect(refusal?.error).toContain("operator-only");
 });
 
 test("the server refuses the paid-only model before it charges the hour", () => {

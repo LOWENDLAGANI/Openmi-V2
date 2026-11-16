@@ -34,7 +34,13 @@ import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
 import { oauthConfigured } from "@/lib/oauth/github";
-import { firstAvailableModel, hasModel, isModelAllowed } from "@/lib/models";
+import { readAdminAccess } from "@/lib/admin/access";
+import {
+  firstAvailableModel,
+  hasModel,
+  isModelAllowed,
+  modelsForReader,
+} from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
 import { filesEnabled } from "@/lib/files/plan";
@@ -337,7 +343,10 @@ async function RepoSurface({
 }
 
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
-  const models = modelCatalogue();
+  // An operator-only model is shown to an operator and to nobody else. The
+  // routes refuse it again; this is what keeps it out of a stranger's picker.
+  const access = await readAdminAccess();
+  const models = modelsForReader(modelCatalogue(), access.state === "admin");
 
   // The citation index is a GitHub round trip, so it is started before the
   // first await and settled alongside the database reads. Sequenced after them,
@@ -537,7 +546,8 @@ async function DraftChat({
 }: {
   repo: { fullName: string; branch: string; sha: string } | null;
 }) {
-  const models = modelCatalogue();
+  const access = await readAdminAccess();
+  const models = modelsForReader(modelCatalogue(), access.state === "admin");
 
   // The composer offers a price before the chat exists, so it needs both
   // balances. Reading them here keeps the call site a repository and nothing

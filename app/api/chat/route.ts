@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { readAdminAccess } from "@/lib/admin/access";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { titleFromMessage } from "@/lib/chat-title";
 import { formatDew } from "@/lib/dew";
@@ -18,8 +19,10 @@ import { hashIp, requestIp } from "@/lib/http/ip";
 import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
 import {
+  adminOnlyRefusal,
   firstAvailableModel,
   hasModel,
+  modelRequiresAdmin,
   modelRequiresPaid,
   paidOnlyRefusal,
   type ModelId,
@@ -259,6 +262,20 @@ export async function POST(request: Request) {
     );
 
     if (refusal) return json(refusal, 402);
+  }
+
+  // The operator-only model is refused in the same place and for the same
+  // reason: before a chat row, an hour or a message exists. Hiding it in the
+  // picker is the display half, not the gate.
+  if (modelRequiresAdmin(model, modelOptions)) {
+    const access = await readAdminAccess();
+    const refusal = adminOnlyRefusal(
+      model,
+      access.state === "admin",
+      modelOptions
+    );
+
+    if (refusal) return json(refusal, 403);
   }
 
   // ── A new message ─────────────────────────────────────────────────────────
