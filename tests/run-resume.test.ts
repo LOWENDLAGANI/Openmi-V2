@@ -53,6 +53,15 @@ test("the workspace layer reattaches instead of seeding a second box", () => {
   expect(sandbox).toContain("attachSandbox(input.sandboxId, input.sandboxAccount)");
 });
 
+test("a reloaded live run gets its reasoning back on the fold's channel", () => {
+  const route = read("app/api/chat/turn/route.ts");
+
+  expect(route).toContain('event.kind === "message.reasoning"');
+  expect(route).toContain("thinking: thinking.slice(0, RUN_PROGRESS_THINKING_CHARS)");
+
+  expect(read("components/ChatPanel.tsx")).toContain("setThinking(payload.thinking)");
+});
+
 test("the answer's reasoning is stored, and streamed on its own channel", () => {
   // Stored: without it a reloaded answer had no thinking fold at all.
   expect(read("lib/runs/chat.ts")).toContain("p_thinking: thinking");

@@ -65,6 +65,8 @@ type TurnPoll = {
   error?: string | null;
   steps?: StepLine[];
   text?: string;
+  /** The live run's chain of thought, folded above its answer. */
+  thinking?: string;
 };
 
 /** One screenshot, exactly as the sandbox returned it. */
@@ -255,14 +257,20 @@ export function ChatPanel({
             if (typeof payload.text === "string" && payload.text.length > 0) {
               setPending(payload.text);
             }
+            // A reloaded tab shows the same fold the streaming one had; the
+            // channel is the run's, not the connection's.
+            if (typeof payload.thinking === "string" && payload.thinking.length > 0) {
+              setThinking(payload.thinking);
+            }
             return;
           }
 
           setBackgroundRunning(false);
-          // Settled: the refreshed transcript carries the steps and the answer
-          // both, so the live copy goes rather than sitting under the answer.
+          // Settled: the refreshed transcript carries the steps, the answer and
+          // its reasoning, so the live copies go rather than sitting under it.
           setSteps([]);
           setPending("");
+          setThinking("");
           // The poll is also where a run nothing finished is settled, so it is
           // where the reason arrives. Without it the wait ended in silence.
           if (typeof payload.error === "string" && payload.error.length > 0) {

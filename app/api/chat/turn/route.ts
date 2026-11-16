@@ -18,6 +18,9 @@ import type { AgentStep } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** How much reasoning a reloaded tab is handed back, in characters. */
+const RUN_PROGRESS_THINKING_CHARS = 20_000;
+
 /**
  * What a live run has already done, rebuilt from its own event log.
  *
@@ -30,7 +33,7 @@ export const dynamic = "force-dynamic";
 async function readRunProgress(
   admin: SupabaseClient,
   runId: string
-): Promise<{ text: string; steps: AgentStep[] }> {
+): Promise<{ text: string; steps: AgentStep[]; thinking: string }> {
   const events = await readEventsSince(
     admin,
     runId,
@@ -43,12 +46,20 @@ async function readRunProgress(
   // pair is joined by name — exactly as the streaming tab joins them.
   const summaries = new Map<string, string>();
   let text = "";
+  let thinking = "";
 
   for (const event of events) {
     const payload = event.payload;
 
     if (event.kind === "message.delta") {
       if (typeof payload.text === "string") text += payload.text;
+      continue;
+    }
+
+    // The chain of thought has a channel of its own, and a reloaded tab needs it
+    // on that channel: folded above the answer, never mixed into the text.
+    if (event.kind === "message.reasoning") {
+      if (typeof payload.text === "string") thinking += payload.text;
       continue;
     }
 
@@ -87,7 +98,9 @@ async function readRunProgress(
     }
   }
 
-  return { text, steps };
+  // Bounded like the answer: a reasoning stream can run long, and this is a
+  // fold the reader opens, not the answer itself.
+  return { text, steps, thinking: thinking.slice(0, RUN_PROGRESS_THINKING_CHARS) };
 }
 
 /**
@@ -155,7 +168,7 @@ export async function GET(request: Request) {
     // instead of a spinner that says nothing about what the run is doing.
     const progress = admin
       ? await readRunProgress(admin, row.id)
-      : { text: "", steps: [] };
+      : { text: "", steps: [], thinking: "" };
 
     return NextResponse.json(
       {
