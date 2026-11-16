@@ -727,7 +727,7 @@ html.ink {
 
   /* One shape for every status a thread or a form raises. The body breaks
      anywhere: provider messages carry URLs and JSON, and a single unbroken token
-     used to push the whole card sicreditays. */
+     used to push the whole card sideways. */
   .alert {
     display: flex;
     align-items: flex-start;

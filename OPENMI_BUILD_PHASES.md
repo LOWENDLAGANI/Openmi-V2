@@ -403,7 +403,7 @@ The rule that cannot be relaxed: **every card state must be reachable from a rea
 | Chat history | 1, 3 | P1-T7, P3-T3 |
 | Repo workspace | 2 | P2-T4, P2-T5 |
 | Sidebar with folders and trash | 1 | P1-T5, P1-T6 |
-| Credit credits | 7 | P7-T1 → P7-T3 |
+| Credit ledger | 7 | P7-T1 → P7-T3 |
 | Daily free usage | 7 | P7-T4 |
 | Activity history | 7 | P7-T5 |
 | Invite rewards | 7 | P7-T6 |
