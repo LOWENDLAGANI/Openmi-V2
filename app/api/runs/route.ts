@@ -3,8 +3,14 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
+import { readDewProfile } from "@/lib/dew/store";
 import { isSameOrigin } from "@/lib/http/origin";
-import { firstAvailableModel, hasModel } from "@/lib/models";
+import {
+  firstAvailableModel,
+  hasModel,
+  modelRequiresPaid,
+  paidOnlyRefusal,
+} from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -125,6 +131,15 @@ export async function POST(request: Request) {
   const model = hasModel(catalogue, body.model)
     ? (body.model as string)
     : firstAvailableModel(catalogue);
+
+  // A run is a second way into the same models, so the paid-only check lives
+  // here too rather than only on the chat route.
+  if (modelRequiresPaid(model, catalogue)) {
+    const profile = await readDewProfile(session.supabase, session.user.id);
+    const refusal = paidOnlyRefusal(model, profile?.paidActive === true, catalogue);
+
+    if (refusal) return json(refusal, 402);
+  }
 
   // A leftover row from a dead worker would hold the one-live-run index and
   // refuse this account forever, so settle its stalls before reading the quota.

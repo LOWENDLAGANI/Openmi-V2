@@ -21,10 +21,12 @@ const B = "22222222-2222-4222-8222-222222222222";
 const C = "77777777-7777-4777-8777-777777777777";
 const D = "44444444-4444-4444-8444-444444444444";
 const E = "55555555-5555-4555-8555-555555555555";
+const F = "66666666-6666-4666-8666-666666666666";
 
 // Keyed hashes, as the server sends them: never an address.
 const IP_ONE = "1111111111111111aaaaaaaaaaaaaaaa";
 const IP_TWO = "2222222222222222bbbbbbbbbbbbbbbb";
+const IP_THREE = "3333333333333333cccccccccccccccc";
 
 const SHIM = `
   create schema if not exists auth;
@@ -247,6 +249,64 @@ test("an hour is charged once and reused inside the hour", async () => {
   // ledger entry is what `dew_transactions.amount <> 0` exists to refuse.
   expect(await ledgerCount(A, "session")).toBe(0);
   expect(await ledgerSum(A)).toBe(11);
+});
+
+test("a paid-only model opens an hour only while the pass is live", async () => {
+  await signUp(F, "f@example.test");
+  await db.query("select public.grant_trial_dew($1, $2)", [F, IP_THREE]);
+
+  await actAs("authenticated", F);
+  await db.query("select public.refill_daily_dew() as balance");
+
+  // No pass: the hour is refused, and the refusal happens before the upsert is
+  // committed, so no session and no charge exists.
+  await expect(
+    db.query(
+      "select * from public.start_hour_session('claude-haiku', 'octocat/hello')"
+    )
+  ).rejects.toThrow(/paid pass/i);
+
+  const before = await balance(F);
+
+  await reset();
+  const hours = await db.query<{ count: number }>(
+    "select count(*)::int as count from public.hour_sessions where owner = $1",
+    [F]
+  );
+  expect(Number(hours.rows[0].count)).toBe(0);
+
+  // `has_paid` is history, not entitlement: only a live `paid_until` unlocks it.
+  await db.query(
+    "update public.profiles set has_paid = true, paid_until = now() - interval '1 day' where id = $1",
+    [F]
+  );
+
+  await actAs("authenticated", F);
+  await expect(
+    db.query(
+      "select * from public.start_hour_session('claude-haiku', 'octocat/hello')"
+    )
+  ).rejects.toThrow(/paid pass/i);
+
+  await reset();
+  await db.query(
+    "update public.profiles set paid_until = now() + interval '1 day' where id = $1",
+    [F]
+  );
+
+  await actAs("authenticated", F);
+  const started = await db.query<{ started: boolean; price: string }>(
+    "select * from public.start_hour_session('claude-haiku', 'octocat/hello')"
+  );
+
+  expect(started.rows[0].started).toBe(true);
+  // The premium model costs the same hour as every other named model.
+  expect(Number(started.rows[0].price)).toBe(3);
+  expect(await balance(F)).toBe(before - 3);
+
+  // The ledger still explains the balance, which is the invariant that carries
+  // every account in this file.
+  expect(await ledgerSum(F)).toBe(await balance(F));
 });
 
 test("a refund is service-role only, and happens once", async () => {

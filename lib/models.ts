@@ -41,6 +41,15 @@ export type ModelCapability = {
   images: boolean;
   documents: boolean;
   /**
+   * Only a live paid pass may answer with this model.
+   *
+   * The flag is public because the picker has to show the lock; it is never the
+   * authority. `paid_until` is checked on the server before an hour is charged,
+   * and `hour_sessions` refuses the row in the database, so hiding or editing
+   * this flag in a browser buys nothing.
+   */
+  paidOnly?: boolean;
+  /**
    * What an hour of chat on this model costs.
    *
    * The hour is charged before the provider is called and belongs to the model
@@ -78,6 +87,18 @@ export const MODELS: ModelCapability[] = [
     documents: false,
     // The catalogue's priced model, and what `DEW_PER_HOUR` documents.
     dewPerHour: 3,
+  },
+  {
+    id: "claude-haiku",
+    name: "Claude Haiku 4.5",
+    category: "general",
+    blurb: "Anthropic's fast model, for paid passes only.",
+    images: false,
+    documents: false,
+    // Premium access is an entitlement, not a different price: the hour costs
+    // what every other named model costs.
+    dewPerHour: 3,
+    paidOnly: true,
   },
 ];
 
@@ -118,6 +139,42 @@ export function modelHourDew(
   catalogue: readonly ModelCapability[] = MODELS
 ): number {
   return catalogue.find((model) => model.id === id)?.dewPerHour ?? DEW_PER_HOUR;
+}
+
+/** True when this model is sold as part of a paid pass. */
+export function modelRequiresPaid(
+  id: ModelId,
+  catalogue: readonly ModelCapability[] = MODELS
+): boolean {
+  return catalogue.find((model) => model.id === id)?.paidOnly === true;
+}
+
+/** Whether this account may pick this model right now. */
+export function isModelAllowed(
+  id: ModelId,
+  paidActive: boolean,
+  catalogue: readonly ModelCapability[] = MODELS
+): boolean {
+  return !modelRequiresPaid(id, catalogue) || paidActive;
+}
+
+/**
+ * The refusal a paid-only model produces, or null when it is allowed.
+ *
+ * One sentence, decided by a pure function, so the route that charges the hour
+ * and the picker that offers it cannot disagree about who may use it.
+ */
+export function paidOnlyRefusal(
+  id: ModelId,
+  paidActive: boolean,
+  catalogue: readonly ModelCapability[] = MODELS
+): { error: string; code: "paid-only" } | null {
+  if (isModelAllowed(id, paidActive, catalogue)) return null;
+
+  return {
+    error: `${modelName(id, catalogue)} is part of the paid plan. Start a pass on Plans, then pick it again.`,
+    code: "paid-only",
+  };
 }
 
 /**

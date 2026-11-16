@@ -34,7 +34,7 @@ import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
 import { oauthConfigured } from "@/lib/oauth/github";
-import { firstAvailableModel, hasModel } from "@/lib/models";
+import { firstAvailableModel, hasModel, isModelAllowed } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
 import { filesEnabled } from "@/lib/files/plan";
@@ -381,7 +381,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .maybeSingle(),
     session.supabase
       .from("profiles")
-      .select("dew_balance, wallet_dew")
+      .select("dew_balance, wallet_dew, paid_until")
       .eq("id", session.user.id)
       .maybeSingle(),
     session.supabase
@@ -397,11 +397,21 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const balances = (profileResult.data ?? {}) as {
     dew_balance?: number | string;
     wallet_dew?: number | string;
+    paid_until?: string | null;
   };
   const dew = {
     balance: Number(balances.dew_balance ?? 0),
     wallet: Number(balances.wallet_dew ?? 0),
   };
+  // The entitlement is `paid_until`, read on the server so the picker and the
+  // opening model agree with what the send gate will decide.
+  const paidUntil = balances.paid_until ?? null;
+  const paidActive = paidUntil !== null && Date.parse(paidUntil) > Date.now();
+  // A chat left on a paid-only model opens on a callable free one once the pass
+  // ends, instead of opening on a model the next send is refused for.
+  const usableModels = models.filter((model) =>
+    isModelAllowed(model.id, paidActive, models)
+  );
   const autoApproveBranch =
     (autoApproval.data as { branch?: string } | null)?.branch ?? null;
 
@@ -480,13 +490,17 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             repo={repo}
             models={models}
             initialModel={
-              hasModel(models, chat.model) ? chat.model : firstAvailableModel(models)
+              hasModel(models, chat.model) &&
+              isModelAllowed(chat.model, paidActive, models)
+                ? chat.model
+                : firstAvailableModel(usableModels)
             }
             initialMessages={messages}
             validPaths={validPaths}
             pinnedPath={null}
             providerReady={providersConfigured()}
             initialRunning={Boolean(runningTurn.data)}
+            paidActive={paidActive}
             dew={dew}
           />
         </div>
@@ -581,24 +595,29 @@ async function DraftChat({
   // balances. Reading them here keeps the call site a repository and nothing
   // else, which is what the draft-chat test pins.
   let dew = { balance: 0, wallet: 0 };
+  let paidActive = false;
   const session = await getSession();
 
   if (session.state === "signed-in") {
     const { data } = await session.supabase
       .from("profiles")
-      .select("dew_balance, wallet_dew")
+      .select("dew_balance, wallet_dew, paid_until")
       .eq("id", session.user.id)
       .maybeSingle();
 
     const row = (data ?? {}) as {
       dew_balance?: number | string;
       wallet_dew?: number | string;
+      paid_until?: string | null;
     };
 
     dew = {
       balance: Number(row.dew_balance ?? 0),
       wallet: Number(row.wallet_dew ?? 0),
     };
+
+    const paidUntil = row.paid_until ?? null;
+    paidActive = paidUntil !== null && Date.parse(paidUntil) > Date.now();
   }
 
   return (
@@ -608,12 +627,15 @@ async function DraftChat({
         chatId={null}
         repo={repo}
         models={models}
-        initialModel={firstAvailableModel(models)}
+        initialModel={firstAvailableModel(
+          paidActive ? models : models.filter((model) => model.paidOnly !== true)
+        )}
         initialMessages={[]}
         validPaths={[]}
         pinnedPath={null}
         providerReady={providersConfigured()}
         initialRunning={false}
+        paidActive={paidActive}
         dew={dew}
       />
     </div>

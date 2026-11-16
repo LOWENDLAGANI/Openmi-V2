@@ -18,11 +18,14 @@ export function ModelMenu({
   models,
   value,
   onChange,
+  paidActive = false,
   disabled = false,
 }: {
   models: ModelCapability[];
   value: string;
   onChange: (id: string) => void;
+  /** The picker shows what a pass unlocks; it is not what enforces it. */
+  paidActive?: boolean;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -87,6 +90,11 @@ export function ModelMenu({
         <span className="min-w-0 truncate text-[11px]">
           {current?.name ?? value}
         </span>
+        {current?.paidOnly === true && !paidActive && (
+          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.08em] text-accent-text">
+            paid
+          </span>
+        )}
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -115,6 +123,7 @@ export function ModelMenu({
 
               {group.options.map((option) => {
                 const available = option.available !== false;
+                const locked = option.paidOnly === true && !paidActive;
                 const active = option.id === value;
 
                 return (
@@ -135,11 +144,22 @@ export function ModelMenu({
                     } ${available ? "" : "opacity-45"}`}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12px] font-medium">
-                        {option.name}
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-[12px] font-medium">
+                          {option.name}
+                        </span>
+                        {locked && (
+                          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.08em] text-accent-text">
+                            paid
+                          </span>
+                        )}
                       </span>
                       <span className="mt-0.5 block text-[10px] leading-snug text-low">
-                        {available ? option.blurb : "Provider key missing"}
+                        {locked
+                          ? "Paid passes only"
+                          : available
+                            ? option.blurb
+                            : "Provider key missing"}
                       </span>
                     </span>
 

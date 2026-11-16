@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 
 import { executionConfigured, serverEnv } from "@/lib/env";
-import { settleExecutionDew, startDewSession } from "@/lib/dew/store";
+import { readDewProfile, settleExecutionDew, startDewSession } from "@/lib/dew/store";
 import { runMissionTick } from "@/lib/execution/mission/loop";
 import {
   readCommands,
@@ -15,7 +15,13 @@ import { isCommitSha, isRepoFullName } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage } from "@/lib/messages";
-import { DEFAULT_MODEL, firstAvailableModel, hasModel } from "@/lib/models";
+import {
+  DEFAULT_MODEL,
+  firstAvailableModel,
+  hasModel,
+  modelRequiresPaid,
+  paidOnlyRefusal,
+} from "@/lib/models";
 import { modelCatalogue } from "@/lib/providers";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -249,6 +255,24 @@ export async function POST(request: Request) {
   const model = hasModel(modelOptions, chat.model)
     ? (chat.model ?? DEFAULT_MODEL)
     : firstAvailableModel(modelOptions);
+
+  // A mission spends the chat's model, so a chat left on the paid-only one is
+  // refused here before a reservation is taken for it.
+  if (modelRequiresPaid(model, modelOptions)) {
+    const profile = await readDewProfile(session.supabase, session.user.id);
+    const refusal = paidOnlyRefusal(
+      model,
+      profile?.paidActive === true,
+      modelOptions
+    );
+
+    if (refusal) {
+      return NextResponse.json(
+        { ...refusal, chatId },
+        { status: 402, headers: NO_STORE }
+      );
+    }
+  }
 
   // One live mission per chat, checked before the charge so a double click does
   // not cost an hour for a refusal the database was always going to make.

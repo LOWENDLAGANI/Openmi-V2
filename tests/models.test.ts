@@ -6,9 +6,12 @@ import {
   DEFAULT_MODEL,
   MODELS,
   hasModel,
+  isModelAllowed,
   isModelId,
   modelHourDew,
   modelName,
+  modelRequiresPaid,
+  paidOnlyRefusal,
 } from "../lib/models";
 
 const MODELS_SOURCE = readFileSync(
@@ -21,14 +24,20 @@ const MODELS_SOURCE = readFileSync(
 const MODELS_CODE = MODELS_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "");
 
 test("the picker offers Auto and the one model this deployment serves", () => {
-  expect(MODELS.map((model) => model.id)).toEqual(["auto", "deepseek-flash"]);
+  expect(MODELS.map((model) => model.id)).toEqual([
+    "auto",
+    "deepseek-flash",
+    "claude-haiku",
+  ]);
   expect(DEFAULT_MODEL).toBe("deepseek-flash");
   expect(MODELS.map((model) => model.name)).toEqual([
     "Auto",
     "DeepSeek V4.1 flash",
+    "Claude Haiku 4.5",
   ]);
   expect(modelName("auto")).toBe("Auto");
   expect(modelName("deepseek-flash")).toBe("DeepSeek V4.1 flash");
+  expect(modelName("claude-haiku")).toBe("Claude Haiku 4.5");
   expect(modelName("unknown-model")).toBe("unknown-model");
 
   // Auto is a real entry now; the retired concrete models are still gone.
@@ -87,6 +96,60 @@ test("every model prices its own hour: Auto free, DeepSeek the default", () => {
   // A model the catalogue does not know is charged the default, never nothing:
   // a missing price must not become a free hour.
   expect(modelHourDew("not-a-model")).toBe(DEW_PER_HOUR);
+});
+
+test("the paid-only model is marked, priced, and refused without a pass", () => {
+  const haiku = MODELS.find((model) => model.id === "claude-haiku");
+
+  expect(haiku?.paidOnly).toBe(true);
+  // Premium is an entitlement, not a price: the hour costs the catalogue's.
+  expect(haiku?.dewPerHour).toBe(DEW_PER_HOUR);
+
+  for (const model of MODELS) {
+    if (model.id === "claude-haiku") continue;
+    expect(model.paidOnly).not.toBe(true);
+  }
+
+  expect(modelRequiresPaid("claude-haiku")).toBe(true);
+  expect(modelRequiresPaid("deepseek-flash")).toBe(false);
+  expect(modelRequiresPaid("not-a-model")).toBe(false);
+
+  // A free model is never gated; the premium one is gated on a live pass.
+  expect(isModelAllowed("deepseek-flash", false)).toBe(true);
+  expect(isModelAllowed("claude-haiku", false)).toBe(false);
+  expect(isModelAllowed("claude-haiku", true)).toBe(true);
+
+  expect(paidOnlyRefusal("deepseek-flash", false)).toBeNull();
+  expect(paidOnlyRefusal("claude-haiku", true)).toBeNull();
+
+  const refusal = paidOnlyRefusal("claude-haiku", false);
+  expect(refusal?.code).toBe("paid-only");
+  expect(refusal?.error).toContain("paid plan");
+});
+
+test("the server refuses the paid-only model before it charges the hour", () => {
+  const route = readFileSync(
+    new URL("../app/api/chat/route.ts", import.meta.url),
+    "utf8"
+  );
+
+  // A gate that ran after the charge would still spend Dew on a refusal.
+  const gate = route.indexOf("paidOnlyRefusal(");
+  const charge = route.indexOf("startDewSession(");
+
+  expect(gate).toBeGreaterThan(-1);
+  expect(charge).toBeGreaterThan(gate);
+});
+
+test("the database enforces the pass, not only the route", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/051_premium_models.sql", import.meta.url),
+    "utf8"
+  );
+
+  expect(migration).toContain("when 'claude-haiku' then true");
+  expect(migration).toContain("hour_sessions_enforce_pass");
+  expect(migration).toContain("model requires a paid pass");
 });
 
 test("no component claims a build or a test ran", () => {
