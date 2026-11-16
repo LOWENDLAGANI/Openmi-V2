@@ -331,6 +331,8 @@ export type ExecResult = {
   durationMs: number;
   /** True only when the provider said the command hit its limit. */
   timedOut: boolean;
+  /** True when the caller's signal killed it, rather than the command ending. */
+  stopped?: boolean;
 };
 
 /**
@@ -398,7 +400,19 @@ export type SandboxHandle = {
    * never serialized and the key is never on it.
    */
   accountId: string;
-  exec: (command: string, cwd?: string, timeoutMs?: number) => Promise<ExecResult>;
+  /**
+   * Runs one command, and kills it if `signal` aborts first.
+   *
+   * The signal is what a run's stop uses in the middle of an install: without
+   * it a real stop waited for the command's own timeout, which is two minutes
+   * of a button that looks dead.
+   */
+  exec: (
+    command: string,
+    cwd?: string,
+    timeoutMs?: number,
+    signal?: AbortSignal
+  ) => Promise<ExecResult>;
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
   /** Reads a workspace file for a repair pass or a mission's diff. */
   readText: (remotePath: string, maxBytes?: number) => Promise<string>;
@@ -541,11 +555,16 @@ function handleFor(
     get trafficToken() {
       return current.trafficAccessToken ?? null;
     },
-    async exec(command, cwd, timeoutMs) {
+    async exec(command, cwd, timeoutMs, signal) {
       const startedAt = Date.now();
       const limitMs = Math.max(5_000, timeoutMs ?? EXEC_STEP_TIMEOUT_MS);
 
-      const result = (exitCode: number, stdout: string, stderr: string): ExecResult => {
+      const result = (
+        exitCode: number,
+        stdout: string,
+        stderr: string,
+        extra: { timedOut?: boolean; stopped?: boolean } = {}
+      ): ExecResult => {
         const tail = tailOf(combined(stdout, stderr));
 
         return {
@@ -554,40 +573,138 @@ function handleFor(
           output: tail.text,
           truncated: tail.truncated,
           durationMs: Date.now() - startedAt,
-          timedOut: false,
+          timedOut: extra.timedOut ?? false,
+          stopped: extra.stopped ?? false,
         };
       };
 
       // E2B runs the string through a shell, which is why the callers above can
       // send `a && b` chains. No `bash -c` wrapper: the image is ours to pick
       // and the shell is the platform's.
+      //
+      // The command is started in the background on purpose: the foreground form
+      // hands back one result and no handle, so an aborted request would free
+      // this worker while the install kept running in a box nobody is watching.
+      // Background start plus `kill()` is what makes a stop actually stop.
+      let handle;
       try {
-        const response = await current.commands.run(command, {
+        handle = await current.commands.run(command, {
           cwd: absolutePath(cwd ?? EXEC_WORKDIR),
           timeoutMs: limitMs,
+          background: true,
         });
-
-        return result(response.exitCode, response.stdout ?? "", response.stderr ?? "");
       } catch (caught) {
-        // A non-zero exit is information, not a provider failure: the card and
-        // the model both need the code and the output, not an exception.
-        if (caught instanceof CommandExitError) {
-          return result(caught.exitCode, caught.stdout ?? "", caught.stderr ?? "");
-        }
-
         const message =
           caught instanceof Error ? caught.message : "The command could not run.";
         const timedOut =
           caught instanceof TimeoutError || /timeout|timed out|deadline/i.test(message);
 
+        return result(timedOut ? 124 : 1, "", message, { timedOut });
+      }
+
+      // One settled outcome for both endings: `wait()` throws on a non-zero
+      // exit, and after a kill it settles too, which is what lets the stopped
+      // path report the output the command had already produced.
+      const settled = handle.wait().then(
+        (response) => ({ ok: true as const, response }),
+        (caught: unknown) => ({ ok: false as const, caught })
+      );
+
+      type Outcome = Awaited<typeof settled>;
+
+      const exitOf = (outcome: Outcome) => {
+        if (outcome.ok) {
+          return {
+            exitCode: outcome.response.exitCode,
+            stdout: outcome.response.stdout ?? "",
+            stderr: outcome.response.stderr ?? "",
+          };
+        }
+
+        if (outcome.caught instanceof CommandExitError) {
+          return {
+            exitCode: outcome.caught.exitCode,
+            stdout: outcome.caught.stdout ?? "",
+            stderr: outcome.caught.stderr ?? "",
+          };
+        }
+
         return {
-          command,
-          exitCode: timedOut ? 124 : 1,
-          output: message,
-          truncated: false,
-          durationMs: Date.now() - startedAt,
-          timedOut,
+          exitCode: 1,
+          stdout: "",
+          stderr:
+            outcome.caught instanceof Error
+              ? outcome.caught.message
+              : "The command could not run.",
         };
+      };
+
+      // The kill is the stop. SIGKILL reaches the shell E2B started; anything
+      // the command backgrounded itself is caught by the pause that settles the
+      // run, so the kill is enough here.
+      let finished = false;
+
+      const stop = () => {
+        if (finished) return;
+        void handle.kill().catch(() => false);
+      };
+
+      const killed = new Promise<null>((resolve) => {
+        if (!signal) return;
+        if (signal.aborted) {
+          stop();
+          resolve(null);
+          return;
+        }
+        signal.addEventListener(
+          "abort",
+          () => {
+            stop();
+            resolve(null);
+          },
+          { once: true }
+        );
+      });
+
+      try {
+        const outcome = await Promise.race([settled, killed]);
+
+        if (outcome === null) {
+          // A killed command's `wait()` settles shortly after the kill; five
+          // seconds is enough to report the exit it caused rather than invent
+          // one, and the tail collected so far is better than nothing.
+          const after = await Promise.race([
+            settled,
+            new Promise<null>((resolve) => setTimeout(resolve, 5_000)),
+          ]);
+
+          const tail =
+            after === null
+              ? {
+                  stdout: handle.stdout ?? "",
+                  stderr: handle.stderr ?? "",
+                }
+              : exitOf(after);
+
+          return result(137, tail.stdout, tail.stderr, { stopped: true });
+        }
+
+        // A non-zero exit is information, not a provider failure: the card and
+        // the model both need the code and the output, not an exception.
+        const first = exitOf(outcome);
+
+        if (outcome.ok || outcome.caught instanceof CommandExitError) {
+          return result(first.exitCode, first.stdout, first.stderr);
+        }
+
+        const message = first.stderr;
+        const timedOut =
+          outcome.caught instanceof TimeoutError ||
+          /timeout|timed out|deadline/i.test(message);
+
+        return result(timedOut ? 124 : 1, "", message, { timedOut });
+      } finally {
+        finished = true;
       }
     },
     async upload(bytes, remotePath) {

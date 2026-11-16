@@ -564,6 +564,9 @@ export async function executeRun(
             name: call.name,
             args,
             sandbox,
+            // A command in flight is killed rather than waited out: the stop
+            // used to arrive only after the tool's own timeout.
+            signal: cancelWatch.signal,
             github:
               github && run.repo_full_name
                 ? { token: github.token, repo: run.repo_full_name }
@@ -653,6 +656,10 @@ export async function executeRun(
           content: result.text,
         });
       }
+
+      // A stop that killed a command ends the step here rather than at the top
+      // of the next one, so a cancelled run settles at the tool it was in.
+      if (cancelWatch.signal.aborted) cancelled = true;
 
       await finishStep(admin, runId, idx, {
         input_tokens: stepInput,

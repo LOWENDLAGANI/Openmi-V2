@@ -413,9 +413,10 @@ async function exec(
   sandbox: SandboxHandle,
   command: string,
   cwd: string,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ) {
-  return sandbox.exec(command, cwd, timeoutMs);
+  return sandbox.exec(command, cwd, timeoutMs, signal);
 }
 
 const PUBLISH_KINDS: readonly PublishDestination["kind"][] = [
@@ -813,8 +814,10 @@ export async function executeRunTool(input: {
   sandbox: SandboxHandle;
   /** The reader's GitHub connection, when this run has one. Never given to the sandbox. */
   github?: RunGithubContext | null;
+  /** Aborts when the reader stops the run; a command in flight is killed. */
+  signal?: AbortSignal;
 }): Promise<RunToolResult> {
-  const { name, args, sandbox, github } = input;
+  const { name, args, sandbox, github, signal } = input;
 
   if (!isRunTool(name)) return failure(`unknown tool: ${name}`);
   if (args === null) return failure("bad-input: arguments were not a JSON object");
@@ -1312,14 +1315,18 @@ export async function executeRunTool(input: {
   const cwd = directory.length > 0 ? `${RUN_WORKDIR}/${directory}` : RUN_WORKDIR;
 
   const startedAt = Date.now();
-  const result = await exec(sandbox, command, cwd, timeoutMs);
+  const result = await exec(sandbox, command, cwd, timeoutMs, signal);
   const output = tailBytes(result.output, RUN_TOOL_OUTPUT_BYTES);
 
-  const status = `exit ${result.exitCode}${result.timedOut ? " (timed out)" : ""} in ${
-    Date.now() - startedAt
-  }ms`;
+  const status = result.stopped
+    ? `killed after ${Date.now() - startedAt}ms`
+    : `exit ${result.exitCode}${result.timedOut ? " (timed out)" : ""} in ${
+        Date.now() - startedAt
+      }ms`;
   const body = output.text.length > 0 ? output.text : "(no output)";
-  const text = `${status}\n${body}`;
+  const text = result.stopped
+    ? `${status}\nThe reader stopped this run, so the command was killed.\n${body}`
+    : `${status}\n${body}`;
 
   // A non-zero exit is information the model must read, not a tool failure to
   // retry blindly, so it is a successful observation that says it failed.
@@ -1327,7 +1334,7 @@ export async function executeRunTool(input: {
 
   return {
     ok: true,
-    isError: result.exitCode !== 0,
+    isError: result.stopped === true || result.exitCode !== 0,
     text: clean,
     preview: previewText(`${purpose}: ${status}`, 400),
   };
