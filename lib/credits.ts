@@ -1,11 +1,11 @@
 /**
- * Dew: the billing unit for one hour of chat.
+ * Credit: the billing unit for one hour of chat.
  *
  * These numbers are the contract. README.md documents each one in a table and
- * tests/dew.test.ts fails if the table and the constants ever disagree.
+ * tests/credit.test.ts fails if the table and the constants ever disagree.
  *
- * Dew precision is three decimals. The dust floor is the smallest amount worth
- * recording; every charge in this build is a whole number of Dew, so the floor
+ * Credit precision is three decimals. The dust floor is the smallest amount worth
+ * recording; every charge in this build is a whole number of Credit, so the floor
  * exists to keep future partial charges from producing invisible fractions.
  */
 
@@ -14,33 +14,33 @@
  * model the catalogue does not name.
  *
  * An hour is priced per model, because the model is what the reader chooses:
- * `ModelCapability.dewPerHour` carries that price and `model_hour_dew` decides
+ * `ModelCapability.creditPerHour` carries that price and `model_hour_credit` decides
  * it in the database, so the browser cannot ask for a cheaper hour. Auto is the
  * one free hour; this value is what DeepSeek Flash and a custom entry without a
  * price of its own charge.
  */
-export const DEW_PER_HOUR = 3;
+export const CREDIT_PER_HOUR = 3;
 export const HOUR_SESSION_MS = 3_600_000;
-export const DAILY_FREE_DEW = 6;
-export const PAID_DAILY_FREE_DEW = 15;
-export const TRIAL_DEW = 5;
+export const DAILY_FREE_CREDIT = 6;
+export const PAID_DAILY_FREE_CREDIT = 15;
+export const TRIAL_CREDIT = 5;
 
 /**
- * The trial grant: 5 Dew, once per account, and at most one paid trial per
+ * The trial grant: 5 Credit, once per account, and at most one paid trial per
  * address per day.
  *
  * It is paid on the first chat request rather than at signup, because the signup
- * trigger has no address to count — auth.users stores none. `grant_trial_dew`
- * in the database is the only place it is paid, and tests/dew.test.ts reads
+ * trigger has no address to count — auth.users stores none. `grant_trial_credit`
+ * in the database is the only place it is paid, and tests/credit.test.ts reads
  * both so the constant and the function cannot drift apart.
  */
 export const TRIAL_GRANT_MAX_PER_IP = 1;
 export const TRIAL_GRANT_WINDOW_HOURS = 24;
-export const DEW_PRECISION = 3;
-export const DEW_DUST_FLOOR = 0.05;
-export const LOW_BALANCE_DEW = 10;
+export const CREDIT_PRECISION = 3;
+export const CREDIT_DUST_FLOOR = 0.05;
+export const LOW_BALANCE_CREDIT = 10;
 
-export const INVITE_REWARD_DEW = 5;
+export const INVITE_REWARD_CREDIT = 5;
 export const MAX_INVITES_PER_ACCOUNT = 10;
 
 /**
@@ -71,18 +71,18 @@ export function normalizeTimezone(value: unknown): Timezone | null {
 }
 
 /** Three decimals, half-up, without floating-point dust. */
-export function roundDew(value: number): number {
+export function roundCredit(value: number): number {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
 /** A balance for display: 10, 2.5, 0.05 — never 10.000. */
-export function formatDew(value: number): string {
-  const rounded = roundDew(value);
-  return rounded.toFixed(DEW_PRECISION).replace(/\.?0+$/, "") || "0";
+export function formatCredit(value: number): string {
+  const rounded = roundCredit(value);
+  return rounded.toFixed(CREDIT_PRECISION).replace(/\.?0+$/, "") || "0";
 }
 
 export function isLowBalance(balance: number): boolean {
-  return balance < LOW_BALANCE_DEW;
+  return balance < LOW_BALANCE_CREDIT;
 }
 
 /**
@@ -134,9 +134,9 @@ export function hourRemainingMs(input: {
   return Math.min(Math.max(0, limit), Math.max(0, ends - base - elapsed));
 }
 
-/** The daily allowance for an account, in Dew: 15 while a pass is active. */
+/** The daily allowance for an account, in Credit: 15 while a pass is active. */
 export function dailyAllowance(paidActive: boolean): number {
-  return paidActive ? PAID_DAILY_FREE_DEW : DAILY_FREE_DEW;
+  return paidActive ? PAID_DAILY_FREE_CREDIT : DAILY_FREE_CREDIT;
 }
 
 /**

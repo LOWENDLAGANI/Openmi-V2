@@ -70,12 +70,12 @@ test("an unset or empty allowlist allows nobody", () => {
   );
 });
 
-test("plans are unique, priced and worth Dew", () => {
+test("plans are unique, priced and worth Credit", () => {
   expect(new Set(PLAN_IDS).size).toBe(PLANS.length);
 
   for (const plan of PLANS) {
     expect(plan.price).toBeGreaterThan(0);
-    expect(plan.dew).toBeGreaterThan(0);
+    expect(plan.credit).toBeGreaterThan(0);
     expect(planById(plan.id)?.name).toBe(plan.name);
   }
 

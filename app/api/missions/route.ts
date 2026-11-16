@@ -3,7 +3,7 @@ import { NextResponse, after } from "next/server";
 import { readAdminAccess } from "@/lib/admin/access";
 
 import { executionConfigured, serverEnv } from "@/lib/env";
-import { readDewProfile, settleExecutionDew, startDewSession } from "@/lib/dew/store";
+import { readCreditProfile, settleExecutionCredit, startCreditSession } from "@/lib/credits/store";
 import { runMissionTick } from "@/lib/execution/mission/loop";
 import {
   readCommands,
@@ -263,7 +263,7 @@ export async function POST(request: Request) {
   // A mission spends the chat's model, so a chat left on the paid-only one is
   // refused here before a reservation is taken for it.
   if (modelRequiresPaid(model, modelOptions)) {
-    const profile = await readDewProfile(session.supabase, session.user.id);
+    const profile = await readCreditProfile(session.supabase, session.user.id);
     const refusal = paidOnlyRefusal(
       model,
       profile?.paidActive === true,
@@ -333,14 +333,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const dew = await startDewSession(session.supabase, model, chat.repo_full_name, {
+  const credit = await startCreditSession(session.supabase, model, chat.repo_full_name, {
     chatId,
   });
 
-  if (!dew.ok) {
+  if (!credit.ok) {
     // The goal could not be paid for, so nothing runs: give the reservation
     // back and cancel the row rather than leave a mission nobody funded.
-    await settleExecutionDew(admin, session.user.id, started.mission.runId, 0);
+    await settleExecutionCredit(admin, session.user.id, started.mission.runId, 0);
     await updateMission(
       admin,
       started.mission.runId,
@@ -349,19 +349,19 @@ export async function POST(request: Request) {
         ended_at: new Date().toISOString(),
         failure_code: null,
         failure_detail: "The goal could not be charged, so nothing ran.",
-        charged_dew: 0,
+        charged_credit: 0,
       },
       { onlyWhileLive: true }
     );
 
     return NextResponse.json(
       {
-        error: dew.error,
-        code: dew.code,
-        activeChatId: dew.activeChatId,
+        error: credit.error,
+        code: credit.code,
+        activeChatId: credit.activeChatId,
         chatId,
       },
-      { status: dew.code === "hour-active" ? 409 : 402, headers: NO_STORE }
+      { status: credit.code === "hour-active" ? 409 : 402, headers: NO_STORE }
     );
   }
 
@@ -386,7 +386,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(
-    { missionId: runId, chatId, reservedDew: started.reservedDew, charged: dew.session.price },
+    { missionId: runId, chatId, reservedCredit: started.reservedCredit, charged: credit.session.price },
     { status: 202, headers: NO_STORE }
   );
 }

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { readAdminAccess } from "@/lib/admin/access";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
-import { readDewProfile } from "@/lib/dew/store";
+import { readCreditProfile } from "@/lib/credits/store";
 import { isSameOrigin } from "@/lib/http/origin";
 import {
   adminOnlyRefusal,
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
   // A run is a second way into the same models, so the paid-only check lives
   // here too rather than only on the chat route.
   if (modelRequiresPaid(model, catalogue)) {
-    const profile = await readDewProfile(session.supabase, session.user.id);
+    const profile = await readCreditProfile(session.supabase, session.user.id);
     const refusal = paidOnlyRefusal(model, profile?.paidActive === true, catalogue);
 
     if (refusal) return json(refusal, 402);

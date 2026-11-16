@@ -130,7 +130,7 @@ NEXT_PUBLIC_SITE_URL=https://ci.invalid bun run build
 different accounts and as `anon`. It also covers the seal/unseal path and its
 tamper cases, the GET-only GitHub client, the context budget, the turn envelope,
 the diff engine and edit rules, both directions of the changeset signature, the
-branch refusal and request shape of the write client, the Dew ledger, sessions,
+branch refusal and request shape of the write client, the Credit ledger, sessions,
 refunds, invites and redeem codes against a real Postgres, migration drift
 detection, probe classification, and the tool surface.
 
@@ -145,7 +145,7 @@ detection, probe classification, and the tool surface.
 | 4 | done | Read-only agent tools, step budget with compare-and-set, signed continuation, truthful caps |
 | 5 | done | Proposed edits, unified diff, per-file review, signed changesets |
 | 6 | done | Approval → agent branch → one commit → pull request, default-branch refusal |
-| 7 | done | Dew sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
+| 7 | done | Credit sessions, ledger, daily refill, activity, invites, refunds, redeem codes |
 | 8 | done | Setup env, migration drift and live probes; `/about` truth surface |
 | 9 | done | RLS audit, contrast gate, shared rate limiter, Vercel route config |
 | 10 | built | Sandbox verification — install + build recorded from real exit codes |
@@ -220,14 +220,14 @@ was computed is not a dead end — the change goes to a new `openmi/agent/` bran
 on top of the live head, unforced. Retrying after a failure reuses the recorded
 branch, commit and pull request, so one approval cannot produce two PRs.
 
-## Dew
+## Credit
 
-One hour of chat costs 3 Dew, charged before the provider is called; Auto's hour
+One hour of chat costs 3 Credit, charged before the provider is called; Auto's hour
 is free. The hour is
 priced per model and belongs to the model and chat that started it: a running
 hour is reused for free, and a turn for another model or another chat is refused
 with what holds it instead of silently riding it. The price is decided by
-`model_hour_dew(model)` and charged by `start_hour_session(model, repo)`, neither
+`model_hour_credit(model)` and charged by `start_hour_session(model, repo)`, neither
 of which takes an amount.
 
 | Constant | Value |
@@ -241,20 +241,20 @@ of which takes an amount.
 | Dust floor | 0.05 |
 
 On the first day the daily allowance is added to the trial credit; after that it
-tops the balance up to 6 Dew (15 while a paid pass is active) at local midnight
+tops the balance up to 6 Credit (15 while a paid pass is active) at local midnight
 in the account's timezone. It never refills on a day that is ahead of the local
 date, so a clock that steps backwards mints nothing. The trial credit is a ledger
-row written on the first message, not an unrecorded default: 5 Dew once per
+row written on the first message, not an unrecorded default: 5 Credit once per
 account, and at most one paid trial per address per day, so bulk signups mint
-accounts but not Dew.
+accounts but not Credit.
 
 A pass is a window, not a badge. `profiles.paid_until` is the entitlement: the
 15-day and 30-day passes extend it from whichever is later, now or its current
 end, and the allowance is back to 6 when it passes. `has_paid` records only that
-a pass was ever bought. The one-off Dew packs are gone; the catalogue is the two
+a pass was ever bought. The one-off Credit packs are gone; the catalogue is the two
 passes, and a receipt for anything else is refused at submission.
 
-An invite rewards both sides 5 Dew, once per invitee, up to 10 rewarded
+An invite rewards both sides 5 Credit, once per invitee, up to 10 rewarded
 accounts. Refunds are one per session at the original price and are written for
 a provider failure or an abort before the first token; anything else is an
 operator adjustment, which is service-role only. Top-ups are operator-issued
@@ -298,10 +298,10 @@ this app, and that nothing claims a test it did not run.
   written directly. The default branch is written directly only when the reader
   names it or an operator allows it. Branches are not cleaned up, and a change
   sent to a branch that moved becomes a new branch, never a forced update.
-- Dew is charged per hour, not per answer. Only a provider failure or an abort
+- Credit is charged per hour, not per answer. Only a provider failure or an abort
   before the first token is refunded automatically; any other correction is an
   operator adjustment.
-- There is no card payment. Top-ups and gift Dew are operator-issued redeem
+- There is no card payment. Top-ups and gift Credit are operator-issued redeem
   codes, and there is no public way to create one.
 - `/setup` probes a provider with a model-list request, not a completion, so a
   pass confirms the key authenticates rather than that a specific model works.
@@ -371,7 +371,7 @@ Auto's pool is `AUTO_ROUTES`, and it is available when `OPENROUTER_API_KEY` is
 set: all fifty free models are attempted in fitness order until one answers. A
 deployment without that key shows Auto as unavailable instead of spending a
 different provider through it. Auto's hour is free whatever answers,
-because `model_hour_dew` prices the model that was chosen — Auto — not the one it
+because `model_hour_credit` prices the model that was chosen — Auto — not the one it
 routed to.
 
 Nothing about a handover reaches the reader: no notice, no vendor name, no
@@ -386,7 +386,7 @@ account whose `paid_until` is still ahead can pick it; anyone else is refused
 before an hour is charged. The picker marks it **paid**, the chat route (and the
 runs and missions routes) checks `paid_until` before writing anything, and a
 trigger on `hour_sessions` refuses the row in the database — so a caller that
-forgets the check cannot spend it either. The hour costs the same 3 Dew as every
+forgets the check cannot spend it either. The hour costs the same 3 Credit as every
 other named model: the pass is the entitlement, not a different price.
 
 The model needs `STRAITLY_API_KEY`. Without that key it is listed as unavailable
@@ -401,7 +401,7 @@ endpoint) under the model id `gpt-6-luna`. Only an operator account sees it in t
 picker: `modelsForReader` filters the catalogue with the same `readAdminAccess()`
 check the admin panel uses, and the chat, runs and missions routes refuse a model
 nobody may see before a row, an hour or a sandbox exists — a forged picker buys
-nothing. The hour costs the catalogue default, 3 Dew.
+nothing. The hour costs the catalogue default, 3 Credit.
 
 The gateway is one provider with no fallback, so a failure is the turn's failure
 rather than an answer from a model the operator did not choose. It needs
@@ -450,7 +450,7 @@ These need a real project and token, so they are steps rather than specs:
 1. Sign in, sign out, sign in again; `/chat` is gated by the cookie and RLS.
 2. Connect GitHub; confirm only the last four characters are shown afterwards.
 3. Pick a repository, open a file from a citation, search the code.
-4. Send a message, stop one mid-stream, and check the Dew chip and `/activity`.
+4. Send a message, stop one mid-stream, and check the Credit chip and `/activity`.
 5. Ask for an edit, reject one file, accept another, then approve.
 6. Confirm one branch exists, one PR is open, and its base is the default branch.
 7. Try to approve with a read-only token; the refusal names the missing scopes.
@@ -491,7 +491,7 @@ records the exit code, the duration and the output tail.
   file API writes into. The repository lives in
   `/home/user/openmi-workspace`; CPU and memory come from the template, so a
   repository that needs bun or pnpm preinstalled wants a custom one.
-- A run reserves `0.5` Dew before the sandbox starts and settles at `0.05` Dew
+- A run reserves `0.5` Credit before the sandbox starts and settles at `0.05` Credit
   per started minute. The unused reservation is refunded through the same
   ledger, so `sum(amount)` still equals the balance.
 

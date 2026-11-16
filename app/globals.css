@@ -704,7 +704,7 @@ html.ink {
     border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   }
 
-  .dew-pill {
+  .credit-pill {
     border: 1px solid transparent;
     background-image:
       linear-gradient(var(--card), var(--card)),
@@ -713,7 +713,7 @@ html.ink {
     background-clip: padding-box, border-box;
   }
 
-  .dew-pill-low {
+  .credit-pill-low {
     background-image:
       linear-gradient(var(--card), var(--card)),
       linear-gradient(120deg, var(--warn), color-mix(in srgb, var(--warn) 25%, transparent));
@@ -727,7 +727,7 @@ html.ink {
 
   /* One shape for every status a thread or a form raises. The body breaks
      anywhere: provider messages carry URLs and JSON, and a single unbroken token
-     used to push the whole card sideways. */
+     used to push the whole card sicreditays. */
   .alert {
     display: flex;
     align-items: flex-start;

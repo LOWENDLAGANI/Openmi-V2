@@ -145,20 +145,20 @@ items are missing because that whole layer is different, not because a button wa
 | 62 | Repo chip with green dot, "Leave repo" | 🟡 | The chip exists in `ChatPanel` with a state dot; there is no detach action (disconnect lives on the workspace page). |
 | 63 | Focus home shows the repo chip above the composer | ❌ | No Focus layout. |
 
-## 14. Pricing / billing (Dew)
+## 14. Pricing / billing (Credit)
 
 | # | Feature | Status | Where / why |
 |---|---|---|---|
-| 64 | Currency is Dew | ✅ | `lib/dew.ts`, `lib/billing/plans.ts`. |
-| 65 | Balance shown in the **sidebar** | 🟡 | The Dew pill is in the workspace header (`app/chat/page.tsx` actions), not the sidebar. |
-| 66 | Amber when low | ✅ | `isLowBalance`, `LOW_BALANCE_DEW`. |
+| 64 | Currency is Credit | ✅ | `lib/credit.ts`, `lib/billing/plans.ts`. |
+| 65 | Balance shown in the **sidebar** | 🟡 | The Credit pill is in the workspace header (`app/chat/page.tsx` actions), not the sidebar. |
+| 66 | Amber when low | ✅ | `isLowBalance`, `LOW_BALANCE_CREDIT`. |
 | 67 | "Top up" route to `/plus` | 🟡 | The route is `/pay`. |
-| 68 | Per-request billing | ❌ | Billing is **per hour session** (`start_hour_session`, `DEW_PER_HOUR`). |
-| 69 | Hour session for Flash, banner while active, End button | 🟡 | Hour sessions exist for any model and the server owns the start (`lib/dew/store.ts`), but the running-hour banner lives on `/activity` and there is no End button. |
+| 68 | Per-request billing | ❌ | Billing is **per hour session** (`start_hour_session`, `CREDIT_PER_HOUR`). |
+| 69 | Hour session for Flash, banner while active, End button | 🟡 | Hour sessions exist for any model and the server owns the start (`lib/credit/store.ts`), but the running-hour banner lives on `/activity` and there is no End button. |
 | 70 | Pricing dialog on the first Flash message (this message vs 1 hour) | ❌ | No dialog; the hour is charged by the server. |
 | 71 | Hour-conflict options (continue there / end / just this one) | ❌ | — |
 | 72 | Refused message shows a live countdown | 🟡 | `lib/rate-limit.ts` returns `retryAfterSeconds` and the message includes the number; nothing ticks down. |
-| 73 | Daily free Dew + paid wallet + paid pass | ✅ | `014_six_dew_daily.sql`, `dew_transactions`, `profiles.has_paid`. |
+| 73 | Daily free Credit + paid wallet + paid pass | ✅ | `014_six_dew_daily.sql`, `credit_transactions`, `profiles.has_paid`. |
 
 ## 15. Search / command palette
 
@@ -221,7 +221,7 @@ items are missing because that whole layer is different, not because a button wa
 | 98 | 10 taps on the About logo opens the gate | ✅ | `components/AboutLogoGate.tsx` + `lib/admin/gesture.ts` (fixed this week: it was an unreachable quadrant sequence). |
 | 99 | Admin panel is lazy-loaded, off the main bundle | ❌ | `/admin` is a normal server-rendered route. |
 | 100 | Maintenance-mode gate for the whole app | ❌ | No maintenance flag or screen. |
-| 101 | Admin controls: receipts, Dew grants, role grants | ✅ | `app/admin/page.tsx`, `app/admin/actions.ts`, `013_admin_payments.sql`. |
+| 101 | Admin controls: receipts, Credit grants, role grants | ✅ | `app/admin/page.tsx`, `app/admin/actions.ts`, `013_admin_payments.sql`. |
 
 ## 22. Service worker UI
 
@@ -290,7 +290,7 @@ one in this repository. Each one changes how a "missing" feature should be built
    server actions, `router.refresh()`. Items 44, 53–56, 122–126 are all consequences of that.
    Adopting local-first is an architecture decision, not a task.
 2. **Billing model.** Spec: per-request billing with a pricing dialog and per-mode costs.
-   Repo: one hour session charged once before the provider call (`DEW_PER_HOUR`), with
+   Repo: one hour session charged once before the provider call (`CREDIT_PER_HOUR`), with
    refunds and daily allowance. Items 68–71 follow from that model.
 3. **Model modes.** Spec: three modes (Auto/Code/Flash) with provider pinning and
    availability warnings. Repo: a model catalogue with a per-chat model id and provider keys

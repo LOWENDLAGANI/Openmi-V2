@@ -86,14 +86,14 @@ beforeEach(async () => {
   // Pin today's refill so a charge test measures the charge, not the allowance.
   await db.query(
     `update public.profiles
-        set dew_balance = 10,
-            wallet_dew = 0,
-            dew_day = (now() at time zone timezone)::date
+        set credit_balance = 10,
+            wallet_credit = 0,
+            credit_day = (now() at time zone timezone)::date
       where id = $1`,
     [A]
   );
   await db.query("delete from public.hour_sessions where owner = $1", [A]);
-  await db.query("delete from public.dew_transactions where owner = $1", [A]);
+  await db.query("delete from public.credit_transactions where owner = $1", [A]);
 });
 
 async function actAsOwner() {
@@ -105,17 +105,17 @@ async function actAsOwner() {
 
 async function balances() {
   await db.exec("reset role");
-  const { rows } = await db.query<{ dew_balance: string; wallet_dew: string }>(
-    "select dew_balance, wallet_dew from public.profiles where id = $1",
+  const { rows } = await db.query<{ credit_balance: string; wallet_credit: string }>(
+    "select credit_balance, wallet_credit from public.profiles where id = $1",
     [A]
   );
   return {
-    balance: Number(rows[0].dew_balance),
-    wallet: Number(rows[0].wallet_dew),
+    balance: Number(rows[0].credit_balance),
+    wallet: Number(rows[0].wallet_credit),
   };
 }
 
-test("a request charges two Dew and is recorded as a request", async () => {
+test("a request charges two Credit and is recorded as a request", async () => {
   await actAsOwner();
 
   const { rows } = await db.query<{ price: string; combined: boolean }>(
@@ -129,7 +129,7 @@ test("a request charges two Dew and is recorded as a request", async () => {
 
   await db.exec("reset role");
   const ledger = await db.query<{ kind: string; amount: string }>(
-    "select kind, amount from public.dew_transactions where owner = $1",
+    "select kind, amount from public.credit_transactions where owner = $1",
     [A]
   );
   expect(ledger.rows).toHaveLength(1);
@@ -196,8 +196,8 @@ test("an hour is priced by its model and locked to it", async () => {
 test("a free hour starts on an empty balance", async () => {
   await db.query(
     `update public.profiles
-        set dew_balance = 0,
-            dew_day = (now() at time zone timezone)::date
+        set credit_balance = 0,
+            credit_day = (now() at time zone timezone)::date
       where id = $1`,
     [A]
   );
@@ -236,7 +236,7 @@ test("ending the hour lets the current chat start a new one", async () => {
 test("the wallet pays only what the balance cannot, and only when it covers it", async () => {
   await db.exec("reset role");
   await db.query(
-    "update public.profiles set dew_balance = 1, wallet_dew = 5 where id = $1",
+    "update public.profiles set credit_balance = 1, wallet_credit = 5 where id = $1",
     [A]
   );
 
@@ -251,7 +251,7 @@ test("the wallet pays only what the balance cannot, and only when it covers it",
 
   await db.exec("reset role");
   const ledger = await db.query<{ kind: string; amount: string }>(
-    "select kind, amount from public.dew_transactions where owner = $1 order by kind",
+    "select kind, amount from public.credit_transactions where owner = $1 order by kind",
     [A]
   );
   expect(ledger.rows.map((row) => [row.kind, Number(row.amount)])).toEqual([
@@ -259,10 +259,10 @@ test("the wallet pays only what the balance cannot, and only when it covers it",
     ["request", -1],
   ]);
 
-  // One Dew of balance and three of wallet cannot cover two Dew of hour.
+  // One Credit of balance and three of wallet cannot cover two Credit of hour.
   await db.exec("reset role");
   await db.query(
-    "update public.profiles set dew_balance = 0, wallet_dew = 1 where id = $1",
+    "update public.profiles set credit_balance = 0, wallet_credit = 1 where id = $1",
     [A]
   );
 

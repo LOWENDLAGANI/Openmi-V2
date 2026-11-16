@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { settleExecutionDew } from "@/lib/dew/store";
+import { settleExecutionCredit } from "@/lib/credits/store";
 import { chargeMissionDuration } from "@/lib/execution/mission/budget";
 import {
   destroySandbox,
@@ -120,8 +120,8 @@ export async function DELETE(
     ? chargeMissionDuration(elapsed, minutes)
     : 0;
 
-  const settlement = await settleExecutionDew(admin, session.user.id, id, charged);
-  const settledDew = settlement.ok ? charged : 0;
+  const settlement = await settleExecutionCredit(admin, session.user.id, id, charged);
+  const settledCredit = settlement.ok ? charged : 0;
 
   await updateMission(
     admin,
@@ -131,7 +131,7 @@ export async function DELETE(
       ended_at: new Date().toISOString(),
       failure_code: null,
       failure_detail: null,
-      charged_dew: settledDew,
+      charged_credit: settledCredit,
     },
     { onlyWhileLive: true }
   );
@@ -139,7 +139,7 @@ export async function DELETE(
   await destroySandbox(mission.sandbox_id);
 
   return NextResponse.json(
-    { cancelled: true, chargedDew: settledDew },
+    { cancelled: true, chargedCredit: settledCredit },
     { headers: NO_STORE }
   );
 }

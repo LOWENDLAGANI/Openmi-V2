@@ -26,20 +26,20 @@ const GATE = read("/components/AdBlockGate.tsx");
 
 test("the public pages take their prices from the constants", () => {
   for (const page of [LANDING, ABOUT]) {
-    expect(page).toContain('from "@/lib/dew"');
+    expect(page).toContain('from "@/lib/credits"');
   }
 
-  // A hard-coded "2 Dew" would survive a price change and become a lie.
-  expect(LANDING).toContain("{DEW_PER_HOUR}");
-  expect(LANDING).toContain("{DAILY_FREE_DEW}");
-  expect(ABOUT).toContain("{DEW_PER_HOUR}");
-  expect(ABOUT).toContain("{PAID_DAILY_FREE_DEW}");
-  expect(ABOUT).toContain("{TRIAL_DEW}");
-  expect(ABOUT).toContain("{INVITE_REWARD_DEW}");
+  // A hard-coded "2 Credit" would survive a price change and become a lie.
+  expect(LANDING).toContain("{CREDIT_PER_HOUR}");
+  expect(LANDING).toContain("{DAILY_FREE_CREDIT}");
+  expect(ABOUT).toContain("{CREDIT_PER_HOUR}");
+  expect(ABOUT).toContain("{PAID_DAILY_FREE_CREDIT}");
+  expect(ABOUT).toContain("{TRIAL_CREDIT}");
+  expect(ABOUT).toContain("{INVITE_REWARD_CREDIT}");
 
   // The terms quote the allowance too, rather than restating it by hand.
-  expect(TERMS).toContain("DEW_PER_HOUR");
-  expect(TERMS).toContain("PAID_DAILY_FREE_DEW");
+  expect(TERMS).toContain("CREDIT_PER_HOUR");
+  expect(TERMS).toContain("PAID_DAILY_FREE_CREDIT");
 });
 
 test("the legal pages name the cookies and processors the code uses", () => {

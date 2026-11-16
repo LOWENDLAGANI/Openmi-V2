@@ -33,7 +33,7 @@ Verification runs and missions do **not** read `OPENMI_SANDBOX_TURNS`. They need
 GitHub-only.
 
 There is no third gate and no per-user allowlist. A user with a repository
-pinned and an hour of Dew gets the shell the moment both switches are on.
+pinned and an hour of Credit gets the shell the moment both switches are on.
 
 ## 2. What is wired
 
@@ -115,9 +115,9 @@ free ceiling instead of leaving chat workspaces unusable.
 
 ## 5. Cost
 
-- Verification run: **0.5 Dew reserved** before the box starts, settled at
-  **0.05 Dew per started minute**, unused reservation refunded through the ledger.
-- Mission: **0.05 Dew per started minute**, reserve = minutes × 0.05, refused
+- Verification run: **0.5 Credit reserved** before the box starts, settled at
+  **0.05 Credit per started minute**, unused reservation refunded through the ledger.
+- Mission: **0.05 Credit per started minute**, reserve = minutes × 0.05, refused
   before start when the balance cannot cover it.
 - Chat turns: the hourly chat price, not sandbox time.
 

@@ -24,7 +24,7 @@ export function EndHourButton() {
         optimisticText="Ended"
         pendingText="Ending…"
         onAction={async () => {
-          const response = await fetch("/api/dew/end-session", {
+          const response = await fetch("/api/credits/end-session", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: "{}",

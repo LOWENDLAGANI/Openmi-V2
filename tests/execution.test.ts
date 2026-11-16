@@ -11,7 +11,7 @@ import {
 } from "../lib/execution/commands";
 import {
   EXEC_MAX_MINUTES,
-  EXEC_RESERVE_DEW,
+  EXEC_RESERVE_CREDIT,
   chargeForDuration,
   formatDuration,
 } from "../lib/execution/cost";
@@ -33,8 +33,8 @@ function row(patch: Partial<ExecutionRunRow>): ExecutionRunRow {
     build_command: "bun run build",
     exit_code: 0,
     duration_ms: 134_000,
-    reserved_dew: 0.5,
-    charged_dew: 0.15,
+    reserved_credit: 0.5,
+    charged_credit: 0.15,
     started_at: "2026-11-03T00:00:00.000Z",
     ended_at: "2026-11-03T00:02:14.000Z",
     heartbeat_at: null,
@@ -139,14 +139,14 @@ test("the egress allowlist is sent only to a restricted sandbox", () => {
 
 test("a terminal run with nothing charged does not read as still pending", () => {
   const failed = describeRun(
-    row({ status: "failed", failure_code: "refused", charged_dew: 0 })
+    row({ status: "failed", failure_code: "refused", charged_credit: 0 })
   );
 
   expect(failed.charge).toContain("no sandbox time was charged");
   expect(failed.charge).not.toContain("nothing charged yet");
 
   const running = describeRun(
-    row({ status: "running", stage: "provision", charged_dew: 0 })
+    row({ status: "running", stage: "provision", charged_credit: 0 })
   );
   expect(running.charge).toContain("nothing charged yet");
 });
@@ -189,9 +189,9 @@ test("a run is charged per started minute, capped at the reserve", () => {
   expect(chargeForDuration(0)).toBe(0);
   expect(chargeForDuration(1_000)).toBe(0.05);
   expect(chargeForDuration(60_001)).toBe(0.1);
-  expect(chargeForDuration(EXEC_MAX_MINUTES * 60_000)).toBe(EXEC_RESERVE_DEW);
-  expect(chargeForDuration(EXEC_MAX_MINUTES * 60_000 * 4)).toBe(EXEC_RESERVE_DEW);
-  expect(EXEC_RESERVE_DEW).toBe(0.5);
+  expect(chargeForDuration(EXEC_MAX_MINUTES * 60_000)).toBe(EXEC_RESERVE_CREDIT);
+  expect(chargeForDuration(EXEC_MAX_MINUTES * 60_000 * 4)).toBe(EXEC_RESERVE_CREDIT);
+  expect(EXEC_RESERVE_CREDIT).toBe(0.5);
 });
 
 test("durations read the way a person says them", () => {
@@ -248,20 +248,20 @@ test("each failure code has its own sentence", () => {
 });
 
 test("the card reports what the ledger charged, never a guess", () => {
-  expect(describeRun(row({})).charge).toBe("0.15 Dew charged of 0.5 reserved.");
-  expect(describeRun(row({ charged_dew: 0 })).charge).toBe(
-    "0.5 Dew reserved; nothing charged yet."
+  expect(describeRun(row({})).charge).toBe("0.15 Credit charged of 0.5 reserved.");
+  expect(describeRun(row({ charged_credit: 0 })).charge).toBe(
+    "0.5 Credit reserved; nothing charged yet."
   );
-  expect(describeRun(row({ reserved_dew: 0 })).charge).toBeNull();
+  expect(describeRun(row({ reserved_credit: 0 })).charge).toBeNull();
   expect(describeRun(null).charge).toBeNull();
 });
 
 test("an unaffordable run says so instead of failing as a build", () => {
   const described = describeRun(
-    row({ status: "failed", failure_code: "insufficient_dew", exit_code: null })
+    row({ status: "failed", failure_code: "insufficient_credit", exit_code: null })
   );
 
-  expect(described.detail.toLowerCase()).toContain("not enough dew");
+  expect(described.detail.toLowerCase()).toContain("not enough credit");
   expect(described.title).not.toContain("succeeded");
 });
 

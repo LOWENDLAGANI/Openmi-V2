@@ -1,10 +1,10 @@
 import "server-only";
 
-import { settleExecutionDew } from "@/lib/dew/store";
+import { settleExecutionCredit } from "@/lib/credits/store";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
-import { EXEC_MAX_MINUTES, EXEC_RESERVE_DEW } from "./cost";
+import { EXEC_MAX_MINUTES, EXEC_RESERVE_CREDIT } from "./cost";
 import { MISSION_HARD_MAX_MINUTES } from "./mission/budget";
 import type {
   ExecutionEventRow,
@@ -47,7 +47,7 @@ export async function clearStaleRuns(admin: AdminClient, owner: string): Promise
     // A run that had a sandbox kept paying until the TTL removed it, so the
     // reservation stands. A run that never reached `provision` is refunded in
     // full: nothing ran, so nothing is owed.
-    const charged = run.sandbox_id ? EXEC_RESERVE_DEW : 0;
+    const charged = run.sandbox_id ? EXEC_RESERVE_CREDIT : 0;
 
     await admin
       .from("execution_runs")
@@ -56,14 +56,14 @@ export async function clearStaleRuns(admin: AdminClient, owner: string): Promise
         failure_code: "crashed",
         failure_detail:
           "The server stopped reporting before this run finished. The sandbox self-destructs on its TTL.",
-        charged_dew: charged,
+        charged_credit: charged,
         ended_at: new Date().toISOString(),
       })
       .eq("owner", owner)
       .eq("id", run.id)
       .in("status", ["queued", "running"]);
 
-    await settleExecutionDew(admin, owner, run.id, charged);
+    await settleExecutionCredit(admin, owner, run.id, charged);
   }
 }
 
@@ -77,7 +77,7 @@ export async function createRun(
     changesetId: string;
     repo: string;
     baseSha: string;
-    reservedDew: number;
+    reservedCredit: number;
   }
 ): Promise<string> {
   const { data, error } = await admin
@@ -91,7 +91,7 @@ export async function createRun(
       base_sha: input.baseSha,
       status: "queued",
       stage: "provision",
-      reserved_dew: input.reservedDew,
+      reserved_credit: input.reservedCredit,
       heartbeat_at: new Date().toISOString(),
     })
     .select("id")
@@ -117,7 +117,7 @@ export async function updateRun(
     build_command?: string | null;
     exit_code?: number | null;
     duration_ms?: number | null;
-    charged_dew?: number;
+    charged_credit?: number;
     ended_at?: string | null;
   },
   options: { onlyWhileLive?: boolean } = {}
@@ -166,7 +166,7 @@ export async function readRunForChangeset(
   const { data } = await supabase
     .from("execution_runs")
     .select(
-      "id, changeset_id, status, stage, failure_code, failure_detail, install_command, build_command, exit_code, duration_ms, reserved_dew, charged_dew, started_at, ended_at, heartbeat_at"
+      "id, changeset_id, status, stage, failure_code, failure_detail, install_command, build_command, exit_code, duration_ms, reserved_credit, charged_credit, started_at, ended_at, heartbeat_at"
     )
     .eq("changeset_id", changesetId)
     .order("started_at", { ascending: false })
@@ -179,8 +179,8 @@ export async function readRunForChangeset(
 
   return {
     ...(row as unknown as ExecutionRunRow),
-    reserved_dew: Number(row.reserved_dew ?? 0),
-    charged_dew: Number(row.charged_dew ?? 0),
+    reserved_credit: Number(row.reserved_credit ?? 0),
+    charged_credit: Number(row.charged_credit ?? 0),
   };
 }
 

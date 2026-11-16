@@ -23,7 +23,7 @@ test("every sellable plan is an expiring pass", () => {
     // A plan without days would be the old permanent badge in disguise.
     expect(plan.days).toBeGreaterThan(0);
     expect(plan.price).toBeGreaterThan(0);
-    expect(plan.dew).toBeGreaterThan(0);
+    expect(plan.credit).toBeGreaterThan(0);
   }
 });
 
@@ -55,7 +55,7 @@ test("the admin panel still tops up a balance by hand", () => {
   const source = admin();
 
   expect(source).toContain("Top up a balance");
-  expect(source).toContain("grantDew");
+  expect(source).toContain("grantCredit");
 });
 
 test("the admin member list shows when a pass ends", () => {

@@ -3,7 +3,7 @@ import "server-only";
 import { workBranchName } from "@/lib/branch";
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import { getFile } from "@/lib/github/read";
-import { settleExecutionDew } from "@/lib/dew/store";
+import { settleExecutionCredit } from "@/lib/credits/store";
 import type { ModelId } from "@/lib/models";
 import type { supabaseServer } from "@/lib/supabase/server";
 import {
@@ -229,7 +229,7 @@ export async function runMissionTick(input: {
       ? chargeMissionDuration(Date.now() - new Date(mission.started_at).getTime(), minutes)
       : 0;
 
-    await settleExecutionDew(admin, owner, runId, charged);
+    await settleExecutionCredit(admin, owner, runId, charged);
     await destroySandbox(sandbox?.id ?? mission.sandbox_id);
   };
 
@@ -271,7 +271,7 @@ export async function runMissionTick(input: {
       const provisioned = await provision(admin, mission, token);
 
       if (!provisioned.ok) {
-        await settleExecutionDew(admin, owner, runId, 0);
+        await settleExecutionCredit(admin, owner, runId, 0);
         await updateMission(admin, runId, {
           status: "failed",
           failure_code: provisioned.failure,

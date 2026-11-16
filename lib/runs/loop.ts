@@ -4,9 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { approveChangesetAndOpenPullRequest } from "@/lib/changesets/commit";
 import type { PublishDestination } from "@/lib/changesets/destination";
-import { refundDewSession } from "@/lib/dew/store";
+import { refundCreditSession } from "@/lib/credits/store";
 import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
-import { refundReasonFor } from "@/lib/dew/refund";
+import { refundReasonFor } from "@/lib/credits/refund";
 import { autoWriteEnabled } from "@/lib/github/autowrite";
 import { readToken } from "@/lib/github/token";
 import { AUTO_MODEL, type ModelId } from "@/lib/models";
@@ -698,7 +698,7 @@ export async function executeRun(
     // asked for, then chose to end it.
     if (
       run.chat_id &&
-      run.dew_session_id &&
+      run.credit_session_id &&
       (status === "failed" || status === "cancelled")
     ) {
       const reason = refundReasonFor({
@@ -707,10 +707,10 @@ export async function executeRun(
       });
 
       if (reason) {
-        await refundDewSession(
+        await refundCreditSession(
           admin as never,
           run.owner,
-          run.dew_session_id,
+          run.credit_session_id,
           reason
         ).catch(() => false);
       }

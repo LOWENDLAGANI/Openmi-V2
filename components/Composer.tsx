@@ -6,7 +6,7 @@ import { Beam } from "@/components/Beam";
 import { ContextCircle } from "@/components/ContextCircle";
 import { ModelMenu } from "@/components/ModelMenu";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
-import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
+import { modelHourCredit, type ModelCapability, type ModelId } from "@/lib/models";
 
 /** How close to the server's cap the counter appears, so it is not noise. */
 const MESSAGE_WARN_CHARS = Math.floor(MAX_MESSAGE_CHARS * 0.9);
@@ -120,7 +120,7 @@ export function Composer({
               }`}
             />
             {activeChatId !== null
-              ? `hour · ${modelHourDew(model, models)} dew`
+              ? `hour · ${modelHourCredit(model, models)} credit`
               : "pay on send"}
           </span>
 

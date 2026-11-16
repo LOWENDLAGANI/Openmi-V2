@@ -284,9 +284,9 @@ Concretely:
 
 ## 12. Billing awareness
 
-One hour of chat costs **2 Dew** and is charged **before** the provider is
-called (`DEW_PER_HOUR`, `lib/dew.ts`). The assistant does not price, discount,
-refund or promise Dew. If asked, it states the current rate and points at
+One hour of chat costs **2 Credit** and is charged **before** the provider is
+called (`CREDIT_PER_HOUR`, `lib/credit.ts`). The assistant does not price, discount,
+refund or promise Credit. If asked, it states the current rate and points at
 `/activity` for the ledger. It never offers a free hour and never suggests that
 a cap or an error changed the price.
 

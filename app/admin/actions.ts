@@ -114,19 +114,19 @@ export async function reviewReceipt(formData: FormData) {
     fail("Choose approve or reject.");
   }
 
-  const rawDew = Number(field(formData, "dew") || "0");
-  if (!Number.isFinite(rawDew)) fail("Enter the Dew to grant.");
+  const rawCredit = Number(field(formData, "credit") || "0");
+  if (!Number.isFinite(rawCredit)) fail("Enter the Credit to grant.");
 
-  const dew =
+  const credit =
     decision === "approved"
-      ? Math.max(0, Math.min(100000, Math.round(rawDew)))
+      ? Math.max(0, Math.min(100000, Math.round(rawCredit)))
       : 0;
 
   const { error } = await supabase.rpc("review_payment_request", {
     p_id: id,
     p_decision: decision,
     p_note: field(formData, "note") || null,
-    p_dew: dew,
+    p_credit: credit,
   });
 
   if (error) fail(error.message.replace(/^review:\s*/, ""));
@@ -136,7 +136,7 @@ export async function reviewReceipt(formData: FormData) {
   redirect(`/admin?done=${decision}`);
 }
 
-export async function grantDew(formData: FormData) {
+export async function grantCredit(formData: FormData) {
   const supabase = await actingClient();
 
   const email = field(formData, "email");
@@ -144,11 +144,11 @@ export async function grantDew(formData: FormData) {
 
   if (email.length === 0) fail("Enter the member's email.");
   if (!Number.isFinite(amount) || amount === 0) {
-    fail("Enter a non-zero Dew amount.");
+    fail("Enter a non-zero Credit amount.");
   }
   if (Math.abs(amount) > 100000) fail("That amount is too large.");
 
-  const { error } = await supabase.rpc("admin_grant_dew", {
+  const { error } = await supabase.rpc("admin_grant_credit", {
     p_email: email,
     p_amount: amount,
     p_reason: field(formData, "reason") || "operator top-up",
@@ -165,7 +165,7 @@ export async function grantDew(formData: FormData) {
  * Giveaways: a batch of codes an operator can hand out.
  *
  * The codes are minted by the database and redeemed one at a time. A giveaway
- * is kind `operator`, so it adds Dew without switching an account to the paid
+ * is kind `operator`, so it adds Credit without switching an account to the paid
  * allowance — a gift is not a plan.
  */
 export async function createGiveawayCodes(formData: FormData) {
@@ -175,13 +175,13 @@ export async function createGiveawayCodes(formData: FormData) {
   const count = Number(field(formData, "count") || "1");
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    fail("Enter a positive Dew amount.");
+    fail("Enter a positive Credit amount.");
   }
   if (!Number.isFinite(count) || count < 1 || count > 50) {
     fail("Issue between 1 and 50 codes.");
   }
 
-  const { error } = await supabase.rpc("admin_create_dew_codes", {
+  const { error } = await supabase.rpc("admin_create_credit_codes", {
     p_amount: Math.round(amount * 1000) / 1000,
     p_count: Math.round(count),
     p_note: field(formData, "note") || null,
@@ -229,7 +229,7 @@ export async function setAdmin(formData: FormData) {
  *
  * The days field is the instruction and "revoke" sends zero: a grant extends
  * the window from the later of now and its current end, so comping a month to a
- * running pass adds to it. No Dew moves, so there is no ledger row — the
+ * running pass adds to it. No Credit moves, so there is no ledger row — the
  * entitlement is `paid_until`, and `admin_set_pass` re-checks the role.
  */
 export async function setPass(formData: FormData) {

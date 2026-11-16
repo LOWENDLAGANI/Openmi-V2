@@ -20,7 +20,7 @@ with files and acceptance tests, and the order they land in.
 | ID | Decision | Options | Recommendation | Blocks |
 |---|---|---|---|---|
 | **D1** | How is a preview exposed? | **A** E2B public host; **B** wildcard subdomain proxy; **C** path-prefix proxy | **B** for private previews, with **A** as an explicitly-labelled temporary link | T1.3, T1.4 |
-| **D2** | What does a warm preview cost? | per started minute; included in the hour; free for N minutes | per started minute at `PREVIEW_DEW_PER_MINUTE = 0.05`, same as sandbox time, capped per chat per day | T1.5 |
+| **D2** | What does a warm preview cost? | per started minute; included in the hour; free for N minutes | per started minute at `PREVIEW_CREDIT_PER_MINUTE = 0.05`, same as sandbox time, capped per chat per day | T1.5 |
 | **D3** | Do templates create repositories? | yes; no, existing repos only | yes, but only after D1 ships — it is a product bet, not a technical one | P3 |
 | **D4** | What does Publish deploy? | Vercel project deploy of the branch; static export to object storage | Vercel deploy of the merged branch, reported from the API response | P4 |
 | **D5** | Does the workspace follow the branch? | poll every 30 s; webhook; manual pull | poll on open + manual pull, fast-forward only when the workspace is clean | P5 |
@@ -119,13 +119,13 @@ Nothing about editing changes.
 
 ### T1.5 Pricing and idle stop
 
-- **Files:** `lib/execution/dev-server.ts`, `lib/dew.ts` or a new
+- **Files:** `lib/execution/dev-server.ts`, `lib/credit.ts` or a new
   `lib/execution/preview-cost.ts`, `supabase/migrations/033_chat_previews.sql`
 - `chat_previews` (service-role only, one row per chat):
   `chat_id` (unique), `owner`, `sandbox_id`, `port`, `command`, `state`
   (`starting|ready|stopped|failed`), `started_at`, `last_hit_at`,
   `failure_detail`, timestamps.
-- `PREVIEW_DEW_PER_MINUTE = 0.05` and `PREVIEW_MAX_MINUTES_PER_CHAT = 60`.
+- `PREVIEW_CREDIT_PER_MINUTE = 0.05` and `PREVIEW_MAX_MINUTES_PER_CHAT = 60`.
 - Charge per started minute through the existing ledger; stop the server and
   release the lease at the cap with a visible reason.
 - **Acceptance:** migration applies twice; the ledger sums to the balance after a
@@ -133,7 +133,7 @@ Nothing about editing changes.
   stops billing in the next minute tick.
 - **Est:** M.
 - **Status:** the cap, the idle stop and the visible reason shipped without the
-  charge (`035_preview_limits.sql`). Per-minute Dew waits for D2 to be signed,
+  charge (`035_preview_limits.sql`). Per-minute Credit waits for D2 to be signed,
   because it is a price, not an implementation detail.
 
 ### T1.6 Kill switch and rollback
@@ -308,7 +308,7 @@ window and their own security review.
 | Risk | Mitigation |
 |---|---|
 | Preview URL leaks | D1=B, token server-side, stop on idle, no URL in logs |
-| Preview keeps billing | per-minute Dew, 60-minute chat cap, visible stop reason |
+| Preview keeps billing | per-minute Credit, 60-minute chat cap, visible stop reason |
 | Absolute asset paths break under a path proxy | D1=B subdomain; do not ship C as if it were finished |
 | Restore destroys uncommitted work | refuse while a lease is live; commit before any reset |
 | Publish claims more than it observed | render only the provider's state and URL |

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { formatHourRemaining, hourRemainingMs } from "@/lib/dew";
+import { formatHourRemaining, hourRemainingMs } from "@/lib/credits";
 
 /**
  * How much of the paid hour is left.

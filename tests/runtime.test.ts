@@ -54,7 +54,7 @@ test("the chat row is created only after the message and provider are valid", ()
 const MUTATING_ROUTES = [
   "../app/api/chat/route.ts",
   "../app/api/chat/stop/route.ts",
-  "../app/api/dew/end-session/route.ts",
+  "../app/api/credits/end-session/route.ts",
   "../app/api/execution/runs/route.ts",
   "../app/api/execution/runs/[id]/route.ts",
   "../app/api/missions/route.ts",
@@ -82,7 +82,7 @@ test("receipt uploads are rate limited before storage", () => {
 test("both code redemption surfaces rate limit before the database call", () => {
   for (const source of [ACTIVITY, PAY]) {
     const limit = source.indexOf('checkRateLimit(admin, "redeem"');
-    const redeem = source.indexOf("redeemDewCode(");
+    const redeem = source.indexOf("redeemCreditCode(");
 
     expect(limit).toBeGreaterThan(-1);
     expect(redeem).toBeGreaterThan(-1);
@@ -92,7 +92,7 @@ test("both code redemption surfaces rate limit before the database call", () => 
 
 test("the rate limit is checked before the provider and carries Retry-After", () => {
   const limitAt = CHAT.indexOf('checkRateLimit(supabaseAdmin(), "chat"');
-  const chargeAt = CHAT.indexOf("await startDewSession(");
+  const chargeAt = CHAT.indexOf("await startCreditSession(");
 
   expect(limitAt).toBeGreaterThan(-1);
   expect(CHAT).toContain('"retry-after"');

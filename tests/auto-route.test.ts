@@ -251,7 +251,7 @@ test("Auto is a free catalogue entry, not a route", () => {
   expect(auto?.name).toBe("Auto");
   expect(auto?.category).toBe("general");
   // Free is a price: the hour still opens, it just costs nothing.
-  expect(auto?.dewPerHour).toBe(0);
+  expect(auto?.creditPerHour).toBe(0);
 
   // Auto is a router, so it has no registry profile of its own: a queue that
   // could contain Auto would be a loop.

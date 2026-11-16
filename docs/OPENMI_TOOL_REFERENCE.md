@@ -268,7 +268,7 @@ Run one shell command and wait for it.
 | Background process ceiling | 300s | `MISSION_BACKGROUND_MS` |
 | Default length | 20 min | `MISSION_DEFAULT_MINUTES` |
 | Hard maximum | 30 min | `MISSION_HARD_MAX_MINUTES` |
-| Price | 0.05 Dew / started minute | `MISSION_DEW_PER_MINUTE` |
+| Price | 0.05 Credit / started minute | `MISSION_CREDIT_PER_MINUTE` |
 | Stall detection | 2 empty ticks | `MISSION_STALL_AFTER_EMPTY_TICKS` |
 | Shown as paused after | 60s without a tick | `MISSION_IDLE_PAUSE_MS` |
 

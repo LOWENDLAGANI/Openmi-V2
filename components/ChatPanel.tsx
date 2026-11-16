@@ -11,14 +11,14 @@ import {
   type ComposerCommand,
   type ContextMeter,
 } from "@/components/Composer";
-import { DEW_EVENT } from "@/components/DewChip";
+import { CREDIT_EVENT } from "@/components/CreditChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
 import { RetryNotice } from "@/components/RetryNotice";
 import { MessageBody } from "@/components/MessageBody";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
 import {
-  modelHourDew,
+  modelHourCredit,
   modelName,
   modelRequiresPaid,
   type ModelCapability,
@@ -78,7 +78,7 @@ export function ChatPanel({
   providerReady,
   initialRunning,
   paidActive,
-  dew,
+  credit,
 }: {
   chatId: string | null;
   repo: RepoRef;
@@ -92,7 +92,7 @@ export function ChatPanel({
   /** A live paid pass is what unlocks the paid-only models. */
   paidActive: boolean;
   /** The two balances a charge can draw on. */
-  dew: { balance: number; wallet: number };
+  credit: { balance: number; wallet: number };
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<UiMessage[]>(() =>
@@ -319,7 +319,7 @@ export function ChatPanel({
 
   /**
    * A new chat asks how to pay before anything is sent; an existing chat already
-   * has an answer, stored on its row. Typing must never cost Dew silently.
+   * has an answer, stored on its row. Typing must never cost Credit silently.
    */
   function beginSend(content: string) {
     if (busyRef.current) return;
@@ -339,7 +339,7 @@ export function ChatPanel({
     // is already paid for, so its messages go straight out. A free hour has
     // nothing to confirm, so it goes straight out too — and still starts the
     // session server-side, because the hour scopes the chat, not the charge.
-    if (activeChatId === null && modelHourDew(model, models) > 0) {
+    if (activeChatId === null && modelHourCredit(model, models) > 0) {
       setChargeFor(content);
       return;
     }
@@ -349,7 +349,7 @@ export function ChatPanel({
 
   async function endAndRetry(pendingChoose: { content: string }) {
     try {
-      await fetch("/api/dew/end-session", {
+      await fetch("/api/credits/end-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: "{}",
@@ -530,7 +530,7 @@ export function ChatPanel({
           return;
         }
 
-        if (event === "dew") {
+        if (event === "credit") {
           const label =
             typeof payload.label === "string"
               ? payload.label
@@ -546,7 +546,7 @@ export function ChatPanel({
 
           if (Number.isFinite(balance)) {
             window.dispatchEvent(
-              new CustomEvent(DEW_EVENT, {
+              new CustomEvent(CREDIT_EVENT, {
                 detail: {
                   balance,
                   wallet: Number.isFinite(wallet) ? wallet : undefined,
@@ -1110,9 +1110,9 @@ export function ChatPanel({
 
       <ChargeDialog
         open={chargeFor !== null}
-        balance={dew.balance}
-        wallet={dew.wallet}
-        hourPrice={modelHourDew(model, models)}
+        balance={credit.balance}
+        wallet={credit.wallet}
+        hourPrice={modelHourCredit(model, models)}
         pending={streaming}
         onCancel={() => setChargeFor(null)}
         onConfirm={() => {

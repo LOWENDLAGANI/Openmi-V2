@@ -41,7 +41,7 @@ export type FailureCode =
   | "apply_failed"
   | "install_failed"
   | "build_failed"
-  | "insufficient_dew"
+  | "insufficient_credit"
   | "changeset_not_ready"
   | "refused"
   | "crashed"
@@ -65,8 +65,8 @@ export type ExecutionRunRow = {
   exit_code: number | null;
   duration_ms: number | null;
   /** Reserved before the sandbox started; settled against real minutes. */
-  reserved_dew: number;
-  charged_dew: number;
+  reserved_credit: number;
+  charged_credit: number;
   started_at: string;
   ended_at: string | null;
   heartbeat_at: string | null;
@@ -100,7 +100,7 @@ const FAILURE_LABEL: Record<FailureCode, string> = {
   apply_failed: "The accepted files could not be written into the sandbox.",
   install_failed: "The dependency install failed.",
   build_failed: "The build failed.",
-  insufficient_dew: "There was not enough Dew to reserve a run.",
+  insufficient_credit: "There was not enough Credit to reserve a run.",
   changeset_not_ready: "Only a signed, ready changeset can be verified.",
   refused: "The sandbox refused the request.",
   crashed: "The run stopped reporting. No result was recorded.",
@@ -146,14 +146,14 @@ export function describeRun(run: ExecutionRunRow | null): RunDescription {
   // the promise has already been settled, so "nothing charged yet" was a lie on
   // a failed start. That sentence is kept for a run that is still live.
   const charge =
-    run.reserved_dew > 0 && run.charged_dew > 0
-      ? `${run.charged_dew} Dew charged of ${run.reserved_dew} reserved.`
-      : run.reserved_dew > 0
+    run.reserved_credit > 0 && run.charged_credit > 0
+      ? `${run.charged_credit} Credit charged of ${run.reserved_credit} reserved.`
+      : run.reserved_credit > 0
         ? run.status === "failed" ||
           run.status === "timed_out" ||
           run.status === "cancelled"
-          ? `${run.reserved_dew} Dew reserved; no sandbox time was charged, so the unused reserve settles back.`
-          : `${run.reserved_dew} Dew reserved; nothing charged yet.`
+          ? `${run.reserved_credit} Credit reserved; no sandbox time was charged, so the unused reserve settles back.`
+          : `${run.reserved_credit} Credit reserved; nothing charged yet.`
         : null;
 
   if (run.status === "queued" || run.status === "running") {

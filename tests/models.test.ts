@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { DEW_PER_HOUR } from "../lib/dew";
+import { CREDIT_PER_HOUR } from "../lib/credits";
 import {
   DEFAULT_MODEL,
   MODELS,
@@ -9,7 +9,7 @@ import {
   hasModel,
   isModelAllowed,
   isModelId,
-  modelHourDew,
+  modelHourCredit,
   modelName,
   modelRequiresAdmin,
   modelRequiresPaid,
@@ -90,17 +90,17 @@ test("the browser catalogue carries no endpoint, upstream id or key", () => {
 
 test("every model prices its own hour: Auto free, DeepSeek the default", () => {
   for (const model of MODELS) {
-    expect(Number.isFinite(model.dewPerHour)).toBe(true);
+    expect(Number.isFinite(model.creditPerHour)).toBe(true);
     // Zero is a price. A negative one would be a credit nobody asked for.
-    expect(model.dewPerHour).toBeGreaterThanOrEqual(0);
+    expect(model.creditPerHour).toBeGreaterThanOrEqual(0);
   }
 
-  expect(modelHourDew("auto")).toBe(0);
-  expect(modelHourDew("deepseek-flash")).toBe(DEW_PER_HOUR);
+  expect(modelHourCredit("auto")).toBe(0);
+  expect(modelHourCredit("deepseek-flash")).toBe(CREDIT_PER_HOUR);
 
   // A model the catalogue does not know is charged the default, never nothing:
   // a missing price must not become a free hour.
-  expect(modelHourDew("not-a-model")).toBe(DEW_PER_HOUR);
+  expect(modelHourCredit("not-a-model")).toBe(CREDIT_PER_HOUR);
 });
 
 test("the paid-only model is marked, priced, and refused without a pass", () => {
@@ -108,7 +108,7 @@ test("the paid-only model is marked, priced, and refused without a pass", () => 
 
   expect(haiku?.paidOnly).toBe(true);
   // Premium is an entitlement, not a price: the hour costs the catalogue's.
-  expect(haiku?.dewPerHour).toBe(DEW_PER_HOUR);
+  expect(haiku?.creditPerHour).toBe(CREDIT_PER_HOUR);
 
   for (const model of MODELS) {
     if (model.id === "claude-haiku") continue;
@@ -136,7 +136,7 @@ test("the operator-only model is hidden from readers and refused on the server",
   const luna = MODELS.find((model) => model.id === "gpt-6-luna");
 
   expect(luna?.adminOnly).toBe(true);
-  expect(luna?.dewPerHour).toBe(DEW_PER_HOUR);
+  expect(luna?.creditPerHour).toBe(CREDIT_PER_HOUR);
 
   // One model is operator-only; the rest are not.
   for (const model of MODELS) {
@@ -172,9 +172,9 @@ test("the server refuses the paid-only model before it charges the hour", () => 
     "utf8"
   );
 
-  // A gate that ran after the charge would still spend Dew on a refusal.
+  // A gate that ran after the charge would still spend Credit on a refusal.
   const gate = route.indexOf("paidOnlyRefusal(");
-  const charge = route.indexOf("startDewSession(");
+  const charge = route.indexOf("startCreditSession(");
 
   expect(gate).toBeGreaterThan(-1);
   expect(charge).toBeGreaterThan(gate);

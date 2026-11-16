@@ -51,7 +51,7 @@ export type RunRow = {
   cost_usd: number;
   cancel_requested: boolean;
   /** The charged hour a chat turn will be refunded against if it fails. */
-  dew_session_id: string | null;
+  credit_session_id: string | null;
   last_event_seq: number;
   created_at: string;
   started_at: string | null;
@@ -120,7 +120,7 @@ function normalizeRun(row: Record<string, unknown>): RunRow {
 }
 
 export const RUN_COLUMNS =
-  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, dew_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
+  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, credit_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
 
 export async function createRun(
   admin: Client,
@@ -133,7 +133,7 @@ export async function createRun(
     prompt: string;
     model: string;
     /** Set by a chat turn: the hour that is refunded if the run fails. */
-    dewSessionId?: string | null;
+    creditSessionId?: string | null;
   }
 ): Promise<RunRow> {
   const { data, error } = await admin
@@ -146,7 +146,7 @@ export async function createRun(
       base_sha: input.baseSha,
       prompt: input.prompt,
       model: input.model,
-      dew_session_id: input.dewSessionId ?? null,
+      credit_session_id: input.creditSessionId ?? null,
       status: "queued",
     })
     .select(RUN_COLUMNS)

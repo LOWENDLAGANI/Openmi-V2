@@ -34,7 +34,7 @@ const SECTIONS: LegalSection[] = [
           "GitHub connection. The personal access token or OAuth grant you provide, sealed with AES-256-GCM before storage (only the last four characters are ever displayed back to you), your GitHub user id and username, the scopes you granted, and the repositories you select.",
           "Content you submit. Chat messages and the answers to them, the repository and commit a chat is pinned to, the files the assistant reads, and the diffs or changesets it proposes.",
           "Execution records, where execution is enabled. Sandbox commands, exit codes, durations and output excerpts, screenshots the browser tool captures, checkpoints, and preview addresses.",
-          "Billing records. Your Dew balance and the append-only ledger of charges, refunds, daily allowances, invite rewards and redeem codes; the plan receipts you upload and an operator’s decision on them.",
+          "Billing records. Your Credit balance and the append-only ledger of charges, refunds, daily allowances, invite rewards and redeem codes; the plan receipts you upload and an operator’s decision on them.",
           "Technical data. A coarse country derived from request headers, used to show currency estimates; request metadata used to enforce rate limits; and error diagnostics.",
         ],
       },
@@ -48,7 +48,7 @@ const SECTIONS: LegalSection[] = [
         kind: "list",
         items: [
           "To provide the service: authenticate you, read the repository you connected, send your prompt to the model you selected, return an answer, and propose changes. Legal basis: performance of our contract with you.",
-          "To bill you: charge Dew for an hour of chat, apply daily allowances and trial credit, record ledger rows, and review uploaded receipts. Legal basis: performance of our contract, and our legal obligation to keep accounting records.",
+          "To bill you: charge Credit for an hour of chat, apply daily allowances and trial credit, record ledger rows, and review uploaded receipts. Legal basis: performance of our contract, and our legal obligation to keep accounting records.",
           "To keep the service safe and working: rate limits, abuse prevention, and fault diagnosis. Legal basis: our legitimate interest in operating a secure service.",
           "To show advertising: banner ads are loaded only after you consent to them in the cookie banner. Legal basis: your consent, which you may withdraw at any time.",
         ],

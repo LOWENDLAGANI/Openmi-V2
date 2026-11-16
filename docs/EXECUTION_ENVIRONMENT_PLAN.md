@@ -20,8 +20,8 @@ rendered. What is deliberately *not* in this build:
   the pull request (the remaining half of P10-T3 is the model driving the
   workspace directly, which this deliberately does not do);
 - charging is implemented through the existing ledger
-  (`017_execution_dew.sql`): reserve 0.5 Dew before the sandbox, settle at 0.05
-  Dew per started minute, refund the unused part;
+  (`017_execution_dew.sql`): reserve 0.5 Credit before the sandbox, settle at 0.05
+  Credit per started minute, refund the unused part;
 - tests are not run, so no card can say they were.
 
 The old gate test (`tests/execution-gate.test.ts`) is gone, replaced by
@@ -50,7 +50,7 @@ user asks for a change
 agent proposes work (existing turn, bounded by MAX_STEPS)
         │
         ▼
- user starts a run ──► Openmi reserves Dew, creates a Daytona sandbox
+ user starts a run ──► Openmi reserves Credit, creates a Daytona sandbox
                             │
                             ├── seed workspace at the pinned commit
                             ├── agent edits files through tools (no shell strings)
@@ -97,9 +97,9 @@ Four further rules, all enforced in code rather than in a prompt:
    `cwd`, `env` or `url` parameter on any execution tool, and a test asserts the
    tool schema has no string parameter that reaches a shell.
 
-### D6.2 — How is sandbox time priced in Dew?
+### D6.2 — How is sandbox time priced in Credit?
 
-**0.05 Dew per started minute, prepaid against the cap, settled on real time.**
+**0.05 Credit per started minute, prepaid against the cap, settled on real time.**
 
 Measured cost basis (`daytona-medium`: 2 vCPU, 4 GiB, 8 GiB disk):
 
@@ -111,14 +111,14 @@ storage  (8 − 5 free) × $0.000108 = $0.000324/h
                                     $0.165924/h  =  $0.00277/min
 ```
 
-At the pass floor of **RM 0.60 per Dew** (15-day pass: RM18 / 30 Dew, plus the
+At the pass floor of **RM 0.60 per Credit** (15-day pass: RM18 / 30 Credit, plus the
 daily allowance while it runs):
 
 | | Cost to Openmi | Charged | Margin |
 |---|---|---|---|
-| 1 minute | RM 0.0126 | 0.05 Dew = RM 0.030 | ~2× |
-| 10-minute run | RM 0.126 | 0.5 Dew = RM 0.300 | ~2× |
-| 1 hour | RM 0.754 | 2 Dew = RM 1.20 | ~1.6× |
+| 1 minute | RM 0.0126 | 0.05 Credit = RM 0.030 | ~2× |
+| 10-minute run | RM 0.126 | 0.5 Credit = RM 0.300 | ~2× |
+| 1 hour | RM 0.754 | 2 Credit = RM 1.20 | ~1.6× |
 
 The symmetry is deliberate and easy to say out loud: **an execution hour costs
 the same as a chat hour.** Model tokens for the run are already covered by the
@@ -127,12 +127,12 @@ active hour (D4), so this price is for compute, not for tokens.
 Mechanics, mirroring the existing billing rules (implemented in
 `supabase/migrations/017_execution_dew.sql` as two service-role functions):
 
-- `EXEC_DEW_PER_MINUTE = 0.05`, `EXEC_MIN_CHARGE_DEW = 0.05` (one minute),
-  `EXEC_MAX_MINUTES = 10`, `EXEC_RESERVE_DEW = 0.5`.
-- Reserve `EXEC_RESERVE_DEW` **before** `daytona.create`. A balance below the
+- `EXEC_CREDIT_PER_MINUTE = 0.05`, `EXEC_MIN_CHARGE_CREDIT = 0.05` (one minute),
+  `EXEC_MAX_MINUTES = 10`, `EXEC_RESERVE_CREDIT = 0.5`.
+- Reserve `EXEC_RESERVE_CREDIT` **before** `daytona.create`. A balance below the
   reserve returns `402` and creates nothing.
 - Settle on the run's recorded wall time, rounded up to a started minute, capped
-  at the reserve. Unused Dew is refunded through the existing refund path with
+  at the reserve. Unused Credit is refunded through the existing refund path with
   `kind='refund'`, not by editing a ledger row.
 - Daytona bills per second; we bill per started minute. The difference is the
   margin, and it is also what pays for a failed install that took 40 seconds.
@@ -318,8 +318,8 @@ create table public.execution_runs (
   build_command  text,
   exit_code      integer,
   duration_ms    integer,
-  reserved_dew   numeric(10,3) not null,
-  charged_dew    numeric(10,3) not null default 0,
+  reserved_credit   numeric(10,3) not null,
+  charged_credit    numeric(10,3) not null default 0,
   started_at     timestamptz not null default now(),
   heartbeat_at   timestamptz,
   ended_at       timestamptz
@@ -353,7 +353,7 @@ Repository size, cost, and failure distribution are the numbers P10-T2 needs, so
 
 | Route | Method | Behaviour |
 |---|---|---|
-| `/api/execution/runs` | `POST` | Auth, chat + pin ownership, Dew reserve, insert `queued`, start run, `202 { runId }`. `402` below reserve, `409` if an active run exists, `503` if not configured. |
+| `/api/execution/runs` | `POST` | Auth, chat + pin ownership, Credit reserve, insert `queued`, start run, `202 { runId }`. `402` below reserve, `409` if an active run exists, `503` if not configured. |
 | `/api/execution/runs/[id]` | `GET` | SSE of `execution_events` after `seq`, then close on terminal status. `no-store`. |
 | `/api/execution/runs/[id]` | `DELETE` | Cancel: set `cancelled`, delete the sandbox, settle. Idempotent. |
 | `/api/execution/runs/[id]/changeset` | `POST` | Turn the collected patch into a signed changeset (server-only, idempotent by run id). |
@@ -402,7 +402,7 @@ Every claim on the card is a rendering of a stored row:
    "stopped reporting" are distinguishable.
 3. Command detection resolves a lockfile to a fixed string, and an unrecognised
    repository is refused with a reason instead of guessed at.
-4. The egress list contains no wildcard, and the Dew charge rounds up to a
+4. The egress list contains no wildcard, and the Credit charge rounds up to a
    started minute and never exceeds the reserve.
 
 What it does not assert, and cannot without a key: that a sandbox starts. That
@@ -420,7 +420,7 @@ has actually produced a row.
 | **P10-T2** | `016_execution.sql`, run orchestrator, POST/GET/DELETE routes, event writer with caps | An interrupted run resumes its stream after reload; every `failure_code` reachable in a test |
 | **P10-T3** | Sandbox tools + prompt clause change + step enum + no-shell test | A model-supplied string never reaches a shell; a path traversal is refused before any exec |
 | **P10-T4** | Patch → changeset, observations on the review card, replace the gate test | Card never claims a build it did not observe; timed-out renders as timed out |
-| **P10-T5** | Dew reserve/settle/refund, concurrency guard, cancel, teardown, kill switch | Concurrent start impossible; a failed start refunds in full; a killed server leaves no running sandbox after TTL |
+| **P10-T5** | Credit reserve/settle/refund, concurrency guard, cancel, teardown, kill switch | Concurrent start impossible; a failed start refunds in full; a killed server leaves no running sandbox after TTL |
 | **P10-T6** | Limits page copy, README, `/about` change (it currently says "no execution"), runbook | `/about` and the card agree with behaviour, verified by a test that greps for the old claim |
 
 P10-T4 and P10-T6 are the two that touch existing copy. `/about` line 30 and

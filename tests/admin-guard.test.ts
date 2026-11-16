@@ -61,7 +61,7 @@ test("the admin page resolves access on the server and hides itself", () => {
 test("admin mutations re-check access instead of trusting the form", () => {
   expect(ADMIN_ACTIONS).toContain("await requireAdmin()");
   expect(ADMIN_ACTIONS).toContain('rpc("review_payment_request"');
-  expect(ADMIN_ACTIONS).toContain('rpc("admin_grant_dew"');
+  expect(ADMIN_ACTIONS).toContain('rpc("admin_grant_credit"');
   expect(ADMIN_ACTIONS).toContain('rpc("admin_set_admin"');
   expect(ADMIN_ACTIONS).toContain('rpc("admin_set_pass"');
   expect(ADMIN_ACTIONS).not.toContain("isAdmin:");

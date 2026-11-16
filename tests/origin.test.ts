@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { isSameOrigin } from "../lib/http/origin";
 
 /**
- * The mission routes spend Dew and start sandboxes, so this check is the only
+ * The mission routes spend Credit and start sandboxes, so this check is the only
  * thing standing between a forged cross-site POST and a bill. These assertions
  * pin both halves: a stranger is refused, and the deployment's own panel is
  * not, whichever host it happens to be served from.

@@ -5,13 +5,13 @@ import { NextResponse } from "next/server";
 import { readAdminAccess } from "@/lib/admin/access";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { titleFromMessage } from "@/lib/chat-title";
-import { formatDew } from "@/lib/dew";
+import { formatCredit } from "@/lib/credits";
 import {
-  grantTrialDew,
-  readDewProfile,
-  startDewSession,
-  type DewGate,
-} from "@/lib/dew/store";
+  grantTrialCredit,
+  readCreditProfile,
+  startCreditSession,
+  type CreditGate,
+} from "@/lib/credits/store";
 import { executionConfigured, serverEnv } from "@/lib/env";
 import { isRepoFullName, getRepo, resolveBranchSha } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
@@ -254,7 +254,7 @@ export async function POST(request: Request) {
   // a refused send costs nothing and leaves nothing behind. The hour trigger in
   // 051 refuses it again, so a caller that forgets this check cannot spend it.
   if (modelRequiresPaid(model, modelOptions)) {
-    const profile = await readDewProfile(session.supabase, session.user.id);
+    const profile = await readCreditProfile(session.supabase, session.user.id);
     const refusal = paidOnlyRefusal(
       model,
       profile?.paidActive === true,
@@ -362,26 +362,26 @@ export async function POST(request: Request) {
 
   const sealKey = serverEnv().githubTokenKey;
 
-  // Trial Dew is granted here, not at signup: this is the first point in the
+  // Trial Credit is granted here, not at signup: this is the first point in the
   // flow where the request has an address, and the grant is capped per address
   // per day.
   const callerIp = requestIp(request.headers);
 
   if (callerIp && sealKey) {
-    await grantTrialDew(admin, session.user.id, hashIp(callerIp, sealKey));
+    await grantTrialCredit(admin, session.user.id, hashIp(callerIp, sealKey));
   }
 
   // Charged once per running hour, and the database reuses a live hour, so a
   // second message inside it costs nothing. A refusal here happens before any
   // row is written.
-  const dew: DewGate = await startDewSession(session.supabase, model, repoFullName, {
+  const credit: CreditGate = await startCreditSession(session.supabase, model, repoFullName, {
     chatId,
   });
 
-  if (!dew.ok) {
+  if (!credit.ok) {
     return json(
-      { error: dew.error, code: dew.code, activeChatId: dew.activeChatId },
-      dew.code === "hour-active" ? 409 : 402
+      { error: credit.error, code: credit.code, activeChatId: credit.activeChatId },
+      credit.code === "hour-active" ? 409 : 402
     );
   }
 
@@ -426,7 +426,7 @@ export async function POST(request: Request) {
       baseSha: sha,
       prompt: content,
       model,
-      dewSessionId: dew.session.sessionId,
+      creditSessionId: credit.session.sessionId,
     });
 
   let run: RunRow;
@@ -505,7 +505,7 @@ export async function POST(request: Request) {
     userMessage: userMessage
       ? { id: userMessage.id, seq: Number(userMessage.seq) }
       : null,
-    dew,
+    credit,
   });
 }
 
@@ -517,7 +517,7 @@ type StreamInput = {
   cursor: number;
   greeting: string | null;
   userMessage?: { id: string; seq: number } | null;
-  dew?: Extract<DewGate, { ok: true }>;
+  credit?: Extract<CreditGate, { ok: true }>;
 };
 
 /**
@@ -567,16 +567,16 @@ function streamRun(input: StreamInput): NextResponse {
       if (input.greeting) send("chat", { id: input.greeting });
       if (input.userMessage) send("user", input.userMessage);
 
-      if (input.dew) {
-        if (input.dew.session.started) {
-          send("dew", {
+      if (input.credit) {
+        if (input.credit.session.started) {
+          send("credit", {
             charged: true,
-            mode: input.dew.session.mode,
-            price: input.dew.session.price,
-            balance: input.dew.session.balance,
-            wallet: input.dew.session.wallet,
-            combined: input.dew.session.combined,
-            label: `Started an hour of chat: ${formatDew(input.dew.session.price)} Dew charged. Balance ${formatDew(input.dew.session.balance)}.`,
+            mode: input.credit.session.mode,
+            price: input.credit.session.price,
+            balance: input.credit.session.balance,
+            wallet: input.credit.session.wallet,
+            combined: input.credit.session.combined,
+            label: `Started an hour of chat: ${formatCredit(input.credit.session.price)} Credit charged. Balance ${formatCredit(input.credit.session.balance)}.`,
           });
         }
       }

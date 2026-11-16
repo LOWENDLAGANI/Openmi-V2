@@ -16,7 +16,7 @@ import { LegalPage, type LegalSection } from "@/components/LegalPage";
 export const metadata = {
   title: "Refunds and cancellation — Openmi",
   description:
-    "Openmi's refund and cancellation policy: all sales are final, passes do not renew, unused Dew is not refundable, and how to raise a payment problem or delete your account.",
+    "Openmi's refund and cancellation policy: all sales are final, passes do not renew, unused Credit is not refundable, and how to raise a payment problem or delete your account.",
 };
 
 const LAST_UPDATED = "November 15, 2026";
@@ -28,7 +28,7 @@ const SECTIONS: LegalSection[] = [
     blocks: [
       {
         kind: "p",
-        text: "This policy explains when Openmi (“we”, “us”) refunds a payment, and how a reader cancels. It applies to every paid product we offer — Dew top-ups, plans, passes, redeem codes bought from us — and to the subscription to the service itself. It forms part of our Terms of Service, and where the two documents differ about money, this page is the specific one.",
+        text: "This policy explains when Openmi (“we”, “us”) refunds a payment, and how a reader cancels. It applies to every paid product we offer — Credit top-ups, plans, passes, redeem codes bought from us — and to the subscription to the service itself. It forms part of our Terms of Service, and where the two documents differ about money, this page is the specific one.",
       },
       {
         kind: "p",
@@ -42,13 +42,13 @@ const SECTIONS: LegalSection[] = [
     blocks: [
       {
         kind: "p",
-        text: "Every purchase is final. Once a payment is made and the Dew, plan or pass is granted, we do not offer refunds, credits, exchanges or partial refunds. That includes, without limitation:",
+        text: "Every purchase is final. Once a payment is made and the Credit, plan or pass is granted, we do not offer refunds, credits, exchanges or partial refunds. That includes, without limitation:",
       },
       {
         kind: "list",
         items: [
           "A change of mind after paying.",
-          "Dew you have not spent, including a balance left when you stop using the service.",
+          "Credit you have not spent, including a balance left when you stop using the service.",
           "Unused days on a pass, and a pass you decide not to use.",
           "An account you close, suspend or abandon, and a plan you no longer need.",
           "A model answer you did not find useful, and a change you decided not to merge.",
@@ -71,7 +71,7 @@ const SECTIONS: LegalSection[] = [
       },
       {
         kind: "p",
-        text: "You can stop using Openmi at any time, and you can close your account yourself at /account/delete. Closing an account, ending a pass early or simply walking away does not refund an unexpired pass or an unspent Dew balance.",
+        text: "You can stop using Openmi at any time, and you can close your account yourself at /account/delete. Closing an account, ending a pass early or simply walking away does not refund an unexpired pass or an unspent Credit balance.",
       },
       {
         kind: "p",
@@ -80,12 +80,12 @@ const SECTIONS: LegalSection[] = [
     ],
   },
   {
-    id: "dew",
-    title: "4. Dew is a licence, not a deposit",
+    id: "credit",
+    title: "4. Credit is a licence, not a deposit",
     blocks: [
       {
         kind: "p",
-        text: "Dew is the unit one hour of chat is billed in. It has no cash value, is not a deposit or stored value, is not transferable between accounts, and may not be resold. Buying Dew buys the right to spend it in the service, not a claim on money we hold for you. Dew granted free — the daily allowance, trial credit, invite rewards, operator adjustments — carries the same limits and is never convertible to cash.",
+        text: "Credit is the unit one hour of chat is billed in. It has no cash value, is not a deposit or stored value, is not transferable between accounts, and may not be resold. Buying Credit buys the right to spend it in the service, not a claim on money we hold for you. Credit granted free — the daily allowance, trial credit, invite rewards, operator adjustments — carries the same limits and is never convertible to cash.",
       },
     ],
   },
@@ -131,7 +131,7 @@ const SECTIONS: LegalSection[] = [
       },
       {
         kind: "p",
-        text: "Deleting an account does not create a refund. Any Dew balance and any unexpired pass are forfeited when the account is deleted, as described in section 2.",
+        text: "Deleting an account does not create a refund. Any Credit balance and any unexpired pass are forfeited when the account is deleted, as described in section 2.",
       },
     ],
   },
@@ -167,7 +167,7 @@ export default function RefundsPage() {
       eyebrow="legal"
       title="Refunds and cancellation"
       updated={LAST_UPDATED}
-      intro="Every purchase is final: Openmi does not offer refunds, credits or cancellations for Dew, plans or passes. This page states that plainly, explains the one automatic correction the meter makes, and tells you how to raise a payment problem or close your account."
+      intro="Every purchase is final: Openmi does not offer refunds, credits or cancellations for Credit, plans or passes. This page states that plainly, explains the one automatic correction the meter makes, and tells you how to raise a payment problem or close your account."
       sections={SECTIONS}
       contact={{
         title: "10. Contact",

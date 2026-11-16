@@ -5,7 +5,7 @@
  * card and the tests read the same numbers, so a cap cannot drift between the
  * thing that enforces it and the thing that describes it.
  *
- * The price is the verification rate — 0.05 Dew per started minute, an
+ * The price is the verification rate — 0.05 Credit per started minute, an
  * execution hour costs the same as a chat hour — and only the reserve moves
  * with the mission's length.
  */
@@ -37,7 +37,7 @@ export const MISSION_DEFAULT_MINUTES = 20;
 export const MISSION_HARD_MAX_MINUTES = 30;
 export const MISSION_MIN_MINUTES = 1;
 
-export const MISSION_DEW_PER_MINUTE = 0.05;
+export const MISSION_CREDIT_PER_MINUTE = 0.05;
 
 /** Two ticks with no action is a loop, not progress. */
 export const MISSION_STALL_AFTER_EMPTY_TICKS = 2;
@@ -55,7 +55,7 @@ export type MissionCaps = {
   outputBytes: number;
   foregroundMs: number;
   backgroundMs: number;
-  reserveDew: number;
+  reserveCredit: number;
   tickMs: number;
 };
 
@@ -75,18 +75,18 @@ export function missionMinutes(
   );
 }
 
-export function roundDew(value: number): number {
+export function roundCredit(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
 /** Reserved before the sandbox exists; the unused part settles back. */
-export function missionReserveDew(minutes: number): number {
+export function missionReserveCredit(minutes: number): number {
   const bounded = Math.min(
     MISSION_HARD_MAX_MINUTES,
     Math.max(MISSION_MIN_MINUTES, Math.trunc(minutes))
   );
 
-  return roundDew(bounded * MISSION_DEW_PER_MINUTE);
+  return roundCredit(bounded * MISSION_CREDIT_PER_MINUTE);
 }
 
 export function missionCaps(
@@ -102,7 +102,7 @@ export function missionCaps(
     outputBytes: MISSION_MAX_OUTPUT_BYTES,
     foregroundMs: MISSION_FOREGROUND_MS,
     backgroundMs: MISSION_BACKGROUND_MS,
-    reserveDew: missionReserveDew(minutes),
+    reserveCredit: missionReserveCredit(minutes),
     tickMs: MISSION_TICK_MS,
   };
 }
@@ -128,15 +128,15 @@ export function missionExpired(
 }
 
 /**
- * Dew owed for a mission that lasted `ms`, rounded up to a started minute and
+ * Credit owed for a mission that lasted `ms`, rounded up to a started minute and
  * never above the reservation. A mission that never started a sandbox costs
  * nothing, because nothing ran.
  */
 export function chargeMissionDuration(ms: number, minutes: number): number {
   if (!Number.isFinite(ms) || ms <= 0) return 0;
 
-  const charged = roundDew(Math.ceil(ms / 60_000) * MISSION_DEW_PER_MINUTE);
-  return Math.min(charged, missionReserveDew(minutes));
+  const charged = roundCredit(Math.ceil(ms / 60_000) * MISSION_CREDIT_PER_MINUTE);
+  return Math.min(charged, missionReserveCredit(minutes));
 }
 
 export function stalledAfter(emptyTicks: number): boolean {

@@ -1,10 +1,10 @@
 import { LegalPage, type LegalSection } from "@/components/LegalPage";
-import { DEW_PER_HOUR, DAILY_FREE_DEW, PAID_DAILY_FREE_DEW, TRIAL_DEW } from "@/lib/dew";
+import { CREDIT_PER_HOUR, DAILY_FREE_CREDIT, PAID_DAILY_FREE_CREDIT, TRIAL_CREDIT } from "@/lib/credits";
 
 export const metadata = {
   title: "Terms of Service — Openmi",
   description:
-    "The terms that govern your use of Openmi: accounts, GitHub access, billing in Dew, automatic changes, acceptable use, and liability.",
+    "The terms that govern your use of Openmi: accounts, GitHub access, billing in Credit, automatic changes, acceptable use, and liability.",
 };
 
 const LAST_UPDATED = "November 13, 2026";
@@ -105,25 +105,25 @@ const SECTIONS: LegalSection[] = [
   },
   {
     id: "billing",
-    title: "7. Dew, plans, refunds and cancellation",
+    title: "7. Credit, plans, refunds and cancellation",
     blocks: [
       {
         kind: "p",
-        text: `Chat is billed in Dew. Each model has an hourly price, shown before you send; DeepSeek Flash is ${DEW_PER_HOUR} Dew per hour and Auto is free. The hour is charged before the model provider is called, and further turns inside that hour are included. Every charge, grant and correction is written to an append-only ledger you can read on the activity page.`,
+        text: `Chat is billed in Credit. Each model has an hourly price, shown before you send; DeepSeek Flash is ${CREDIT_PER_HOUR} Credit per hour and Auto is free. The hour is charged before the model provider is called, and further turns inside that hour are included. Every charge, grant and correction is written to an append-only ledger you can read on the activity page.`,
       },
       {
         kind: "p",
-        text: `A daily allowance is granted once per local day: ${DAILY_FREE_DEW} Dew on the free tier, and ${PAID_DAILY_FREE_DEW} Dew while a paid plan is active. A trial credit of ${TRIAL_DEW} Dew is granted once per account, with at most one trial per address in any 24-hour period. An invite rewards the inviter and the invited account 5 Dew each, up to 10 rewarded accounts per inviter.`,
+        text: `A daily allowance is granted once per local day: ${DAILY_FREE_CREDIT} Credit on the free tier, and ${PAID_DAILY_FREE_CREDIT} Credit while a paid plan is active. A trial credit of ${TRIAL_CREDIT} Credit is granted once per account, with at most one trial per address in any 24-hour period. An invite rewards the inviter and the invited account 5 Credit each, up to 10 rewarded accounts per inviter.`,
       },
       {
         kind: "list",
         items: [
           "Paid plans are sold through a hosted payment page operated by Sociabuzz. We never receive or store card details.",
-          "A plan becomes active when a receipt you upload is approved. A redeem code issued by an operator adds Dew only; it does not start or extend a pass.",
-          "All sales are final. Dew, plans and passes are non-refundable and cannot be cancelled, exchanged or credited — including for unused Dew, unused time on a pass, a change of mind, or an account you stop using. The refunds and cancellation policy published at /refunds forms part of these terms.",
+          "A plan becomes active when a receipt you upload is approved. A redeem code issued by an operator adds Credit only; it does not start or extend a pass.",
+          "All sales are final. Credit, plans and passes are non-refundable and cannot be cancelled, exchanged or credited — including for unused Credit, unused time on a pass, a change of mind, or an account you stop using. The refunds and cancellation policy published at /refunds forms part of these terms.",
           "A pass runs for the number of days shown at purchase and ends by itself; it does not renew automatically, so there is nothing to cancel. Closing your account does not refund an unexpired pass or an unspent balance.",
           "If the model provider returns no answer for an hour at all, that hour is released back to your balance automatically. The release is how the meter is corrected; it is not a discretionary refund. Stopping after text has arrived, reaching a time or step limit, or pausing a turn keeps the hour charged, because the work is kept and the turn can continue.",
-          "Dew has no cash value, is not transferable, and may not be resold. A balance is a licence to use the service, not a deposit, and it is not redeemable for money.",
+          "Credit has no cash value, is not transferable, and may not be resold. A balance is a licence to use the service, not a deposit, and it is not redeemable for money.",
           "Prices and allowances may change. A change applies to hours started after it is announced in the product.",
         ],
       },

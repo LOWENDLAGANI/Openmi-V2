@@ -9,7 +9,7 @@ import {
   MISSION_MAX_COMMANDS,
   MISSION_WORKDIR,
   missionDeadline,
-  missionReserveDew,
+  missionReserveCredit,
   type MissionAutonomy,
 } from "./budget";
 import type { MissionCommandRow, MissionRow } from "./status";
@@ -29,7 +29,7 @@ import type { MissionCommandRow, MissionRow } from "./status";
 type Admin = NonNullable<ReturnType<typeof supabaseAdmin>>;
 
 const MISSION_COLUMNS =
-  "id, owner, chat_id, status, stage, goal, autonomy, model, repo_full_name, base_sha, failure_code, failure_detail, sandbox_id, commands_count, changed_files, diff_bytes, reserved_dew, charged_dew, started_at, deadline_at, last_tick_at, ended_at, heartbeat_at, result_changeset_id";
+  "id, owner, chat_id, status, stage, goal, autonomy, model, repo_full_name, base_sha, failure_code, failure_detail, sandbox_id, commands_count, changed_files, diff_bytes, reserved_credit, charged_credit, started_at, deadline_at, last_tick_at, ended_at, heartbeat_at, result_changeset_id";
 
 function toMission(row: Record<string, unknown>): MissionRow {
   return {
@@ -49,8 +49,8 @@ function toMission(row: Record<string, unknown>): MissionRow {
     commands_count: Number(row.commands_count ?? 0),
     changed_files: row.changed_files === null ? null : Number(row.changed_files),
     diff_bytes: row.diff_bytes === null ? null : Number(row.diff_bytes),
-    reserved_dew: Number(row.reserved_dew ?? 0),
-    charged_dew: Number(row.charged_dew ?? 0),
+    reserved_credit: Number(row.reserved_credit ?? 0),
+    charged_credit: Number(row.charged_credit ?? 0),
     started_at: String(row.started_at),
     deadline_at: row.deadline_at ? String(row.deadline_at) : null,
     last_tick_at: row.last_tick_at ? String(row.last_tick_at) : null,
@@ -90,7 +90,7 @@ export async function createMissionRun(
     base_sha: input.baseSha,
     status: "queued",
     stage: "provision",
-    reserved_dew: missionReserveDew(input.minutes),
+    reserved_credit: missionReserveCredit(input.minutes),
     deadline_at: missionDeadline(input.startedAt, input.minutes),
     heartbeat_at: new Date().toISOString(),
   });
@@ -144,7 +144,7 @@ export async function updateMission(
     result_changeset_id?: string | null;
     last_tick_at?: string | null;
     ended_at?: string | null;
-    charged_dew?: number;
+    charged_credit?: number;
     commands_count?: number;
   },
   options: { onlyWhileLive?: boolean } = {}

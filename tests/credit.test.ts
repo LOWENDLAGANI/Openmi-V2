@@ -2,29 +2,29 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import {
-  DAILY_FREE_DEW,
-  DEW_DUST_FLOOR,
-  DEW_PER_HOUR,
-  DEW_PRECISION,
+  DAILY_FREE_CREDIT,
+  CREDIT_DUST_FLOOR,
+  CREDIT_PER_HOUR,
+  CREDIT_PRECISION,
   HOUR_SESSION_MS,
-  INVITE_REWARD_DEW,
-  LOW_BALANCE_DEW,
+  INVITE_REWARD_CREDIT,
+  LOW_BALANCE_CREDIT,
   MAX_INVITES_PER_ACCOUNT,
-  PAID_DAILY_FREE_DEW,
+  PAID_DAILY_FREE_CREDIT,
   TIMEZONES,
-  TRIAL_DEW,
+  TRIAL_CREDIT,
   TRIAL_GRANT_MAX_PER_IP,
   TRIAL_GRANT_WINDOW_HOURS,
   dailyAllowance,
-  formatDew,
+  formatCredit,
   formatHourRemaining,
   formatPassDate,
   formatPassRemaining,
   hourRemainingMs,
   isLowBalance,
   normalizeTimezone,
-  roundDew,
-} from "../lib/dew";
+  roundCredit,
+} from "../lib/credits";
 import { MODELS } from "../lib/models";
 
 const README = readFileSync(new URL("../README.md", import.meta.url), "utf8");
@@ -35,16 +35,16 @@ function documented(label: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-test("the documented Dew numbers are the exported constants", () => {
-  expect(DEW_PER_HOUR).toBe(3);
+test("the documented Credit numbers are the exported constants", () => {
+  expect(CREDIT_PER_HOUR).toBe(3);
   expect(HOUR_SESSION_MS).toBe(3_600_000);
-  expect(DAILY_FREE_DEW).toBe(6);
-  expect(PAID_DAILY_FREE_DEW).toBe(15);
-  expect(TRIAL_DEW).toBe(5);
-  expect(DEW_PRECISION).toBe(3);
-  expect(DEW_DUST_FLOOR).toBe(0.05);
-  expect(LOW_BALANCE_DEW).toBe(10);
-  expect(INVITE_REWARD_DEW).toBe(5);
+  expect(DAILY_FREE_CREDIT).toBe(6);
+  expect(PAID_DAILY_FREE_CREDIT).toBe(15);
+  expect(TRIAL_CREDIT).toBe(5);
+  expect(CREDIT_PRECISION).toBe(3);
+  expect(CREDIT_DUST_FLOOR).toBe(0.05);
+  expect(LOW_BALANCE_CREDIT).toBe(10);
+  expect(INVITE_REWARD_CREDIT).toBe(5);
   expect(MAX_INVITES_PER_ACCOUNT).toBe(10);
 });
 
@@ -60,10 +60,10 @@ test("an hour is priced per model, and the database agrees with the catalogue", 
   for (const model of MODELS) {
     // The same number in both places, or the picker advertises a price the
     // charge does not use.
-    expect(migration).toContain(`when '${model.id}' then ${model.dewPerHour}::numeric`);
+    expect(migration).toContain(`when '${model.id}' then ${model.creditPerHour}::numeric`);
     // Auto is the one free hour; every other catalogue entry charges the
     // documented price.
-    expect(model.dewPerHour).toBe(model.id === "auto" ? 0 : DEW_PER_HOUR);
+    expect(model.creditPerHour).toBe(model.id === "auto" ? 0 : CREDIT_PER_HOUR);
   }
 });
 
@@ -76,13 +76,15 @@ test("the trial grant is one address per day, and the database agrees", () => {
     "utf8"
   );
 
-  expect(migration).toContain(`v_amount numeric := ${TRIAL_DEW}`);
+  expect(migration).toContain(`v_amount numeric := ${TRIAL_CREDIT}`);
   expect(migration).toContain(`if v_recent >= ${TRIAL_GRANT_MAX_PER_IP} then`);
   expect(migration).toContain(`interval '${TRIAL_GRANT_WINDOW_HOURS} hours'`);
 
   // Signup no longer writes the trial row; only the first request does.
   const trigger = migration.slice(
     migration.indexOf("create or replace function public.handle_new_user"),
+    // The historical migration names the function `grant_trial_dew`; 053
+    // renames it, which is why the text still reads the old name.
     migration.indexOf("create or replace function public.grant_trial_dew")
   );
 
@@ -97,27 +99,27 @@ test("the deployed refill allowance matches the constants", () => {
   );
 
   expect(migration).toContain(
-    `case when v_paid then ${PAID_DAILY_FREE_DEW} else ${DAILY_FREE_DEW} end`
+    `case when v_paid then ${PAID_DAILY_FREE_CREDIT} else ${DAILY_FREE_CREDIT} end`
   );
   expect(migration).toContain("(now() at time zone coalesce(v_tz, 'UTC'))::date");
 });
 
 test("the README table agrees with every constant", () => {
-  expect(documented("Hour price")).toBe(String(DEW_PER_HOUR));
-  expect(documented("Daily free allowance")).toBe(String(DAILY_FREE_DEW));
-  expect(documented("Paid daily allowance")).toBe(String(PAID_DAILY_FREE_DEW));
-  expect(documented("Trial credit")).toBe(String(TRIAL_DEW));
-  expect(documented("Low-balance warning")).toBe(String(LOW_BALANCE_DEW));
-  expect(documented("Precision (decimals)")).toBe(String(DEW_PRECISION));
-  expect(documented("Dust floor")).toBe(String(DEW_DUST_FLOOR));
+  expect(documented("Hour price")).toBe(String(CREDIT_PER_HOUR));
+  expect(documented("Daily free allowance")).toBe(String(DAILY_FREE_CREDIT));
+  expect(documented("Paid daily allowance")).toBe(String(PAID_DAILY_FREE_CREDIT));
+  expect(documented("Trial credit")).toBe(String(TRIAL_CREDIT));
+  expect(documented("Low-balance warning")).toBe(String(LOW_BALANCE_CREDIT));
+  expect(documented("Precision (decimals)")).toBe(String(CREDIT_PRECISION));
+  expect(documented("Dust floor")).toBe(String(CREDIT_DUST_FLOOR));
 });
 
-test("Dew is kept to three decimals and displayed without trailing zeros", () => {
-  expect(roundDew(1.23456)).toBe(1.235);
-  expect(formatDew(10)).toBe("10");
-  expect(formatDew(2.5)).toBe("2.5");
-  expect(formatDew(0.05)).toBe("0.05");
-  expect(formatDew(0)).toBe("0");
+test("Credit is kept to three decimals and displayed without trailing zeros", () => {
+  expect(roundCredit(1.23456)).toBe(1.235);
+  expect(formatCredit(10)).toBe("10");
+  expect(formatCredit(2.5)).toBe("2.5");
+  expect(formatCredit(0.05)).toBe("0.05");
+  expect(formatCredit(0)).toBe("0");
 });
 
 test("the low-balance state is a named threshold", () => {
@@ -127,8 +129,8 @@ test("the low-balance state is a named threshold", () => {
 });
 
 test("the daily allowance depends on whether the account has paid", () => {
-  expect(dailyAllowance(false)).toBe(DAILY_FREE_DEW);
-  expect(dailyAllowance(true)).toBe(PAID_DAILY_FREE_DEW);
+  expect(dailyAllowance(false)).toBe(DAILY_FREE_CREDIT);
+  expect(dailyAllowance(true)).toBe(PAID_DAILY_FREE_CREDIT);
 });
 
 test("the pass countdown says how long is left before the free tier returns", () => {
@@ -178,7 +180,7 @@ test("the paid benefits are the ones advertised", () => {
   expect(plans).toContain("export const PAID_BENEFITS = [");
   // The allowance is a constant the daily refill implements, not a number typed
   // into the copy: the two lines below cannot drift apart.
-  expect(plans).toContain(`${PAID_DAILY_FREE_DEW} Dew a day instead of ${DAILY_FREE_DEW}`);
+  expect(plans).toContain(`${PAID_DAILY_FREE_CREDIT} Credit a day instead of ${DAILY_FREE_CREDIT}`);
   // Paid accounts get the free tier as well; nothing here promises a support
   // channel or any other benefit the app does not implement.
   expect(plans).toContain("Everything the free tier includes");
@@ -226,7 +228,7 @@ test("the hour clock measures from the server and never promises more than an ho
 test("the charge gate runs before any provider request", () => {
   const route = readFileSync(new URL("../app/api/chat/route.ts", import.meta.url), "utf8");
 
-  const gate = route.indexOf("await startDewSession(");
+  const gate = route.indexOf("await startCreditSession(");
   const providerReady = route.indexOf("if (!providersConfigured())");
   const queued = route.indexOf("createRun(admin");
 

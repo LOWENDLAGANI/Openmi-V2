@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Beam } from "@/components/Beam";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { DAILY_FREE_DEW, DEW_PER_HOUR } from "@/lib/dew";
+import { DAILY_FREE_CREDIT, CREDIT_PER_HOUR } from "@/lib/credits";
 import { getSession } from "@/lib/session";
 import { supportMailto } from "@/lib/support";
 
@@ -87,13 +87,13 @@ export default async function HomePage() {
               <div className="flex items-baseline gap-2">
                 <dt className="text-low">Hour of work</dt>
                 <dd className="font-medium tabular-nums text-hi">
-                  {DEW_PER_HOUR} Dew
+                  {CREDIT_PER_HOUR} Credit
                 </dd>
               </div>
               <div className="flex items-baseline gap-2">
                 <dt className="text-low">Free every day</dt>
                 <dd className="font-medium tabular-nums text-hi">
-                  {DAILY_FREE_DEW} Dew
+                  {DAILY_FREE_CREDIT} Credit
                 </dd>
               </div>
             </dl>

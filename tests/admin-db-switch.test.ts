@@ -118,7 +118,7 @@ test("switching it off makes a valid admin token worth nothing in the database",
 
   // An admin RPC called straight against PostgREST refuses.
   await actAs(ADMIN);
-  await expect(db.query("select * from public.admin_list_dew_codes(5)")).rejects.toThrow(
+  await expect(db.query("select * from public.admin_list_credit_codes(5)")).rejects.toThrow(
     /admin/i
   );
 });
@@ -136,7 +136,7 @@ test("switching it back on restores the panel and the RPCs", async () => {
   await db.query("select public.admin_set_disabled(false)");
 
   await actAs(ADMIN);
-  const codes = await db.query("select * from public.admin_list_dew_codes(5)");
+  const codes = await db.query("select * from public.admin_list_credit_codes(5)");
 
   expect(codes.rows).toEqual([]);
   await db.exec("reset role");

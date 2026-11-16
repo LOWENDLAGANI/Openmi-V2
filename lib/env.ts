@@ -269,7 +269,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "How long one mission may run",
-    hint: "Defaults to 20, clamped to 1..30; the Dew reserve is minutes × 0.05",
+    hint: "Defaults to 20, clamped to 1..30; the Credit reserve is minutes × 0.05",
   },
   {
     key: "CHAT_SANDBOX_ENABLED",

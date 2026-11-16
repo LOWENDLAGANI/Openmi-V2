@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { settleExecutionDew } from "@/lib/dew/store";
+import { settleExecutionCredit } from "@/lib/credits/store";
 import { chargeForDuration } from "@/lib/execution/cost";
 import { isTerminal } from "@/lib/execution/status";
 import { readRunForOwner } from "@/lib/execution/store";
@@ -63,7 +63,7 @@ export async function DELETE(
   const elapsed = Math.max(0, Date.now() - new Date(run.started_at).getTime());
   const charged = run.sandbox_id ? chargeForDuration(elapsed) : 0;
 
-  const settlement = await settleExecutionDew(
+  const settlement = await settleExecutionCredit(
     admin,
     session.user.id,
     id,
@@ -72,7 +72,7 @@ export async function DELETE(
 
   // A settlement that could not be written is reported as zero rather than as
   // a charge the ledger does not contain.
-  const settledDew = settlement.ok ? charged : 0;
+  const settledCredit = settlement.ok ? charged : 0;
 
   await admin
     .from("execution_runs")
@@ -80,7 +80,7 @@ export async function DELETE(
       status: "cancelled",
       ended_at: new Date().toISOString(),
       duration_ms: elapsed,
-      charged_dew: settledDew,
+      charged_credit: settledCredit,
       failure_code: null,
       failure_detail: null,
     })
@@ -88,5 +88,5 @@ export async function DELETE(
     .eq("owner", session.user.id)
     .in("status", ["queued", "running"]);
 
-  return NextResponse.json({ cancelled: true, chargedDew: settledDew });
+  return NextResponse.json({ cancelled: true, chargedCredit: settledCredit });
 }

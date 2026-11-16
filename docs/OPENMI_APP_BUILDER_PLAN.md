@@ -69,7 +69,7 @@ The loop, from its own documentation:
 | Visual editing | select/edit/annotate | no | **no** |
 | Two-way sync | yes | eject | **no** — pinned commit, no pull-back |
 | Per-message checkpoint | yes | git | **only changeset-level revert** |
-| Billing | credits | ad-funded | Dew per hour + per sandbox minute |
+| Billing | credits | ad-funded | Credit per hour + per sandbox minute |
 
 The pattern is clear: Openmi has the **rigour** layer that neither competitor
 advertises (signed artefacts, refusal of the default branch, exit codes as the
@@ -110,8 +110,8 @@ therefore a leak, not a feature.
    wakes the box instead of failing.
 
 **Cost consequence, must be priced before shipping:** a preview keeps the box
-warm, and E2B bills running compute. Either the preview is Dew-per-minute
-(`MISSION_DEW_PER_MINUTE = 0.05` is the existing rate) or it stops after a short
+warm, and E2B bills running compute. Either the preview is Credit-per-minute
+(`MISSION_CREDIT_PER_MINUTE = 0.05` is the existing rate) or it stops after a short
 idle window with a visible "preview stopped" state. Do not ship an always-on
 preview on an hourly chat price.
 
@@ -204,7 +204,7 @@ technical one — take it only if Openmi should compete for the no-repo user.
 - **"Verified" marketing.** Lovable's self-repair is explicitly probabilistic and
   its publish scan does not block. Openmi's one durable advantage is that a card
   says only what exited 0 — do not spend it on a badge.
-- **Credit pricing theatre.** Dew is already hourly plus sandbox minutes; a
+- **Credit pricing theatre.** Credit is already hourly plus sandbox minutes; a
   preview must be priced explicitly, not hidden in "credits".
 
 ## 7. Risks
@@ -212,7 +212,7 @@ technical one — take it only if Openmi should compete for the no-repo user.
 | Risk | Consequence | Mitigation |
 |---|---|---|
 | Public E2B URL leaks | anyone runs code in the user's box while it lives | same-origin proxy, `allowPublicTraffic: false`, token server-side |
-| Preview keeps billing | an idle tab costs Dew | idle stop, visible state, per-minute pricing |
+| Preview keeps billing | an idle tab costs Credit | idle stop, visible state, per-minute pricing |
 | WebSocket/HMR cannot be proxied by a route handler | preview without hot reload | polling reload first; dedicated proxy later |
 | A published app is mistaken for the repo state | false claim | "published snapshot" wording, republish required |
 | Scaffolding drifts into a second write path | two ways to change GitHub | scaffold creates a repo, then the existing changeset path only |

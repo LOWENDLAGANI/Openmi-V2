@@ -11,7 +11,7 @@
  * code change, and it still never reaches the browser's routing logic.
  */
 
-import { DEW_PER_HOUR } from "./dew";
+import { CREDIT_PER_HOUR } from "./credits";
 
 export type ModelId = string;
 
@@ -63,10 +63,10 @@ export type ModelCapability = {
    *
    * The hour is charged before the provider is called and belongs to the model
    * that was chosen, so the price belongs to the model too. The number here and
-   * `model_hour_dew` in the database are the same decision, and a test reads
+   * `model_hour_credit` in the database are the same decision, and a test reads
    * both.
    */
-  dewPerHour: number;
+  creditPerHour: number;
   /** Filled in on the server: is a key for this model's provider configured? */
   available?: boolean;
 };
@@ -83,9 +83,9 @@ export const MODELS: ModelCapability[] = [
     images: false,
     documents: false,
     // Auto answers with free models, so its hour is free: the picker shows 0
-    // and `model_hour_dew('auto')` in the database agrees. Free is a price,
+    // and `model_hour_credit('auto')` in the database agrees. Free is a price,
     // not an exemption — the hour still starts and still scopes the chat.
-    dewPerHour: 0,
+    creditPerHour: 0,
   },
   {
     id: "deepseek-flash",
@@ -94,8 +94,8 @@ export const MODELS: ModelCapability[] = [
     blurb: "DeepSeek's fast model, and the only DeepSeek model offered here.",
     images: false,
     documents: false,
-    // The catalogue's priced model, and what `DEW_PER_HOUR` documents.
-    dewPerHour: 3,
+    // The catalogue's priced model, and what `CREDIT_PER_HOUR` documents.
+    creditPerHour: 3,
   },
   {
     id: "claude-haiku",
@@ -106,7 +106,7 @@ export const MODELS: ModelCapability[] = [
     documents: false,
     // Premium access is an entitlement, not a different price: the hour costs
     // what every other named model costs.
-    dewPerHour: 3,
+    creditPerHour: 3,
     paidOnly: true,
   },
   {
@@ -118,7 +118,7 @@ export const MODELS: ModelCapability[] = [
     documents: false,
     // The generic hour: the database prices an unlisted id the same way, so this
     // is documentation as much as a number.
-    dewPerHour: 3,
+    creditPerHour: 3,
     adminOnly: true,
   },
 ];
@@ -155,11 +155,11 @@ export function modelName(
  * An unknown id is charged the catalogue default rather than nothing: a price
  * the picker cannot find must never become a free hour.
  */
-export function modelHourDew(
+export function modelHourCredit(
   id: ModelId,
   catalogue: readonly ModelCapability[] = MODELS
 ): number {
-  return catalogue.find((model) => model.id === id)?.dewPerHour ?? DEW_PER_HOUR;
+  return catalogue.find((model) => model.id === id)?.creditPerHour ?? CREDIT_PER_HOUR;
 }
 
 /** True when this model is reserved for an operator account. */

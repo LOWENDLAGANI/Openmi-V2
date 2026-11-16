@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { MOTION_EASE, useReducedMotion } from "@/components/Motion";
 import { gsap } from "gsap";
-import { formatDew } from "@/lib/dew";
+import { formatCredit } from "@/lib/credits";
 
 /**
  * The confirmation a new chat's first message asks for: one hour, charged once.
@@ -100,8 +100,8 @@ export function ChargeDialog({
         </h2>
 
         <p className="mt-2 text-[11.5px] leading-relaxed text-mid">
-          {formatDew(balance)} Dew balance
-          {wallet > 0 ? ` · ${formatDew(wallet)} Dew wallet` : ""}
+          {formatCredit(balance)} Credit balance
+          {wallet > 0 ? ` · ${formatCredit(wallet)} Credit wallet` : ""}
         </p>
 
         {canStart ? (
@@ -123,20 +123,20 @@ export function ChargeDialog({
                 )}
               </span>
               <span className="font-mono text-[12px] text-accent-text">
-                {formatDew(hourPrice)} Dew
+                {formatCredit(hourPrice)} Credit
               </span>
             </button>
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3">
             <p className="text-[11.5px] leading-relaxed text-warn">
-              Not enough Dew.
+              Not enough Credit.
             </p>
             <Link
               href="/pay"
               className="btn mt-2 px-3 py-1.5 text-[11.5px]"
             >
-              Dew wallet
+              Credit wallet
             </Link>
           </div>
         )}

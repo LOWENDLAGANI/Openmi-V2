@@ -7,30 +7,30 @@ import { EndHourButton } from "@/components/EndHourButton";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
-  DEW_PER_HOUR,
-  INVITE_REWARD_DEW,
-  LOW_BALANCE_DEW,
+  CREDIT_PER_HOUR,
+  INVITE_REWARD_CREDIT,
+  LOW_BALANCE_CREDIT,
   MAX_INVITES_PER_ACCOUNT,
   TIMEZONES,
   dailyAllowance,
-  formatDew,
+  formatCredit,
   formatPassDate,
   formatPassRemaining,
   isLowBalance,
-} from "@/lib/dew";
-import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
+} from "@/lib/credits";
+import { readCreditProfile, refillDailyCredit } from "@/lib/credits/store";
 import { getSession } from "@/lib/session";
 import { redeemCode, saveTimezone } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Dew & activity — Openmi",
+  title: "Credit & activity — Openmi",
 };
 
 const KIND_LABEL: Record<string, string> = {
   trial: "Trial credit",
-  daily: "Daily free Dew",
+  daily: "Daily free Credit",
   session: "Hour session",
   refund: "Refund",
   invite: "Invite reward",
@@ -93,9 +93,9 @@ export default async function ActivityPage({
 
   // Settle the local day before reading, so the balance shown is the balance
   // the next turn will use.
-  await refillDailyDew(supabase);
+  await refillDailyCredit(supabase);
 
-  const profile = await readDewProfile(supabase, user.id);
+  const profile = await readCreditProfile(supabase, user.id);
 
   if (!profile) {
     redirect("/chat?error=Profile%20missing%20for%20this%20account");
@@ -104,7 +104,7 @@ export default async function ActivityPage({
   const [ledgerResult, sessionResult, inviteCountResult, chatsResult, messagesResult] =
     await Promise.all([
       supabase
-        .from("dew_transactions")
+        .from("credit_transactions")
         .select("id, kind, amount, balance_after, reference, created_at")
         .order("created_at", { ascending: false })
         .limit(50),
@@ -167,7 +167,7 @@ export default async function ActivityPage({
           </Link>
           <span aria-hidden="true" className="h-4 w-px bg-line-strong" />
           <div>
-            <p className="eyebrow">dew</p>
+            <p className="eyebrow">credit</p>
             <h1 className="text-[17px] font-semibold tracking-[-0.02em] text-hi">
               Balance &amp; activity
             </h1>
@@ -209,14 +209,14 @@ export default async function ActivityPage({
             isLowBalance(profile.balance) ? "text-warn" : "text-hi"
           }`}
         >
-          {formatDew(profile.balance)}{" "}
+          {formatCredit(profile.balance)}{" "}
           <span className="text-[0.42em] font-medium uppercase tracking-[0.08em] text-low">
-            dew
+            credit
           </span>
         </p>
         <p className="mt-3 text-[12.5px] leading-relaxed text-mid">
-          An hour costs {DEW_PER_HOUR} Dew; Auto is free. The daily allowance is{" "}
-          {dailyAllowance(profile.paidActive)} Dew, refilled at midnight in{" "}
+          An hour costs {CREDIT_PER_HOUR} Credit; Auto is free. The daily allowance is{" "}
+          {dailyAllowance(profile.paidActive)} Credit, refilled at midnight in{" "}
           {profile.timezone}.
         </p>
 
@@ -250,7 +250,7 @@ export default async function ActivityPage({
             Invite
           </h2>
           <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-            Share this code at sign-up. Both sides get {INVITE_REWARD_DEW} Dew,
+            Share this code at sign-up. Both sides get {INVITE_REWARD_CREDIT} Credit,
             once per account, up to {MAX_INVITES_PER_ACCOUNT} rewarded accounts.
           </p>
           <p className="mt-3 rounded-2xl bg-canvas px-4 py-2.5 font-mono text-[15px] tracking-[0.14em] text-hi">
@@ -268,7 +268,7 @@ export default async function ActivityPage({
                   <li key={row.id} className="flex justify-between gap-3 font-mono">
                     <span>{utc(row.created_at)}</span>
                     <span className="text-accent-text">
-                      +{formatDew(Number(row.amount))}
+                      +{formatCredit(Number(row.amount))}
                     </span>
                   </li>
                 ))}
@@ -288,7 +288,7 @@ export default async function ActivityPage({
 
         {ledger.length === 0 ? (
           <p className="px-5 pb-5 text-[12px] text-mid">
-            No Dew activity yet. Trial credit appears after your first message.
+            No Credit activity yet. Trial credit appears after your first message.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -318,10 +318,10 @@ export default async function ActivityPage({
                         }`}
                       >
                         {amount > 0 ? "+" : ""}
-                        {formatDew(amount)}
+                        {formatCredit(amount)}
                       </td>
                       <td className="text-right font-mono text-mid">
-                        {formatDew(Number(row.balance_after))}
+                        {formatCredit(Number(row.balance_after))}
                       </td>
                       <td className="max-w-[180px] truncate pl-3 pr-5 font-mono text-[10.5px] text-low">
                         {row.reference ?? "—"}
@@ -341,7 +341,7 @@ export default async function ActivityPage({
             Recent per-chat usage
           </h2>
           <p className="text-[10.5px] text-low">
-            Last 1,000 messages. Dew is charged per hour, not per token.
+            Last 1,000 messages. Credit is charged per hour, not per token.
           </p>
         </div>
 

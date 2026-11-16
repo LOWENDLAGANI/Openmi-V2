@@ -30,6 +30,10 @@ const LEDGER = readFileSync(
   new URL("../supabase/migrations/009_setup.sql", import.meta.url),
   "utf8"
 );
+const CREDIT_MIGRATION = readFileSync(
+  new URL("../supabase/migrations/053_dew_to_credit.sql", import.meta.url),
+  "utf8"
+);
 const README = readFileSync(new URL("../README.md", import.meta.url), "utf8");
 
 test("reformatting a migration is not drift, editing a statement is", () => {
@@ -133,12 +137,13 @@ test("the ledger function is service-role only", () => {
   expect(LEDGER).not.toMatch(
     /grant execute on function public\.openmi_migration_ledger\(\) to (anon|authenticated)/
   );
-  expect(LEDGER).toContain("operator_adjust_dew");
+  // The operator correction function is granted where its name last changed.
+  expect(CREDIT_MIGRATION).toContain("operator_adjust_credit");
 });
 
 test("the about page claims no verification the product does not perform", () => {
   expect(ABOUT).toContain("AGENT_BRANCH_PREFIX");
-  expect(ABOUT).toContain("DEW_PER_HOUR");
+  expect(ABOUT).toContain("CREDIT_PER_HOUR");
   expect(ABOUT).toContain("does not run");
   expect(ABOUT.toLowerCase()).not.toContain("tests passed");
   expect(ABOUT.toLowerCase()).not.toContain("build passed");

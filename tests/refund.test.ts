@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { refundReasonFor } from "../lib/dew/refund";
+import { refundReasonFor } from "../lib/credits/refund";
 
 test("a failed turn with no answer is refunded", () => {
   expect(refundReasonFor({ textLength: 0, stopped: "error" })).toContain("provider failed");
@@ -43,7 +43,7 @@ test("the worker refunds through the shared decision, against the charged hour",
   // The run settles out of band, so the refund belongs to the loop and the
   // request only hands over the session it charged.
   expect(loop.split("refundReasonFor(").length - 1).toBe(1);
-  expect(loop).toContain("refundDewSession(");
+  expect(loop).toContain("refundCreditSession(");
   expect(route).not.toContain("refundReasonFor(");
-  expect(route).toContain("dewSessionId: dew.session.sessionId");
+  expect(route).toContain("creditSessionId: credit.session.sessionId");
 });

@@ -89,7 +89,7 @@ export const RUN_DAILY_TOKENS = 400_000;
 
 /**
  * A price per token, only so a run's cost can be charted. It is an estimate for
- * the operator's own dashboard, never a charge: Dew remains the billing unit.
+ * the operator's own dashboard, never a charge: Credit remains the billing unit.
  */
 export const RUN_COST_PER_INPUT_TOKEN_USD = 0.15 / 1_000_000;
 export const RUN_COST_PER_OUTPUT_TOKEN_USD = 0.6 / 1_000_000;

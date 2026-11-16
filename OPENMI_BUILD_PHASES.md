@@ -23,7 +23,7 @@
 13. [Phase 4 — Repo agent](#13-phase-4--repo-agent)
 14. [Phase 5 — Changesets and review](#14-phase-5--changesets-and-review)
 15. [Phase 6 — Approval, branch, pull request](#15-phase-6--approval-branch-pull-request)
-16. [Phase 7 — Dew billing](#16-phase-7--dew-billing)
+16. [Phase 7 — Credit billing](#16-phase-7--credit-billing)
 17. [Phase 8 — Setup and about truth surface](#17-phase-8--setup-and-about-truth-surface)
 18. [Phase 9 — Hardening and launch](#18-phase-9--hardening-and-launch)
 19. [Phase 10 — Execution (gated, not v1)](#19-phase-10--execution-gated-not-v1)
@@ -152,7 +152,7 @@ Migrations live in `supabase/migrations/` and are applied with `supabase db push
 | `004_chat.sql` | 3 | `append_message()` — per-chat sequence, first-message title |
 | `005_agent.sql` | 4 | `agent_turns`, `consume_agent_step()` |
 | `006_changesets.sql` | 5 | `changesets`, `changeset_files` |
-| `007_dew.sql` | 7 | `hour_sessions`, `dew_transactions`, `invites`, `start_hour_session()`, `refund_hour()` |
+| `007_credit.sql` | 7 | `hour_sessions`, `credit_transactions`, `invites`, `start_hour_session()`, `refund_hour()` |
 | `008_rls.sql` | 1–7, extended per phase | all policies + `revoke all from anon, authenticated` where it moves money or identity |
 | `009_rate_limit.sql` | 9 | `rate_limits`, `rate_limit_hit(bucket, window_start, max)` |
 
@@ -162,7 +162,7 @@ Migrations live in `supabase/migrations/` and are applied with `supabase db push
 - `github_connections.token_sealed` is AES-256-GCM under `GITHUB_TOKEN_KEY`, format `v1.<iv>.<tag>.<ciphertext>`. Only the last four characters of the token are ever returned to the browser.
 - `changesets` stores `base_sha`, `branch`, `title`, `summary`, `status`, `content_hash`, `signature`, `pr_url`, `pr_number`, `commit_sha`.
 - `hour_sessions(owner uuid primary key, model text, repo text, started_at, expires_at)` — no surrogate key, deliberately.
-- `dew_transactions` is an append-only ledger: `(id, owner, delta, kind, reason, ref, created_at)`. Balance is derived, with a cached column updated in the same transaction.
+- `credit_transactions` is an append-only ledger: `(id, owner, delta, kind, reason, ref, created_at)`. Balance is derived, with a cached column updated in the same transaction.
 
 ---
 
@@ -187,7 +187,7 @@ P0 foundation
 | **P4** | Repo agent | 5 | P3 | Replayed turn rejected; cap message truthful; no tool writes |
 | **P5** | Changesets and review | 5 | P4 | Signature breaks on content change, survives a status change |
 | **P6** | Approval, branch, PR | 5 | P5 | Commit-refusal test green; PR only from approval; default branch untouched |
-| **P7** | Dew billing | 8 | P3 | Concurrent start impossible; exactly 3 Dew/hour; ledger sums to balance |
+| **P7** | Credit billing | 8 | P3 | Concurrent start impossible; exactly 3 Credit/hour; ledger sums to balance |
 | **P8** | Setup and about | 4 | P0, P7 | `/setup` accurate at zero config and at full config |
 | **P9** | Hardening and launch | 6 | P6, P7, P8 | RLS audit green; contrast gate green; smoke tests pass |
 | **P10** | Execution (gated) | 4+ | P9, §21 D6 | Review card can truthfully say "tests passed" |
@@ -223,7 +223,7 @@ P0 foundation
 | **P1-T1** | `001_profiles.sql`: `profiles(id → auth.users, handle, timezone, created_at)` + insert trigger | Signup creates exactly one profile row |
 | **P1-T2** | Email + password signup/signin via Supabase Auth, `/auth/callback`, sign-out; cookie session through `@supabase/ssr` | Signed-out `/chat` → `/login?next=/chat`; signed-in stays |
 | **P1-T3** | `middleware.ts`: cookie-presence gate for `/chat`, `/settings`, `/activity` — presence only, no authorization decision | Clearing cookies redirects; RLS still refuses data on a forged cookie |
-| **P1-T4** | App shell: sidebar, header, user menu, Dew chip placeholder, responsive breakpoints, focus and reduced-motion support | Renders at 360px and 1440px; keyboard reaches every control |
+| **P1-T4** | App shell: sidebar, header, user menu, Credit chip placeholder, responsive breakpoints, focus and reduced-motion support | Renders at 360px and 1440px; keyboard reaches every control |
 | **P1-T5** | `002_chats.sql`: `folders`, `chats` (with `folder_id`, `deleted_at`); RLS on both; sidebar CRUD | Forked request with another user's id returns zero rows, not another user's row |
 | **P1-T6** | Trash: soft delete, restore, purge-forever, empty-trash; chats and folders | Delete → restore → purge round-trips; purge removes dependent messages by cascade |
 | **P1-T7** | Chat history list with recency grouping, titles from the first user message, empty state | New account shows an empty state with one clear next action |
@@ -308,28 +308,28 @@ P0 foundation
 | **P6-T2** | `lib/github/write.ts`: create ref `openmi/agent/<changeset-id>`, commit all accepted files in one Git tree commit, open a PR against the recorded base | Exactly one commit and one PR per approval; a retry with the same idempotency key returns the same PR |
 | **P6-T3** | Branch policy: prefix enforced, base compared to the repo default branch, refusal is `403 "Openmi only commits to agent/ branches."` | Test asserts refusal for the default branch and for a user-supplied branch name |
 | **P6-T4** | Persist `pr_url`, `pr_number`, `commit_sha`; review card links out; activity records the approval | Card links to the real PR; no PR is created before approval |
-| **P6-T5** | Failure handling: partial commit, permission denied, stale base — each surfaced with its own message and no retry storm | Each failure has a distinct message; none consumes a second Dew hour |
+| **P6-T5** | Failure handling: partial commit, permission denied, stale base — each surfaced with its own message and no retry storm | Each failure has a distinct message; none consumes a second Credit hour |
 
 **Phase gate:** commit-refusal test green; a PR exists only after an approval; default branch has no new commits in the test repo.
 
 ---
 
-## 16. Phase 7 — Dew billing
+## 16. Phase 7 — Credit billing
 
 **Outcome:** an hour of chat costs a flat amount, paid before the model call, with a ledger and a history page.
 
 | Task | Work | Acceptance |
 |---|---|---|
-| **P7-T1** | `lib/dew.ts`: `DEW_PER_HOUR = 3`, `HOUR_SESSION_MS = 3_600_000`, `DAILY_FREE_DEW = 10`, `PAID_DAILY_FREE_DEW = 15`, `TRIAL_DEW = 5`, precision 3, dust floor 0.05, low balance 10 | A docs test asserts every documented number equals its exported constant |
-| **P7-T2** | `006_dew.sql`: `hour_sessions(owner pk)`, `start_hour_session(model, repo)` `security definer`, advisory lock, no price parameter | Two concurrent calls yield one session and one charge; the function signature has no amount argument |
+| **P7-T1** | `lib/credit.ts`: `CREDIT_PER_HOUR = 3`, `HOUR_SESSION_MS = 3_600_000`, `DAILY_FREE_CREDIT = 10`, `PAID_DAILY_FREE_CREDIT = 15`, `TRIAL_CREDIT = 5`, precision 3, dust floor 0.05, low balance 10 | A docs test asserts every documented number equals its exported constant |
+| **P7-T2** | `006_credit.sql`: `hour_sessions(owner pk)`, `start_hour_session(model, repo)` `security definer`, advisory lock, no price parameter | Two concurrent calls yield one session and one charge; the function signature has no amount argument |
 | **P7-T3** | Charge gate on `/api/chat` and agent routes: no active hour → `402` before any provider call; spend free bucket, then paid credit | A refused request makes no upstream call (asserted with a stubbed fetch) |
-| **P7-T4** | `dew_transactions` ledger; daily refill at local midnight in the account's timezone; a `dailyDay` ahead of today does not refill | Clock-backwards fixture does not refill; ledger sums to the cached balance |
+| **P7-T4** | `credit_transactions` ledger; daily refill at local midnight in the account's timezone; a `dailyDay` ahead of today does not refill | Clock-backwards fixture does not refill; ledger sums to the cached balance |
 | **P7-T5** | `/activity`: ledger entries, hour sessions, per-chat usage, empty state | Totals match the ledger exactly |
 | **P7-T6** | Invites: personal code, attribution at signup, reward both sides, ledger `kind='invite'`, per-account cap | Self-invite and re-use are refused; rewards appear once |
 | **P7-T7** | Refunds: provider failure, abort before first token, operator correction — three explicit paths, each writing a ledger row | Each path tested; no refund exceeds the original charge |
 | **P7-T8** | Low-balance state, top-up packs, redeem code (operator-issued), purchase history | Balance below 10 turns the chip amber; a used code cannot be reused |
 
-**Phase gate:** concurrent start impossible by primary key; exactly 3 Dew per hour; ledger and cached balance agree after every test.
+**Phase gate:** concurrent start impossible by primary key; exactly 3 Credit per hour; ledger and cached balance agree after every test.
 
 ---
 
@@ -366,7 +366,7 @@ P0 foundation
 ## 19. Phase 10 — Execution (gated, not v1)
 
 **Status: built, verification only.** The four decisions are answered in
-`docs/EXECUTION_ENVIRONMENT_PLAN.md`: enumerated commands, 0.05 Dew per started
+`docs/EXECUTION_ENVIRONMENT_PLAN.md`: enumerated commands, 0.05 Credit per started
 minute, no secrets in the sandbox, and a specific state for every way a run can
 fail. What ships is the verification half of this phase — seed, apply, install,
 build — because it is the half whose result can be observed and stated without
@@ -377,7 +377,7 @@ verifies.
 | Task | Work | Blocked on |
 |---|---|---|
 | **P10-T1** | Design doc: what runs, where, for how long, at what cost, with which secrets absent | D6.1–D6.4 |
-| **P10-T2** | Provider selection and a cost model in Dew/hour | D6.2 |
+| **P10-T2** | Provider selection and a cost model in Credit/hour | D6.2 |
 | **P10-T3** | Wire results into the review card, including failure text | P10-T1 |
 | **P10-T4** | Contract tests: "tests passed" is impossible without a real run; a failed run cannot render as success | P10-T3 |
 
@@ -403,7 +403,7 @@ The rule that cannot be relaxed: **every card state must be reachable from a rea
 | Chat history | 1, 3 | P1-T7, P3-T3 |
 | Repo workspace | 2 | P2-T4, P2-T5 |
 | Sidebar with folders and trash | 1 | P1-T5, P1-T6 |
-| Dew credits | 7 | P7-T1 → P7-T3 |
+| Credit credits | 7 | P7-T1 → P7-T3 |
 | Daily free usage | 7 | P7-T4 |
 | Activity history | 7 | P7-T5 |
 | Invite rewards | 7 | P7-T6 |
@@ -419,10 +419,10 @@ The rule that cannot be relaxed: **every card state must be reachable from a rea
 | **D1** | Sign-in method: email + password, magic link, GitHub OAuth, or all three? | P1-T2 | Email + password plus magic link; GitHub OAuth stays a connect flow, not a login |
 | **D2** | Does a chat belong to one repository permanently, or can the attachment change mid-thread? | P3-T1, P5-T1 | One repository per chat; a new repo starts a new chat, so a diff always has one base |
 | **D3** | A shared rate limiter without Upstash: Postgres RPC or per-instance? | P9-T3 | Postgres RPC. No new vendor, and the app must boot unconfigured |
-| **D4** | Is Dew spendable on an agent turn separately from chat, or does one hour cover both? | P7-T3, P4-T4 | One hour covers both; the caps bound cost, not price |
+| **D4** | Is Credit spendable on an agent turn separately from chat, or does one hour cover both? | P7-T3, P4-T4 | One hour covers both; the caps bound cost, not price |
 | **D5** | Top-up: manual receipt upload, redeem codes, or a payment provider? | P7-T8 | Redeem codes in v1; a provider is its own project with tax and webhook work |
 | **D6.1** | What may the sandbox execute? | P10-T1 | Enumerated commands, never "the project's tests" |
-| **D6.2** | How is sandbox time priced in Dew? | P10-T2 | Per minute, prepaid, refused before start |
+| **D6.2** | How is sandbox time priced in Credit? | P10-T2 | Per minute, prepaid, refused before start |
 | **D6.3** | Which secrets are absent from the sandbox? | P10-T1 | All of them |
 | **D6.4** | What happens when the sandbox cannot start? | P10-T3 | The card says so, and the gate stays closed on a claim |
 

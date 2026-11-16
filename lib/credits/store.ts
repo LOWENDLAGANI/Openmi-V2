@@ -1,14 +1,14 @@
 import "server-only";
 
-import { formatDew } from "@/lib/dew";
-import { modelHourDew, modelName } from "@/lib/models";
+import { formatCredit } from "@/lib/credits";
+import { modelHourCredit, modelName } from "@/lib/models";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
- * The Dew gate and its readers.
+ * The Credit gate and its readers.
  *
- * `startDewSession` is called before any provider request. A refusal is a 402
+ * `startCreditSession` is called before any provider request. A refusal is a 402
  * with a plain message and no upstream call; the hour is charged exactly once,
  * by `start_hour_session`, whose signature has no price parameter.
  *
@@ -19,7 +19,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 type Client = NonNullable<Awaited<ReturnType<typeof supabaseServer>>>;
 type AdminClient = NonNullable<ReturnType<typeof supabaseAdmin>>;
 
-export type DewSession = {
+export type CreditSession = {
   sessionId: string;
   started: boolean;
   expiresAt: string;
@@ -33,18 +33,18 @@ export type DewSession = {
   combined: boolean;
 };
 
-export type DewGate =
-  | { ok: true; session: DewSession }
+export type CreditGate =
+  | { ok: true; session: CreditSession }
   | {
       ok: false;
       error: string;
       balance: number | null;
-      code: "hour-active" | "no-dew" | "paid-only";
+      code: "hour-active" | "no-credit" | "paid-only";
       /** The chat holding the running hour, when the database named one. */
       activeChatId: string | null;
     };
 
-export type DewProfile = {
+export type CreditProfile = {
   balance: number;
   /** Paid credit, spent only after the daily balance cannot cover a charge. */
   wallet: number;
@@ -63,12 +63,12 @@ function errorText(error: { message?: string } | null): string {
   return error?.message ?? "";
 }
 
-export async function refillDailyDew(supabase: Client): Promise<number | null> {
+export async function refillDailyCredit(supabase: Client): Promise<number | null> {
   // The function's only argument has a default, but PostgREST resolves an RPC
   // by the arguments it is given. Sending it explicitly (null means "the
   // signed-in account") is what makes the call match; omitting it addressed a
   // zero-argument function that does not exist.
-  const { data, error } = await supabase.rpc("refill_daily_dew", {
+  const { data, error } = await supabase.rpc("refill_daily_credit", {
     p_owner: null,
   });
 
@@ -77,19 +77,19 @@ export async function refillDailyDew(supabase: Client): Promise<number | null> {
 }
 
 /**
- * Asks for the account's trial Dew, once.
+ * Asks for the account's trial Credit, once.
  *
  * Returns what was granted: 5 the first time from an address that has not been
  * paid today, 0 otherwise. A refusal is not an error — the account can still
  * chat on its daily allowance — so a failed call returns 0 and the turn goes on.
  * The address arrives as a keyed hash; the server never stores the address.
  */
-export async function grantTrialDew(
+export async function grantTrialCredit(
   admin: AdminClient,
   owner: string,
   ipHash: string
 ): Promise<number> {
-  const { data, error } = await admin.rpc("grant_trial_dew", {
+  const { data, error } = await admin.rpc("grant_trial_credit", {
     p_owner: owner,
     p_ip_hash: ipHash,
   });
@@ -105,16 +105,16 @@ export async function grantTrialDew(
  * a message inside a running hour in the same chat is free. The price is not a
  * parameter, and the browser chooses nothing about it.
  */
-export async function startDewSession(
+export async function startCreditSession(
   supabase: Client,
   model: string,
   repo: string | null,
   options: { chatId: string | null }
-): Promise<DewGate> {
+): Promise<CreditGate> {
   const { chatId } = options;
   // The price belongs to the model, so the sentence a refusal shows names the
   // same number the database will charge rather than a global constant.
-  const price = modelHourDew(model);
+  const price = modelHourCredit(model);
 
   const { data, error } = await supabase.rpc("start_hour_session", {
     p_model: model,
@@ -176,18 +176,18 @@ export async function startDewSession(
       return {
         ok: false,
         balance: null,
-        code: "no-dew",
+        code: "no-credit",
         activeChatId: null,
-        error: `This hour costs ${formatDew(price)} Dew, and the balance and wallet cannot cover it. Redeem a code or wait for the daily refill.`,
+        error: `This hour costs ${formatCredit(price)} Credit, and the balance and wallet cannot cover it. Redeem a code or wait for the daily refill.`,
       };
     }
 
     return {
       ok: false,
       balance: null,
-      code: "no-dew",
+      code: "no-credit",
       activeChatId: null,
-      error: `Dew could not be charged, so nothing was sent to a provider: ${message.replace(/^dew:\s*/, "")}`,
+      error: `Credit could not be charged, so nothing was sent to a provider: ${message.replace(/^credit:\s*/, "")}`,
     };
   }
 
@@ -207,9 +207,9 @@ export async function startDewSession(
     return {
       ok: false,
       balance: null,
-      code: "no-dew",
+      code: "no-credit",
       activeChatId: null,
-      error: "Dew did not return a session.",
+      error: "Credit did not return a session.",
     };
   }
 
@@ -242,7 +242,7 @@ export async function endHourSession(
   return !error && Boolean(data);
 }
 
-export async function refundDewSession(
+export async function refundCreditSession(
   admin: AdminClient,
   owner: string,
   sessionId: string,
@@ -265,13 +265,13 @@ export async function refundDewSession(
  * refuses a reservation the balance cannot cover — so a run that cannot be
  * paid for never reaches a provider.
  */
-export async function reserveExecutionDew(
+export async function reserveExecutionCredit(
   admin: AdminClient,
   owner: string,
   runId: string,
   amount: number
 ): Promise<{ ok: true; balance: number } | { ok: false; error: string }> {
-  const { data, error } = await admin.rpc("execution_reserve_dew", {
+  const { data, error } = await admin.rpc("execution_reserve_credit", {
     p_owner: owner,
     p_run_id: runId,
     p_amount: amount,
@@ -281,13 +281,13 @@ export async function reserveExecutionDew(
   return { ok: true, balance: Number(data ?? 0) };
 }
 
-export async function settleExecutionDew(
+export async function settleExecutionCredit(
   admin: AdminClient,
   owner: string,
   runId: string,
   charged: number
 ): Promise<{ ok: true; balance: number } | { ok: false; error: string }> {
-  const { data, error } = await admin.rpc("execution_settle_dew", {
+  const { data, error } = await admin.rpc("execution_settle_credit", {
     p_owner: owner,
     p_run_id: runId,
     p_charged: charged,
@@ -297,14 +297,14 @@ export async function settleExecutionDew(
   return { ok: true, balance: Number(data ?? 0) };
 }
 
-export async function readDewProfile(
+export async function readCreditProfile(
   supabase: Client,
   owner: string
-): Promise<DewProfile | null> {
+): Promise<CreditProfile | null> {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "dew_balance, wallet_dew, timezone, has_paid, paid_until, invite_code, invited_by"
+      "credit_balance, wallet_credit, timezone, has_paid, paid_until, invite_code, invited_by"
     )
     .eq("id", owner)
     .maybeSingle();
@@ -312,8 +312,8 @@ export async function readDewProfile(
   if (!data) return null;
 
   const row = data as {
-    dew_balance: number | string;
-    wallet_dew?: number | string;
+    credit_balance: number | string;
+    wallet_credit?: number | string;
     timezone: string;
     has_paid: boolean;
     paid_until: string | null;
@@ -324,8 +324,8 @@ export async function readDewProfile(
   const paidUntil = row.paid_until ?? null;
 
   return {
-    balance: Number(row.dew_balance),
-    wallet: Number(row.wallet_dew ?? 0),
+    balance: Number(row.credit_balance),
+    wallet: Number(row.wallet_credit ?? 0),
     timezone: row.timezone ?? "UTC",
     paidActive: paidUntil !== null && Date.parse(paidUntil) > Date.now(),
     paidUntil,
@@ -335,12 +335,12 @@ export async function readDewProfile(
   };
 }
 
-export async function redeemDewCode(
+export async function redeemCreditCode(
   admin: AdminClient,
   owner: string,
   code: string
 ): Promise<{ ok: true; amount: number; balance: number } | { ok: false; error: string }> {
-  const { data, error } = await admin.rpc("redeem_dew_code", {
+  const { data, error } = await admin.rpc("redeem_credit_code", {
     p_owner: owner,
     p_code: code,
   });

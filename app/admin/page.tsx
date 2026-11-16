@@ -12,12 +12,12 @@ import { RuntimePanel } from "./RuntimePanel";
 import { readAdminAccess } from "@/lib/admin/access";
 import { readRuntimeSnapshot } from "@/lib/admin/runtime";
 import { planById } from "@/lib/billing/plans";
-import { formatDew } from "@/lib/dew";
+import { formatCredit } from "@/lib/credits";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   banUser,
   createGiveawayCodes,
-  grantDew,
+  grantCredit,
   resolveRisk,
   reviewReceipt,
   setAdmin,
@@ -42,7 +42,7 @@ type RequestRow = {
   receipt_path: string;
   receipt_name: string | null;
   status: string;
-  dew_granted: number | null;
+  credit_granted: number | null;
   decision_note: string | null;
   created_at: string;
   decided_at: string | null;
@@ -83,7 +83,7 @@ function severityClass(severity: RiskRow["severity"]): string {
 type ProfileRow = {
   id: string;
   email: string | null;
-  dew_balance: number | string;
+  credit_balance: number | string;
   paid_until: string | null;
 };
 
@@ -197,14 +197,14 @@ export default async function AdminPage({
     adminCountResult,
     pendingCountResult,
     membersResult,
-    dewHeldResult,
+    creditHeldResult,
     selfAdminResult,
     codesResult,
   ] = await Promise.all([
     admin
       .from("payment_requests")
       .select(
-        "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, dew_granted, decision_note, created_at, decided_at"
+        "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, credit_granted, decision_note, created_at, decided_at"
       )
       .eq("status", "pending")
       .order("created_at", { ascending: true })
@@ -212,7 +212,7 @@ export default async function AdminPage({
     admin
       .from("payment_requests")
       .select(
-        "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, dew_granted, decision_note, created_at, decided_at"
+        "id, owner, plan, amount, reference, note, receipt_path, receipt_name, status, credit_granted, decision_note, created_at, decided_at"
       )
       .neq("status", "pending")
       .order("created_at", { ascending: false })
@@ -231,7 +231,7 @@ export default async function AdminPage({
       .eq("status", "pending"),
     admin.from("profiles").select("id", { count: "exact", head: true }),
     // One aggregate for the whole table: summing a capped page undercounted.
-    admin.rpc("admin_dew_held"),
+    admin.rpc("admin_credit_held"),
     // The warning below asks about this operator, not about the first 50 rows.
     admin
       .from("admin_users")
@@ -239,15 +239,15 @@ export default async function AdminPage({
       .eq("user_id", access.userId)
       .maybeSingle(),
     admin
-      .from("dew_codes")
-      .select("code, dew_amount, note, created_at, redeemed_at")
+      .from("credit_codes")
+      .select("code, credit_amount, note, created_at, redeemed_at")
       .order("created_at", { ascending: false })
       .limit(12),
   ]);
 
   const giveawayCodes = (codesResult.data ?? []) as Array<{
     code: string;
-    dew_amount: number | string;
+    credit_amount: number | string;
     note: string | null;
     redeemed_at: string | null;
   }>;
@@ -261,7 +261,7 @@ export default async function AdminPage({
 
   const adminCount = adminCountResult.count ?? adminRows.length;
   const pendingTotal = pendingCountResult.count ?? pending.length;
-  const dewHeld = dewHeldResult.error ? null : Number(dewHeldResult.data ?? 0);
+  const creditHeld = creditHeldResult.error ? null : Number(creditHeldResult.data ?? 0);
   const selfIsStoredAdmin = Boolean(selfAdminResult.data);
   const paymentsError =
     pendingResult.error ?? decidedResult.error ?? pendingCountResult.error;
@@ -277,7 +277,7 @@ export default async function AdminPage({
   const profilesResult = ownerIds.length
     ? await admin
         .from("profiles")
-        .select("id, email, dew_balance, paid_until")
+        .select("id, email, credit_balance, paid_until")
         .in("id", ownerIds)
     : { data: [] as ProfileRow[] };
 
@@ -297,7 +297,7 @@ export default async function AdminPage({
   let accountQuery = admin
     .from("profiles")
     .select(
-      "id, email, handle, dew_balance, paid_until, created_at, banned_at, ban_expires_at, ban_reason",
+      "id, email, handle, credit_balance, paid_until, created_at, banned_at, ban_expires_at, ban_reason",
       { count: "exact" }
     );
 
@@ -401,11 +401,11 @@ export default async function AdminPage({
           className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
         >
           {params.done === "approved"
-            ? "Receipt approved and Dew granted."
+            ? "Receipt approved and Credit granted."
             : params.done === "rejected"
               ? "Receipt rejected. The note is visible to the member."
               : params.done === "topup"
-                ? "Dew added to that account."
+                ? "Credit added to that account."
                 : params.done === "giveaway"
                   ? "Giveaway codes created. They are listed below."
                   : params.done === "granted"
@@ -431,8 +431,8 @@ export default async function AdminPage({
           { label: "members", value: String(membersResult.count ?? 0) },
           { label: "receipts waiting", value: String(pendingTotal) },
           {
-            label: "dew + wallet",
-            value: dewHeld === null ? "—" : formatDew(dewHeld),
+            label: "credit + wallet",
+            value: creditHeld === null ? "—" : formatCredit(creditHeld),
           },
           { label: "admins", value: String(adminCount) },
         ].map((stat) => (
@@ -528,7 +528,7 @@ export default async function AdminPage({
 
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="font-mono text-[10.5px] text-low">
-                      {formatDew(Number(member.dew_balance))} dew
+                      {formatCredit(Number(member.credit_balance))} credit
                     </span>
                     <StatusPill tone={active ? "ok" : "optional"}>
                       {active ? "paid" : "free"}
@@ -825,7 +825,7 @@ export default async function AdminPage({
                       </span>
                     )}
                     <span className="font-mono text-[10px] text-low">
-                      balance {formatDew(Number(member?.dew_balance ?? 0))}
+                      balance {formatCredit(Number(member?.credit_balance ?? 0))}
                     </span>
                     <span className="font-mono text-[10px] text-low">
                       {paidActive(member?.paid_until) ? "paid" : "free"}
@@ -838,12 +838,12 @@ export default async function AdminPage({
                   >
                     <input type="hidden" name="requestId" value={row.id} />
                     <input
-                      name="dew"
+                      name="credit"
                       type="number"
                       min="0"
                       step="1"
-                      defaultValue={plan?.dew ?? 0}
-                      aria-label="Dew to grant"
+                      defaultValue={plan?.credit ?? 0}
+                      aria-label="Credit to grant"
                       className="field py-1.5 font-mono text-[12px]"
                     />
                     <input
@@ -893,7 +893,7 @@ export default async function AdminPage({
             adjustment and cannot go below zero.
           </p>
 
-          <form action={grantDew} className="mt-3 space-y-2">
+          <form action={grantCredit} className="mt-3 space-y-2">
             <Field label="Member email">
               <input
                 name="email"
@@ -903,7 +903,7 @@ export default async function AdminPage({
                 className="field py-1.5 text-[12px]"
               />
             </Field>
-            <Field label="Dew amount">
+            <Field label="Credit amount">
               <input
                 name="amount"
                 type="number"
@@ -923,9 +923,9 @@ export default async function AdminPage({
             <SubmitButton
               className="btn btn-primary w-full py-2 text-[12px]"
               optimisticText="Added"
-              pendingText="Adding Dew…"
+              pendingText="Adding Credit…"
             >
-              Add Dew
+              Add Credit
             </SubmitButton>
           </form>
         </section>
@@ -938,12 +938,12 @@ export default async function AdminPage({
             Giveaway codes
           </h2>
           <p className="mt-1 text-[11.5px] leading-relaxed text-mid">
-            Mint codes that add Dew once each, for a launch or a support gesture.
+            Mint codes that add Credit once each, for a launch or a support gesture.
             A giveaway does not switch an account to the paid allowance.
           </p>
 
           <form action={createGiveawayCodes} className="mt-3 space-y-2">
-            <Field label="Dew each">
+            <Field label="Credit each">
               <input
                 name="amount"
                 type="number"
@@ -994,7 +994,7 @@ export default async function AdminPage({
                     {row.code}
                   </span>
                   <span className="font-mono text-[10px] text-low">
-                    {formatDew(Number(row.dew_amount))} Dew ·{" "}
+                    {formatCredit(Number(row.credit_amount))} Credit ·{" "}
                     {row.redeemed_at ? "redeemed" : "unused"}
                   </span>
                 </li>
@@ -1088,9 +1088,9 @@ export default async function AdminPage({
                     {planById(row.plan)?.name ?? row.plan}
                   </p>
                   <div className="flex items-center gap-2">
-                    {row.status === "approved" && row.dew_granted !== null && (
+                    {row.status === "approved" && row.credit_granted !== null && (
                       <span className="font-mono text-[10px] text-accent-text">
-                        +{row.dew_granted} dew
+                        +{row.credit_granted} credit
                       </span>
                     )}
                     <StatusPill tone={row.status === "approved" ? "ok" : "missing"}>

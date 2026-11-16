@@ -142,7 +142,7 @@ the promise when the sweep is not running (a Hobby deployment gets a daily cron
 at best, and an outage is a normal Tuesday). No design here depends on cron
 frequency for correctness.
 
-### D12.6 — A per-owner cap, no new Dew charge
+### D12.6 — A per-owner cap, no new Credit charge
 
 Running chat time is already paid for by the chat hour or request charge; the
 sandbox is one of the things that charge buys. Pausing does not add a charge,
@@ -532,7 +532,7 @@ not.** A reseed is announced; a lost disk is named as a lost disk.
 ## 9. Billing, caps and storage
 
 - **No new ledger kind.** Chat sandboxes are covered by the existing hour or
-  request charge. This keeps the ledger's `sum(amount) = dew_balance` invariant
+  request charge. This keeps the ledger's `sum(amount) = credit_balance` invariant
   untouched and avoids a new reservation to refund when a chat is abandoned.
 - **Cap per owner:** 3 live environments. Eviction is by `last_active_at`,
   oldest first, and happens before the create, not after. Eviction destroys the

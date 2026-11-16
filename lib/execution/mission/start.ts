@@ -2,14 +2,14 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { reserveExecutionDew } from "@/lib/dew/store";
+import { reserveExecutionCredit } from "@/lib/credits/store";
 import { clearStaleRuns } from "@/lib/execution/store";
 import type { supabaseAdmin } from "@/lib/supabase/admin";
 import type { supabaseServer } from "@/lib/supabase/server";
 
 import {
   missionCaps,
-  missionReserveDew,
+  missionReserveCredit,
   type MissionAutonomy,
 } from "./budget";
 import { createMissionRun } from "./store";
@@ -37,7 +37,7 @@ export type MissionContext = {
 };
 
 export type StartMissionResult =
-  | { ok: true; mission: MissionContext; reservedDew: number }
+  | { ok: true; mission: MissionContext; reservedCredit: number }
   | { ok: false; status: number; code: string; message: string };
 
 export function readAutonomy(value: unknown): MissionAutonomy | null {
@@ -96,18 +96,18 @@ export async function startMission(input: {
   await clearStaleRuns(admin, owner);
 
   const runId = randomUUID();
-  const reservedDew = missionReserveDew(minutes);
+  const reservedCredit = missionReserveCredit(minutes);
 
-  const reserved = await reserveExecutionDew(admin, owner, runId, reservedDew);
+  const reserved = await reserveExecutionCredit(admin, owner, runId, reservedCredit);
 
   if (!reserved.ok) {
     return {
       ok: false,
       status: 402,
-      code: "insufficient_dew",
+      code: "insufficient_credit",
       message: reserved.error.includes("insufficient balance")
-        ? `A mission reserves ${reservedDew} Dew before the sandbox starts, and the balance cannot cover that. Top up with a code, or wait for the daily refill.`
-        : `Dew could not be reserved, so nothing was started: ${reserved.error}`,
+        ? `A mission reserves ${reservedCredit} Credit before the sandbox starts, and the balance cannot cover that. Top up with a code, or wait for the daily refill.`
+        : `Credit could not be reserved, so nothing was started: ${reserved.error}`,
     };
   }
 
@@ -126,8 +126,8 @@ export async function startMission(input: {
     });
   } catch (caught) {
     // The reservation exists but the mission does not, so give it straight back.
-    const { settleExecutionDew } = await import("@/lib/dew/store");
-    await settleExecutionDew(admin, owner, runId, 0);
+    const { settleExecutionCredit } = await import("@/lib/credits/store");
+    await settleExecutionCredit(admin, owner, runId, 0);
 
     const message = caught instanceof Error ? caught.message : "The mission could not be recorded.";
 
@@ -143,7 +143,7 @@ export async function startMission(input: {
 
   return {
     ok: true,
-    reservedDew,
+    reservedCredit,
     mission: {
       runId,
       owner,

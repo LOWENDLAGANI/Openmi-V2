@@ -8,10 +8,10 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { SandboxDock } from "@/components/SandboxDock";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
-import { DewChip } from "@/components/DewChip";
+import { CreditChip } from "@/components/CreditChip";
 import { SubmitButton } from "@/components/SubmitButton";
 import { TrashList } from "@/components/TrashList";
-import { refillDailyDew } from "@/lib/dew/store";
+import { refillDailyCredit } from "@/lib/credits/store";
 import { RepoPicker } from "@/components/RepoPicker";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { Sidebar } from "@/components/Sidebar";
@@ -391,7 +391,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .maybeSingle(),
     session.supabase
       .from("profiles")
-      .select("dew_balance, wallet_dew, paid_until")
+      .select("credit_balance, wallet_credit, paid_until")
       .eq("id", session.user.id)
       .maybeSingle(),
     session.supabase
@@ -405,13 +405,13 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   ]);
 
   const balances = (profileResult.data ?? {}) as {
-    dew_balance?: number | string;
-    wallet_dew?: number | string;
+    credit_balance?: number | string;
+    wallet_credit?: number | string;
     paid_until?: string | null;
   };
-  const dew = {
-    balance: Number(balances.dew_balance ?? 0),
-    wallet: Number(balances.wallet_dew ?? 0),
+  const credit = {
+    balance: Number(balances.credit_balance ?? 0),
+    wallet: Number(balances.wallet_credit ?? 0),
   };
   // The entitlement is `paid_until`, read on the server so the picker and the
   // opening model agree with what the send gate will decide.
@@ -507,7 +507,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             providerReady={providersConfigured()}
             initialRunning={Boolean(runningTurn.data)}
             paidActive={paidActive}
-            dew={dew}
+            credit={credit}
           />
         </div>
       </div>
@@ -553,26 +553,26 @@ async function DraftChat({
   // The composer offers a price before the chat exists, so it needs both
   // balances. Reading them here keeps the call site a repository and nothing
   // else, which is what the draft-chat test pins.
-  let dew = { balance: 0, wallet: 0 };
+  let credit = { balance: 0, wallet: 0 };
   let paidActive = false;
   const session = await getSession();
 
   if (session.state === "signed-in") {
     const { data } = await session.supabase
       .from("profiles")
-      .select("dew_balance, wallet_dew, paid_until")
+      .select("credit_balance, wallet_credit, paid_until")
       .eq("id", session.user.id)
       .maybeSingle();
 
     const row = (data ?? {}) as {
-      dew_balance?: number | string;
-      wallet_dew?: number | string;
+      credit_balance?: number | string;
+      wallet_credit?: number | string;
       paid_until?: string | null;
     };
 
-    dew = {
-      balance: Number(row.dew_balance ?? 0),
-      wallet: Number(row.wallet_dew ?? 0),
+    credit = {
+      balance: Number(row.credit_balance ?? 0),
+      wallet: Number(row.wallet_credit ?? 0),
     };
 
     const paidUntil = row.paid_until ?? null;
@@ -594,7 +594,7 @@ async function DraftChat({
         providerReady={providersConfigured()}
         initialRunning={false}
         paidActive={paidActive}
-        dew={dew}
+        credit={credit}
       />
     </div>
   );
@@ -634,7 +634,7 @@ export default async function ChatPage({
 
   // The daily allowance is settled before anything is rendered, so the chip
   // shows the balance the next turn will actually use.
-  await refillDailyDew(supabase);
+  await refillDailyCredit(supabase);
 
   const [foldersResult, chatsResult, connection, profileResult, hourResult] = await Promise.all([
     supabase.from("folders").select("id, name, created_at").order("name"),
@@ -647,7 +647,7 @@ export default async function ChatPage({
     readConnection(supabase, user.id),
     supabase
       .from("profiles")
-      .select("dew_balance, wallet_dew")
+      .select("credit_balance, wallet_credit")
       .eq("id", user.id)
       .maybeSingle(),
     // The running hour, read with the same predicate `start_hour_session` uses
@@ -660,11 +660,11 @@ export default async function ChatPage({
       .maybeSingle(),
   ]);
 
-  const dewBalance = Number(
-    (profileResult.data as { dew_balance?: number | string } | null)?.dew_balance ?? 0
+  const creditBalance = Number(
+    (profileResult.data as { credit_balance?: number | string } | null)?.credit_balance ?? 0
   );
-  const dewWallet = Number(
-    (profileResult.data as { wallet_dew?: number | string } | null)?.wallet_dew ?? 0
+  const creditWallet = Number(
+    (profileResult.data as { wallet_credit?: number | string } | null)?.wallet_credit ?? 0
   );
 
   const hourEndsAt =
@@ -836,7 +836,7 @@ export default async function ChatPage({
             </Link>
           )}
 
-          <DewChip initialBalance={dewBalance} initialWallet={dewWallet} />
+          <CreditChip initialBalance={creditBalance} initialWallet={creditWallet} />
 
         </>
       }

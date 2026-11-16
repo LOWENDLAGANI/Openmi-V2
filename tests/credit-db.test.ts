@@ -104,17 +104,17 @@ async function signUp(id: string, email: string, inviteCode = "") {
 
 async function balance(owner: string): Promise<number> {
   await reset();
-  const { rows } = await db.query<{ dew_balance: string }>(
-    "select dew_balance from public.profiles where id = $1",
+  const { rows } = await db.query<{ credit_balance: string }>(
+    "select credit_balance from public.profiles where id = $1",
     [owner]
   );
-  return Number(rows[0]?.dew_balance ?? Number.NaN);
+  return Number(rows[0]?.credit_balance ?? Number.NaN);
 }
 
 async function ledgerSum(owner: string): Promise<number> {
   await reset();
   const { rows } = await db.query<{ total: string }>(
-    "select coalesce(sum(amount), 0) as total from public.dew_transactions where owner = $1",
+    "select coalesce(sum(amount), 0) as total from public.credit_transactions where owner = $1",
     [owner]
   );
   return Number(rows[0]?.total ?? 0);
@@ -123,7 +123,7 @@ async function ledgerSum(owner: string): Promise<number> {
 async function ledgerCount(owner: string, kind: string): Promise<number> {
   await reset();
   const { rows } = await db.query<{ count: number }>(
-    "select count(*)::int as count from public.dew_transactions where owner = $1 and kind = $2",
+    "select count(*)::int as count from public.credit_transactions where owner = $1 and kind = $2",
     [owner, kind]
   );
   return Number(rows[0]?.count ?? 0);
@@ -136,7 +136,7 @@ test("the hourly session function takes no price parameter", () => {
   expect(MIGRATION_SOURCE).not.toMatch(/start_hour_session\([^)]*p_amount/i);
 });
 
-test("signup writes a profile and an invite code, and no Dew yet", async () => {
+test("signup writes a profile and an invite code, and no Credit yet", async () => {
   await signUp(A, "a@example.test");
 
   // The account exists; the trial is not paid until it is used.
@@ -157,12 +157,12 @@ test("signup writes a profile and an invite code, and no Dew yet", async () => {
 test("the trial is a service-role grant, once, and once per address", async () => {
   await actAs("authenticated", A);
   await expect(
-    db.query("select public.grant_trial_dew($1) as amount", [IP_ONE])
+    db.query("select public.grant_trial_credit($1) as amount", [IP_ONE])
   ).rejects.toThrow(/permission denied/);
 
   await reset();
   const granted = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1, $2) as amount",
+    "select public.grant_trial_credit($1, $2) as amount",
     [A, IP_ONE]
   );
   expect(Number(granted.rows[0].amount)).toBe(5);
@@ -172,7 +172,7 @@ test("the trial is a service-role grant, once, and once per address", async () =
 
   // Asking twice from the same account pays nothing.
   const again = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1, $2) as amount",
+    "select public.grant_trial_credit($1, $2) as amount",
     [A, IP_ONE]
   );
   expect(Number(again.rows[0].amount)).toBe(0);
@@ -181,7 +181,7 @@ test("the trial is a service-role grant, once, and once per address", async () =
   // A second account on the same address is not paid either.
   await signUp(C, "c@example.test");
   const refused = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1, $2) as amount",
+    "select public.grant_trial_credit($1, $2) as amount",
     [C, IP_ONE]
   );
   expect(Number(refused.rows[0].amount)).toBe(0);
@@ -193,17 +193,17 @@ test("the daily allowance refills once, at the local day", async () => {
   await reset();
 
   // The trial is paid on first use; asking again here is a no-op.
-  await db.query("select public.grant_trial_dew($1, $2)", [A, IP_ONE]);
+  await db.query("select public.grant_trial_credit($1, $2)", [A, IP_ONE]);
 
   await actAs("authenticated", A);
   const first = await db.query<{ balance: string }>(
-    "select public.refill_daily_dew() as balance"
+    "select public.refill_daily_credit() as balance"
   );
-  // Five trial Dew plus the six Dew free allowance.
+  // Five trial Credit plus the six Credit free allowance.
   expect(Number(first.rows[0].balance)).toBe(11);
 
   const second = await db.query<{ balance: string }>(
-    "select public.refill_daily_dew() as balance"
+    "select public.refill_daily_credit() as balance"
   );
   expect(Number(second.rows[0].balance)).toBe(11);
 
@@ -222,7 +222,7 @@ test("an hour is charged once and reused inside the hour", async () => {
   }>("select * from public.start_hour_session('auto', 'octocat/hello')");
 
   expect(started.rows[0].started).toBe(true);
-  // Auto's hour is free: the session exists, and no Dew moved.
+  // Auto's hour is free: the session exists, and no Credit moved.
   expect(Number(started.rows[0].price)).toBe(0);
   expect(Number(started.rows[0].balance)).toBe(11);
 
@@ -246,17 +246,17 @@ test("an hour is charged once and reused inside the hour", async () => {
   expect(Number(sessions.rows[0].count)).toBe(1);
 
   // Nothing was charged, so there is no session row to point at: a zero-amount
-  // ledger entry is what `dew_transactions.amount <> 0` exists to refuse.
+  // ledger entry is what `credit_transactions.amount <> 0` exists to refuse.
   expect(await ledgerCount(A, "session")).toBe(0);
   expect(await ledgerSum(A)).toBe(11);
 });
 
 test("a paid-only model opens an hour only while the pass is live", async () => {
   await signUp(F, "f@example.test");
-  await db.query("select public.grant_trial_dew($1, $2)", [F, IP_THREE]);
+  await db.query("select public.grant_trial_credit($1, $2)", [F, IP_THREE]);
 
   await actAs("authenticated", F);
-  await db.query("select public.refill_daily_dew() as balance");
+  await db.query("select public.refill_daily_credit() as balance");
 
   // No pass: the hour is refused, and the refusal happens before the upsert is
   // committed, so no session and no charge exists.
@@ -313,7 +313,7 @@ test("a refund is service-role only, and happens once", async () => {
   await actAs("authenticated", A);
 
   // The hour above is Auto's free hour, so it has nothing to refund. End it and
-  // buy a paid hour, so this test still exercises a refund that moves Dew.
+  // buy a paid hour, so this test still exercises a refund that moves Credit.
   await db.query("select public.end_hour_session()");
   const paid = await db.query<{ session_id: string; price: string }>(
     "select * from public.start_hour_session('deepseek-flash', 'octocat/hello')"
@@ -343,7 +343,7 @@ test("a refund is service-role only, and happens once", async () => {
 test("a balance below one hour refuses the session before anything runs", async () => {
   await reset();
   await db.query(
-    "update public.profiles set dew_balance = 1, dew_day = (now() at time zone timezone)::date where id = $1",
+    "update public.profiles set credit_balance = 1, credit_day = (now() at time zone timezone)::date where id = $1",
     [A]
   );
   await db.query(
@@ -359,18 +359,18 @@ test("a balance below one hour refuses the session before anything runs", async 
   expect(await ledgerCount(A, "session")).toBe(1);
 
   await reset();
-  await db.query("update public.profiles set dew_balance = 11 where id = $1", [A]);
+  await db.query("update public.profiles set credit_balance = 11 where id = $1", [A]);
 });
 
-test("a redeem code is service-role only, works once and adds Dew only", async () => {
+test("a redeem code is service-role only, works once and adds Credit only", async () => {
   await reset();
   await db.query(
-    "insert into public.dew_codes (code, dew_amount, kind, note) values ('TOPUP-20', 20, 'topup', 'test')"
+    "insert into public.credit_codes (code, credit_amount, kind, note) values ('TOPUP-20', 20, 'topup', 'test')"
   );
 
   await actAs("authenticated", A);
   await expect(
-    db.query("select * from public.redeem_dew_code('topup-20')")
+    db.query("select * from public.redeem_credit_code('topup-20')")
   ).rejects.toThrow(/permission denied/);
 
   // The owner is not the caller's to choose: a signed-in account can only
@@ -378,13 +378,13 @@ test("a redeem code is service-role only, works once and adds Dew only", async (
   // touched, so the code survives for its real owner.
   await expect(
     db.query(
-      "select * from public.redeem_dew_code('99999999-9999-4999-8999-999999999999', 'topup-20')"
+      "select * from public.redeem_credit_code('99999999-9999-4999-8999-999999999999', 'topup-20')"
     )
   ).rejects.toThrow(/not your balance/);
 
   await reset();
   const redeemed = await db.query<{ amount: string; balance: string }>(
-    "select * from public.redeem_dew_code($1, 'topup-20')",
+    "select * from public.redeem_credit_code($1, 'topup-20')",
     [A]
   );
 
@@ -392,7 +392,7 @@ test("a redeem code is service-role only, works once and adds Dew only", async (
   expect(Number(redeemed.rows[0].balance)).toBe(31);
 
   await expect(
-    db.query("select * from public.redeem_dew_code($1, 'TOPUP-20')", [A])
+    db.query("select * from public.redeem_credit_code($1, 'TOPUP-20')", [A])
   ).rejects.toThrow(/already redeemed/);
 
   await reset();
@@ -441,7 +441,7 @@ test("a receipt reference is single-use and cannot underpay its plan", async () 
   expect(Number(rows[0].count)).toBe(1);
 });
 
-test("a pass is a window: approval extends paid_until and grants its Dew", async () => {
+test("a pass is a window: approval extends paid_until and grants its Credit", async () => {
   await signUp(E, "e@example.test");
   await reset();
   await db.query(
@@ -470,7 +470,7 @@ test("a pass is a window: approval extends paid_until and grants its Dew", async
   }>(
     `select has_paid,
             extract(day from paid_until - now())::int as days,
-            dew_balance as balance
+            credit_balance as balance
        from public.profiles where id = $1`,
     [E]
   );
@@ -482,13 +482,13 @@ test("a pass is a window: approval extends paid_until and grants its Dew", async
 
 test("operator aggregates are admin-only and self-revoke by id is refused", async () => {
   await actAs("authenticated", A);
-  await expect(db.query("select public.admin_dew_held()")).rejects.toThrow(
+  await expect(db.query("select public.admin_credit_held()")).rejects.toThrow(
     /admin: not allowed/
   );
 
   await actAs("authenticated", E);
   const held = await db.query<{ total: string }>(
-    "select public.admin_dew_held() as total"
+    "select public.admin_credit_held() as total"
   );
   expect(Number(held.rows[0].total)).toBeGreaterThan(0);
 
@@ -501,8 +501,8 @@ test("the daily allowance is 15 only while the pass is running", async () => {
   await reset();
   await db.query(
     `update public.profiles
-        set dew_balance = 0,
-            dew_day = (now() at time zone timezone)::date - 1,
+        set credit_balance = 0,
+            credit_day = (now() at time zone timezone)::date - 1,
             paid_until = now() + interval '2 days'
       where id = $1`,
     [E]
@@ -510,15 +510,15 @@ test("the daily allowance is 15 only while the pass is running", async () => {
 
   await actAs("authenticated", E);
   const paid = await db.query<{ balance: string }>(
-    "select public.refill_daily_dew() as balance"
+    "select public.refill_daily_credit() as balance"
   );
   expect(Number(paid.rows[0].balance)).toBe(15);
 
   await reset();
   await db.query(
     `update public.profiles
-        set dew_balance = 0,
-            dew_day = (now() at time zone timezone)::date - 1,
+        set credit_balance = 0,
+            credit_day = (now() at time zone timezone)::date - 1,
             paid_until = now() - interval '1 day'
       where id = $1`,
     [E]
@@ -526,7 +526,7 @@ test("the daily allowance is 15 only while the pass is running", async () => {
 
   await actAs("authenticated", E);
   const ended = await db.query<{ balance: string }>(
-    "select public.refill_daily_dew() as balance"
+    "select public.refill_daily_credit() as balance"
   );
   expect(Number(ended.rows[0].balance)).toBe(6);
 
@@ -535,8 +535,8 @@ test("the daily allowance is 15 only while the pass is running", async () => {
   await reset();
   await db.query(
     `update public.profiles
-        set dew_balance = coalesce(
-          (select sum(amount) from public.dew_transactions where owner = $1),
+        set credit_balance = coalesce(
+          (select sum(amount) from public.credit_transactions where owner = $1),
           0
         )
       where id = $1`,
@@ -547,12 +547,12 @@ test("the daily allowance is 15 only while the pass is running", async () => {
 test("operator correction is service-role only and stays in the ledger", async () => {
   await actAs("authenticated", A);
   await expect(
-    db.query("select public.operator_adjust_dew($1, -5, 'correction')", [A])
+    db.query("select public.operator_adjust_credit($1, -5, 'correction')", [A])
   ).rejects.toThrow(/permission denied/);
 
   await reset();
   const adjusted = await db.query<{ balance: string }>(
-    "select public.operator_adjust_dew($1, -5, 'correction') as balance",
+    "select public.operator_adjust_credit($1, -5, 'correction') as balance",
     [A]
   );
   expect(Number(adjusted.rows[0].balance)).toBe(26);
@@ -565,19 +565,19 @@ test("both sides of an invite are rewarded once", async () => {
   await signUp(B, "b@example.test", inviteA);
 
   await reset();
-  const inviter = await db.query<{ dew_balance: string }>(
-    "select dew_balance from public.profiles where id = $1",
+  const inviter = await db.query<{ credit_balance: string }>(
+    "select credit_balance from public.profiles where id = $1",
     [A]
   );
-  expect(Number(inviter.rows[0].dew_balance)).toBe(31);
+  expect(Number(inviter.rows[0].credit_balance)).toBe(31);
 
   const invitee = await db.query<{
-    dew_balance: string;
+    credit_balance: string;
     invited_by: string;
     invite_rewarded: boolean;
-  }>("select dew_balance, invited_by, invite_rewarded from public.profiles where id = $1", [B]);
+  }>("select credit_balance, invited_by, invite_rewarded from public.profiles where id = $1", [B]);
 
-  expect(Number(invitee.rows[0].dew_balance)).toBe(5);
+  expect(Number(invitee.rows[0].credit_balance)).toBe(5);
   expect(String(invitee.rows[0].invited_by)).toBe(A);
   expect(invitee.rows[0].invite_rewarded).toBe(true);
 
@@ -587,7 +587,7 @@ test("both sides of an invite are rewarded once", async () => {
   // A different address still gets its own trial, so the invitee is paid on
   // first use exactly like anyone else who is not farming accounts.
   const trial = await db.query<{ amount: string }>(
-    "select public.grant_trial_dew($1, $2) as amount",
+    "select public.grant_trial_credit($1, $2) as amount",
     [B, IP_TWO]
   );
   expect(Number(trial.rows[0].amount)).toBe(5);
@@ -629,13 +629,13 @@ test("a day ahead of the local date never refills", async () => {
 
   await reset();
   await db.query(
-    "update public.profiles set dew_balance = 2, dew_day = (now() at time zone timezone)::date + 1 where id = $1",
+    "update public.profiles set credit_balance = 2, credit_day = (now() at time zone timezone)::date + 1 where id = $1",
     [D]
   );
 
   await actAs("authenticated", D);
   const refilled = await db.query<{ balance: string }>(
-    "select public.refill_daily_dew() as balance"
+    "select public.refill_daily_credit() as balance"
   );
 
   expect(Number(refilled.rows[0].balance)).toBe(2);
@@ -643,7 +643,7 @@ test("a day ahead of the local date never refills", async () => {
 
   await reset();
   await db.query(
-    "update public.profiles set dew_balance = 0, dew_day = null where id = $1",
+    "update public.profiles set credit_balance = 0, credit_day = null where id = $1",
     [D]
   );
 });
@@ -651,7 +651,7 @@ test("a day ahead of the local date never refills", async () => {
 test("another account cannot read or write the ledger", async () => {
   await actAs("authenticated", B);
   const seen = await db.query<{ owner: string }>(
-    "select owner from public.dew_transactions"
+    "select owner from public.credit_transactions"
   );
 
   expect(seen.rows.length).toBeGreaterThan(0);
@@ -659,13 +659,13 @@ test("another account cannot read or write the ledger", async () => {
 
   await expect(
     db.query(
-      "insert into public.dew_transactions (owner, kind, amount, balance_after) values ($1, 'trial', 1, 1)",
+      "insert into public.credit_transactions (owner, kind, amount, balance_after) values ($1, 'trial', 1, 1)",
       [B]
     )
   ).rejects.toThrow(/row-level security|permission denied/);
 
   await actAs("anon", null);
-  await expect(db.query("select id from public.dew_transactions")).rejects.toThrow(
+  await expect(db.query("select id from public.credit_transactions")).rejects.toThrow(
     /permission denied/
   );
 });
@@ -674,17 +674,17 @@ test("every cached balance equals the sum of its ledger", async () => {
   await reset();
   const { rows } = await db.query<{
     id: string;
-    dew_balance: string;
+    credit_balance: string;
     total: string;
   }>(
-    `select p.id, p.dew_balance, coalesce(sum(t.amount), 0) as total
+    `select p.id, p.credit_balance, coalesce(sum(t.amount), 0) as total
        from public.profiles p
-       left join public.dew_transactions t on t.owner = p.id
-      group by p.id, p.dew_balance`
+       left join public.credit_transactions t on t.owner = p.id
+      group by p.id, p.credit_balance`
   );
 
   expect(rows.length).toBeGreaterThan(0);
   for (const row of rows) {
-    expect(Number(row.dew_balance)).toBe(Number(row.total));
+    expect(Number(row.credit_balance)).toBe(Number(row.total));
   }
 });

@@ -6,7 +6,7 @@ never owns the transcript.
 
 This is the implementation of the "Web Agent — Finalized Build Plan" in this
 repository. It reuses the existing base — Supabase auth/RLS, the provider
-adapter, the E2B sandbox provider, Dew and the rate limiter — and replaces the
+adapter, the E2B sandbox provider, Credit and the rate limiter — and replaces the
 in-request chat turn as the place agent work happens.
 
 ```
@@ -35,7 +35,7 @@ Browser
 | Progress | SSE built from in-memory state | append-only `run_events`, replayed on reload |
 | Cancellation | provider abort flag on a turn row | `runs.cancel_requested`, read at step boundaries |
 | Workspace | chat sandbox / GitHub-only turn | one sandbox per run, paused when it settles, destroyed after 48 h |
-| Budget | Dew hour + turn caps | plus per-account concurrent, daily-run and daily-token caps |
+| Budget | Credit hour + turn caps | plus per-account concurrent, daily-run and daily-token caps |
 | Output | changeset rows written by the loop | changeset proposed by the worker, plus diff/files as artifacts |
 | Chat | its own in-request loop | the run runtime: one chat message queues one run |
 

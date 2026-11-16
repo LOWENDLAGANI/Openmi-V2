@@ -28,7 +28,7 @@ the rest:
 | Decision | Verify runs (built) | Mission runs (this plan) |
 |---|---|---|
 | D6.1 — who picks the command | the runner, from an enumerated list | **the model, no list** |
-| D6.2 — price | 0.05 Dew per started minute | same rate, bigger reserve |
+| D6.2 — price | 0.05 Credit per started minute | same rate, bigger reserve |
 | D6.3 — secrets in the sandbox | none | **none — unchanged** |
 | D6.4 — failure vocabulary | specific and stored | same, plus mission-specific codes |
 | GitHub write | approval → branch → PR | **unchanged: still approval** |
@@ -48,7 +48,7 @@ builds it. The user's ask is one sentence: *"here is the goal — go do it."*
 user types: "make the landing page load under 1s, then open a PR"
         │
         ▼
- POST /api/missions            reserve Dew, record the mission, create the sandbox
+ POST /api/missions            reserve Credit, record the mission, create the sandbox
         │
         ▼
  tick loop (server, ≤4 min per tick, sandbox reused across ticks)
@@ -146,7 +146,7 @@ A mission reads repository content, and repository content is attacker-controlle
 (a README, a fixture, a `postinstall`). An agent with a shell *and* the user's
 GitHub token is one prompt injection away from pushing to `main` or exfiltrating
 the token. The same is true of `SUPABASE_SERVICE_ROLE_KEY`, which would let
-injected content rewrite every account's Dew balance. The product already made
+injected content rewrite every account's Credit balance. The product already made
 this call in D6.3; a shell does not change the reasoning, it strengthens it.
 
 So the boundary is enforced where it cannot be argued with:
@@ -170,7 +170,7 @@ So the boundary is enforced where it cannot be argued with:
 **Residual risk, stated rather than hidden:** a sandbox with open egress can be
 used to send traffic at a third party for the length of one mission. That is a
 terms-of-service problem, not a secret-leak problem, and the mitigation is an
-abuse report path plus the same email-verified account that tops up Dew. It is
+abuse report path plus the same email-verified account that tops up Credit. It is
 listed in §15.
 
 ### D11.3 — How is a long-running mission bounded?
@@ -214,19 +214,19 @@ Same rate as verification, different reserve. An execution hour costs the same
 as a chat hour, as `docs/EXECUTION_ENVIRONMENT_PLAN.md` established.
 
 ```
-EXEC_DEW_PER_MINUTE      0.05     (unchanged, lib/execution/cost.ts)
+EXEC_CREDIT_PER_MINUTE      0.05     (unchanged, lib/execution/cost.ts)
 EXEC_MISSION_MAX_MINUTES 20       (30 hard ceiling)
-MISSION_RESERVE_DEW      1.0      = 0.05 × 20, reserved before daytona.create
+MISSION_RESERVE_CREDIT      1.0      = 0.05 × 20, reserved before daytona.create
 ```
 
 - Reserve before the sandbox exists; `402` and no row if the balance cannot
   cover it.
 - Settle on recorded wall time, rounded up to a started minute, capped at the
-  reserve — the same `execution_settle_dew` function, no new ledger kind.
+  reserve — the same `execution_settle_credit` function, no new ledger kind.
 - A mission that never got a sandbox is refunded in full (existing behaviour in
   `executeRun`'s `finally`).
 - Model tokens are covered by the active session, exactly as a turn's are (D4).
-- The card shows minutes and Dew as two numbers, because they are two facts.
+- The card shows minutes and Credit as two numbers, because they are two facts.
 
 ### D11.5 — What may the UI claim?
 
@@ -374,7 +374,7 @@ create table public.mission_messages (
 
 | Route | Method | Behaviour |
 |---|---|---|
-| `/api/missions` | `POST` | Auth, chat + repo ownership, reserve Dew, insert `kind='mission'`, seed sandbox, `202 { missionId, ticket }` |
+| `/api/missions` | `POST` | Auth, chat + repo ownership, reserve Credit, insert `kind='mission'`, seed sandbox, `202 { missionId, ticket }` |
 | `/api/missions` | `GET` | The latest mission for `chatId`, with commands, events and `describeMission(row)` |
 | `/api/missions/[id]` | `GET` | One mission: row, last 200 commands, last 100 events |
 | `/api/missions/[id]/tick` | `POST` | Advance one tick; requires the signed ticket; `409` if terminal, `423` if paused-by-deadline |
@@ -425,7 +425,7 @@ sandbox is destroyed at the end and no changeset is collected. The card says
 
 `ship` is the "whole website is AI driven" path: goal in, PR out, no click. It
 is opt-in per mission, it is gated on recorded exit codes, and it is
-rate-limited by Dew like everything else. The commit still runs server-side
+rate-limited by Credit like everything else. The commit still runs server-side
 through the one approval function the product has — mission mode never gains a
 new write path.
 
@@ -473,12 +473,12 @@ arithmetic, and that a `finish` with an empty diff cannot render as success.
 
 - **Composer**: goal textarea (the chat message that starts it becomes the
   goal), repo already pinned by the chat, autonomy radio, minutes selector, the
-  Dew reserve shown before the button, a disabled state that names the missing
+  Credit reserve shown before the button, a disabled state that names the missing
   key ("`DAYTONA_API_KEY` is not set…") like `ExecutionPanel` already does.
 - **Live terminal**: one line per command — purpose, command, spinner, then
   `exit 0 · 12s`, collapsible tail. Auto-scroll only when the user is already at
   the bottom.
-- **Header**: elapsed / cap, commands used / 200, Dew so far, Stop.
+- **Header**: elapsed / cap, commands used / 200, Credit so far, Stop.
 - **Result**: files changed, the diff (reusing `ReviewPanel`'s rendering), and
   the per-check list with the recorded exit codes.
 - **Close the tab** → the next visit shows `paused`, not a spinner.
@@ -522,7 +522,7 @@ Checks after every task, unchanged from the README:
 ## 15. Risks, ranked
 
 1. **Compute abuse.** Open egress + a shell is a mining rig or a scanner for 20
-   minutes. Mitigations: Dew reserve, one active mission, global concurrency
+   minutes. Mitigations: Credit reserve, one active mission, global concurrency
    cap, TTL, verified-email accounts, and an abuse report path. Accepted
    residual risk, stated in the terms page.
 2. **Cost runaway through model loops.** 200 commands × 32 KiB tails is a lot of

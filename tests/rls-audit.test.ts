@@ -137,7 +137,7 @@ test("a table without a policy is a table no client can read", async () => {
     (table) => !withPolicy.has(table) && granted.has(table)
   );
 
-  // dew_codes, openmi_meta and rate_limits are the service-only tables; each has
+  // credit_codes, openmi_meta and rate_limits are the service-only tables; each has
   // no policy and no grant, which is what this asserts.
   expect(exposed).toEqual([]);
 });

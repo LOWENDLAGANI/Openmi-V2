@@ -10,7 +10,7 @@ import { parseCustomModels, type CustomModel } from "@/lib/models/custom";
 import { AUTO_ROUTES, routeForModel } from "@/lib/models/routes";
 import { MAX_CHAIN_LENGTH, planChain } from "@/lib/routing/chain";
 import { classifyTask } from "@/lib/routing/classify";
-import { DEW_PER_HOUR } from "@/lib/dew";
+import { CREDIT_PER_HOUR } from "@/lib/credits";
 import {
   EmptyCompletionError,
   ProviderError,
@@ -244,7 +244,7 @@ export function modelCatalogue(
       images: false,
       documents: false,
       // A custom entry has no price of its own, so it costs the default hour.
-      dewPerHour: DEW_PER_HOUR,
+      creditPerHour: CREDIT_PER_HOUR,
       available: providersFor(model.id, env, custom).length > 0,
     });
   }

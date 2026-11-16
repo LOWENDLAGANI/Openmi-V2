@@ -2,7 +2,7 @@
  * Same-origin check for mutating routes.
  *
  * A session cookie is not enough on its own: another origin can make the
- * browser send it. Mission routes start sandboxes and spend Dew, so they check
+ * browser send it. Mission routes start sandboxes and spend Credit, so they check
  * that the request came from this deployment before doing either.
  *
  * A missing `Origin` header is allowed because non-browser callers and some

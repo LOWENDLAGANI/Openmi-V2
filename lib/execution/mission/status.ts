@@ -45,8 +45,8 @@ export type MissionRow = {
   commands_count: number;
   changed_files: number | null;
   diff_bytes: number | null;
-  reserved_dew: number;
-  charged_dew: number;
+  reserved_credit: number;
+  charged_credit: number;
   started_at: string;
   deadline_at: string | null;
   last_tick_at: string | null;
@@ -115,10 +115,10 @@ export function describeMission(
   const commands = Math.max(commandCount, run.commands_count ?? 0);
 
   const charge =
-    run.charged_dew > 0
-      ? `${run.charged_dew} Dew charged of ${run.reserved_dew} reserved.`
-      : run.reserved_dew > 0
-        ? `${run.reserved_dew} Dew reserved; nothing charged yet.`
+    run.charged_credit > 0
+      ? `${run.charged_credit} Credit charged of ${run.reserved_credit} reserved.`
+      : run.reserved_credit > 0
+        ? `${run.reserved_credit} Credit reserved; nothing charged yet.`
         : null;
 
   if (run.status === "queued" || run.status === "running") {

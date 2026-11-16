@@ -81,7 +81,7 @@ a different product.
 
 So "fork bolt.diy and ship it" is MIT-legal right up to the moment it faces
 paying users, at which point the runtime is a negotiated cost. That cost has no
-public number, which makes it impossible to price into Dew honestly before a
+public number, which makes it impossible to price into Credit honestly before a
 sales conversation.
 
 ## 5. Fit against Openmi
@@ -93,7 +93,7 @@ sales conversation.
 | Editor | CodeMirror 6 | file viewer only | add a CodeMirror tab (no Monaco) |
 | Error loop | preview errors forwarded into chat | Playwright console errors in a tool result | forward preview runtime errors into the turn |
 | Persistence | IndexedDB | Supabase + sandbox disk | already better |
-| AI | server proxy + token meter | provider chain + Dew ledger | already better |
+| AI | server proxy + token meter | provider chain + Credit ledger | already better |
 | Deploy | bolt.host / Netlify | none (P16) | Vercel deploy |
 | Version history | snapshots | changeset revert only (P14) | checkpoints |
 | COOP/COEP | required app-wide | not set | **do not** adopt app-wide; isolate any WebContainer surface on its own origin |

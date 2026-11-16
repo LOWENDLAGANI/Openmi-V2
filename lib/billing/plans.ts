@@ -11,7 +11,7 @@
  * days are mirrored in `038_subscription_passes.sql`; a plan the database does
  * not know is refused at submission rather than stored as a string.
  *
- * The one-off Dew packs are gone. They sold Dew at RM0.60–0.75 each while a pass
+ * The one-off Credit packs are gone. They sold Credit at RM0.60–0.75 each while a pass
  * already raised the daily allowance, so they were strictly worse value and one
  * of them undercut the cheapest pass.
  */
@@ -23,8 +23,8 @@ export type Plan = {
   name: string;
   /** Price in the currency the hosted page charges (RM). */
   price: number;
-  /** Dew granted when a receipt for this plan is approved. */
-  dew: number;
+  /** Credit granted when a receipt for this plan is approved. */
+  credit: number;
   /** Days of paid allowance the pass covers. */
   days: number;
   blurb: string;
@@ -35,17 +35,17 @@ export const PLANS: readonly Plan[] = [
     id: "pass-15",
     name: "15-day pass",
     price: 18,
-    dew: 30,
+    credit: 30,
     days: 15,
-    blurb: "Fifteen days at 15 Dew a day, plus 30 Dew up front.",
+    blurb: "Fifteen days at 15 Credit a day, plus 30 Credit up front.",
   },
   {
     id: "pass-30",
     name: "30-day pass",
     price: 36,
-    dew: 70,
+    credit: 70,
     days: 30,
-    blurb: "Thirty days at 15 Dew a day, plus 70 Dew up front.",
+    blurb: "Thirty days at 15 Credit a day, plus 70 Credit up front.",
   },
 ];
 
@@ -53,11 +53,11 @@ export const PLAN_IDS = PLANS.map((plan) => plan.id);
 
 /**
  * What a paid account actually gets. Shown next to the plans, and the same
- * rules the receipt review and the daily refill implement: fifteen Dew a day
+ * rules the receipt review and the daily refill implement: fifteen Credit a day
  * while the pass is active, six once it ends.
  */
 export const PAID_BENEFITS = [
-  "15 Dew a day instead of 6",
+  "15 Credit a day instead of 6",
   "For the length of the pass — the allowance returns to 6 when it ends",
   "Approval extends a running pass from its current end, never from today",
   "Everything the free tier includes",

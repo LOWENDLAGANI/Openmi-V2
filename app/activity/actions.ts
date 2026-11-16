@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { normalizeTimezone } from "@/lib/dew";
-import { redeemDewCode } from "@/lib/dew/store";
+import { normalizeTimezone } from "@/lib/credits";
+import { redeemCreditCode } from "@/lib/credits/store";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -58,14 +58,14 @@ export async function redeemCode(formData: FormData) {
     fail(`Too many code attempts. Try again in ${limited.retryAfterSeconds} seconds.`);
   }
 
-  const result = await redeemDewCode(admin, user.id, code);
+  const result = await redeemCreditCode(admin, user.id, code);
 
   if (!result.ok) fail(result.error);
 
   revalidatePath("/activity");
   redirect(
     `/activity?saved=${encodeURIComponent(
-      `Redeemed ${result.amount} Dew. New balance: ${result.balance}.`
+      `Redeemed ${result.amount} Credit. New balance: ${result.balance}.`
     )}`
   );
 }

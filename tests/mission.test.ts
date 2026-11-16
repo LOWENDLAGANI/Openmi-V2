@@ -6,7 +6,7 @@ import {
   missionDeadline,
   missionExpired,
   missionMinutes,
-  missionReserveDew,
+  missionReserveCredit,
   remainingMs,
   stalledAfter,
 } from "../lib/execution/mission/budget";
@@ -44,16 +44,16 @@ describe("mission budget", () => {
   });
 
   test("the reserve is the rate times the chosen minutes", () => {
-    expect(missionReserveDew(20)).toBe(1);
-    expect(missionReserveDew(5)).toBe(0.25);
-    expect(missionReserveDew(90)).toBe(1.5);
+    expect(missionReserveCredit(20)).toBe(1);
+    expect(missionReserveCredit(5)).toBe(0.25);
+    expect(missionReserveCredit(90)).toBe(1.5);
   });
 
   test("a mis-set env cannot buy an hour", () => {
     expect(missionMinutes({ EXEC_MISSION_MINUTES: "99" })).toBe(30);
     expect(missionMinutes({ EXEC_MISSION_MINUTES: "0" })).toBe(1);
     expect(missionMinutes({ EXEC_MISSION_MINUTES: "nonsense" })).toBe(20);
-    expect(missionCaps({ EXEC_MISSION_MINUTES: "10" }).reserveDew).toBe(0.5);
+    expect(missionCaps({ EXEC_MISSION_MINUTES: "10" }).reserveCredit).toBe(0.5);
   });
 
   test("a deadline in the past is expired, and a missing one is too", () => {
@@ -184,8 +184,8 @@ describe("mission description", () => {
     commands_count: 4,
     changed_files: 2,
     diff_bytes: 1200,
-    reserved_dew: 1,
-    charged_dew: 0.2,
+    reserved_credit: 1,
+    charged_credit: 0.2,
     started_at: new Date().toISOString(),
     deadline_at: new Date(Date.now() + 60_000).toISOString(),
     last_tick_at: null,

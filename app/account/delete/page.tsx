@@ -33,7 +33,7 @@ const REMOVED = [
   "The sealed GitHub token and the connection it belongs to.",
   "Uploaded receipts and the payment requests attached to them.",
   "Run records, checkpoints, sandboxes and preview addresses.",
-  "The Dew ledger, balance, invites and pass history.",
+  "The Credit ledger, balance, invites and pass history.",
 ];
 
 const KEPT = [
@@ -156,7 +156,7 @@ export default async function DeleteAccountPage({
           <Link href="/privacy#retention" className="text-accent-text underline-offset-2 hover:underline">
             privacy policy
           </Link>{" "}
-          describes. Deleting an account does not refund an unspent Dew balance
+          describes. Deleting an account does not refund an unspent Credit balance
           or an unexpired pass; the{" "}
           <Link href="/refunds" className="text-accent-text underline-offset-2 hover:underline">
             refund and cancellation policy

@@ -25,12 +25,12 @@ import {
   planById,
 } from "@/lib/billing/plans";
 import {
-  DAILY_FREE_DEW,
-  formatDew,
+  DAILY_FREE_CREDIT,
+  formatCredit,
   formatPassDate,
   formatPassRemaining,
-} from "@/lib/dew";
-import { readDewProfile, refillDailyDew } from "@/lib/dew/store";
+} from "@/lib/credits";
+import { readCreditProfile, refillDailyCredit } from "@/lib/credits/store";
 import { getSession } from "@/lib/session";
 import { submitReceipt } from "./actions";
 
@@ -55,7 +55,7 @@ type RequestRow = {
   receipt_path: string;
   receipt_name: string | null;
   status: string;
-  dew_granted: number | null;
+  credit_granted: number | null;
   decision_note: string | null;
   created_at: string;
   decided_at: string | null;
@@ -69,7 +69,7 @@ function utc(value: string | null): string {
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; submitted?: string; dew?: string }>;
+  searchParams: Promise<{ error?: string; submitted?: string; credit?: string }>;
 }) {
   const params = await searchParams;
   const session = await getSession();
@@ -95,14 +95,14 @@ export default async function PayPage({
   const { supabase, user } = session;
 
   // Settle the local day before reading the balance the next turn will use.
-  await refillDailyDew(supabase);
+  await refillDailyCredit(supabase);
 
   const [profile, requestsResult] = await Promise.all([
-    readDewProfile(supabase, user.id),
+    readCreditProfile(supabase, user.id),
     supabase
       .from("payment_requests")
       .select(
-        "id, plan, amount, reference, note, receipt_path, receipt_name, status, dew_granted, decision_note, created_at, decided_at"
+        "id, plan, amount, reference, note, receipt_path, receipt_name, status, credit_granted, decision_note, created_at, decided_at"
       )
       .eq("owner", user.id)
       .order("created_at", { ascending: false })
@@ -184,12 +184,12 @@ export default async function PayPage({
         </p>
       )}
 
-      {params.dew && (
+      {params.credit && (
         <p
           role="status"
           className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
         >
-          {params.dew}
+          {params.credit}
         </p>
       )}
 
@@ -198,9 +198,9 @@ export default async function PayPage({
           <div>
             <p className="eyebrow">balance</p>
             <p className="mt-1 text-[clamp(2rem,5vw,2.7rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums text-hi">
-              {formatDew(profile?.balance ?? 0)}{" "}
+              {formatCredit(profile?.balance ?? 0)}{" "}
               <span className="text-[0.42em] font-medium uppercase tracking-[0.08em] text-low">
-                dew
+                credit
               </span>
             </p>
           </div>
@@ -221,15 +221,15 @@ export default async function PayPage({
 
         <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-mid">
           {TOPUP_PAUSED
-            ? "Checkout is paused while the payment path is tested. No payment is accepted and the upload form is closed; a redeem code still adds Dew."
-            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, upload it below. Approval adds the Dew and starts or extends the pass."}
+            ? "Checkout is paused while the payment path is tested. No payment is accepted and the upload form is closed; a redeem code still adds Credit."
+            : "Payment happens on Sociabuzz, not here. Pay, keep the receipt, upload it below. Approval adds the Credit and starts or extends the pass."}
         </p>
 
         {profile?.paidUntil && (
           <p className="mt-2 max-w-xl text-[11.5px] leading-relaxed text-low">
             {profile.paidActive
               ? `Your pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} — ${formatPassRemaining(profile.paidUntil)}.`
-              : `Your last pass ended ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}. The daily allowance is back to ${DAILY_FREE_DEW} Dew.`}
+              : `Your last pass ended ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}. The daily allowance is back to ${DAILY_FREE_CREDIT} Credit.`}
           </p>
         )}
 
@@ -237,9 +237,9 @@ export default async function PayPage({
           <div>
             <p className="eyebrow">wallet credit</p>
             <p className="mt-0.5 font-mono text-[16px] leading-none tabular-nums text-hi">
-              {formatDew(profile?.wallet ?? 0)}{" "}
+              {formatCredit(profile?.wallet ?? 0)}{" "}
               <span className="text-[10px] uppercase tracking-[0.1em] text-low">
-                dew
+                credit
               </span>
             </p>
           </div>
@@ -306,9 +306,9 @@ export default async function PayPage({
                 </p>
               </div>
               <p className="mt-2 font-mono text-[20px] leading-none tabular-nums text-accent-text">
-                {plan.dew}
+                {plan.credit}
                 <span className="ml-1 text-[10px] uppercase tracking-[0.12em] text-low">
-                  dew
+                  credit
                 </span>
               </p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
@@ -360,7 +360,7 @@ export default async function PayPage({
             >
               {PLANS.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name} — {plan.dew} Dew
+                  {plan.name} — {plan.credit} Credit
                 </option>
               ))}
             </select>
@@ -479,9 +479,9 @@ export default async function PayPage({
                     ref {row.reference}
                   </p>
 
-                  {row.status === "approved" && row.dew_granted !== null && (
+                  {row.status === "approved" && row.credit_granted !== null && (
                     <p className="mt-1 text-[11px] text-accent-text">
-                      +{row.dew_granted} Dew granted
+                      +{row.credit_granted} Credit granted
                     </p>
                   )}
 
@@ -513,7 +513,7 @@ export default async function PayPage({
       </section>
 
       <p className="mt-8 max-w-2xl text-[10.5px] leading-relaxed text-low">
-        Approval is recorded against your receipt, and the Dew moves through the
+        Approval is recorded against your receipt, and the Credit moves through the
         same ledger as every other balance change. A rejected receipt
         keeps its note and can be resubmitted with a corrected reference.
       </p>

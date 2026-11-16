@@ -80,7 +80,7 @@ beforeAll(async () => {
 
   // The trial is paid on first use now, so the test pays it the way the app
   // does before it measures the reservation. The grant is a service-role call.
-  await db.query("select public.grant_trial_dew($1, $2)", [
+  await db.query("select public.grant_trial_credit($1, $2)", [
     OWNER,
     "execution-test-address-01",
   ]);
@@ -91,16 +91,16 @@ afterAll(async () => {
 });
 
 async function balance(): Promise<number> {
-  const { rows } = await db.query<{ dew_balance: string }>(
-    "select dew_balance from public.profiles where id = $1",
+  const { rows } = await db.query<{ credit_balance: string }>(
+    "select credit_balance from public.profiles where id = $1",
     [OWNER]
   );
-  return Number(rows[0]?.dew_balance);
+  return Number(rows[0]?.credit_balance);
 }
 
 async function ledgerSum(): Promise<number> {
   const { rows } = await db.query<{ total: string }>(
-    "select coalesce(sum(amount), 0) as total from public.dew_transactions where owner = $1",
+    "select coalesce(sum(amount), 0) as total from public.credit_transactions where owner = $1",
     [OWNER]
   );
   return Number(rows[0]?.total ?? 0);
@@ -109,11 +109,11 @@ async function ledgerSum(): Promise<number> {
 async function ledgerCount(kind: string, reference?: string): Promise<number> {
   const { rows } = reference
     ? await db.query<{ count: number }>(
-        "select count(*)::int as count from public.dew_transactions where owner = $1 and kind = $2 and reference = $3",
+        "select count(*)::int as count from public.credit_transactions where owner = $1 and kind = $2 and reference = $3",
         [OWNER, kind, reference]
       )
     : await db.query<{ count: number }>(
-        "select count(*)::int as count from public.dew_transactions where owner = $1 and kind = $2",
+        "select count(*)::int as count from public.credit_transactions where owner = $1 and kind = $2",
         [OWNER, kind]
       );
 
@@ -122,11 +122,11 @@ async function ledgerCount(kind: string, reference?: string): Promise<number> {
 
 test("a run reserves its cap before anything is created", async () => {
   const { rows } = await db.query<{ balance: string }>(
-    "select public.execution_reserve_dew($1, $2, 0.5) as balance",
+    "select public.execution_reserve_credit($1, $2, 0.5) as balance",
     [OWNER, RUN_A]
   );
 
-  // The first request granted five Dew; the reservation takes half of one.
+  // The first request granted five Credit; the reservation takes half of one.
   expect(Number(rows[0].balance)).toBe(4.5);
   expect(await ledgerCount("execution", RUN_A)).toBe(1);
   expect(await ledgerSum()).toBe(4.5);
@@ -134,7 +134,7 @@ test("a run reserves its cap before anything is created", async () => {
 
 test("settlement charges the minutes used and returns the rest", async () => {
   const { rows } = await db.query<{ balance: string }>(
-    "select public.execution_settle_dew($1, $2, 0.15) as balance",
+    "select public.execution_settle_credit($1, $2, 0.15) as balance",
     [OWNER, RUN_A]
   );
 
@@ -145,7 +145,7 @@ test("settlement charges the minutes used and returns the rest", async () => {
 
 test("settling twice does not refund twice", async () => {
   const { rows } = await db.query<{ balance: string }>(
-    "select public.execution_settle_dew($1, $2, 0.15) as balance",
+    "select public.execution_settle_credit($1, $2, 0.15) as balance",
     [OWNER, RUN_A]
   );
 
@@ -156,14 +156,14 @@ test("settling twice does not refund twice", async () => {
 
 test("a caller cannot charge more than was reserved", async () => {
   const reserved = await db.query<{ balance: string }>(
-    "select public.execution_reserve_dew($1, $2, 0.5) as balance",
+    "select public.execution_reserve_credit($1, $2, 0.5) as balance",
     [OWNER, RUN_B]
   );
   expect(Number(reserved.rows[0].balance)).toBe(4.35);
 
-  // Ten Dew of claimed usage against a half-Dew reservation.
+  // Ten Credit of claimed usage against a half-Credit reservation.
   const settled = await db.query<{ balance: string }>(
-    "select public.execution_settle_dew($1, $2, 10) as balance",
+    "select public.execution_settle_credit($1, $2, 10) as balance",
     [OWNER, RUN_B]
   );
 
@@ -175,12 +175,12 @@ test("a caller cannot charge more than was reserved", async () => {
 test("an unaffordable reservation is refused and writes nothing", async () => {
   // Spend down through the ledger, not by editing the balance: the
   // "sum equals balance" property has to stay meaningful for the last test.
-  await db.query("select public.operator_adjust_dew($1, -4.25, 'spend down')", [
+  await db.query("select public.operator_adjust_credit($1, -4.25, 'spend down')", [
     OWNER,
   ]);
 
   await expect(
-    db.query("select public.execution_reserve_dew($1, $2, 0.5)", [OWNER, RUN_C])
+    db.query("select public.execution_reserve_credit($1, $2, 0.5)", [OWNER, RUN_C])
   ).rejects.toThrow(/insufficient balance/);
 
   expect(await ledgerCount("execution", RUN_C)).toBe(0);
@@ -188,14 +188,14 @@ test("an unaffordable reservation is refused and writes nothing", async () => {
 });
 
 test("a reservation can only exist once per run", async () => {
-  await db.query("select public.operator_adjust_dew($1, 4.9, 'top up for the test')", [
+  await db.query("select public.operator_adjust_credit($1, 4.9, 'top up for the test')", [
     OWNER,
   ]);
 
-  await db.query("select public.execution_reserve_dew($1, $2, 0.5)", [OWNER, RUN_C]);
+  await db.query("select public.execution_reserve_credit($1, $2, 0.5)", [OWNER, RUN_C]);
 
   await expect(
-    db.query("select public.execution_reserve_dew($1, $2, 0.5)", [OWNER, RUN_C])
+    db.query("select public.execution_reserve_credit($1, $2, 0.5)", [OWNER, RUN_C])
   ).rejects.toThrow(/duplicate key|unique/i);
 
   expect(await ledgerCount("execution", RUN_C)).toBe(1);
@@ -209,7 +209,7 @@ test("the run functions are not callable by a signed-in account", async () => {
   await db.exec("set role authenticated");
 
   await expect(
-    db.query("select public.execution_reserve_dew($1, $2, 0.5)", [
+    db.query("select public.execution_reserve_credit($1, $2, 0.5)", [
       OWNER,
       "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     ])
@@ -223,17 +223,17 @@ test("every cached balance still equals the sum of its ledger", async () => {
 
   const { rows } = await db.query<{
     id: string;
-    dew_balance: string;
+    credit_balance: string;
     total: string;
   }>(
-    `select p.id, p.dew_balance, coalesce(sum(t.amount), 0) as total
+    `select p.id, p.credit_balance, coalesce(sum(t.amount), 0) as total
        from public.profiles p
-       left join public.dew_transactions t on t.owner = p.id
-      group by p.id, p.dew_balance`
+       left join public.credit_transactions t on t.owner = p.id
+      group by p.id, p.credit_balance`
   );
 
   expect(rows.length).toBeGreaterThan(0);
   for (const row of rows) {
-    expect(Number(row.dew_balance)).toBe(Number(row.total));
+    expect(Number(row.credit_balance)).toBe(Number(row.total));
   }
 });

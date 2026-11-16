@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { endHourSession } from "@/lib/dew/store";
+import { endHourSession } from "@/lib/credits/store";
 import { isSameOrigin } from "@/lib/http/origin";
 import { getSession } from "@/lib/session";
 

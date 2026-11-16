@@ -23,9 +23,9 @@ import {
   detectCommands,
   type DetectedCommands,
 } from "./commands";
-import { reserveExecutionDew, settleExecutionDew } from "@/lib/dew/store";
+import { reserveExecutionCredit, settleExecutionCredit } from "@/lib/credits/store";
 
-import { EXEC_MAX_MINUTES, EXEC_RESERVE_DEW, chargeForDuration } from "./cost";
+import { EXEC_MAX_MINUTES, EXEC_RESERVE_CREDIT, chargeForDuration } from "./cost";
 import { MAX_REPAIR_PASSES, requestRepair } from "./repair";
 import { createSandbox, SandboxStartError, type SandboxHandle } from "./provider";
 import { appendEvent, clearStaleRuns, createRun, updateRun } from "./store";
@@ -169,16 +169,16 @@ export async function startExecutionRun(input: {
   // looks like it started.
   const runId = randomUUID();
 
-  const reserved = await reserveExecutionDew(admin, owner, runId, EXEC_RESERVE_DEW);
+  const reserved = await reserveExecutionCredit(admin, owner, runId, EXEC_RESERVE_CREDIT);
 
   if (!reserved.ok) {
     return {
       ok: false,
       status: 402,
-      code: "insufficient_dew",
+      code: "insufficient_credit",
       message: reserved.error.includes("insufficient balance")
-        ? `A sandbox run reserves ${EXEC_RESERVE_DEW} Dew before it starts, and the balance cannot cover that. Top up with a code, or wait for the daily refill.`
-        : `Dew could not be reserved, so nothing was started: ${reserved.error}`,
+        ? `A sandbox run reserves ${EXEC_RESERVE_CREDIT} Credit before it starts, and the balance cannot cover that. Top up with a code, or wait for the daily refill.`
+        : `Credit could not be reserved, so nothing was started: ${reserved.error}`,
     };
   }
 
@@ -190,11 +190,11 @@ export async function startExecutionRun(input: {
       changesetId,
       repo: changeset.repo_full_name,
       baseSha: changeset.base_sha,
-      reservedDew: EXEC_RESERVE_DEW,
+      reservedCredit: EXEC_RESERVE_CREDIT,
     });
   } catch (caught) {
     // The reservation exists but the run does not, so give it straight back.
-    await settleExecutionDew(admin, owner, runId, 0);
+    await settleExecutionCredit(admin, owner, runId, 0);
 
     return {
       ok: false,
@@ -487,7 +487,7 @@ export async function executeRun(input: {
     // against the minutes actually used. A run that never got a sandbox is
     // refunded in full, because nothing ran.
     const charged = sandbox ? chargeForDuration(Date.now() - startedAt) : 0;
-    const settled = await settleExecutionDew(
+    const settled = await settleExecutionCredit(
       input.admin,
       input.owner,
       input.runId,
@@ -495,7 +495,7 @@ export async function executeRun(input: {
     );
 
     if (settled.ok) {
-      await updateRun(input.admin, input.runId, { charged_dew: charged });
+      await updateRun(input.admin, input.runId, { charged_credit: charged });
     } else {
       await event("observation", `the reservation could not be settled: ${settled.error}`);
     }
