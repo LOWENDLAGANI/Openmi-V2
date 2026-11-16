@@ -13,7 +13,6 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { TrashList } from "@/components/TrashList";
 import { refillDailyDew } from "@/lib/dew/store";
 import { RepoPicker } from "@/components/RepoPicker";
-import { ReviewPanel } from "@/components/ReviewPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { Workspace } from "@/components/Workspace";
 import {
@@ -29,7 +28,6 @@ import {
   resolveBranchSha,
   searchCode,
 } from "@/lib/github/read";
-import { loadChangesets } from "@/lib/changesets/store";
 import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
@@ -357,17 +355,8 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
         )
       : Promise.resolve<string[]>([]);
 
-  const [
-    messages,
-    proposals,
-    runningTurn,
-    profileResult,
-    autoApproval,
-    validPaths,
-  ] =
-    await Promise.all([
+  const [messages, runningTurn, profileResult, validPaths] = await Promise.all([
     listMessages(session.supabase, chat.id),
-    loadChangesets(session.supabase, chat.id),
     // A turn keeps running after the tab closes. Reading the flag here is what
     // turns "the answer will arrive" into something the page can show.
     //
@@ -394,13 +383,6 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .select("dew_balance, wallet_dew, paid_until")
       .eq("id", session.user.id)
       .maybeSingle(),
-    session.supabase
-      .from("branch_autoapprovals")
-      .select("branch")
-      .eq("owner", session.user.id)
-      .eq("repo_full_name", chat.repo_full_name ?? "")
-      .eq("branch", chat.repo_branch ?? "main")
-      .maybeSingle(),
     citationPaths,
   ]);
 
@@ -422,9 +404,6 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const usableModels = models.filter((model) =>
     isModelAllowed(model.id, paidActive, models)
   );
-  const autoApproveBranch =
-    (autoApproval.data as { branch?: string } | null)?.branch ?? null;
-
   const repo =
     chat.repo_full_name && chat.repo_base_sha
       ? {
@@ -448,33 +427,6 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
           </Link>
         </p>
       )}
-
-      {proposals.error ? (
-        <div
-          role="alert"
-          className="mb-3 shrink-0 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[11.5px] leading-relaxed text-danger"
-        >
-          <p className="font-medium">Your proposals could not be loaded.</p>
-          <p className="mt-1 text-[11px]">
-            The change is stored; this page could not read it. Reloading is
-            safe. If this deployment was just updated, a database migration may
-            still be pending — an operator can check the setup report.
-          </p>
-          <p className="mt-1 font-mono text-[10.5px] opacity-80">
-            {proposals.error}
-          </p>
-        </div>
-      ) : proposals.changesets.length > 0 ? (
-        <div className="mb-3 max-h-[46vh] shrink-0 overflow-y-auto">
-          <ReviewPanel
-            changesets={proposals.changesets}
-            chatId={chat.id}
-            chatSha={chat.repo_base_sha}
-            chatBranch={chat.repo_branch ?? null}
-            autoApproveBranch={autoApproveBranch}
-          />
-        </div>
-      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col">
         {/* The sandbox sits above the transcript rather than beside it: the

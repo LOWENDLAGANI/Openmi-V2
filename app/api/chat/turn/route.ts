@@ -6,7 +6,11 @@ import {
   RUN_PROGRESS_EVENTS,
   RUN_QUEUE_WAIT_MS,
 } from "@/lib/runs/limits";
-import { readEventsSince, settleStalledRuns } from "@/lib/runs/store";
+import {
+  failUnclaimedRetries,
+  readEventsSince,
+  settleStalledRuns,
+} from "@/lib/runs/store";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentStep } from "@/lib/types";
@@ -126,6 +130,7 @@ export async function GET(request: Request) {
   // Scoped to this account and idempotent: a queued run nobody claimed and a
   // running one whose heartbeat stopped are marked failed with their reason.
   if (admin) await settleStalledRuns(admin, session.user.id);
+  if (admin) await failUnclaimedRetries(admin, session.user.id);
 
   const { data } = await session.supabase
     .from("runs")

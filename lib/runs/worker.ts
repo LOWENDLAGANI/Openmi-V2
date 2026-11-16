@@ -7,6 +7,7 @@ import { destroySandboxConfirmed } from "@/lib/execution/provider";
 import { listRunSandboxesEveryAccount } from "@/lib/execution/sandbox-inventory";
 
 import {
+  RUN_WORKER_KEEPALIVE_MS,
   WORKER_HEARTBEAT_MS,
   runSandboxExpired,
   workerConcurrency,
@@ -14,7 +15,7 @@ import {
 import { executeRun } from "./loop";
 import { workerIdentity } from "./pool";
 import { claimNextRun, reapStaleRuns } from "./store";
-import { wakeQueue } from "./wake";
+import { keepWorkerAwake, wakeQueue } from "./wake";
 import {
   drainWorker,
   heartbeatWorker,
@@ -248,6 +249,18 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
     void heartbeatWorker(admin, id, active.size);
   }, WORKER_HEARTBEAT_MS);
 
+  // The run's lease lives in Postgres; this one lives in the host. A free host
+  // sleeps an instance after fifteen minutes without inbound traffic no matter
+  // what it is executing, and a killed worker is the "worker stopped reporting"
+  // every run in flight then shows. Only pinged while there is work, so an idle
+  // worker still costs the host nothing.
+  const keepAliveUrl = options.healthUrl ?? identity.healthUrl;
+  const keepAlive = keepAliveUrl
+    ? setInterval(() => {
+        if (active.size > 0) keepWorkerAwake(keepAliveUrl);
+      }, RUN_WORKER_KEEPALIVE_MS)
+    : null;
+
   try {
     // Requeue before reaping: a run whose worker died is work to hand on, not a
     // failure, and the reaper must not settle it first.
@@ -333,6 +346,7 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
   log(`[runs] worker ${id} stopping, waiting for ${active.size} run(s)`);
 
   if (beats) clearInterval(beats);
+  if (keepAlive) clearInterval(keepAlive);
 
   // Draining is not failure: the waker stops choosing this member, and the runs
   // it already holds finish as they would have. Only a lost heartbeat is a

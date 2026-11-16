@@ -230,6 +230,17 @@ export function runWallClockMs(
  * Thirty seconds, against a five-minute stale window: twelve beats may be lost
  * to a database blip before another machine is told the worker is gone.
  */
+/**
+ * How often a worker with work in flight pings its own health URL.
+ *
+ * A host that gives instances away for free sleeps one after fifteen minutes
+ * without inbound traffic, and a worker's own database calls are not traffic to
+ * its HTTP port. A run is capped at fifteen minutes, so without this a long run
+ * could be killed by the host for being quiet. Five minutes leaves two beats
+ * inside the shortest sleep window in use.
+ */
+export const RUN_WORKER_KEEPALIVE_MS = 5 * 60_000;
+
 export const WORKER_HEARTBEAT_MS = 30_000;
 
 /** How many runs one worker executes at once. */

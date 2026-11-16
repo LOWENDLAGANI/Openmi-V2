@@ -109,6 +109,18 @@ function ping(url: string): void {
     });
 }
 
+/**
+ * A worker pinging itself, so a host that sleeps on silence keeps it alive.
+ *
+ * The waker's traffic is inbound and counts; a worker executing a run makes no
+ * inbound requests at all. This is the same ping, sent from the worker while it
+ * holds work, and it is a no-op when the deployment knows no health URL.
+ */
+export function keepWorkerAwake(url: string | null | undefined): void {
+  const target = url ? httpUrl(url) : null;
+  if (target) ping(target);
+}
+
 /** Pings a deployment's one static URL. Kept for the single-worker setup. */
 export function wakeWorker(
   env: Record<string, string | undefined> = process.env

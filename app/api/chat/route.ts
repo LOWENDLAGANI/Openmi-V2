@@ -36,6 +36,7 @@ import {
 import {
   appendRunMessage,
   createRun,
+  failUnclaimedRetries,
   readEventsSince,
   readQuota,
   settleStalledRuns,
@@ -365,6 +366,10 @@ export async function POST(request: Request) {
   // already have a run in progress" for good. Age the account's leftovers out
   // before asking the quota, so a leftover is not a permanent lockout.
   await settleStalledRuns(admin, session.user.id);
+  // A retry nobody claimed is not work in progress; it is a row holding the
+  // account's one-live-run slot, which is what "you already have a run in
+  // progress" was saying about a run that had already died.
+  await failUnclaimedRetries(admin, session.user.id);
 
   const quota = await readQuota(admin, session.user.id);
   const decision = checkRunQuota(quota);
@@ -445,6 +450,7 @@ export async function POST(request: Request) {
     // above and this insert. Settle again and retry once: if the retry is also
     // refused, the other run really is live and the 409 is the truth.
     await settleStalledRuns(admin, session.user.id);
+    await failUnclaimedRetries(admin, session.user.id);
 
     try {
       run = await queueRun();

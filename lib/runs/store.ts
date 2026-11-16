@@ -610,6 +610,77 @@ export async function settleStalledRuns(
 }
 
 /**
+ * How long a requeued run may wait for a machine before it is called a dead end.
+ *
+ * A first attempt gets twenty minutes to be claimed, because it may be sitting
+ * behind a full-length run. A retry has already waited once and its machine has
+ * already gone, so two minutes without a claim means the fleet is not going to
+ * take it.
+ */
+export const RUN_RETRY_CLAIM_MS = 2 * 60_000;
+
+/**
+ * Retries that nobody claimed, failed so they stop holding the account's slot.
+ *
+ * `settle_stalled_runs` hands a lost run back to the queue and resets its clock.
+ * While that row sits in `queued` the quota counts it as a live run, so every new
+ * message is refused with "you already have a run in progress" by a run that will
+ * never start — the phantom that made the worker look like it was running
+ * something. Twenty minutes of that is what the queue rule allows a first attempt;
+ * a second failure does not get it.
+ */
+export async function failUnclaimedRetries(
+  admin: Client,
+  owner: string,
+  now: number = Date.now()
+): Promise<string[]> {
+  const cutoff = new Date(now - RUN_RETRY_CLAIM_MS).toISOString();
+
+  const { data } = await admin
+    .from("runs")
+    .select("id")
+    .eq("owner", owner)
+    .eq("status", "queued")
+    .gt("retry_count", 0)
+    .is("started_at", null)
+    .lt("created_at", cutoff)
+    .limit(10);
+
+  const ids = ((data ?? []) as Array<{ id?: string }>)
+    .map((row) => (row.id ? String(row.id) : ""))
+    .filter((id) => id.length > 0);
+
+  const failed: string[] = [];
+
+  for (const id of ids) {
+    const { error } = await admin
+      .from("runs")
+      .update({
+        status: "failed",
+        stop_reason: "error",
+        error:
+          "The machine running this stopped responding and no worker claimed the retry. Start it again.",
+        ended_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "queued")
+      .gt("retry_count", 0);
+
+    if (error) continue;
+
+    failed.push(id);
+
+    await appendEvent(admin, id, "run.error", {
+      code: "worker-lost",
+      message: "The worker stopped reporting and the retry was never claimed.",
+      retryable: true,
+    });
+  }
+
+  return failed;
+}
+
+/**
  * A run whose worker stopped reporting is not running any more.
  *
  * The reaper is a safety net for a worker crash, and it runs from the worker's
