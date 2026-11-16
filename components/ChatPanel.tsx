@@ -1137,14 +1137,15 @@ export function ChatPanel({
  * The chain of thought, folded.
  *
  * A thinking model streams what it is weighing before it answers, on a channel
- * of its own. Printing it would put the working out into the conversation;
- * dropping it would pretend the model does not think, and the reader who wants
- * it is usually checking one claim. So it is one tap away, and it never renders
- * as part of the answer.
+ * of its own. Printing it would put the working out into the conversation, so it
+ * folds; dropping it would pretend the model does not think. A live block starts
+ * open — the point of reading in real time is to see it think — and a stored one
+ * opens on a tap. Neither renders as part of the answer.
  */
 function ThinkingBlock({ text, live = false }: { text: string; live?: boolean }) {
   return (
     <details
+      open={live ? true : undefined}
       className="mb-2 rounded-2xl border border-line bg-raised/60 px-3 py-1.5"
       data-live={live ? "true" : "false"}
     >

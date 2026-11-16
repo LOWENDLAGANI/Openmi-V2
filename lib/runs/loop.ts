@@ -130,6 +130,8 @@ export async function executeRun(
   // which is what a cancelled or failed run has to show.
   let answerText = "";
   let collectedText = "";
+  /** Everything the model thought, for the chat's folded reasoning block. */
+  let collectedReasoning = "";
   let changedFiles: string[] = [];
   let chatToken: string | null = null;
 
@@ -228,6 +230,8 @@ export async function executeRun(
 
     let deltaBuffer = "";
     let lastFlush = 0;
+    let reasoningBuffer = "";
+    let lastReasoningFlush = 0;
 
     const flushDeltas = async (force = false) => {
       if (deltaBuffer.length === 0) return;
@@ -239,6 +243,30 @@ export async function executeRun(
       deltaBuffer = "";
       lastFlush = Date.now();
       await appendEvent(admin, runId, "message.delta", { text });
+    };
+
+    /**
+     * Reasoning, on its own channel.
+     *
+     * It used to be kept only for the provider that echoes it back, so a
+     * thinking model looked idle until the first token of its answer. The chat
+     * folds it away and opens it on request; the answer is still a separate
+     * channel, so nothing here can be mistaken for one.
+     */
+    const flushReasoning = async (force = false) => {
+      if (reasoningBuffer.length === 0) return;
+      if (
+        !force &&
+        reasoningBuffer.length < MAX_DELTA_BUFFER &&
+        Date.now() - lastReasoningFlush < DELTA_FLUSH_MS
+      ) {
+        return;
+      }
+
+      const text = reasoningBuffer;
+      reasoningBuffer = "";
+      lastReasoningFlush = Date.now();
+      await appendEvent(admin, runId, "message.reasoning", { text });
     };
 
     const emitUsage = async () => {
@@ -326,9 +354,12 @@ export async function executeRun(
               outputTokens += estimateTokens(event.text);
               await flushDeltas();
             } else if (event.type === "reasoning") {
-              // Recorded for the provider that requires it echoed back, never
-              // streamed: the reader sees tool summaries, not chain-of-thought.
+              // Kept for the provider that requires it echoed back, and sent to
+              // the chat on its own channel so the reader can watch it think.
               stepReasoning += event.text;
+              collectedReasoning += event.text;
+              reasoningBuffer += event.text;
+              await flushReasoning();
             } else {
               const existing = fragments.get(event.index) ?? {
                 id: "",
@@ -357,6 +388,7 @@ export async function executeRun(
       }
 
       await flushDeltas(true);
+      await flushReasoning(true);
 
       const calls = [...fragments.values()]
         .filter((call) => call.name.length > 0)
@@ -582,6 +614,7 @@ export async function executeRun(
         run,
         sandbox,
         text: status === "done" ? answerText : collectedText,
+        thinking: collectedReasoning,
         files: changedFiles,
         token: chatToken,
         sealKey: serverEnv().githubTokenKey,

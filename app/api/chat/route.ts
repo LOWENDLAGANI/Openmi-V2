@@ -605,6 +605,15 @@ function streamRun(input: StreamInput): NextResponse {
             continue;
           }
 
+          // The model's chain of thought, on its own channel. The panel keeps
+          // it apart from the answer and folds it, so it is never mistaken for
+          // something the assistant said.
+          if (event.kind === "message.reasoning") {
+            const text = typeof payload.text === "string" ? payload.text : "";
+            if (text.length > 0) send("reasoning", { text });
+            continue;
+          }
+
           if (event.kind === "tool.started") {
             const name = typeof payload.name === "string" ? payload.name : "tool";
             const summary =

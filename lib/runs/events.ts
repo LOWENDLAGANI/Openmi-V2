@@ -17,6 +17,7 @@ import { RUN_EVENT_MAX_BYTES } from "./limits";
 export const RUN_EVENT_NAMES = [
   "run.started",
   "message.delta",
+  "message.reasoning",
   "message.done",
   "tool.started",
   "tool.finished",
@@ -86,10 +87,11 @@ export function runIsLive(status: string): boolean {
 }
 
 /**
- * A short, human line for a tool call, shown instead of chain-of-thought.
+ * A short, human line for a tool call.
  *
- * The reader sees what the agent is doing — "editing src/app/page.tsx" — never
- * the model's private reasoning, which is not streamed at all.
+ * The reader sees what the agent is doing — "editing src/app/page.tsx" — and
+ * the model's reasoning arrives beside it on its own channel, folded until the
+ * reader opens it.
  */
 export function toolSummary(name: string, args: Record<string, unknown> | null): string {
   const value = (key: string) =>

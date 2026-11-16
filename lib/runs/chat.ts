@@ -45,7 +45,8 @@ export async function appendChatAnswer(
   admin: SupabaseClient,
   run: RunRow,
   text: string,
-  tokens: number
+  tokens: number,
+  thinking = ""
 ): Promise<boolean> {
   if (!run.chat_id || text.trim().length === 0) return false;
 
@@ -56,7 +57,8 @@ export async function appendChatAnswer(
     p_content: text.slice(0, 40_000),
     p_model: run.model,
     p_tokens: tokens,
-    p_thinking: null,
+    p_thinking:
+      thinking.trim().length > 0 ? thinking.slice(0, 40_000) : null,
     p_steps: [],
   });
 
@@ -182,6 +184,7 @@ export async function deliverChatTurn(input: {
   run: RunRow;
   sandbox: SandboxHandle | null;
   text: string;
+  thinking?: string;
   files: string[];
   token: string | null;
   sealKey: string | null;
@@ -195,7 +198,8 @@ export async function deliverChatTurn(input: {
     input.admin,
     run,
     input.text,
-    input.tokens
+    input.tokens,
+    input.thinking ?? ""
   ).catch(() => false);
 
   if (!input.sandbox) {
