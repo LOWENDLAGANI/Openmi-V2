@@ -10,8 +10,17 @@
 /** One run stops at this many model steps, tool calls included. */
 export const RUN_MAX_STEPS = 40;
 
-/** Estimated tokens one run may spend. `ceil(chars / 4)` is the estimate. */
-export const RUN_MAX_TOKENS = 120_000;
+/**
+ * Estimated tokens one run may spend. `ceil(chars / 4)` is the estimate.
+ *
+ * Every step re-sends the whole context, so this is a spend cap, not a size
+ * cap: at the compaction target below it buys roughly twenty full-context
+ * steps, which is a real turn rather than a handful of file reads. The old
+ * 120,000 ended ordinary work — six steps of a README and a few greps reached
+ * it — and the transcript then said the answer had stopped before it finished.
+ * The step cap is what bounds runaway work.
+ */
+export const RUN_MAX_TOKENS = 600_000;
 
 /** Wall clock, from claim to teardown. The sandbox is killed at the same edge. */
 export const RUN_WALL_CLOCK_MS = 15 * 60_000;
@@ -84,8 +93,14 @@ export const RUN_MAX_CONCURRENT = 1;
 /** Runs one account may start per UTC day. */
 export const RUN_DAILY_RUNS = 20;
 
-/** Tokens one account may spend per UTC day, across runs. */
-export const RUN_DAILY_TOKENS = 400_000;
+/**
+ * Tokens one account may spend per UTC day, across runs.
+ *
+ * Five runs at the per-run ceiling: a daily allowance below one run's own
+ * budget would refuse the second message of the day instead of the run that
+ * overspent.
+ */
+export const RUN_DAILY_TOKENS = 3_000_000;
 
 /**
  * A price per token, only so a run's cost can be charted. It is an estimate for
@@ -135,15 +150,22 @@ export const RUN_TREE_MAX_CHARS = 6_000;
 export const RUN_INSTRUCTIONS_MAX_CHARS = 8_000;
 
 /**
- * Compaction. The context window is 128k tokens; at 80% the oldest exchanges
- * are dropped (never the system prompt or the first request) and the eviction
- * is reported, so nobody mistakes a compacted run for a complete one.
+ * Compaction. The context window is 128k tokens; the oldest exchanges are
+ * dropped once the prompt is larger than the run wants to carry (never the
+ * system prompt or the first request) and the eviction is reported, so nobody
+ * mistakes a compacted run for a complete one.
+ *
+ * The target is well under the window on purpose. Compaction is not only a
+ * guard against the provider refusing an over-long prompt: every step re-sends
+ * the context, so a prompt left at the window's ceiling spends a step's whole
+ * token budget carrying the same read output again. Twenty-four thousand
+ * tokens is enough for the instructions, the request and the last few command
+ * results.
  */
 export const RUN_CONTEXT_WINDOW_TOKENS = 128_000;
 export const RUN_COMPACT_AT = 0.8;
-export const RUN_COMPACT_TARGET_CHARS = Math.floor(
-  RUN_CONTEXT_WINDOW_TOKENS * RUN_COMPACT_AT * 4
-);
+export const RUN_COMPACT_TARGET_TOKENS = 24_000;
+export const RUN_COMPACT_TARGET_CHARS = RUN_COMPACT_TARGET_TOKENS * 4;
 
 /** Milliseconds a run may be silent before the reaper calls it crashed. */
 export const RUN_STALE_AFTER_MS = RUN_WALL_CLOCK_MS + 5 * 60_000;

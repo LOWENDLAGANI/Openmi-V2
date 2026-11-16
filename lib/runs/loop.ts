@@ -27,6 +27,7 @@ import {
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
   RUN_STREAM_HEARTBEAT_MS,
+  compactMessages,
   estimateTokens,
   runCostUsd,
   runWallClockMs,
@@ -219,7 +220,7 @@ export async function executeRun(
         ? seeded.map((message) => ({ role: message.role, content: message.text }))
         : [{ role: "user", content: run.prompt }];
 
-    const messages: WireMessage[] = [{ role: "system", content: system }, ...history];
+    let messages: WireMessage[] = [{ role: "system", content: system }, ...history];
 
     chatToken = github?.token ?? null;
 
@@ -293,6 +294,21 @@ export async function executeRun(
           message: "The run reached its wall-clock limit.",
         });
         break;
+      }
+
+      // Every step re-sends the context, so the oldest exchanges go before the
+      // call once the prompt is larger than the run wants to carry. Without
+      // this the prompt grew until the provider refused it — and the run's own
+      // token budget was spent re-reading read output it had already paid for.
+      // The system prompt and the request stay, and the eviction is reported so
+      // a compacted turn is never mistaken for one that saw everything.
+      const compacted = compactMessages(messages);
+      if (compacted.evicted > 0) {
+        messages = compacted.messages;
+        await appendEvent(admin, runId, "warning", {
+          code: "context-compacted",
+          message: `Dropped ${compacted.evicted} older messages so the context fits the run's window.`,
+        });
       }
 
       const stepInput = estimateTokens(

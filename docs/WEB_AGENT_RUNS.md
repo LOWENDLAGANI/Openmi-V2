@@ -144,13 +144,13 @@ reader asked for in the turn. Repository content is data, never permission.
 | Limit | Value | Where |
 |---|---|---|
 | Steps per run | 40 | `RUN_MAX_STEPS` |
-| Tokens per run (estimate) | 120,000 | `RUN_MAX_TOKENS` |
+| Tokens per run (estimate) | 600,000 | `RUN_MAX_TOKENS` |
 | Wall clock | 15 min (`RUN_MAX_MINUTES`) | `runWallClockMs` |
 | Concurrent runs per account | 1 | `RUN_MAX_CONCURRENT` + unique index |
 | Runs per account per UTC day | 20 | `RUN_DAILY_RUNS` |
-| Tokens per account per UTC day | 400,000 | `RUN_DAILY_TOKENS` |
+| Tokens per account per UTC day | 3,000,000 | `RUN_DAILY_TOKENS` |
 | Run requests per minute | 6 | `RATE_LIMITS.run` |
-| Compaction | 0.8 × 128k context | `RUN_COMPACT_AT` |
+| Compaction | 24,000 tokens (96k chars) | `RUN_COMPACT_TARGET_TOKENS` |
 | Sandbox pause | 15 min (`RUN_SANDBOX_IDLE_MINUTES`) | `runSandboxIdleMinutes` |
 | Sandbox destroy | 48 h after the run settles (`RUN_SANDBOX_TTL_HOURS`) | `runSandboxExpired` |
 | Files / file size / diff | 40 / 200 KB / 400 KB | `lib/runs/limits.ts` |

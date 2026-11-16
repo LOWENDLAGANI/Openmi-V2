@@ -61,9 +61,9 @@ const read = (path: string) =>
 describe("run limits", () => {
   test("the documented caps are the ones the code enforces", () => {
     expect(RUN_MAX_STEPS).toBe(40);
-    expect(RUN_MAX_TOKENS).toBe(120_000);
+    expect(RUN_MAX_TOKENS).toBe(600_000);
     expect(RUN_DAILY_RUNS).toBe(20);
-    expect(RUN_DAILY_TOKENS).toBe(400_000);
+    expect(RUN_DAILY_TOKENS).toBe(3_000_000);
 
     // The reader stops believing a run is in progress at the same ages the
     // database settles it, so a dead row cannot spin "working" forever.
@@ -437,6 +437,16 @@ describe("the runtime the plan requires exists in the repository", () => {
     expect(stream).toContain("sseFrame");
     expect(stream).toContain("sseHeartbeat");
     expect(stream).toContain("readEventsSince");
+  });
+
+  test("the loop compacts the context before it spends the budget on it", () => {
+    const loop = read("/lib/runs/loop.ts");
+
+    // Compaction in the limits module is only a guard if the run actually
+    // calls it: every step re-sends the context, so an uncompacted prompt costs
+    // a step's whole budget to carry output the run already paid for.
+    expect(loop).toContain("compactMessages(messages)");
+    expect(loop).toContain("context-compacted");
   });
 
   test("the worker is a separate entry point", () => {
