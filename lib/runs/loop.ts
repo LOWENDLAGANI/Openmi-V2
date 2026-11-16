@@ -24,6 +24,7 @@ import type { AgentStep } from "@/lib/types";
 import { collectRunArtifacts } from "./artifacts";
 import { deliverChatTurn } from "./chat";
 import {
+  RUN_CANCEL_POLL_MS,
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
   RUN_STREAM_HEARTBEAT_MS,
@@ -153,6 +154,21 @@ export async function executeRun(
   const lease = setInterval(() => {
     void heartbeat(admin, runId, run.worker_id ?? "");
   }, RUN_STREAM_HEARTBEAT_MS);
+
+  // The stop button writes a row, not a signal: the run is here and the reader
+  // is in another process. Reading that row only between steps meant a stop
+  // waited for the model to stop writing — and a stream that had gone quiet
+  // never did, so the button appeared to do nothing for the rest of the run.
+  // This watcher is what turns the row into an abort of the call in flight.
+  const cancelWatch = new AbortController();
+  const cancelPoll = setInterval(() => {
+    if (cancelWatch.signal.aborted) return;
+    void cancelRequested(admin, runId)
+      .then((requested) => {
+        if (requested) cancelWatch.abort();
+      })
+      .catch(() => {});
+  }, RUN_CANCEL_POLL_MS);
 
   try {
     await appendEvent(admin, runId, "run.started", {
@@ -339,6 +355,18 @@ export async function executeRun(
       // token budget mid-sentence, which is not the model finishing its answer.
       let stepFinish: string | null = null;
 
+      // One signal per step, ended by the run's deadline or by the reader's
+      // stop, whichever comes first. A stop therefore lands inside the answer
+      // rather than after it.
+      const stepStop = new AbortController();
+      const stepDeadline = setTimeout(
+        () => stepStop.abort(),
+        Math.max(1_000, deadline - Date.now())
+      );
+      const onStop = () => stepStop.abort();
+      cancelWatch.signal.addEventListener("abort", onStop, { once: true });
+      if (cancelWatch.signal.aborted) stepStop.abort();
+
       for (const provider of chain) {
         try {
           for await (const event of streamChat({
@@ -346,7 +374,7 @@ export async function executeRun(
             apiKeys: providerKeys(provider),
             messages,
             tools: RUN_TOOL_SPECS,
-            signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
+            signal: stepStop.signal,
           })) {
             if (event.type === "text") {
               stepText += event.text;
@@ -378,6 +406,10 @@ export async function executeRun(
           stepFailure = null;
           break;
         } catch (caught) {
+          // A call aborted by the reader's stop is not the provider failing: the
+          // `!completed` path below settles the step as cancelled.
+          if (cancelWatch.signal.aborted) break;
+
           stepFailure = caught instanceof Error ? caught : new Error("The provider failed.");
 
           // Text or a half tool call means this step has already committed to
@@ -385,6 +417,9 @@ export async function executeRun(
           if (stepText.length > 0 || fragments.size > 0) break;
         }
       }
+
+      clearTimeout(stepDeadline);
+      cancelWatch.signal.removeEventListener("abort", onStop);
 
       await flushDeltas(true);
 
@@ -662,6 +697,7 @@ export async function executeRun(
     stopReason = "error";
   } finally {
     clearInterval(lease);
+    clearInterval(cancelPoll);
 
     // The chat is the product: the answer and its proposed diff are written
     // before the workspace is paused and before the run is marked settled, so a

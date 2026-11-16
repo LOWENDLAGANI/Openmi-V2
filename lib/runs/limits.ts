@@ -22,6 +22,17 @@ export const RUN_MAX_STEPS = 40;
  */
 export const RUN_MAX_TOKENS = 600_000;
 
+/**
+ * How often a running loop asks whether the reader stopped it.
+ *
+ * Cancellation is a row in Postgres, not a signal: the run is in the worker and
+ * the stop button is in another process. Reading that row only between steps
+ * made a stop wait for the model to finish writing, so a provider that had gone
+ * quiet held the run — and the button — for the rest of the wall clock. The loop
+ * watches it on this interval and aborts the call in flight.
+ */
+export const RUN_CANCEL_POLL_MS = 2_000;
+
 /** Wall clock, from claim to teardown. The sandbox is killed at the same edge. */
 export const RUN_WALL_CLOCK_MS = 15 * 60_000;
 

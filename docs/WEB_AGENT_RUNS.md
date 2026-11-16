@@ -33,7 +33,7 @@ Browser
 |---|---|---|
 | Loop owner | `app/api/chat/route.ts`, inside the request | `lib/runs/loop.ts`, in the worker |
 | Progress | SSE built from in-memory state | append-only `run_events`, replayed on reload |
-| Cancellation | provider abort flag on a turn row | `runs.cancel_requested`, read at step boundaries |
+| Cancellation | provider abort flag on a turn row | `runs.cancel_requested`, polled every 2 s, aborts the call in flight |
 | Workspace | chat sandbox / GitHub-only turn | one sandbox per run, paused when it settles, destroyed after 48 h |
 | Budget | Dew hour + turn caps | plus per-account concurrent, daily-run and daily-token caps |
 | Output | changeset rows written by the loop | changeset proposed by the worker, plus diff/files as artifacts |
@@ -91,9 +91,13 @@ execute grant on a mutating function.
    event appended, sandbox paused in `finally` (compute released, disk kept).
    The sweep destroys it 48 hours later — `RUN_SANDBOX_TTL_HOURS`.
 
-Cancellation is a flag checked before each step and before each tool call. A
-tool in flight is allowed to finish: a half-applied edit is worse than a slow
-cancel.
+Cancellation is a flag checked before each step, before each tool call, and
+every `RUN_CANCEL_POLL_MS` (2 s) while a step runs. A stop aborts the provider
+stream in flight, so the button neither waits for the model to finish writing
+nor sits dead until the wall clock. A tool in flight is still allowed to
+finish: a half-applied edit is worse than a slow cancel. A provider that sends
+nothing for `PROVIDER_IDLE_MS` (120 s) is treated as gone, and the step fails
+with that reason instead of holding the run open in silence.
 
 A run whose heartbeat stops is marked failed by `reapStaleRuns`, called on
 worker start and from `GET /api/cron/run-sweep` with `CRON_SECRET`. The same

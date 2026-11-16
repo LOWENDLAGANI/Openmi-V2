@@ -412,8 +412,29 @@ async function* streamCompletionOnce({
   let sawReasoning = false;
   let finishReason: string | null = null;
 
+  /** One read, with an idle deadline attached to it. */
+  const readFrame = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    return Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          // Cancelling the body frees the socket; the rejection is what lets the
+          // caller fail this step instead of waiting on it.
+          void reader.cancel().catch(() => {});
+          reject(
+            new ProviderError("The provider stopped responding mid-answer.")
+          );
+        }, PROVIDER_IDLE_MS);
+      }),
+    ]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+  };
+
   frames: while (true) {
-    const { value, done } = await reader.read();
+    const { value, done } = await readFrame();
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
@@ -581,6 +602,17 @@ export async function* streamChat({
     : new ProviderError("Every key for this provider failed.");
 }
 
+/**
+ * How long a single read may wait before the provider is treated as gone.
+ *
+ * A provider that stops sending frames without closing the socket leaves the
+ * read pending forever, and the run then shows nothing until its wall clock
+ * expires — a finished-looking answer with no way to tell it is still open.
+ * Longer than any real gap between frames, including a reasoning model's first
+ * token.
+ */
+const PROVIDER_IDLE_MS = 120_000;
+
 async function* streamChatOnce({
   provider,
   apiKey,
@@ -640,8 +672,29 @@ async function* streamChatOnce({
   let sawReasoning = false;
   let finishReason: string | null = null;
 
+  /** One read, with an idle deadline attached to it. */
+  const readFrame = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    return Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          // Cancelling the body frees the socket; the rejection is what lets the
+          // caller fail this step instead of waiting on it.
+          void reader.cancel().catch(() => {});
+          reject(
+            new ProviderError("The provider stopped responding mid-answer.")
+          );
+        }, PROVIDER_IDLE_MS);
+      }),
+    ]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+  };
+
   frames: while (true) {
-    const { value, done } = await reader.read();
+    const { value, done } = await readFrame();
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");

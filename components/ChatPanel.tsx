@@ -144,6 +144,11 @@ export function ChatPanel({
   const [notices, setNotices] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [stopping, setStopping] = useState(false);
+  // How the last turn ended. A spinner disappearing is not a signal: an answer
+  // that stopped mid-plan and one that finished read the same without this.
+  const [turnEnd, setTurnEnd] = useState<{ status: string; steps: number } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   // The sentence a paid-only model shows when the account has no live pass,
   // with the way to fix it. Nothing is sent while it is up.
@@ -523,6 +528,7 @@ export function ChatPanel({
     }
     setError(null);
     setNotices([]);
+    setTurnEnd(null);
 
     // A continuation keeps what the previous window wrote; a fresh turn starts
     // from an empty column.
@@ -839,6 +845,10 @@ export function ChatPanel({
           ]);
           setPending("");
           sawDone = true;
+          setTurnEnd({
+            status: typeof payload.status === "string" ? payload.status : "done",
+            steps: stepLog.length,
+          });
           // The finished message carries the steps now.
           stepsCarried = true;
           setShots([]);
@@ -865,6 +875,7 @@ export function ChatPanel({
           setError(typeof payload.message === "string" ? payload.message : "The turn failed.");
           setPending("");
           sawDone = true;
+          setTurnEnd({ status: "failed", steps: stepLog.length });
           // The steps stay: a failed turn has no message to carry them, and
           // the command output is the only evidence of what went wrong.
           //
@@ -943,6 +954,13 @@ export function ChatPanel({
         ]);
       }
 
+      // A stop the reader asked for is what the line at the end of the turn is
+      // for. A stream that merely dropped is handed to the poll below instead,
+      // because that turn is still out there and has not ended.
+      if (!sawDone && !willContinue && stoppedRef.current) {
+        setTurnEnd({ status: "cancelled", steps: stepLog.length });
+      }
+
       // A finished or stopped answer carries its console on the message card, so
       // the live copy can go. A turn that failed, or stopped before any text,
       // keeps the console on screen: that output is the only record of what the
@@ -1012,8 +1030,24 @@ export function ChatPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ chatId: activeChatId }),
       })
-        .then((response) => {
-          if (!response.ok) abortRef.current?.abort();
+        .then(async (response) => {
+          if (!response.ok) {
+            abortRef.current?.abort();
+            return;
+          }
+
+          // "No live run" is a real answer, not a stop in progress: saying so
+          // is better than leaving the button spinning for a turn already over.
+          const payload = (await response.json().catch(() => null)) as
+            | { cancelled?: boolean }
+            | null;
+
+          if (payload?.cancelled === false) {
+            setNotices((current) => [
+              ...current,
+              "There was no run left to stop.",
+            ]);
+          }
         })
         .catch(() => {
           // No server to stop, so end this view rather than hang on it.
@@ -1199,6 +1233,23 @@ export function ChatPanel({
                   <span aria-hidden="true" className="stream-caret" />
                 )}
               </article>
+            )}
+
+            {turnEnd && (
+              <p
+                role="status"
+                data-state={turnEnd.status}
+                className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-low"
+              >
+                <span aria-hidden="true">
+                  {turnEnd.status === "done"
+                    ? "✓"
+                    : turnEnd.status === "cancelled"
+                      ? "■"
+                      : "✕"}
+                </span>
+                {endLabel(turnEnd)}
+              </p>
             )}
           </div>
         )}
@@ -1387,6 +1438,22 @@ function ThinkingBlock({ text, live = false }: { text: string; live?: boolean })
       </p>
     </details>
   );
+}
+
+/**
+ * How the turn ended, as one line.
+ *
+ * The transcript used to end the same way whether the run had answered or was
+ * still holding an open provider stream, so "is it done?" had to be guessed from
+ * a button. The step count is the other half: it says work happened.
+ */
+function endLabel(end: { status: string; steps: number }): string {
+  const count =
+    end.steps > 0 ? ` · ${end.steps} step${end.steps === 1 ? "" : "s"}` : "";
+  if (end.status === "cancelled") return `Stopped${count}`;
+  if (end.status === "blocked") return `Stopped at a limit${count}`;
+  if (end.status === "failed") return `Failed${count}`;
+  return `Finished${count}`;
 }
 
 /**
