@@ -858,6 +858,43 @@ export type RemoteSandboxSummary = {
  * destroyed. Bounded because reconciliation is a safety net, not a scan of the
  * whole account's estate.
  */
+/**
+ * The throwaway boxes an operator's sandbox test created.
+ *
+ * A test box carries `kind: "probe"` instead of a run or chat id, so the panel
+ * can find leftovers by label — the only record that survives a request that
+ * died between create and teardown.
+ */
+export async function listProbeSandboxes(
+  limit = 100
+): Promise<RemoteSandboxSummary[]> {
+  if (!executionConfigured()) {
+    throw new SandboxStartError(
+      "not_configured",
+      "Execution is not configured on this deployment."
+    );
+  }
+
+  try {
+    const paginator = Sandbox.list({
+      query: { metadata: { app: "openmi", kind: "probe" } },
+      limit,
+      ...clientOptions(),
+    });
+
+    const found = paginator.hasNext ? await paginator.nextItems() : [];
+
+    return found.slice(0, limit).map((sandbox) => ({
+      id: sandbox.sandboxId,
+      labels: sandbox.metadata ?? {},
+      createdAt:
+        sandbox.startedAt instanceof Date ? sandbox.startedAt.toISOString() : null,
+    }));
+  } catch (caught) {
+    throw classifyStartError(caught, "attach");
+  }
+}
+
 export async function listChatSandboxes(
   limit = 200
 ): Promise<RemoteSandboxSummary[]> {

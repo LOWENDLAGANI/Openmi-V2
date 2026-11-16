@@ -7,8 +7,10 @@ import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { BanControl } from "./BanControl";
+import { RuntimePanel } from "./RuntimePanel";
 
 import { readAdminAccess } from "@/lib/admin/access";
+import { readRuntimeSnapshot } from "@/lib/admin/runtime";
 import { planById } from "@/lib/billing/plans";
 import { formatDew } from "@/lib/dew";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -349,6 +351,10 @@ export default async function AdminPage({
     })
   );
 
+  // The runtime card reads counters and the last stored probes; it contacts no
+  // provider on a page load, so opening /admin cannot start a sandbox.
+  const runtime = await readRuntimeSnapshot(admin);
+
   return (
     <main className="animate-enter mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -441,6 +447,8 @@ export default async function AdminPage({
           </div>
         ))}
       </section>
+
+      <RuntimePanel initial={runtime} />
 
       <section
         id="members"

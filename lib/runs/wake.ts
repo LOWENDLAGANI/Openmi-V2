@@ -56,17 +56,16 @@ function httpUrl(value: string): string | null {
 }
 
 /**
- * The health URL this deployment pings, or null when pinging is switched off.
+ * The worker's health URL, regardless of the wake switch.
  *
- * An explicitly configured value that is not an http URL answers null rather
- * than falling back to the default: a typo should not send traffic to a host
- * nobody meant to touch.
+ * The operator panel tests the worker on demand, which is not a wake and must
+ * still work when `RUN_WAKE_WORKER=off` — the switch decides whether a queued
+ * run pings the host, not whether a human may. `workerHealthUrl` keeps the
+ * switch for the automatic path.
  */
-export function workerHealthUrl(
+export function configuredWorkerHealthUrl(
   env: Record<string, string | undefined> = process.env
 ): string | null {
-  if (!wakeWorkerEnabled(env)) return null;
-
   const explicit = (env.RUN_WORKER_HEALTH_URL ?? "").trim();
   if (explicit.length > 0) return httpUrl(explicit);
 
@@ -79,6 +78,20 @@ export function workerHealthUrl(
   }
 
   return DEFAULT_RUN_WORKER_HEALTH_URL;
+}
+
+/**
+ * The health URL this deployment pings, or null when pinging is switched off.
+ *
+ * An explicitly configured value that is not an http URL answers null rather
+ * than falling back to the default: a typo should not send traffic to a host
+ * nobody meant to touch.
+ */
+export function workerHealthUrl(
+  env: Record<string, string | undefined> = process.env
+): string | null {
+  if (!wakeWorkerEnabled(env)) return null;
+  return configuredWorkerHealthUrl(env);
 }
 
 /** Pings the queue's worker once. Never throws, never blocks the caller. */
