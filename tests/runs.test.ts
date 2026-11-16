@@ -439,6 +439,16 @@ describe("the runtime the plan requires exists in the repository", () => {
     expect(stream).toContain("readEventsSince");
   });
 
+  test("the run prompt sizes the work and forbids a weakened check", () => {
+    const prompt = read("/lib/runs/prompt.ts");
+
+    // A named file is the whole request: the survey is what spent the steps.
+    expect(prompt).toContain("Do what was asked, and nothing more");
+    expect(prompt).toContain("not a reason to survey the repository");
+    // Passing a check by removing it is not a verified change.
+    expect(prompt).toContain("weakening the check to make it pass");
+  });
+
   test("the loop compacts the context before it spends the budget on it", () => {
     const loop = read("/lib/runs/loop.ts");
 

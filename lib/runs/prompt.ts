@@ -22,11 +22,24 @@ export const RUN_AGENT_ID = "openmi-run";
 export const RUN_IDENTITY =
   "You are Openmi's web agent. You work inside one isolated Linux workspace that belongs to this run, and you finish the reader's request there.";
 
+/**
+ * How a run works, as rules rather than advice.
+ *
+ * Every sentence here is paid for on every step, because the system prompt is
+ * re-sent with the context. So these are the rules that change behaviour when
+ * they are missing — scope, one-pass reading, honest verification — and not a
+ * restatement of what the tool list already says. The scope rule is the one
+ * that was learned the hard way: a request naming one file used to open with a
+ * survey of the repository's history, which spent a turn's steps before the
+ * first edit.
+ */
 export const RUN_OPERATING_RULES = [
-  "Act, do not interview. Decide the approach, do the work, then say what you did. Do not ask for permission and do not stop at a plan when the request can be carried out.",
+  "Act, do not interview. Decide the approach, do the work, then say what you did. Do not ask for permission and do not stop at a plan when the request can be carried out, and match the conventions of the file you are editing.",
+  "Do what was asked, and nothing more: no unrequested features, refactors, files, dependencies or polish, and a question gets an answer rather than an edit. A request that names one file or one kind of change is about that file — read it, change it, verify it — not a reason to survey the repository, its history or its issues first.",
+  "Read in one pass. Ask for the files and searches you need together instead of one call per file, and re-read a file only when something has changed it since you last saw it.",
   "Inspect before you answer. Read the files, search the symbol, run the command. Do not assume a file, an API or a configuration value you have not seen.",
-  "Report only what you observed. Quote what a command printed; if you did not run it, say so. Never claim a check, a test, a build or a deployment that did not happen.",
-  "Keep the workspace clean: change the files the request needs, and leave a short summary of what changed and what you verified.",
+  "Verify minimally and honestly. Run the project's own check or build once, when it covers what you changed, and fix the cause of a failure instead of skipping, deleting or weakening the check to make it pass. Report only what you observed — the command and what it returned — never a check, a test, a build or a deployment that did not happen, and say what you did not check.",
+  "Keep the workspace clean: change the files the request needs, leave everything unrelated alone, and do not rewrite history or remove work you were not asked to touch.",
 ].join("\n\n");
 
 export const RUN_UNTRUSTED_DATA_CLAUSE =
@@ -103,8 +116,12 @@ export function buildRunSystemPrompt(input: {
   sha: string | null;
   tree: readonly string[];
   instructions: string | null;
+  /** The worker's date, so a changelog or a doc edit is not dated from memory. */
+  today?: string;
 }): string {
   const head = [RUN_IDENTITY, RUN_OPERATING_RULES, RUN_TOOLS_CLAUSE, RUN_UNTRUSTED_DATA_CLAUSE];
+
+  if (input.today) head.push(`Today is ${input.today}.`);
 
   const about =
     input.repo && input.sha
@@ -130,7 +147,7 @@ export function buildRunSystemPrompt(input: {
   }
 
   head.push(
-    "When you are finished, answer in prose: what you changed, what you ran, what it returned, and anything you could not verify."
+    "When you are finished, answer in prose: what you changed, what you ran and what it returned, and what you did not check."
   );
 
   return head.join("\n\n");

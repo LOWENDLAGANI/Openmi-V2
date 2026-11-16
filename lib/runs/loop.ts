@@ -213,6 +213,7 @@ export async function executeRun(
       sha: run.base_sha,
       tree,
       instructions,
+      today: new Date().toISOString().slice(0, 10),
     });
 
     const history: WireMessage[] =
