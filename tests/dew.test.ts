@@ -49,10 +49,10 @@ test("the documented Dew numbers are the exported constants", () => {
 });
 
 test("an hour is priced per model, and the database agrees with the catalogue", () => {
-  // 041 is the current definition: it makes Auto free and prices DeepSeek at 3.
-  // 025 introduced the function and 026 taught it Auto, so those two are history.
+  // 051 is the current definition: it adds the paid-only model beside Auto's
+  // free hour and DeepSeek's 3. 041 made Auto free; 025 and 026 are history.
   const migration = readFileSync(
-    new URL("../supabase/migrations/041_free_auto_pricing.sql", import.meta.url),
+    new URL("../supabase/migrations/051_premium_models.sql", import.meta.url),
     "utf8"
   );
 

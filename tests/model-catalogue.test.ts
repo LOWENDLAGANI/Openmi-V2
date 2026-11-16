@@ -9,7 +9,7 @@ import {
   firstAvailableModel,
 } from "../lib/models";
 import { MAX_CUSTOM_MODELS, parseCustomModels } from "../lib/models/custom";
-import { BUILTIN_ROUTES, routeForModel } from "../lib/models/routes";
+import { AUTO_ROUTES, BUILTIN_ROUTES, routeForModel } from "../lib/models/routes";
 
 test("every built-in model has a category the picker can group", () => {
   const ids = MODEL_CATEGORIES.map((category) => category.id);
@@ -113,6 +113,16 @@ test("every built-in model has a provider route, and Auto has a queue", () => {
   // chat route is the one place that maps an unknown id to the default model.
   expect(routeForModel("glm-4.6")).toBeNull();
   expect(routeForModel("nope")).toBeNull();
+});
+
+test("the paid-only model is one Straitly route, with no free fallback", () => {
+  // A paid model that failed over to a free one would answer with something the
+  // reader did not buy; the route is deliberately a single provider.
+  expect(BUILTIN_ROUTES["claude-haiku"]).toEqual({
+    provider: "straitly",
+    upstream: "claude-haiku-4-5",
+  });
+  expect(AUTO_ROUTES["claude-haiku"]).toBeUndefined();
 });
 
 test("DeepSeek is one named model with a Straitly-first fallback chain", () => {

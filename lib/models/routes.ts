@@ -127,6 +127,9 @@ export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
   // direct DeepSeek (handled in providersFor). It is absent from AUTO_ROUTES:
   // Auto never spends these providers.
   "deepseek-flash": { provider: "straitly", upstream: "deepseek-v4-1-flash-1017" },
+  // The paid-only model. One provider, no fallback: a request that fails here
+  // fails, rather than silently answering on something the reader did not buy.
+  "claude-haiku": { provider: "straitly", upstream: "claude-haiku-4-5" },
 };
 
 export type CustomRouteInput = {

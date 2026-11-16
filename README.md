@@ -379,6 +379,20 @@ Nothing about a handover reaches the reader: no notice, no vendor name, no
 fails after text was written, the partial answer is kept and reported as partial;
 if none wrote anything, the last error is the turn's one failure.
 
+## Premium models
+
+Claude Haiku 4.5 is served through Straitly and is part of the paid plan. An
+account whose `paid_until` is still ahead can pick it; anyone else is refused
+before an hour is charged. The picker marks it **paid**, the chat route (and the
+runs and missions routes) checks `paid_until` before writing anything, and a
+trigger on `hour_sessions` refuses the row in the database — so a caller that
+forgets the check cannot spend it either. The hour costs the same 3 Dew as every
+other named model: the pass is the entitlement, not a different price.
+
+The model needs `STRAITLY_API_KEY`. Without that key it is listed as unavailable
+rather than answered by a different model, because a paid model that failed over
+to a free one would answer with something the reader did not buy.
+
 ## Accessibility
 
 Semantic tokens only, and three appearances: paper (the default), carbon and ink.

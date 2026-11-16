@@ -40,6 +40,7 @@ export function Composer({
   onModelChange,
   meter,
   activeChatId,
+  paidActive,
   streaming,
   stopping,
   providerReady,
@@ -52,6 +53,8 @@ export function Composer({
   onModelChange: (id: string) => void;
   meter: ContextMeter | null;
   activeChatId: string | null;
+  /** Whether a paid pass is live; the picker marks the models that need one. */
+  paidActive: boolean;
   streaming: boolean;
   stopping: boolean;
   providerReady: boolean;
@@ -96,6 +99,7 @@ export function Composer({
           models={models}
           value={model}
           onChange={(id) => onModelChange(id as ModelId)}
+          paidActive={paidActive}
         />
 
         <div className="flex min-w-0 items-center gap-1.5">

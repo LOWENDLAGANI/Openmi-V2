@@ -5,14 +5,25 @@ import { NextResponse } from "next/server";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { titleFromMessage } from "@/lib/chat-title";
 import { formatDew } from "@/lib/dew";
-import { grantTrialDew, startDewSession, type DewGate } from "@/lib/dew/store";
+import {
+  grantTrialDew,
+  readDewProfile,
+  startDewSession,
+  type DewGate,
+} from "@/lib/dew/store";
 import { executionConfigured, serverEnv } from "@/lib/env";
 import { isRepoFullName, getRepo, resolveBranchSha } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { hashIp, requestIp } from "@/lib/http/ip";
 import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
-import { firstAvailableModel, hasModel, type ModelId } from "@/lib/models";
+import {
+  firstAvailableModel,
+  hasModel,
+  modelRequiresPaid,
+  paidOnlyRefusal,
+  type ModelId,
+} from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { firstSignalIn, recordRiskSignal } from "@/lib/moderation/record";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -231,6 +242,25 @@ export async function POST(request: Request) {
     });
   }
 
+  const modelOptions = modelCatalogue();
+  const model: ModelId = hasModel(modelOptions, body.model)
+    ? (body.model as string)
+    : firstAvailableModel(modelOptions);
+
+  // A paid-only model is judged before a chat row, an hour or a message exists:
+  // a refused send costs nothing and leaves nothing behind. The hour trigger in
+  // 051 refuses it again, so a caller that forgets this check cannot spend it.
+  if (modelRequiresPaid(model, modelOptions)) {
+    const profile = await readDewProfile(session.supabase, session.user.id);
+    const refusal = paidOnlyRefusal(
+      model,
+      profile?.paidActive === true,
+      modelOptions
+    );
+
+    if (refusal) return json(refusal, 402);
+  }
+
   // ── A new message ─────────────────────────────────────────────────────────
   let createdChat = false;
 
@@ -297,11 +327,6 @@ export async function POST(request: Request) {
     chatId = String((created as { id: string }).id);
     createdChat = true;
   }
-
-  const modelOptions = modelCatalogue();
-  const model: ModelId = hasModel(modelOptions, body.model)
-    ? (body.model as string)
-    : firstAvailableModel(modelOptions);
 
   const { data: chat, error } = await session.supabase
     .from("chats")

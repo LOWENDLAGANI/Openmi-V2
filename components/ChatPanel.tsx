@@ -17,7 +17,13 @@ import { RetryNotice } from "@/components/RetryNotice";
 import { MessageBody } from "@/components/MessageBody";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
-import { modelHourDew, type ModelCapability, type ModelId } from "@/lib/models";
+import {
+  modelHourDew,
+  modelName,
+  modelRequiresPaid,
+  type ModelCapability,
+  type ModelId,
+} from "@/lib/models";
 import type { AgentStep, Message } from "@/lib/types";
 
 type RepoRef = { fullName: string; branch: string; sha: string } | null;
@@ -71,6 +77,7 @@ export function ChatPanel({
   pinnedPath,
   providerReady,
   initialRunning,
+  paidActive,
   dew,
 }: {
   chatId: string | null;
@@ -82,6 +89,8 @@ export function ChatPanel({
   pinnedPath: string | null;
   providerReady: boolean;
   initialRunning: boolean;
+  /** A live paid pass is what unlocks the paid-only models. */
+  paidActive: boolean;
   /** The two balances a charge can draw on. */
   dew: { balance: number; wallet: number };
 }) {
@@ -109,6 +118,9 @@ export function ChatPanel({
   const [streaming, setStreaming] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The sentence a paid-only model shows when the account has no live pass,
+  // with the way to fix it. Nothing is sent while it is up.
+  const [paidGate, setPaidGate] = useState<string | null>(null);
   const [meter, setMeter] = useState<ContextMeter | null>(null);
   const [lastSent, setLastSent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -312,6 +324,16 @@ export function ChatPanel({
   function beginSend(content: string) {
     if (busyRef.current) return;
     if (content.trim().length === 0) return;
+
+    // A paid-only model is refused here with the sentence that says what to do,
+    // before a dialog opens or a request leaves. The server refuses it again,
+    // and the database refuses the hour itself.
+    if (modelRequiresPaid(model, models) && !paidActive) {
+      setPaidGate(
+        `${modelName(model, models)} is part of the paid plan. Start a pass on Plans, then pick it again.`
+      );
+      return;
+    }
 
     // A new chat confirms the hour before it spends anything; an existing chat
     // is already paid for, so its messages go straight out. A free hour has
@@ -1010,6 +1032,30 @@ export function ChatPanel({
         </div>
       )}
 
+      {paidGate && (
+        <div
+          role="alert"
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-hi"
+        >
+          <span className="min-w-0 break-words">{paidGate}</span>
+          <div className="flex items-center gap-2">
+            <a
+              href="/pay"
+              className="rounded-full border border-accent/40 px-2.5 py-0.5 text-[11px] text-accent-text hover:opacity-90"
+            >
+              See plans
+            </a>
+            <button
+              type="button"
+              onClick={() => setPaidGate(null)}
+              className="text-[11px] text-mid underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div
           role="alert"
@@ -1045,7 +1091,11 @@ export function ChatPanel({
           <Composer
             models={models}
             model={model}
-            onModelChange={(id) => setModel(id as ModelId)}
+            onModelChange={(id) => {
+              setModel(id as ModelId);
+              setPaidGate(null);
+            }}
+            paidActive={paidActive}
             meter={meter}
             activeChatId={activeChatId}
             streaming={streaming}

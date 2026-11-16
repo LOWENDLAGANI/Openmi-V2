@@ -39,7 +39,7 @@ export type DewGate =
       ok: false;
       error: string;
       balance: number | null;
-      code: "hour-active" | "no-dew";
+      code: "hour-active" | "no-dew" | "paid-only";
       /** The chat holding the running hour, when the database named one. */
       activeChatId: string | null;
     };
@@ -157,6 +157,18 @@ export async function startDewSession(
         error: activeChatId
           ? "An hour of chat is already running in another chat. Open that chat to continue, or end the session and start a new one here."
           : "An hour of chat is already running. Continue in that chat, or end the session and start a new one here.",
+      };
+    }
+
+    // The database refuses an hour on a paid-only model for an account with no
+    // live pass. This is the sentence the reader gets instead of the raw raise.
+    if (/requires a paid pass/i.test(message)) {
+      return {
+        ok: false,
+        balance: null,
+        code: "paid-only",
+        activeChatId: null,
+        error: `${modelName(model)} is part of the paid plan. Start a pass on Plans, then pick it again.`,
       };
     }
 
