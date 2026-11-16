@@ -393,6 +393,23 @@ The model needs `STRAITLY_API_KEY`. Without that key it is listed as unavailable
 rather than answered by a different model, because a paid model that failed over
 to a free one would answer with something the reader did not buy.
 
+## Operator-only model
+
+GPT-6 Luna is served through the Experiential gateway
+(`https://api.experientiallabs.ai/v1`, an OpenAI-compatible Chat Completions
+endpoint) under the model id `gpt-6-luna`. Only an operator account sees it in the
+picker: `modelsForReader` filters the catalogue with the same `readAdminAccess()`
+check the admin panel uses, and the chat, runs and missions routes refuse a model
+nobody may see before a row, an hour or a sandbox exists — a forged picker buys
+nothing. The hour costs the catalogue default, 3 Dew.
+
+The gateway is one provider with no fallback, so a failure is the turn's failure
+rather than an answer from a model the operator did not choose. It needs
+`EXPLABS_API_KEY` (create one under Experiential Settings → API Keys and export it
+in the deployment's environment; `EXPLABS_API_KEYS` is accepted as a pool in the
+same shape as the other providers). Without it the model is listed as unavailable
+and no request is sent.
+
 ## Accessibility
 
 Semantic tokens only, and three appearances: paper (the default), carbon and ink.

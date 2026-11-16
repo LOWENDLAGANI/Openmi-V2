@@ -1,5 +1,7 @@
 import { NextResponse, after } from "next/server";
 
+import { readAdminAccess } from "@/lib/admin/access";
+
 import { executionConfigured, serverEnv } from "@/lib/env";
 import { readDewProfile, settleExecutionDew, startDewSession } from "@/lib/dew/store";
 import { runMissionTick } from "@/lib/execution/mission/loop";
@@ -17,8 +19,10 @@ import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage } from "@/lib/messages";
 import {
   DEFAULT_MODEL,
+  adminOnlyRefusal,
   firstAvailableModel,
   hasModel,
+  modelRequiresAdmin,
   modelRequiresPaid,
   paidOnlyRefusal,
 } from "@/lib/models";
@@ -270,6 +274,24 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ...refusal, chatId },
         { status: 402, headers: NO_STORE }
+      );
+    }
+  }
+
+  // A mission spends the chat's model too, so an operator-only model is refused
+  // here rather than only in the picker that showed it.
+  if (modelRequiresAdmin(model, modelOptions)) {
+    const access = await readAdminAccess();
+    const refusal = adminOnlyRefusal(
+      model,
+      access.state === "admin",
+      modelOptions
+    );
+
+    if (refusal) {
+      return NextResponse.json(
+        { ...refusal, chatId },
+        { status: 403, headers: NO_STORE }
       );
     }
   }

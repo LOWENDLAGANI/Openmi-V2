@@ -50,6 +50,15 @@ export type ModelCapability = {
    */
   paidOnly?: boolean;
   /**
+   * Only an operator may see this model or call it.
+   *
+   * The flag is a display rule for this browser and a second check on the
+   * server: `modelsForReader` is what keeps it out of the picker, and the chat,
+   * run and mission routes refuse it again before a row or an hour exists. A
+   * forged picker buys nothing either way.
+   */
+  adminOnly?: boolean;
+  /**
    * What an hour of chat on this model costs.
    *
    * The hour is charged before the provider is called and belongs to the model
@@ -100,6 +109,18 @@ export const MODELS: ModelCapability[] = [
     dewPerHour: 3,
     paidOnly: true,
   },
+  {
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
+    category: "general",
+    blurb: "Served through the Experiential gateway. Operators only.",
+    images: false,
+    documents: false,
+    // The generic hour: the database prices an unlisted id the same way, so this
+    // is documentation as much as a number.
+    dewPerHour: 3,
+    adminOnly: true,
+  },
 ];
 
 export const DEFAULT_MODEL: ModelId = "deepseek-flash";
@@ -139,6 +160,47 @@ export function modelHourDew(
   catalogue: readonly ModelCapability[] = MODELS
 ): number {
   return catalogue.find((model) => model.id === id)?.dewPerHour ?? DEW_PER_HOUR;
+}
+
+/** True when this model is reserved for an operator account. */
+export function modelRequiresAdmin(
+  id: ModelId,
+  catalogue: readonly ModelCapability[] = MODELS
+): boolean {
+  return catalogue.find((model) => model.id === id)?.adminOnly === true;
+}
+
+/**
+ * The catalogue a reader's picker may show.
+ *
+ * Operators see the operator-only entries; nobody else is told they exist. This
+ * is the display half; the refusal below is the half that matters.
+ */
+export function modelsForReader(
+  catalogue: readonly ModelCapability[],
+  isAdmin: boolean
+): ModelCapability[] {
+  return catalogue.filter((model) => !model.adminOnly || isAdmin);
+}
+
+/**
+ * The refusal an operator-only model produces, or null when it is allowed.
+ *
+ * The same shape as `paidOnlyRefusal` so a route can treat both refusals the
+ * same way, and a test can prove the picker and the server agree about who may
+ * call it.
+ */
+export function adminOnlyRefusal(
+  id: ModelId,
+  isAdmin: boolean,
+  catalogue: readonly ModelCapability[] = MODELS
+): { error: string; code: "admin-only" } | null {
+  if (!modelRequiresAdmin(id, catalogue) || isAdmin) return null;
+
+  return {
+    error: `${modelName(id, catalogue)} is an operator-only model.`,
+    code: "admin-only",
+  };
 }
 
 /** True when this model is sold as part of a paid pass. */

@@ -125,6 +125,35 @@ test("the paid-only model is one Straitly route, with no free fallback", () => {
   expect(AUTO_ROUTES["claude-haiku"]).toBeUndefined();
 });
 
+test("the operator-only model is one Experiential route, at the gateway's own id", () => {
+  // The gateway does the routing, so the picker id, the upstream id and the
+  // gateway's model id are one string. No fallback: answering from another
+  // model is what the operator did not ask for.
+  expect(BUILTIN_ROUTES["gpt-6-luna"]).toEqual({
+    provider: "experiential",
+    upstream: "gpt-6-luna",
+  });
+
+  // Auto's free pool still lists its own `gpt-6-luna`, untouched.
+  expect(AUTO_ROUTES["gpt-6-luna"]).toEqual({
+    provider: "openrouter",
+    upstream: "gpt-6-luna:free",
+  });
+});
+
+test("the gateway is one endpoint, one key name, one model id", () => {
+  const source = readFileSync(
+    new URL("../lib/providers.ts", import.meta.url),
+    "utf8"
+  );
+
+  expect(source).toContain(
+    'endpoint: "https://api.experientiallabs.ai/v1/chat/completions"'
+  );
+  expect(source).toContain('model: "gpt-6-luna"');
+  expect(source).toContain('keyName: "EXPLABS_API_KEY"');
+});
+
 test("DeepSeek is one named model with a Straitly-first fallback chain", () => {
   const deepseek = MODELS.filter((model) => model.id === "deepseek-flash");
 

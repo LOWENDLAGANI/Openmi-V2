@@ -49,10 +49,11 @@ test("the documented Dew numbers are the exported constants", () => {
 });
 
 test("an hour is priced per model, and the database agrees with the catalogue", () => {
-  // 051 is the current definition: it adds the paid-only model beside Auto's
-  // free hour and DeepSeek's 3. 041 made Auto free; 025 and 026 are history.
+  // 052 is the current definition: it lists the operator-only model beside the
+  // paid one and DeepSeek's 3. 051 added the paid model, 041 made Auto free, and
+  // 025/026 are history.
   const migration = readFileSync(
-    new URL("../supabase/migrations/051_premium_models.sql", import.meta.url),
+    new URL("../supabase/migrations/052_experiential_gateway.sql", import.meta.url),
     "utf8"
   );
 
