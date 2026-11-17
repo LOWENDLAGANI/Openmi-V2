@@ -872,13 +872,8 @@ export default async function ChatPage({
 
       {filesView && activeChat && (
         <WorkspaceOverlay closeHref={`/chat?chat=${activeChat.id}`}>
-          <Suspense
-            fallback={
-              <p className="py-16 text-center text-[12px] text-mid">
-                Loading the repository…
-              </p>
-            }
-          >
+          <Suspense fallback={<ChatSkeleton />}>
+
             <SandboxDock
               chatId={activeChat.id}
               files={filesEnabled()}

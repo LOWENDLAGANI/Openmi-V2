@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Spinner } from "@/components/Loading";
 import { MIN_QUERY_CHARS } from "@/lib/search";
 
 /**
@@ -210,7 +209,7 @@ export function CommandPalette() {
             className="min-w-0 flex-1 bg-transparent text-[14px] text-body placeholder:text-low focus:outline-none"
           />
 
-          {loading && <Spinner size={14} />}
+          {loading && <div className="skeleton size-4 rounded-full" />}
 
           <kbd className="rounded border border-line-strong px-1.5 py-0.5 text-[9.5px] text-low">
             esc
@@ -227,9 +226,21 @@ export function CommandPalette() {
               {error}
             </p>
           ) : results.length === 0 ? (
-            <p className="px-3 py-6 text-center text-[12px] text-low">
-              {loading ? "Searching…" : "No chat or message matches that."}
-            </p>
+            loading ? (
+              <div className="space-y-2 px-3 py-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="skeleton h-9 rounded-xl"
+                    style={{ animationDelay: `${index * 90}ms` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="px-3 py-6 text-center text-[12px] text-low">
+                No chat or message matches that.
+              </p>
+            )
           ) : (
             <ul role="listbox" aria-label="Search results">
               {results.map((result, index) => (
