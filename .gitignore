@@ -28,6 +28,11 @@ dist/
 *.pid
 .DS_Store
 
+# agent skills are installed from skills-lock.json (npx skills add), not vendored
+.agents/
+agent/
+.claude/skills/
+
 # run artifacts written by the local worker (fs backend default)
 .openmi-artifacts/
 

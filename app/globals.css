@@ -202,6 +202,12 @@ html.ink {
      are copied from its tailwind config so the two products measure the same. */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
+  /* The marketing face: a grotesque with a little more character than the OS
+     stack, loaded by next/font in the root layout. The app keeps the system
+     face, because a chat surface should read as a native window; the front
+     door can afford a face of its own. */
+  --font-ui: var(--font-instrument), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-display: var(--font-fraunces), -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
@@ -420,6 +426,104 @@ html.ink {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /* ── The front door ──────────────────────────────────────────────────────
+     The landing page is a shopfront, not the product: a marketing face, one
+     1200px column every block starts and ends on, and screens at least a
+     viewport tall so each idea gets the reader's whole attention. Nothing in
+     this block is used inside the app shell. */
+
+  .lp {
+    font-family: var(--font-ui);
+    letter-spacing: -0.012em;
+  }
+
+  .lp-wrap {
+    width: min(100% - 2.5rem, 1200px);
+    margin-inline: auto;
+  }
+
+  @media (min-width: 768px) {
+    .lp-wrap {
+      width: min(100% - 5rem, 1200px);
+    }
+  }
+
+  .lp-section {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100svh;
+    padding-block: clamp(4.5rem, 9vw, 7rem);
+    /* The header is fixed, so an anchor jump lands under it without the
+       heading disappearing behind it. */
+    scroll-margin-top: 4rem;
+  }
+
+  /* ── The product, drawn in HTML ──────────────────────────────────────── */
+
+  .preview-frame {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background-color: var(--card);
+    box-shadow:
+      0 32px 64px -40px rgba(16, 24, 40, 0.42),
+      0 2px 6px rgba(16, 24, 40, 0.05);
+  }
+
+  html.dark .preview-frame,
+  html.ink .preview-frame {
+    box-shadow:
+      0 32px 64px -34px rgba(0, 0, 0, 0.7),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    border-bottom: 1px solid var(--line);
+    background-color: var(--bg-raised);
+    padding: 0.45rem 0.85rem;
+  }
+
+  .preview-dots {
+    display: flex;
+    flex: none;
+    gap: 4px;
+  }
+
+  .preview-dots > span {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background-color: var(--line-strong);
+  }
+
+  /* A diff is a table of one line per row. The two fixed tracks hold the line
+     number and the sign; the third takes what is left and clips instead of
+     pushing the frame sideways. */
+  .diff-row {
+    display: grid;
+    grid-template-columns: 1.7rem 0.85rem minmax(0, 1fr);
+    gap: 0.35rem;
+    overflow: hidden;
+    padding-inline: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.7;
+  }
+
+  .diff-row--add {
+    background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
+  .diff-row--del {
+    background-color: color-mix(in srgb, var(--danger) 7%, transparent);
+    box-shadow: inset 2px 0 0 var(--danger);
   }
 
   /* ── Chat surfaces ────────────────────────────────────────────────────── */

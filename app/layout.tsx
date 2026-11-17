@@ -1,13 +1,27 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 
-import { Fraunces } from "next/font/google";
+import { Fraunces, Instrument_Sans } from "next/font/google";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-fraunces",
   display: "swap",
   axes: ["opsz"],
+});
+
+/**
+ * The landing page's text face.
+ *
+ * The app keeps the operating system's own face so it reads as a native
+ * window; the front door gets a grotesque with a little more character, which
+ * is what stops a marketing page looking like a settings screen. One extra
+ * file, one variable, and only `.lp` uses it.
+ */
+const instrument = Instrument_Sans({
+  subsets: ["latin"],
+  variable: "--font-instrument",
+  display: "swap",
 });
 
 import { AdBlockGate } from "@/components/AdBlockGate";
@@ -70,7 +84,9 @@ export default function RootLayout({
       <head>
         <script src="/theme-boot.js" />
       </head>
-      <body className={`${fraunces.variable} app-surface min-h-dvh bg-canvas text-body antialiased`}>
+      <body
+        className={`${fraunces.variable} ${instrument.variable} app-surface min-h-dvh bg-canvas text-body antialiased`}
+      >
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
