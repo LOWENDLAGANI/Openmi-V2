@@ -65,16 +65,6 @@ test("a background process lives outside the repository and stops as a group", (
   expect(CHAT_SHELL_MAX_PROCESSES).toBeGreaterThan(0);
 });
 
-test("the chat sandbox wires the process tools it advertises", async () => {
-  const source = await Bun.file("lib/agent/sandbox.ts").text();
-
-  expect(source).toContain('if (name === "start_process")');
-  expect(source).toContain('if (name === "read_process")');
-  expect(source).toContain('if (name === "kill_process")');
-  expect(source).toContain("startProcessCommand(");
-  expect(source).toContain("killProcessCommand(");
-});
-
 test("a path with a quote in it cannot become a second command", () => {
   const hostile = "src/a'; touch /tmp/pwned; '.ts";
 

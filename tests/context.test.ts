@@ -5,43 +5,17 @@ import {
   MAX_TREE_PATHS,
   assembleContext,
 } from "../lib/context";
-import {
-  ANALYSIS_CLAUSE,
-  ANALYSE_FIRST_CLAUSE,
-  BUILDER_CLAUSE,
-  SHELL_ANALYSIS_CLAUSE,
-  SHELL_CLAUSE,
-  buildSystemPrompt,
-} from "../lib/prompt";
+
+/**
+ * The context budget, on its own.
+ *
+ * These cases used to share a file with the retired GitHub-only prompt, which
+ * made a passing suite read as though that prompt had been exercised. What is
+ * left is the budget: the pinned file survives, the tree is capped, and a trim
+ * says so instead of going quiet.
+ */
 
 const paths = Array.from({ length: 50 }, (_, index) => `src/module-${index}.ts`);
-
-test("a continued turn is told it still has its sandbox", () => {
-  const withShell = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc123",
-    context: "",
-    notes: [],
-    shell: true,
-    continuation: true,
-  });
-
-  expect(withShell).toContain("continues a turn");
-  expect(withShell).toContain("still have this chat's Linux sandbox");
-
-  const withoutShell = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc123",
-    context: "",
-    notes: [],
-    shell: false,
-    continuation: true,
-  });
-
-  expect(withoutShell).toContain("no sandbox in this turn");
-  // The environment is stated once, and only the true one.
-  expect(withShell).not.toContain("no sandbox in this turn");
-});
 
 test("the open file is kept and the tree is added", () => {
   const budget = assembleContext({
@@ -91,106 +65,4 @@ test("the path list is capped at the named constant", () => {
   const budget = assembleContext({ paths: many, pinned: null });
 
   expect(budget.notes.join(" ")).toContain(String(many.length));
-});
-
-test("the default prompt carries the shell and citation clauses", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "### src/app.ts\n\nexport const app = 1;",
-    notes: [],
-  });
-
-  expect(prompt).toContain(SHELL_CLAUSE);
-  expect(prompt).toContain("path:line");
-  expect(prompt).toContain("octocat/hello");
-  expect(prompt).toContain("abc1234");
-});
-
-test("the default prompt still proposes shell execution when shell is unset", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-  });
-
-  expect(prompt).toContain(SHELL_CLAUSE);
-  expect(prompt).toContain("run_command");
-  expect(prompt).toContain("curl, wget, npm, python");
-  expect(prompt).toContain("output the command results");
-});
-
-test("a shell turn is told the browser exists, a GitHub-only turn is not", () => {
-  const base = {
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-  };
-  const shell = buildSystemPrompt({ ...base, shell: true });
-  const noShell = buildSystemPrompt({ ...base, shell: false });
-
-  // The shell surface registers `browser`, so the prompt may not forbid it.
-  expect(shell).toContain(SHELL_ANALYSIS_CLAUSE);
-  expect(shell).not.toContain(ANALYSIS_CLAUSE);
-  expect(shell).not.toContain("Do not open a browser");
-  expect(shell).toContain("browser tool");
-
-  // GitHub-only means no terminal and no browser, so it gets neither clause.
-  expect(noShell).not.toContain(SHELL_ANALYSIS_CLAUSE);
-  expect(noShell).not.toContain(ANALYSIS_CLAUSE);
-  expect(noShell).not.toContain("browser tool");
-});
-
-test("a shell turn knows the preview panel and versions exist", () => {
-  const shell = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-  });
-  const noShell = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-    shell: false,
-  });
-
-  expect(shell).toContain(BUILDER_CLAUSE);
-  expect(shell).toContain("Preview panel");
-  expect(shell).toContain("nothing in the sandbox reaches GitHub".replace("nothing", "Nothing"));
-
-  // A GitHub-only turn has neither a preview nor a workspace to snapshot.
-  expect(noShell).not.toContain(BUILDER_CLAUSE);
-  expect(noShell).not.toContain("Preview panel");
-});
-
-test("both answer surfaces analyse before answering, and never guess", () => {
-  const base = {
-    repo: "octocat/hello",
-    sha: "abc1234",
-    context: "",
-    notes: [],
-  };
-
-  const shell = buildSystemPrompt({ ...base, shell: true });
-  const noShell = buildSystemPrompt({ ...base, shell: false });
-
-  // A question is answered by looking, and a change is written only after the
-  // names it depends on have been checked against the files in context.
-  for (const prompt of [shell, noShell]) {
-    expect(prompt).toContain(ANALYSE_FIRST_CLAUSE);
-    expect(prompt).toContain("Do not guess");
-    expect(prompt).toContain("a plausible default is still an invention");
-  }
-});
-
-test("the system prompt still refuses to pretend when no repository is attached", () => {
-  const prompt = buildSystemPrompt({ repo: null, sha: null, context: "", notes: [] });
-
-  expect(prompt).toContain("No repository is attached");
-  expect(prompt).not.toContain("The attached repository is");
-  expect(prompt).toContain(SHELL_CLAUSE);
 });

@@ -42,42 +42,14 @@ describe("one composer decides nothing about modes", () => {
     expect(route).toContain("export const maxDuration = 300");
   });
 
-  test("nothing is provisioned until a tool is actually called", () => {
-    const sandbox = read("lib/agent/sandbox.ts");
+  test("the model is told about the shell it actually has", () => {
+    // The composer that runs is the run's, and it always has a sandbox: a run
+    // cannot start without one. The retired GitHub-only prompt is not shipped.
+    const prompt = read("lib/runs/prompt.ts");
 
-    // The create call lives inside `ensure`, which only `run` reaches.
-    const ensureAt = sandbox.indexOf("async function ensure()");
-    const createAt = sandbox.indexOf("await createSandbox(");
-    const runAt = sandbox.indexOf("async function run(");
-
-    expect(ensureAt).toBeGreaterThan(-1);
-    expect(createAt).toBeGreaterThan(ensureAt);
-    expect(runAt).toBeGreaterThan(createAt);
-    expect(sandbox).toContain("await ensure()");
-  });
-
-  test("the model is told it has a shell, and the old denial is not sent with it", () => {
-    const prompt = read("lib/prompt.ts");
-
-    expect(prompt).toContain("SHELL_CLAUSE");
-    // The old denial clause was removed when the prompt switched to shell-first.
-    expect(prompt).not.toContain("NO_EXECUTION_CLAUSE");
-    expect(prompt).toContain("/bin/sh otherwise");
-
-    // The run's prompt is the one that describes the workspace now, and it
-    // always has a shell: a run cannot start without a sandbox.
-    expect(read("lib/runs/prompt.ts")).toContain("run_command");
+    expect(prompt).toContain("run_command");
+    expect(existsSync(join(root, "lib/prompt.ts"))).toBe(false);
     expect(read("app/api/chat/route.ts")).not.toContain("shell: Boolean(shellTurn)");
-  });
-
-  test("a shell supersedes the repository reads it can do itself", () => {
-    const run = read("lib/agent/run.ts");
-
-    // Two tools with one name would reach the provider twice with different
-    // parameters, and the dispatch would quietly prefer the sandbox.
-    expect(run).toContain(
-      "TOOL_SPECS.filter((tool) => !shellNames.has(tool.name))"
-    );
   });
 
   test("the transcript folds a step instead of printing a log", () => {

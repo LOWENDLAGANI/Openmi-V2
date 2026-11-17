@@ -250,6 +250,8 @@ export async function executeRun(
       sha: run.base_sha,
       tree,
       instructions,
+      // The prompt says the workspace outlives this turn only when it does.
+      persistent: opened.shared,
     });
 
     const history: WireMessage[] =

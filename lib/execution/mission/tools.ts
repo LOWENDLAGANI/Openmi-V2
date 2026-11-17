@@ -11,10 +11,10 @@ import {
 /**
  * The mission tool surface.
  *
- * Unlike `lib/agent/tools.ts` this file has a tool whose parameter is a shell
- * string. That is the point of mission mode, and the guarantee is a different
- * one: the command runs in an ephemeral sandbox that holds no platform secret
- * and has no remote. The caps below are what keep one mission from becoming a
+ * Unlike the chat run's surface in `lib/runs/tools.ts`, this file is built
+ * around one tool whose parameter is a shell string. That is the point of
+ * mission mode, and the guarantee is a different one: the command runs in an
+ * ephemeral sandbox that holds no platform secret and has no remote. The caps below are what keep one mission from becoming a
  * bill, not a filter on what the model may ask for.
  *
  * Everything here is pure: the loop executes the command, this module decides

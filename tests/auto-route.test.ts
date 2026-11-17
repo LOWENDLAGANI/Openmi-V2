@@ -284,14 +284,6 @@ test("the run loop sends Auto through the pipeline and leaves the rest alone", (
   expect(loop).toContain("for (const provider of chain)");
 });
 
-test("a tool turn only rotates while the step has produced nothing", () => {
-  const agent = source("../lib/agent/run.ts");
-
-  expect(agent).toContain("options.model === AUTO_MODEL");
-  expect(agent).toContain("autoChain(");
-  expect(agent).toContain("providerText.length > 0 || fragments.size > 0");
-});
-
 test("a continuation request carries the partial answer and the directive", () => {
   const base: RoutedMessage[] = [{ role: "user", content: "hi" }];
   const continued = continuationMessages(base, "Once upon a");

@@ -19,8 +19,8 @@ turn now runs inside that chat's own persistent workspace by default, so it can
 execute what it writes and the files are still there on the next message; the
 workspace is kept for `CHAT_SANDBOX_TTL_HOURS` (2 days) of inactivity, then
 destroyed.
-`OPENMI_SANDBOX_TURNS=off` restores GitHub-only turns. Nothing in the product
-runs your test suite on its own.
+`CHAT_SANDBOX_ENABLED=off` gives each turn a box of its own instead of reusing
+the chat's. Nothing in the product runs your test suite on its own.
 
 ---
 
@@ -152,20 +152,20 @@ detection, probe classification, and the tool surface.
 
 ## The agent, and its limits
 
-On a GitHub-only turn (`OPENMI_SANDBOX_TURNS=off`) the agent may call four tools:
-`list_files` (≤200 paths),
-`read_file` (≤200KB, text only), `search_code` (≤10 candidates) and `git`
-(`status`, and a `pull` that moves the pin). No tool accepts a URL; every request
-is built from the token plus a path in the repository the chat is pinned to.
-Every write to GitHub stays server-side: the review card commits to an
-`openmi/agent/` branch and opens the pull request with the sealed token, and a
-branch that moved is re-applied on the live head rather than force-pushed.
+A chat turn is a run, and a run has one workspace and eleven tools: `read_file`
+(≤400 lines), `write_file` (≤200KB), `edit_file`, `search_code` (≤40 hits),
+`list_files` (≤200 paths), `run_command` (120s), `todo`, `publish`,
+`git_history`, `github_read` and `github_action`. The read tools take paths
+inside the workspace; `run_command` is the only one with a network, and it
+refuses loopback, private ranges, cloud metadata addresses and any `git push`.
+No tool takes a URL.
 
-With the sandbox on, the surface also carries the shell tools, `browser`, and
-`fetch_url` — one public https page as text (200KB read, 12s, three redirects,
-private and metadata addresses refused). That last one lives on the sandbox
-surface on purpose: the chat-only surface stays free of any tool that takes an
-address.
+`github_read` and `github_action` act on the server with the sealed token, never
+inside the sandbox: pull requests, issues, checks, comments, labels and a merge
+happen only when the reader asked for that exact action. A change to a branch
+goes through `publish` and the review card, which commits to an
+`openmi/agent/` branch, opens one pull request and re-applies a moved branch
+rather than force-pushing; the sandbox itself holds no credential and no remote.
 
 The turn stops at one of three caps, and the transcript says which:
 
@@ -291,8 +291,8 @@ this app, and that nothing claims a test it did not run.
   can run what it writes. The handle is lazy: a turn that never calls a tool
   provisions nothing. The box stops after 5 idle minutes (its disk is kept) and
   is destroyed `CHAT_SANDBOX_TTL_HOURS` (2 days) after the last activity, which
-  also takes that chat's versions with it. `OPENMI_SANDBOX_TURNS=off` is the
-  GitHub-only turn: reads plus a proposed diff, no shell, no browser.
+  also takes that chat's versions with it. `CHAT_SANDBOX_ENABLED=off` gives each
+  turn its own box instead of the chat's; the turn still has a shell.
 - Writes are one branch and one pull request per approved changeset, and the
   approval path squash-merges that pull request. A branch the reader names is
   written directly. The default branch is written directly only when the reader

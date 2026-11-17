@@ -8,7 +8,6 @@ import {
   isBlockedAddress,
   parseFetchUrl,
 } from "../lib/agent/research";
-import { TOOL_SPECS } from "../lib/agent/tools";
 
 /**
  * A URL-taking tool is an SSRF primitive unless the address is checked first.
@@ -93,13 +92,10 @@ test("a page becomes quotable text, not markup", () => {
   expect(text).not.toContain("a comment");
 });
 
-test("the tool surface keeps its shapes: addresses only on the sandbox side", () => {
-  // The chat surface reads a repository and nothing else; `fetch_url` exists
-  // only where a sandbox does, which is what lets the strict rule stay true.
-  for (const tool of TOOL_SPECS) {
-    expect(JSON.stringify(tool.parameters)).not.toContain('"url"');
-  }
-
+test("the fetch tool is shaped and capped as documented", () => {
+  // `fetch_url` is not on the run surface: the only tool that takes an address
+  // lives with this module, and the run's 11 tools take paths and commands.
+  // That is what keeps the address check the only way to reach the network.
   expect(JSON.stringify(FETCH_URL_TOOL_SPEC.parameters)).toContain('"url"');
   expect(FETCH_MAX_BYTES).toBe(200_000);
   expect(FETCH_MAX_REDIRECTS).toBe(3);

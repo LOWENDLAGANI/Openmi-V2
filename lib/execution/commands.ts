@@ -8,7 +8,7 @@
  * chosen from a lockfile and a `package.json` this process read itself.
  *
  * Caps live here rather than in a prompt for the same reason they live in
- * `lib/agent/tools.ts`: a model that ignores them gets a typed refusal, not a
+ * `lib/runs/tools.ts`: a model that ignores them gets a typed refusal, not a
  * silent truncation.
  */
 

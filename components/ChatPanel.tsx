@@ -1334,7 +1334,7 @@ export function ChatPanel({
  * What the model did, folded into the answer it produced.
  *
  * A row says what the step was for, in the model's own words: "install
- * dependencies", "Read lib/prompt.ts". The command and its output are one tap
+ * dependencies", "Read lib/runs/tools.ts". The command and its output are one tap
  * away, because the reader who wants proof is not the reader who wants a
  * conversation. A live step shows its state; a stored one is already settled.
  */

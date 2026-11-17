@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
 
 import { utcToday } from "../lib/clock";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import { buildMissionPrompt } from "../lib/execution/mission/prompt";
 import { MISSION_TOOL_SPECS } from "../lib/execution/mission/tools";
 import {
@@ -67,6 +70,45 @@ test("the prompt carries today's date and admits the knowledge cutoff", () => {
   expect(prompt).toContain("lockfile");
   expect(prompt).toContain("npm view");
   expect(prompt).toContain("unverified");
+});
+
+test("the rules the retired prompt carried are in the live one", () => {
+  const prompt = buildRunSystemPrompt(BASE);
+
+  // Read the work back, and cite the path the workspace uses.
+  expect(prompt).toContain("Read your own work back");
+  expect(prompt).toContain("lib/runs/loop.ts:248");
+
+  // The preview panel owns the dev server; the run must not fight it for a port.
+  expect(prompt).toContain("Preview panel");
+  expect(prompt).toContain("never say a preview is running");
+
+  // The sandbox holds no credential and nothing in it can push.
+  expect(prompt).toContain("no GitHub token");
+});
+
+test("the workspace is described as persistent only when it is", () => {
+  const shared = buildRunSystemPrompt({ ...BASE, persistent: true });
+  const own = buildRunSystemPrompt({ ...BASE, persistent: false });
+
+  expect(shared).toContain("reused for the next message");
+  expect(own).toContain("belongs to this run alone");
+  expect(own).not.toContain("reused for the next message");
+});
+
+test("the retired composers cannot come back by accident", () => {
+  const root = join(import.meta.dir, "..");
+
+  // Two prompt builders and two tool surfaces is how a model ends up told
+  // about a tool that is not registered. The run's is the only one left.
+  for (const retired of [
+    "lib/prompt.ts",
+    "lib/agent/run.ts",
+    "lib/agent/tools.ts",
+    "lib/agent/sandbox.ts",
+  ]) {
+    expect(existsSync(join(root, retired))).toBe(false);
+  }
 });
 
 test("the default date is the server's UTC date, not a constant", () => {

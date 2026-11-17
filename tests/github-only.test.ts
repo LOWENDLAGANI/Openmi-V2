@@ -2,12 +2,14 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { sandboxTurnsEnabled } from "../lib/env";
-import {
-  GITHUB_ONLY_CLAUSE,
-  NO_READ_CLAUSE,
-  SHELL_CLAUSE,
-  buildSystemPrompt,
-} from "../lib/prompt";
+
+/**
+ * Every chat turn is a run, and the route refuses before it queues.
+ *
+ * The prompt clauses this file used to exercise belonged to the GitHub-only
+ * composer that no route sent; they are gone, and the rules that still hold now
+ * live in `lib/runs/prompt.ts`, pinned by `tests/run-prompt.test.ts`.
+ */
 
 const ROUTE = readFileSync(
   new URL("../app/api/chat/route.ts", import.meta.url),
@@ -38,35 +40,4 @@ test("the route refuses before it queues when there is no execution provider", (
 
   // The in-request shell is gone: the worker opens the workspace, not the route.
   expect(ROUTE).not.toContain("createShellTurn");
-});
-
-test("a turn whose repository could not be opened is not told it has read tools", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc123",
-    context: "",
-    notes: [],
-    shell: false,
-    readTools: false,
-  });
-
-  // The fallback path offers no tools, so the prompt may not promise any.
-  expect(prompt).toContain(NO_READ_CLAUSE);
-  expect(prompt).not.toContain(GITHUB_ONLY_CLAUSE);
-  expect(prompt).not.toContain("propose_edits");
-});
-
-test("a GitHub-only turn is not told it has a terminal", () => {
-  const prompt = buildSystemPrompt({
-    repo: "octocat/hello",
-    sha: "abc123",
-    context: "### src/app.ts\n\nexport const app = 1;",
-    notes: [],
-    shell: false,
-  });
-
-  expect(prompt).toContain(GITHUB_ONLY_CLAUSE);
-  expect(prompt).not.toContain(SHELL_CLAUSE);
-  expect(prompt).not.toContain("run_command");
-  expect(prompt).toContain("propose_edits");
 });
