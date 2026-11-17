@@ -9,6 +9,7 @@ import { formatCredit } from "@/lib/credits";
 import {
   grantTrialCredit,
   readCreditProfile,
+  refundCreditSession,
   startCreditSession,
   type CreditGate,
 } from "@/lib/credits/store";
@@ -359,7 +360,6 @@ export async function POST(request: Request) {
       .insert({
         owner: session.user.id,
         title: titleFromMessage(content),
-        charge_mode: "hour",
         ...pin,
       })
       .select("id")
@@ -420,6 +420,23 @@ export async function POST(request: Request) {
     );
   }
 
+  // The hour is charged before the run exists, so every path from here to a
+  // queued run is a path that may owe the reader their Credit back: they paid
+  // for a turn that never started. Only an hour this request bought is given
+  // back — an hour that was already running was paid for by an earlier message,
+  // and the worker owns the refund decision for that one. The refund also ends
+  // the hour, so the time cannot stay while the Credit returns.
+  const refundChargedHour = async (reason: string) => {
+    if (!credit.session.started || !credit.session.sessionId) return;
+
+    await refundCreditSession(
+      admin,
+      session.user.id,
+      credit.session.sessionId,
+      reason
+    ).catch(() => false);
+  };
+
   let userMessage = null;
 
   try {
@@ -430,13 +447,19 @@ export async function POST(request: Request) {
       settleStalledRuns(admin, session.user.id),
     ]);
   } catch (caught) {
+    await refundChargedHour("the message was not saved");
+
     return json(
       { error: caught instanceof Error ? caught.message : "The message was not saved." },
       500
     );
   }
 
-  if (!userMessage) return json({ error: "The message was not saved." }, 500);
+  if (!userMessage) {
+    await refundChargedHour("the message was not saved");
+
+    return json({ error: "The message was not saved." }, 500);
+  }
 
   // A worker that died — or a deployment with no worker at all — leaves its run
   // in the one-live-run index, which would refuse every new chat with "you
@@ -449,6 +472,10 @@ export async function POST(request: Request) {
   const decision = checkRunQuota(quota);
 
   if (!decision.allowed) {
+    // The hour was charged a moment ago and no run will start: the quota is
+    // advice about what this account may do, not something it can be billed for.
+    await refundChargedHour("the turn was over the account's quota");
+
     return json(
       { error: decision.message, code: decision.code, quota },
       decision.code === "concurrency" ? 409 : 402
@@ -480,6 +507,8 @@ export async function POST(request: Request) {
       caught instanceof Error ? caught.message : "The message could not be queued.";
 
     if (!/duplicate key|unique/i.test(message)) {
+      await refundChargedHour("the turn could not be queued");
+
       return json({ error: message }, 500);
     }
 
@@ -495,6 +524,8 @@ export async function POST(request: Request) {
         retry instanceof Error ? retry.message : "The message could not be queued.";
 
       if (!/duplicate key|unique/i.test(again)) {
+        await refundChargedHour("the turn could not be queued");
+
         return json({ error: again }, 500);
       }
 
@@ -508,6 +539,8 @@ export async function POST(request: Request) {
           route: "POST /api/chat",
         });
       }
+
+      await refundChargedHour("another turn was already running");
 
       return json(
         {

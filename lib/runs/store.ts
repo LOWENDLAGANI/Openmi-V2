@@ -641,6 +641,37 @@ export async function settleStalledRuns(
 }
 
 /**
+ * Gives back the hour of a run no worker finished.
+ *
+ * The sweep marks a dead run failed so it stops holding the one-live-run index.
+ * Without this the reader also kept the charge for an answer that never came —
+ * the loop refunds a failure it saw, and the reaper is the case where no loop
+ * was left to see it.
+ *
+ * Best effort, and never raises: `try_refund_hour_session` reports a refusal (an
+ * hour past the refund window, an hour already refunded) as `false`, because a
+ * settle that failed would leave the run stuck in the index and lock the account
+ * out of chatting.
+ */
+async function refundSettledRun(
+  admin: Client,
+  run: { owner: string; credit_session_id: string | null }
+): Promise<void> {
+  if (!run.credit_session_id) return;
+
+  await admin
+    .rpc("try_refund_hour_session", {
+      p_owner: run.owner,
+      p_session_id: run.credit_session_id,
+      p_reason: "the turn did not finish",
+    })
+    .then(
+      () => undefined,
+      () => undefined
+    );
+}
+
+/**
  * A run whose worker stopped reporting is not running any more.
  *
  * The reaper is a safety net for a worker crash, and it runs from the worker's
@@ -660,7 +691,7 @@ export async function reapStaleRuns(
   const [runningResult, queuedResult] = await Promise.all([
     admin
       .from("runs")
-      .select("id, owner")
+      .select("id, owner, credit_session_id")
       .eq("status", "running")
       // A heartbeat is written the moment a run is claimed, so a null one is a
       // row that never really started; without this branch it was immortal.
@@ -669,7 +700,7 @@ export async function reapStaleRuns(
       .limit(50),
     admin
       .from("runs")
-      .select("id, owner")
+      .select("id, owner, credit_session_id")
       .eq("status", "queued")
       .lt("created_at", cutoff)
       .limit(50),
@@ -678,10 +709,12 @@ export async function reapStaleRuns(
   const running = (runningResult.data ?? []) as Array<{
     id: string;
     owner: string;
+    credit_session_id: string | null;
   }>;
   const queued = (queuedResult.data ?? []) as Array<{
     id: string;
     owner: string;
+    credit_session_id: string | null;
   }>;
 
   for (const run of running) {
@@ -703,6 +736,8 @@ export async function reapStaleRuns(
       message: "The worker stopped reporting. Start a new run.",
       retryable: true,
     });
+
+    await refundSettledRun(admin, run);
   }
 
   for (const run of queued) {
@@ -723,6 +758,8 @@ export async function reapStaleRuns(
       message: "No worker picked this run up. Start it again.",
       retryable: true,
     });
+
+    await refundSettledRun(admin, run);
   }
 
   return [...running, ...queued].map((run) => run.id);

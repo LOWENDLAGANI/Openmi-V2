@@ -211,7 +211,6 @@ export async function POST(request: Request) {
       .insert({
         owner: session.user.id,
         title: goal.slice(0, 80),
-        charge_mode: "hour",
         repo_full_name: repo,
         repo_branch: branch,
         repo_base_sha: sha,

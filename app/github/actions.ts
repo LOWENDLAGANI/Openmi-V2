@@ -156,7 +156,6 @@ export async function startFromTemplate(formData: FormData) {
     .insert({
       owner: user.id,
       title: template.name,
-      charge_mode: "hour",
       repo_full_name: created.fullName,
       repo_branch: created.branch,
       repo_base_sha: created.commitSha,

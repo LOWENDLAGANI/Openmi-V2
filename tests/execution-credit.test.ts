@@ -90,12 +90,24 @@ afterAll(async () => {
   await db.close();
 });
 
+/**
+ * The whole balance: the daily pocket plus the wallet a reservation comes from.
+ *
+ * A sandbox reservation spends paid Credit, so reading one column would report
+ * zero for an account that has money in the other.
+ */
 async function balance(): Promise<number> {
-  const { rows } = await db.query<{ credit_balance: string }>(
-    "select credit_balance from public.profiles where id = $1",
+  const { rows } = await db.query<{
+    credit_balance: string;
+    wallet_credit: string;
+  }>(
+    "select credit_balance, wallet_credit from public.profiles where id = $1",
     [OWNER]
   );
-  return Number(rows[0]?.credit_balance);
+
+  if (!rows[0]) return Number.NaN;
+
+  return Number(rows[0].credit_balance) + Number(rows[0].wallet_credit);
 }
 
 async function ledgerSum(): Promise<number> {
@@ -226,10 +238,12 @@ test("every cached balance still equals the sum of its ledger", async () => {
     credit_balance: string;
     total: string;
   }>(
-    `select p.id, p.credit_balance, coalesce(sum(t.amount), 0) as total
+    `select p.id,
+            p.credit_balance + p.wallet_credit as credit_balance,
+            coalesce(sum(t.amount), 0) as total
        from public.profiles p
        left join public.credit_transactions t on t.owner = p.id
-      group by p.id, p.credit_balance`
+      group by p.id, p.credit_balance, p.wallet_credit`
   );
 
   expect(rows.length).toBeGreaterThan(0);

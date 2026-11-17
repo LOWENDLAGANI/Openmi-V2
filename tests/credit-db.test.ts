@@ -102,13 +102,28 @@ async function signUp(id: string, email: string, inviteCode = "") {
   );
 }
 
+/**
+ * What the account can spend: the daily balance plus the paid wallet.
+ *
+ * The two pockets are real — `charge_credit_with_wallet` spends the daily
+ * balance first and the wallet only for the rest — but almost every assertion in
+ * this file is about how much Credit an account has, not which pocket holds it.
+ * A test that cares about the split reads the column itself, because a refund
+ * that lands in the wrong pocket is exactly the bug 057 fixed.
+ */
 async function balance(owner: string): Promise<number> {
   await reset();
-  const { rows } = await db.query<{ credit_balance: string }>(
-    "select credit_balance from public.profiles where id = $1",
+  const { rows } = await db.query<{
+    credit_balance: string;
+    wallet_credit: string;
+  }>(
+    "select credit_balance, wallet_credit from public.profiles where id = $1",
     [owner]
   );
-  return Number(rows[0]?.credit_balance ?? Number.NaN);
+
+  if (!rows[0]) return Number.NaN;
+
+  return Number(rows[0].credit_balance) + Number(rows[0].wallet_credit);
 }
 
 async function ledgerSum(owner: string): Promise<number> {
@@ -199,13 +214,16 @@ test("the daily allowance refills once, at the local day", async () => {
   const first = await db.query<{ balance: string }>(
     "select public.refill_daily_credit() as balance"
   );
-  // Five trial Credit plus the six Credit free allowance.
-  expect(Number(first.rows[0].balance)).toBe(11);
+  // The refill settles the daily balance at six. The trial's five sit in the
+  // wallet, which the daily allowance never tops up or resets.
+  expect(Number(first.rows[0].balance)).toBe(6);
+  expect(await balance(A)).toBe(11);
 
   const second = await db.query<{ balance: string }>(
     "select public.refill_daily_credit() as balance"
   );
-  expect(Number(second.rows[0].balance)).toBe(11);
+  expect(Number(second.rows[0].balance)).toBe(6);
+  expect(await balance(A)).toBe(11);
 
   expect(await ledgerCount(A, "daily")).toBe(1);
   expect(await ledgerSum(A)).toBe(11);
@@ -224,7 +242,8 @@ test("an hour is charged once and reused inside the hour", async () => {
   expect(started.rows[0].started).toBe(true);
   // Auto's hour is free: the session exists, and no Credit moved.
   expect(Number(started.rows[0].price)).toBe(0);
-  expect(Number(started.rows[0].balance)).toBe(11);
+  expect(Number(started.rows[0].balance)).toBe(6);
+  expect(await balance(A)).toBe(11);
 
   sessionA = String(started.rows[0].session_id);
 
@@ -236,7 +255,7 @@ test("an hour is charged once and reused inside the hour", async () => {
 
   expect(again.rows[0].started).toBe(false);
   expect(String(again.rows[0].session_id)).toBe(sessionA);
-  expect(Number(again.rows[0].balance)).toBe(11);
+  expect(Number(again.rows[0].balance)).toBe(6);
 
   await reset();
   const sessions = await db.query<{ count: number }>(
@@ -330,7 +349,20 @@ test("a refund is service-role only, and happens once", async () => {
     "select public.refund_hour_session($1, $2, 'provider failed') as balance",
     [A, sessionA]
   );
-  expect(Number(refund.rows[0].balance)).toBe(11);
+
+  // The hour was paid out of the daily balance, so it comes back to the daily
+  // balance — not into the wallet, which would turn renewable allowance into
+  // Credit that never expires.
+  expect(Number(refund.rows[0].balance)).toBe(6);
+  expect(await balance(A)).toBe(11);
+
+  // The refund ends the hour as well: the Credit returned, so the time it
+  // bought cannot still be running.
+  const { rows: ended } = await db.query<{ live: boolean }>(
+    "select (expires_at > now()) as live from public.hour_sessions where session_id = $1",
+    [sessionA]
+  );
+  expect(ended[0].live).toBe(false);
 
   await expect(
     db.query("select public.refund_hour_session($1, $2, 'again')", [A, sessionA])
@@ -343,7 +375,7 @@ test("a refund is service-role only, and happens once", async () => {
 test("a balance below one hour refuses the session before anything runs", async () => {
   await reset();
   await db.query(
-    "update public.profiles set credit_balance = 1, credit_day = (now() at time zone timezone)::date where id = $1",
+    "update public.profiles set credit_balance = 1, wallet_credit = 0, credit_day = (now() at time zone timezone)::date where id = $1",
     [A]
   );
   await db.query(
@@ -359,7 +391,12 @@ test("a balance below one hour refuses the session before anything runs", async 
   expect(await ledgerCount(A, "session")).toBe(1);
 
   await reset();
-  await db.query("update public.profiles set credit_balance = 11 where id = $1", [A]);
+  // Restore the invariant the last test asserts: the two pockets together hold
+  // what the ledger says.
+  await db.query(
+    "update public.profiles set credit_balance = 11, wallet_credit = 0 where id = $1",
+    [A]
+  );
 });
 
 test("a redeem code is service-role only, works once and adds Credit only", async () => {
@@ -389,7 +426,9 @@ test("a redeem code is service-role only, works once and adds Credit only", asyn
   );
 
   expect(Number(redeemed.rows[0].amount)).toBe(20);
-  expect(Number(redeemed.rows[0].balance)).toBe(31);
+  // A code adds paid Credit, so the wallet is what moves.
+  expect(Number(redeemed.rows[0].balance)).toBe(20);
+  expect(await balance(A)).toBe(31);
 
   await expect(
     db.query("select * from public.redeem_credit_code($1, 'TOPUP-20')", [A])
@@ -470,14 +509,65 @@ test("a pass is a window: approval extends paid_until and grants its Credit", as
   }>(
     `select has_paid,
             extract(day from paid_until - now())::int as days,
-            credit_balance as balance
+            credit_balance + wallet_credit as balance
        from public.profiles where id = $1`,
     [E]
   );
 
   expect(rows[0].has_paid).toBe(true);
   expect(Number(rows[0].days)).toBeGreaterThanOrEqual(14);
+  // The plan's Credit is paid into the wallet, which is paid Credit.
   expect(Number(rows[0].balance)).toBe(30);
+});
+
+test("a pass approved today raises today's allowance too", async () => {
+  await reset();
+
+  // The ordinary case: the account chatted this morning, so today's allowance is
+  // already settled at the free six, and the pass is bought at noon.
+  await db.query("delete from public.credit_transactions where owner = $1", [E]);
+  await db.query(
+    `update public.profiles
+        set credit_balance = 6,
+            wallet_credit = 0,
+            credit_day = (now() at time zone timezone)::date,
+            paid_until = null,
+            has_paid = false
+      where id = $1`,
+    [E]
+  );
+  await db.query(
+    "insert into public.credit_transactions (owner, kind, amount, balance_after) values ($1, 'daily', 6, 6)",
+    [E]
+  );
+
+  const opened = await db.query<{ id: string }>(
+    `insert into public.payment_requests
+       (owner, plan, amount, reference, receipt_path, status)
+     values ($1, 'pass-15', 18, 'ref-noontime', $2, 'pending')
+     returning id`,
+    [E, `${E}/noon.pdf`]
+  );
+
+  await actAs("authenticated", E);
+  // No Credit granted here: this test is about the allowance alone.
+  await db.query(
+    "select * from public.review_payment_request($1, 'approved', 'ok', 0)",
+    [opened.rows[0].id]
+  );
+
+  // 15 for a paid day, not the 6 the morning refill settled: the member paid for
+  // "15 a day" today, and the top-up is to the allowance rather than a second
+  // grant, so nothing is doubled.
+  expect(await balance(E)).toBe(15);
+  expect(await ledgerSum(E)).toBe(15);
+
+  await reset();
+  const { rows } = await db.query<{ amount: string }>(
+    "select amount from public.credit_transactions where owner = $1 and kind = 'daily' order by created_at desc limit 1",
+    [E]
+  );
+  expect(Number(rows[0].amount)).toBe(9);
 });
 
 test("operator aggregates are admin-only and self-revoke by id is refused", async () => {
@@ -538,7 +628,7 @@ test("the daily allowance is 15 only while the pass is running", async () => {
         set credit_balance = coalesce(
           (select sum(amount) from public.credit_transactions where owner = $1),
           0
-        )
+        ) - wallet_credit
       where id = $1`,
     [E]
   );
@@ -555,7 +645,9 @@ test("operator correction is service-role only and stays in the ledger", async (
     "select public.operator_adjust_credit($1, -5, 'correction') as balance",
     [A]
   );
-  expect(Number(adjusted.rows[0].balance)).toBe(26);
+  // An operator correction moves paid Credit, so the wallet is what changes.
+  expect(Number(adjusted.rows[0].balance)).toBe(15);
+  expect(await balance(A)).toBe(26);
 
   expect(await ledgerCount(A, "adjustment")).toBe(1);
   expect(await ledgerSum(A)).toBe(26);
@@ -566,7 +658,7 @@ test("both sides of an invite are rewarded once", async () => {
 
   await reset();
   const inviter = await db.query<{ credit_balance: string }>(
-    "select credit_balance from public.profiles where id = $1",
+    "select credit_balance + wallet_credit as credit_balance from public.profiles where id = $1",
     [A]
   );
   expect(Number(inviter.rows[0].credit_balance)).toBe(31);
@@ -575,7 +667,10 @@ test("both sides of an invite are rewarded once", async () => {
     credit_balance: string;
     invited_by: string;
     invite_rewarded: boolean;
-  }>("select credit_balance, invited_by, invite_rewarded from public.profiles where id = $1", [B]);
+  }>(
+    "select credit_balance + wallet_credit as credit_balance, invited_by, invite_rewarded from public.profiles where id = $1",
+    [B]
+  );
 
   expect(Number(invitee.rows[0].credit_balance)).toBe(5);
   expect(String(invitee.rows[0].invited_by)).toBe(A);
@@ -648,6 +743,57 @@ test("a day ahead of the local date never refills", async () => {
   );
 });
 
+test("a run no worker finished is settled, and its hour comes back", async () => {
+  await reset();
+
+  const before = await balance(A);
+
+  const chat = await db.query<{ id: string }>(
+    "insert into public.chats (owner, title) values ($1, 'a lost turn') returning id",
+    [A]
+  );
+
+  await actAs("authenticated", A);
+  const hour = await db.query<{ session_id: string; price: string }>(
+    "select * from public.start_hour_session('deepseek-flash', 'octocat/hello', $1)",
+    [chat.rows[0].id]
+  );
+  const session = String(hour.rows[0].session_id);
+  expect(Number(hour.rows[0].price)).toBe(3);
+
+  // The shape a crashed worker leaves: a queued run, an hour behind it, and a
+  // row old enough that no worker is coming.
+  await reset();
+  await db.query(
+    `insert into public.runs
+       (owner, chat_id, prompt, model, status, created_at, credit_session_id)
+     values ($1, $2, 'what changed?', 'deepseek-flash', 'queued',
+             now() - interval '30 minutes', $3)`,
+    [A, chat.rows[0].id, session]
+  );
+
+  const settled = await db.query<{ status: string }>(
+    "select status from public.settle_stalled_runs($1)",
+    [A]
+  );
+
+  expect(settled.rows).toHaveLength(1);
+  expect(settled.rows[0].status).toBe("failed");
+
+  // The hour came back — into the pocket it was charged from — and the hour is
+  // over, so the time cannot be kept as well as the Credit.
+  expect(await balance(A)).toBe(before);
+  expect(await ledgerCount(A, "refund")).toBe(2);
+  expect(await ledgerSum(A)).toBe(await balance(A));
+
+  const { rows } = await db.query<{ live: boolean; refunded_at: string | null }>(
+    "select (expires_at > now()) as live, refunded_at from public.hour_sessions where session_id = $1",
+    [session]
+  );
+  expect(rows[0].live).toBe(false);
+  expect(rows[0].refunded_at).not.toBeNull();
+});
+
 test("another account cannot read or write the ledger", async () => {
   await actAs("authenticated", B);
   const seen = await db.query<{ owner: string }>(
@@ -677,10 +823,12 @@ test("every cached balance equals the sum of its ledger", async () => {
     credit_balance: string;
     total: string;
   }>(
-    `select p.id, p.credit_balance, coalesce(sum(t.amount), 0) as total
+    `select p.id,
+            p.credit_balance + p.wallet_credit as credit_balance,
+            coalesce(sum(t.amount), 0) as total
        from public.profiles p
        left join public.credit_transactions t on t.owner = p.id
-      group by p.id, p.credit_balance`
+      group by p.id, p.credit_balance, p.wallet_credit`
   );
 
   expect(rows.length).toBeGreaterThan(0);
