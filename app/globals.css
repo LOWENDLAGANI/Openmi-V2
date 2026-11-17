@@ -717,8 +717,22 @@ html.ink {
     position: sticky;
     bottom: 0;
     border-top: 1px solid var(--line);
+    background-color: transparent;
+    /* The blur and tint live on a pseudo-element so the dock itself is not a
+       containing block: an absolutely positioned popover inside the
+       composer (the model/effort selectors) must anchor to its own
+       wrapper, not to the whole dock. */
+    backdrop-filter: none;
+  }
+
+  .composer-dock::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
     background-color: color-mix(in srgb, var(--dock) 90%, transparent);
     backdrop-filter: blur(14px);
+    pointer-events: none;
   }
 
   .composer-input {
