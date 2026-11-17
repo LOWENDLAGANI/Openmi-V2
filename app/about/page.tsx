@@ -15,7 +15,7 @@ import {
 } from "@/lib/credits";
 
 export const metadata = {
-  title: "About — Openmi",
+  title: "About · Openmi",
 };
 
 const DOES = [
@@ -148,7 +148,7 @@ export default function AboutPage() {
           Every purchase is final: Credit, plans and passes are not refundable and
           cannot be cancelled. A pass ends on its own and never renews. If the
           provider never returns an answer at all, that hour is released back to
-          your balance by the meter — a correction, not a refund — and a turn
+          your balance by the meter (a correction, not a refund), and a turn
           stopped after text arrived keeps its hour, because the answer is kept.
           Everything is an append-only ledger row on{" "}
           <Link href="/activity" className="text-accent-text underline-offset-2 hover:underline">
@@ -164,7 +164,7 @@ export default function AboutPage() {
 
       <section className="mt-12 rounded-2xl border border-line bg-card p-5 shadow-[inset_3px_0_0_var(--accent)]">
         <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-          The honesty rule
+          What the review card states
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
           The review card states what the model proposed and what you approved.

@@ -18,7 +18,7 @@ import { supportMailto } from "@/lib/support";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Openmi — a repository agent for GitHub",
+  title: "Openmi: a repository agent for GitHub",
   description: `Reads your code at a pinned commit, cites the file and line it used, and proposes the change as a diff you approve. ${CREDIT_PER_HOUR} Credit an hour, ${DAILY_FREE_CREDIT} free every day.`,
   other: { "page-type": "software", "site-kind": "software" },
 };

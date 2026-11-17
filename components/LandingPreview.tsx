@@ -184,9 +184,7 @@ export function RunTrace() {
   return (
     <div className="rounded-2xl border border-line bg-card p-4 shadow-[var(--card-shadow)] sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-low">
-          turn 04
-        </p>
+        <p className="text-[11px] text-low">Turn 4</p>
         <p className="font-mono text-[10.5px] tabular-nums text-low">
           9.4k tokens
         </p>

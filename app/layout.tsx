@@ -40,7 +40,7 @@ import "./globals.css";
  */
 
 export const metadata: Metadata = {
-  title: "openmi — your repository, with a reviewer built in",
+  title: "Openmi: your repository, with a reviewer built in",
   description:
     "Connect GitHub, pick a repository, and chat with a model that reads the code and proposes edits. Nothing is pushed until you approve.",
   applicationName: "Openmi",

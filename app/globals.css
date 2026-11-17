@@ -421,13 +421,6 @@ html.ink {
     backdrop-filter: blur(12px);
   }
 
-  .gradient-text {
-    background-image: linear-gradient(92deg, var(--text-hi) 20%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
   /* ── The front door ──────────────────────────────────────────────────────
      The landing page is a shopfront, not the product: a marketing face, one
      1200px column every block starts and ends on, and screens at least a

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { Beam } from "@/components/Beam";
 import { ContextCircle } from "@/components/ContextCircle";
 import { EffortMenu } from "@/components/EffortMenu";
 import { ModelMenu } from "@/components/ModelMenu";
@@ -164,8 +163,9 @@ export function Composer({
         </div>
       </div>
 
-      <Beam>
-        <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
+      {/* One owned surface, not a glowing frame: the capsule is the same
+          control at rest, on focus and while streaming. */}
+      <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
           <textarea
             ref={textareaRef}
             value={text}
@@ -229,8 +229,7 @@ export function Composer({
               </svg>
             </button>
           </div>
-        </div>
-      </Beam>
+      </div>
 
       {/* The keyboard convention is stated once, where it is used, and hidden
           on a touch layout where Enter is a newline and only the button sends.
