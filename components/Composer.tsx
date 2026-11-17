@@ -119,7 +119,7 @@ export function Composer({
           reference parks its context ring there: a message field with four
           chips inside it stops reading as one field. */}
       <div className="mb-1 flex items-center justify-between gap-2 px-1">
-        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <div className="flex min-w-0 items-center gap-1.5 overflow-visible">
           <ModelMenu
             models={models}
             value={model}

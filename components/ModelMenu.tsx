@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { MODEL_CATEGORIES, type ModelCapability } from "@/lib/models";
 
@@ -29,24 +30,41 @@ export function ModelMenu({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const wrapper = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ bottom: number; left: number } | null>(null);
 
   const current = models.find((model) => model.id === value) ?? models[0];
 
   useEffect(() => {
     if (!open) return;
 
+    const update = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (rect) {
+        setPos({ bottom: window.innerHeight - rect.top + 8, left: rect.left });
+      }
+    };
+    update();
+
     function onPointer(event: PointerEvent) {
-      if (!wrapper.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     }
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
 
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
       document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
@@ -83,8 +101,9 @@ export function ModelMenu({
   })).filter((group) => group.options.length > 0);
 
   return (
-    <div ref={wrapper} className="relative min-w-0">
+    <div className="relative min-w-0">
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((previous) => !previous)}
@@ -116,80 +135,91 @@ export function ModelMenu({
         </svg>
       </button>
 
-      {open && (
-        <div
-          role="listbox"
-          aria-label="Model"
-          onKeyDown={onPanelKey}
-          className="animate-pop absolute bottom-full left-0 z-40 mb-1.5 max-h-[58vh] w-64 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.22)]"
-        >
-          {groups.map((group) => (
-            <div key={group.id} className="pb-1 last:pb-0">
-              <p className="eyebrow px-2.5 pb-1 pt-1.5">{group.label}</p>
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            role="listbox"
+            aria-label="Model"
+            onKeyDown={onPanelKey}
+            style={{
+              position: "fixed",
+              bottom: pos.bottom,
+              left: pos.left,
+              zIndex: 100,
+            }}
+            className="animate-pop max-h-[58vh] w-64 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.22)]"
+          >
+            {groups.map((group) => (
+              <div key={group.id} className="pb-1 last:pb-0">
+                <p className="eyebrow px-2.5 pb-1 pt-1.5">{group.label}</p>
 
-              {group.options.map((option) => {
-                const available = option.available !== false;
-                const locked = option.paidOnly === true && !paidActive;
-                const active = option.id === value;
+                {group.options.map((option) => {
+                  const available = option.available !== false;
+                  const locked = option.paidOnly === true && !paidActive;
+                  const active = option.id === value;
 
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    disabled={!available}
-                    onClick={() => {
-                      onChange(option.id);
-                      setOpen(false);
-                    }}
-                    className={`flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                      active
-                        ? "bg-elevated text-hi"
-                        : "text-body hover:bg-hover hover:text-hi"
-                    } ${available ? "" : "opacity-45"}`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[12px] font-medium">
-                          {option.name}
-                        </span>
-                        {locked && (
-                          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] text-accent-text">
-                            paid
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      disabled={!available}
+                      onClick={() => {
+                        onChange(option.id);
+                        setOpen(false);
+                      }}
+                      className={`flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                        active
+                          ? "bg-elevated text-hi"
+                          : "text-body hover:bg-hover hover:text-hi"
+                      } ${available ? "" : "opacity-45"}`}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-[12px] font-medium">
+                            {option.name}
                           </span>
-                        )}
+                          {locked && (
+                            <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] text-accent-text">
+                              paid
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] leading-snug text-low">
+                          {locked
+                            ? "Paid passes only"
+                            : available
+                              ? option.blurb
+                              : "Provider key missing"}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-low">
-                        {locked
-                          ? "Paid passes only"
-                          : available
-                            ? option.blurb
-                            : "Provider key missing"}
-                      </span>
-                    </span>
 
-                    {active && (
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        className="mt-0.5 size-3.5 shrink-0 text-accent-text"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="m5 12.5 4.5 4.5L19 7.5" />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
+                      {active && (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="mt-0.5 size-3.5 shrink-0 text-accent-text"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m5 12.5 4.5 4.5L19 7.5" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
