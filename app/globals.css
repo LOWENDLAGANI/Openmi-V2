@@ -968,20 +968,26 @@ html.ink {
     box-shadow: var(--card-shadow);
   }
 
-  /* The pill the composer sits in: a filled capsule that becomes a card on
-     focus, which is the reference's one focus affordance. */
-  .composer-capsule {
-    background-color: var(--hover);
-    border: 1px solid transparent;
-    border-radius: 9999px;
+  /* The composer's card: one owned surface, with the model, the effort and the
+     send control on its bottom edge. It looks the same idle, focused and while
+     streaming — only the border and the glow mark focus, so a field holding a
+     draft never changes shape under the reader. */
+  .composer-card {
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    background-color: var(--card);
     transition:
-      border-color 0.15s ease,
-      background-color 0.15s ease;
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
   }
 
-  .composer-capsule:focus-within {
-    background-color: var(--card);
+  .composer-card:hover {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .composer-card:focus-within {
     border-color: var(--line-strong);
+    box-shadow: 0 0 25px rgba(0, 0, 0, 0.14);
   }
 
   /* An empty composer still shows a control with an edge, so it reads as

@@ -112,83 +112,79 @@ export function Composer({
 
   return (
     <form onSubmit={submit}>
-      {/* The model and the hour's price sit above the capsule, the way the
-          reference parks its context ring there: a message field with four
-          chips inside it stops reading as one field. */}
-      <div className="mb-1 flex items-center justify-between gap-2 px-1">
-        <div className="flex min-w-0 items-center gap-1.5 overflow-visible">
-          <ModelMenu
-            models={models}
-            value={model}
-            onChange={(id) => onModelChange(id as ModelId)}
-            paidActive={paidActive}
-          />
-
-          {/* Effort only exists where the provider documents it, so the control
-              appears with the model instead of sitting there doing nothing. */}
-          {modelSupportsEffort(model) && (
-            <EffortMenu value={effort} onChange={onEffortChange} />
-          )}
-        </div>
-
-        <div className="flex min-w-0 items-center gap-1.5">
-          {/* What the next message costs, so the price is never a surprise
-              after the answer. */}
-          <span
-            title={
-              activeChatId !== null
-                ? "Every message in this chat is covered for the hour."
-                : "The hour starts when the first message sends."
+      {/* The field and its controls are one card, with the toolbar on the bottom
+          edge: the model, the effort and the send control belong to the box they
+          act on, not to a row of chips floating above it. */}
+      <div className="composer-card">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (!canSend) return;
+              onSend(text);
             }
-            className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 text-[9.5px] text-low sm:inline-flex"
-          >
+          }}
+          rows={1}
+          placeholder={
+            providerReady
+              ? repoName
+                ? `Ask about ${repoName}…`
+                : "Ask what to build, or attach a repository…"
+              : "Chat is unavailable right now."
+          }
+          className="composer-input max-h-[168px] min-h-[56px] w-full px-3.5 pb-1 pt-3 text-[15px] leading-snug focus:outline-none"
+        />
+
+        <div className="flex items-center justify-between gap-2 px-2 pb-2">
+          <div className="flex min-w-0 items-center gap-1 overflow-visible">
+            <ModelMenu
+              models={models}
+              value={model}
+              onChange={(id) => onModelChange(id as ModelId)}
+              paidActive={paidActive}
+            />
+
+            {/* Effort only exists where the provider documents it, so the
+                control appears with the model instead of sitting there doing
+                nothing. */}
+            {modelSupportsEffort(model) && (
+              <EffortMenu value={effort} onChange={onEffortChange} />
+            )}
+          </div>
+
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+            {/* What the next message costs, so the price is never a surprise
+                after the answer. */}
             <span
-              aria-hidden="true"
-              className={`size-1 rounded-full ${
-                activeChatId !== null ? "bg-accent" : "bg-line-strong"
-              }`}
-            />
-            {activeChatId !== null
-              ? `hour · ${modelHourCredit(model, models)} credit`
-              : "pay on send"}
-          </span>
-
-          {meter && (
-            <ContextCircle
-              usedChars={meter.usedChars}
-              budgetChars={meter.budgetChars}
-              notes={meter.notes}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* One owned surface, not a glowing frame: the capsule is the same
-          control at rest, on focus and while streaming. */}
-      <div className="composer-capsule flex items-end gap-1 px-2 py-1.5">
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                if (!canSend) return;
-                onSend(text);
+              title={
+                activeChatId !== null
+                  ? "Every message in this chat is covered for the hour."
+                  : "The hour starts when the first message sends."
               }
-            }}
-            rows={1}
-            placeholder={
-              providerReady
-                ? repoName
-                  ? `Ask about ${repoName}…`
-                  : "Ask what to build, or attach a repository…"
-                : "Chat is unavailable right now."
-            }
-            className="composer-input max-h-[168px] min-h-[40px] flex-1 px-2 py-2.5 text-[15px] leading-snug focus:outline-none"
-          />
+              className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 text-[9.5px] text-low sm:inline-flex"
+            >
+              <span
+                aria-hidden="true"
+                className={`size-1 rounded-full ${
+                  activeChatId !== null ? "bg-accent" : "bg-line-strong"
+                }`}
+              />
+              {activeChatId !== null
+                ? `hour · ${modelHourCredit(model, models)} credit`
+                : "pay on send"}
+            </span>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+            {meter && (
+              <ContextCircle
+                usedChars={meter.usedChars}
+                budgetChars={meter.budgetChars}
+                notes={meter.notes}
+              />
+            )}
+
             {streaming && (
               <button
                 type="button"
@@ -196,7 +192,7 @@ export function Composer({
                 disabled={stopping}
                 aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
                 title={stopping ? "Stopping…" : "Stop"}
-                className="lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
+                className="lift grid size-9 shrink-0 place-items-center rounded-xl border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
               >
                 <span
                   aria-hidden="true"
@@ -211,7 +207,7 @@ export function Composer({
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
+              className={`lift grid size-9 shrink-0 place-items-center rounded-xl transition-colors ${
                 canSend ? "bg-accent text-on-accent" : "send-idle"
               }`}
             >
@@ -229,6 +225,7 @@ export function Composer({
               </svg>
             </button>
           </div>
+        </div>
       </div>
 
       {/* The keyboard convention is stated once, where it is used, and hidden
