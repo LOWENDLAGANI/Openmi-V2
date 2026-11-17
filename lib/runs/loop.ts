@@ -108,6 +108,30 @@ function summaryOf(text: string): string {
   return flat.length <= 500 ? flat : `${flat.slice(0, 497)}…`;
 }
 
+/**
+ * Why an answer that is not complete stopped, as the note stored under it.
+ *
+ * This used to live only in the tab that watched the turn, so a reload showed a
+ * truncated answer with nothing to say it had been cut — which reads as the
+ * model giving up rather than as the cap it hit.
+ */
+function stoppedNote(status: RunStatus, stopReason: string): string {
+  if (status === "cancelled") return "stopped before this answer finished";
+
+  switch (stopReason) {
+    case "wall-clock":
+      return `this answer stopped before it finished: the run reached its ${Math.round(
+        runWallClockMs() / 60_000
+      )}-minute limit.`;
+    case "max-steps":
+      return `this answer stopped before it finished: the run reached its ${RUN_MAX_STEPS}-step limit.`;
+    case "token-budget":
+      return `this answer stopped before it finished: the run reached its ${RUN_MAX_TOKENS.toLocaleString()}-token estimate.`;
+    default:
+      return "this answer stopped before it finished";
+  }
+}
+
 export async function executeRun(
   run: RunRow,
   deps: ExecuteDeps
@@ -646,11 +670,22 @@ export async function executeRun(
     // before the workspace is paused and before the run is marked settled, so a
     // reader who sees `run.finished` can already reload the transcript.
     if (run.chat_id) {
+      // A complete answer is stored as it was written. One that stopped early is
+      // stored with the reason attached, so the transcript says what the tab
+      // would have said while it watched.
+      const partial = status === "done" ? "" : collectedText;
+      const deliveredText =
+        status === "done"
+          ? answerText
+          : partial.trim().length > 0
+            ? `${partial}\n\n_(${stoppedNote(status, stopReason)})_`
+            : partial;
+
       const delivered = await deliverChatTurn({
         admin,
         run,
         sandbox,
-        text: status === "done" ? answerText : collectedText,
+        text: deliveredText,
         thinking: collectedReasoning,
         steps: chatSteps,
         files: changedFiles,

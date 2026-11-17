@@ -67,6 +67,90 @@ type Shot = {
   caption: string;
 };
 
+/**
+ * The note under an answer that stopped early. The worker writes it into the
+ * stored row and the panel writes it under text that has not been stored yet, so
+ * both spellings are recognised and the note is never doubled.
+ */
+const STOPPED_NOTE =
+  /\n\n_\((?:stopped before this answer finished|this answer stopped before it finished)[^)]*\)_$/;
+
+/** Adds the note unless the text already ends with one. */
+function withStoppedNote(text: string, note: string): string {
+  return STOPPED_NOTE.test(text) ? text : `${text}\n\n_(${note})_`;
+}
+
+/** A stored row in the shape the transcript renders. */
+function toTranscript(rows: Message[]): UiMessage[] {
+  return rows.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    seq: Number(message.seq),
+    model: message.model,
+    // The stored answer carries the work that produced it, so a reload keeps
+    // the console instead of showing a bare paragraph.
+    thinking: message.thinking ?? undefined,
+    steps: Array.isArray(message.steps) ? message.steps : undefined,
+  }));
+}
+
+/**
+ * Folds a refreshed server transcript into what this tab is showing.
+ *
+ * `router.refresh()` re-renders the page but does not remount this panel, so its
+ * first `initialMessages` used to be the last transcript it ever read: an answer
+ * written while the tab was away arrived in the refresh payload and was thrown
+ * away, which is why a finished turn looked like it had stopped until the page
+ * was reloaded by hand.
+ *
+ * The stored rows are the authority. A local row is dropped once the server has
+ * it — and a local copy of a stopped answer is dropped once a stored answer
+ * begins with its text — while anything this tab still owns and the server has
+ * not stored yet is kept after the stored list.
+ */
+function mergeTranscript(current: UiMessage[], stored: UiMessage[]): UiMessage[] {
+  const storedIds = new Set(stored.map((message) => message.id));
+
+  const kept = current.filter((message) => {
+    if (storedIds.has(message.id)) return false;
+    // Only this tab's own rows are candidates; anything else is stale.
+    if (!message.id.startsWith("local-")) return false;
+
+    if (message.role === "user") {
+      // The optimistic copy of a message the server now has.
+      return !stored.some(
+        (row) => row.role === "user" && row.content === message.content
+      );
+    }
+
+    // A stopped answer standing in for one the worker has now stored.
+    const answer = message.content.replace(STOPPED_NOTE, "").trim();
+    return !(
+      answer.length > 0 &&
+      stored.some(
+        (row) => row.role === "assistant" && row.content.trim().startsWith(answer)
+      )
+    );
+  });
+
+  if (kept.length === 0) {
+    const unchanged =
+      stored.length === current.length &&
+      stored.every(
+        (message, index) =>
+          message.id === current[index].id &&
+          message.content === current[index].content &&
+          message.model === current[index].model
+      );
+
+    // Nothing new arrived, so hand back the same array rather than a copy of it.
+    if (unchanged) return current;
+  }
+
+  return kept.length === 0 ? stored : [...stored, ...kept];
+}
+
 export function ChatPanel({
   chatId,
   repo,
@@ -96,17 +180,7 @@ export function ChatPanel({
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<UiMessage[]>(() =>
-    initialMessages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      seq: Number(message.seq),
-      model: message.model,
-      // The stored answer carries the work that produced it, so a reload keeps
-      // the console instead of showing a bare paragraph.
-      thinking: message.thinking ?? undefined,
-      steps: Array.isArray(message.steps) ? message.steps : undefined,
-    }))
+    toTranscript(initialMessages)
   );
   const [model, setModel] = useState<ModelId>(initialModel);
   const [composer, setComposer] = useState<ComposerCommand>({ text: "", nonce: 0 });
@@ -132,6 +206,14 @@ export function ChatPanel({
   useEffect(() => {
     if (initialRunning) setBackgroundRunning(true);
   }, [initialRunning]);
+
+  // The transcript the server just rendered is the authority. This panel is not
+  // remounted by `router.refresh()`, so without this the answer written while
+  // the tab was away was read by the page and never reached the screen.
+  useEffect(() => {
+    const stored = toTranscript(initialMessages);
+    setMessages((current) => mergeTranscript(current, stored));
+  }, [initialMessages]);
   const [atBottom, setAtBottom] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId);
   // The first message of a new chat waits here until the hour is confirmed.
@@ -215,9 +297,12 @@ export function ChatPanel({
 
           setBackgroundRunning(false);
           // Settled: the refreshed transcript carries the steps and the answer
-          // both, so the live copy goes rather than sitting under the answer.
+          // both, so the live copy goes rather than sitting under the answer —
+          // including the reasoning, which would otherwise leave a lone folded
+          // block behind for a turn that is over.
           setSteps([]);
           setPending("");
+          setThinking("");
           // The poll is also where a run nothing finished is settled, so it is
           // where the reason arrives. Without it the wait ended in silence.
           if (typeof payload.error === "string" && payload.error.length > 0) {
@@ -362,11 +447,35 @@ export function ChatPanel({
     await send(pendingChoose.content);
   }
 
-  async function send(content: string, turnToken?: string) {
+  /**
+   * Sends a message, or continues the window of a turn already running.
+   *
+   * A continuation is the same answer seen through the next stream, so what the
+   * reader already has travels with it: `resume` is the text, the reasoning, the
+   * steps, the screenshots and the cursor this window reached. Starting from
+   * nothing is what made a long answer blank at the boundary and keep only the
+   * tail that arrived afterwards.
+   */
+  async function send(
+    content: string,
+    turnToken?: string,
+    resume?: {
+      text: string;
+      thinking: string;
+      steps: StepLine[];
+      shots: Shot[];
+      cursor: number;
+    }
+  ) {
     const continuation = typeof turnToken === "string";
 
     if (busyRef.current) return;
     if (!continuation && content.trim().length === 0) return;
+
+    // A new message starts its own continuation budget. Nothing else reset this
+    // counter, so after six windows in one visit every later long turn stopped
+    // being followed at its first handover.
+    if (!continuation) continuedRef.current = 0;
 
     // One path for every message. Whether this answer needs a command, a file
     // read or nothing at all is the model's call, and the sandbox it would use
@@ -380,16 +489,24 @@ export function ChatPanel({
       stopTimerRef.current = null;
     }
     setError(null);
-    setPending("");
-    setThinking("");
-    setSteps([]);
-    setShots([]);
-    setNotices([]);
+    setPending(resume?.text ?? "");
+    setThinking(resume?.thinking ?? "");
+    setSteps(resume?.steps ? [...resume.steps] : []);
+    setShots(resume?.shots ? [...resume.shots] : []);
+    // A continuation is the same turn, so the charge and queue notices that
+    // belong to it stay on screen instead of being wiped at the boundary.
+    if (!resume) setNotices([]);
 
     let pausedToken: string | null = null;
-    let assembled = "";
-    let thinkingText = "";
+    /** Where this window stopped in the run's event log, for the next one. */
+    let pausedCursor = 0;
+    let assembled = resume?.text ?? "";
+    let thinkingText = resume?.thinking ?? "";
     let sawDone = false;
+    /** True once the server reported a failure for this window. */
+    let failed = false;
+    /** True when this window ends on a token rather than a finished turn. */
+    let resuming = false;
     // The server accepted a run for this turn, so a stream that ends without
     // "done" is a turn still out there rather than a request that was refused.
     let attached = false;
@@ -401,8 +518,8 @@ export function ChatPanel({
     // Steps belong to the answer they produced, so they are collected here and
     // stored on the message when it lands. A finished answer keeps its fold;
     // live progress is cleared the moment the turn ends.
-    const stepLog: StepLine[] = [];
-    const shotLog: Shot[] = [];
+    const stepLog: StepLine[] = resume?.steps ? [...resume.steps] : [];
+    const shotLog: Shot[] = resume?.shots ? [...resume.shots] : [];
 
     const recordStep = (next: StepLine) => {
       if (next.state === "start") {
@@ -441,7 +558,7 @@ export function ChatPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           continuation
-            ? { chatId: activeChatId, turn: turnToken }
+            ? { chatId: activeChatId, turn: turnToken, cursor: resume?.cursor ?? 0 }
             : {
                 chatId: activeChatId ?? undefined,
                 content,
@@ -621,6 +738,8 @@ export function ChatPanel({
 
         if (event === "paused") {
           pausedToken = typeof payload.turn === "string" ? payload.turn : null;
+          pausedCursor =
+            typeof payload.cursor === "number" ? payload.cursor : 0;
           return;
         }
 
@@ -649,14 +768,30 @@ export function ChatPanel({
           const storedSteps = Array.isArray(payload.steps)
             ? (payload.steps as StepLine[])
             : [...stepLog];
-          // The server appends the same note when it stores a stopped answer, so
-          // the card on screen and the row in the transcript say the same thing.
+          // The worker stores the same note with a stopped answer, so the card
+          // and the row say the same thing and neither writes it twice.
           const content =
             payload.stopped === "aborted"
-              ? `${storedContent}\n\n_(stopped before this answer finished)_`
+              ? withStoppedNote(storedContent, "stopped before this answer finished")
               : payload.stopped === "partial"
-                ? `${storedContent}\n\n_(this answer stopped before it finished)_`
+                ? withStoppedNote(
+                    storedContent,
+                    "this answer stopped before it finished"
+                  )
                 : storedContent;
+
+          // A run that settled without writing a sentence has nothing to put in
+          // a card, and an empty card reads as a broken answer. Say what
+          // happened instead, and keep the console that shows how it got there.
+          if (storedContent.trim().length === 0) {
+            setError(
+              (current) => current ?? "The run finished without an answer."
+            );
+            setPending("");
+            sawDone = true;
+            router.refresh();
+            return;
+          }
 
           setMessages((current) => [
             ...current,
@@ -697,7 +832,10 @@ export function ChatPanel({
 
         if (event === "error") {
           setError(typeof payload.message === "string" ? payload.message : "The turn failed.");
-          setPending("");
+          // The part of the answer already on screen stays. The worker stored
+          // that same text, so blanking it here is what made a failed turn look
+          // like a turn that never answered, until the page was reloaded.
+          failed = true;
           sawDone = true;
           // The steps stay: a failed turn has no message to carry them, and
           // the command output is the only evidence of what went wrong.
@@ -735,17 +873,25 @@ export function ChatPanel({
         stopTimerRef.current = null;
       }
 
+      // A window that ended with a token is not a stopped turn: the next one
+      // takes the answer on from exactly here, so its text stays live instead of
+      // being committed with a "stopped" note around it.
+      resuming = pausedToken !== null && continuedRef.current < 6;
+
       // A stopped turn is not a lost answer. If the stream ended without the
       // server's final "done", the part already on screen becomes a message
       // instead of vanishing with the composer state.
-      if (!sawDone && assembled.trim().length > 0) {
+      if (!sawDone && !resuming && assembled.trim().length > 0) {
         stepsCarried = true;
         setMessages((current) => [
           ...current,
           {
             id: `local-stopped-${Date.now()}`,
             role: "assistant",
-            content: `${assembled}\n\n_(stopped before this answer finished)_`,
+            content: withStoppedNote(
+              assembled,
+              "stopped before this answer finished"
+            ),
             seq: null,
             model,
             thinking: thinkingText,
@@ -759,25 +905,39 @@ export function ChatPanel({
       // keeps the console on screen: that output is the only record of what the
       // sandbox did, and clearing it is what made a failed run impossible to
       // diagnose.
-      setSteps(stepsCarried ? [] : [...stepLog]);
-      setPending("");
-      setThinking("");
+      setSteps(resuming || !stepsCarried ? [...stepLog] : []);
+      // Text that arrived before a failure or a handover is the answer so far,
+      // and it is already stored; it stays on screen rather than vanishing.
+      // A committed message already carries the answer, so the live copy only
+      // stays when nothing was written into the transcript.
+      const keepLive = resuming || (failed && !stepsCarried);
+      setPending(keepLive ? assembled : "");
+      setThinking(keepLive ? thinkingText : "");
 
       // The stream can end without the turn ending: a dropped connection, or the
       // continuation budget running out. A turn the server accepted is still in
       // the queue or the worker, so hand it to the poll — that is the half which
       // either reports the answer or ends the wait with its reason. A refused
       // request and a stop the reader asked for have nothing to follow.
-      if (attached && !sawDone && !stoppedRef.current) {
+      // A continuation names a run that exists even when this window's request
+      // was refused or dropped, so it is handed to the poll too.
+      if ((attached || continuation) && !sawDone && !stoppedRef.current && !resuming) {
         setBackgroundRunning(true);
       }
     }
 
-    // A paused turn is continued once, with the signed token the server issued.
-    // If that continuation also pauses, the reader is told instead of looping.
-    if (pausedToken && continuedRef.current < 6) {
+    // A paused turn is continued once, with the token the server issued and the
+    // cursor this window reached. If that continuation also pauses, the reader
+    // is told instead of looping.
+    if (resuming && pausedToken) {
       continuedRef.current += 1;
-      await send("", pausedToken);
+      await send("", pausedToken, {
+        text: assembled,
+        thinking: thinkingText,
+        steps: stepLog,
+        shots: shotLog,
+        cursor: pausedCursor,
+      });
     }
   }
 

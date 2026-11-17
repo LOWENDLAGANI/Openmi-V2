@@ -84,6 +84,12 @@ type ChatRequest = {
   path?: unknown;
   /** A continuation: the run the client is already watching. */
   turn?: unknown;
+  /**
+   * A continuation's place in that run's event log: the last seq the reader
+   * actually received. Without it the next window starts at the run's newest
+   * event and everything written during the handover is never delivered.
+   */
+  cursor?: unknown;
   repo?: unknown;
   branch?: unknown;
   sha?: unknown;
@@ -235,12 +241,22 @@ export async function POST(request: Request) {
       return json({ error: "That run does not exist." }, 404);
     }
 
+    // Resume exactly where the reader stopped rather than at the run's newest
+    // event. Deltas and steps are written while one window closes and the next
+    // opens; starting at `last_event_seq` dropped them, which is a sentence
+    // vanishing mid-answer. A cursor past the log is clamped, so a stale or
+    // forged value can only replay what this run really wrote.
+    const resumeAt =
+      typeof body.cursor === "number" && Number.isFinite(body.cursor)
+        ? Math.min(Math.max(0, Math.trunc(body.cursor)), run.last_event_seq)
+        : run.last_event_seq;
+
     return streamRun({
       admin,
       session,
       chatId,
       run,
-      cursor: run.last_event_seq,
+      cursor: resumeAt,
       greeting: null,
     });
   }
@@ -756,7 +772,9 @@ function streamRun(input: StreamInput): NextResponse {
         }
 
         if (Date.now() > deadline) {
-          send("paused", { turn: run.id });
+          // The cursor travels with the token, so the next window continues from
+          // the reader's own place in the log instead of from the newest event.
+          send("paused", { turn: run.id, cursor });
           close();
           return;
         }
