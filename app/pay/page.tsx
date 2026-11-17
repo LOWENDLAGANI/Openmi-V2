@@ -1,17 +1,17 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
-import { CountryHint } from "@/components/CountryHint";
+import { CountrySelector } from "@/components/CountrySelector";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { ReceiptWave } from "@/components/ReceiptWave";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   COUNTRY_COOKIE,
-  countryFromRequest,
+  COUNTRY_OPTIONS,
   currencyForCountry,
   formatMoney,
   isConverted,
@@ -32,7 +32,7 @@ import {
 } from "@/lib/credits";
 import { readCreditProfile, refillDailyCredit } from "@/lib/credits/store";
 import { getSession } from "@/lib/session";
-import { submitReceipt } from "./actions";
+import { setCountry, submitReceipt } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,12 @@ function utc(value: string | null): string {
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; submitted?: string; credit?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    submitted?: string;
+    credit?: string;
+    country?: string;
+  }>;
 }) {
   const params = await searchParams;
   const session = await getSession();
@@ -124,15 +129,11 @@ export default async function PayPage({
     })
   );
 
-  // Country detection, in order: the host's geo header, the browser region the
-  // hint cookie remembered, then the request's own language tag. The client hint
-  // is written only when all three are absent, so a real IP lookup always wins.
-  const requestHeaders = await headers();
+  // The country is chosen by the reader through the selector below and stored
+  // in the cookie. We no longer guess it from request headers or the browser
+  // language.
   const cookieStore = await cookies();
-  const country = countryFromRequest(
-    requestHeaders,
-    cookieStore.get(COUNTRY_COOKIE)?.value
-  );
+  const country = cookieStore.get(COUNTRY_COOKIE)?.value ?? null;
   const base = currencyForCountry(country);
   const currency = withLiveRate(base, await getMyrRates());
   const live = currency !== base;
@@ -141,7 +142,6 @@ export default async function PayPage({
 
   return (
     <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
-      <CountryHint needed={country === null} />
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -263,6 +263,35 @@ export default async function PayPage({
       </section>
 
       <AdBanner className="mt-6" />
+
+      <form action={setCountry} className="mt-4 max-w-sm">
+        <label className="block">
+          <span className="eyebrow block px-1 pb-1.5">Your country</span>
+          <select
+            name="country"
+            defaultValue={country ?? ""}
+            className="field py-2 text-[12px]"
+            aria-label="Choose your country for the price estimate"
+          >
+            <option value="">Choose your country</option>
+            {COUNTRY_OPTIONS.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.name} ({option.currency})
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="submit"
+          className="btn mt-2 px-3.5 py-1.5 text-[12px]"
+        >
+          Update estimate
+        </button>
+        <span className="mt-1 block px-1 text-[10px] text-low">
+          Used only to show an estimated amount in your currency. Payment is
+          charged in Malaysian ringgit.
+        </span>
+      </form>
 
       <section aria-labelledby="plans-heading" className="mt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

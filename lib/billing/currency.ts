@@ -126,6 +126,78 @@ const COUNTRY_CURRENCY: Record<string, CurrencyCode> = {
   EG: "EGP",
 };
 
+export type CountryOption = {
+  /** Two-letter country code, e.g. "US". */
+  code: string;
+  /** English country name for the selector. */
+  name: string;
+  /** The currency that country maps to. */
+  currency: CurrencyCode;
+};
+
+const COUNTRY_NAMES: Record<string, string> = {
+  MY: "Malaysia",
+  SG: "Singapore",
+  US: "United States",
+  GB: "United Kingdom",
+  IE: "Ireland",
+  DE: "Germany",
+  FR: "France",
+  ES: "Spain",
+  IT: "Italy",
+  NL: "Netherlands",
+  BE: "Belgium",
+  AT: "Austria",
+  PT: "Portugal",
+  FI: "Finland",
+  GR: "Greece",
+  AU: "Australia",
+  CA: "Canada",
+  IN: "India",
+  ID: "Indonesia",
+  PH: "Philippines",
+  TH: "Thailand",
+  VN: "Vietnam",
+  JP: "Japan",
+  CN: "China",
+  HK: "Hong Kong",
+  TW: "Taiwan",
+  KR: "South Korea",
+  AE: "United Arab Emirates",
+  SA: "Saudi Arabia",
+  NZ: "New Zealand",
+  BD: "Bangladesh",
+  PK: "Pakistan",
+  LK: "Sri Lanka",
+  NG: "Nigeria",
+  ZA: "South Africa",
+  BR: "Brazil",
+  MX: "Mexico",
+  TR: "Turkey",
+  EG: "Egypt",
+};
+
+/**
+ * Every country the page can show an estimate for, with its name and currency,
+ * in alphabetical order. The pay page renders this as a drop-down so the
+ * reader picks their own country instead of relying on a guessed one.
+ */
+export const COUNTRY_OPTIONS: CountryOption[] = Object.entries(
+  COUNTRY_CURRENCY
+)
+  .map(([code, currency]) => ({
+    code,
+    name: COUNTRY_NAMES[code] ?? code,
+    currency,
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+/** Alias kept for callers that expect a shorter name. */
+export const COUNTRIES = COUNTRY_OPTIONS;
+
+/** Alias kept for callers that expect a "list" name. */
+export const COUNTRY_LIST = COUNTRY_OPTIONS;
+
 /**
  * The display currency for a country code. Unknown, missing or malformed
  * countries fall back to ringgit rather than guessing.

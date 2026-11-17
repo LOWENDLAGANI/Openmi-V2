@@ -2,10 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 
+import { cookies } from "next/headers";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { planById } from "@/lib/billing/plans";
+import { COUNTRY_COOKIE } from "@/lib/billing/currency";
 import { redeemCreditCode } from "@/lib/credits/store";
 import { sendReceiptNotification } from "@/lib/email/receipt";
 import { RECEIPT_TYPES, receiptBytesMatchType } from "@/lib/receipts";
@@ -218,4 +221,22 @@ export async function deductOwnCredit(formData: FormData) {
   done(
     `Deducted ${amount} Credit. New balance: ${Number.isFinite(balance) ? balance : "updated"}.`
   );
+}
+
+/**
+ * Remember the country the reader picked for the price estimate. Stored in the
+ * same cookie the page already reads, so the next render shows that currency.
+ */
+export async function setCountry(formData: FormData) {
+  const country = field(formData, "country");
+  if (/^[A-Za-z]{2}$/.test(country)) {
+    const store = await cookies();
+    store.set(COUNTRY_COOKIE, country.toUpperCase(), {
+      path: "/",
+      maxAge: 31536000,
+      sameSite: "lax",
+    });
+  }
+  revalidatePath("/pay");
+  redirect("/pay");
 }
