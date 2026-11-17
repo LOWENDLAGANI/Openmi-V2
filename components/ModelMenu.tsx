@@ -67,7 +67,13 @@ export function ModelMenu({
 
     const index = options.indexOf(document.activeElement as HTMLButtonElement);
     const step = event.key === "ArrowDown" ? 1 : -1;
-    const target = options[(index + step + options.length) % options.length];
+    const targetIndex =
+      index === -1
+        ? step === 1
+          ? 0
+          : options.length - 1
+        : (index + step + options.length) % options.length;
+    const target = options[targetIndex];
     target?.focus();
   }
 
