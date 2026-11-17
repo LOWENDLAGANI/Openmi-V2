@@ -52,6 +52,24 @@ test("a streaming answer looks like it is still arriving", () => {
   expect(CSS).toContain("@keyframes stream-caret-blink");
 });
 
+test("a message typed mid-run is queued, not swallowed", () => {
+  const COMPOSER = read("/components/Composer.tsx");
+
+  // Every product worth copying keeps the field live while a turn runs. The
+  // composer therefore does not gate on `streaming`; the panel gives the press
+  // a meaning.
+  expect(COMPOSER).toContain("const canSend = !tooLong && text.trim().length > 0");
+  expect(COMPOSER).toContain('streaming ? "Queue message" : "Send message"');
+
+  expect(PANEL).toContain("setQueued(content)");
+  expect(PANEL).toContain("if (streaming || stopping || queued === null) return;");
+
+  // Stop means stop: the queued line goes back into the box, editable, rather
+  // than firing the instant the turn dies.
+  expect(PANEL).toContain("nonce: current.nonce + 1");
+  expect(PANEL).toContain("Cancel the queued message");
+});
+
 test("the composer warns before the server has to refuse the message", () => {
   const LIMITS = read("/lib/chat-limits.ts");
   const ROUTE = read("/app/api/chat/route.ts");

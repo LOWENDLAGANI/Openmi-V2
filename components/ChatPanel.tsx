@@ -207,6 +207,8 @@ export function ChatPanel({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   /** True when a streaming turn has gone quiet for longer than a reader waits. */
   const [stalled, setStalled] = useState(false);
+  /** A line typed while a turn was running, sent when it ends. */
+  const [queued, setQueued] = useState<string | null>(null);
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
 
   // A stored run can outlive the tab that started it. When the server says one
@@ -347,7 +349,16 @@ export function ChatPanel({
     const timer = window.setTimeout(() => setStalled(true), 12_000);
 
     return () => window.clearTimeout(timer);
-  }, [streaming, pending.length, steps.length, thinking.length]);
+      }, [streaming, pending.length, steps.length, thinking.length]);
+
+  // The queued line leaves when the turn it was queued behind ends.
+  useEffect(() => {
+    if (streaming || stopping || queued === null) return;
+
+    const line = queued;
+    setQueued(null);
+    beginSend(line);
+  }, [streaming, stopping, queued]);
 
   // Follow the transcript only while the reader is already at the end. A
   // tween per token is a stutter, so streaming jumps and a finished message is
@@ -431,8 +442,17 @@ export function ChatPanel({
    * has an answer, stored on its row. Typing must never cost Credit silently.
    */
   function beginSend(content: string) {
-    if (busyRef.current) return;
     if (content.trim().length === 0) return;
+
+    // A turn already running is not a reason to throw the sentence away. Cursor,
+    // Copilot and v0 all keep the composer live mid-run: the line is queued and
+    // delivered when the turn ends, which is what typing during a long run means.
+    if (streaming) {
+      setQueued(content);
+      return;
+    }
+
+    if (busyRef.current) return;
 
     // A paid-only model is refused here with the sentence that says what to do,
     // before a dialog opens or a request leaves. The server refuses it again,
@@ -989,6 +1009,14 @@ export function ChatPanel({
   function stop() {
     if (!streaming || stopping) return;
 
+    // Stop means stop. A line queued behind this turn goes back into the box
+    // rather than firing the instant the turn dies, so it stays editable.
+    if (queued) {
+      const line = queued;
+      setQueued(null);
+      setComposer((current) => ({ text: line, nonce: current.nonce + 1 }));
+    }
+
     stoppedRef.current = true;
     setStopping(true);
     setBackgroundRunning(false);
@@ -1315,6 +1343,24 @@ export function ChatPanel({
                 slot="mobile"
                 className="w-full max-w-[320px] opacity-80"
               />
+            </div>
+          )}
+
+          {queued && (
+            <div
+              className="mb-2 flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-1.5 text-[11.5px]"
+              title="Sends when this turn ends"
+            >
+              <span className="shrink-0 text-low">Queued</span>
+              <span className="min-w-0 flex-1 truncate text-mid">{queued}</span>
+              <button
+                type="button"
+                onClick={() => setQueued(null)}
+                aria-label="Cancel the queued message"
+                className="shrink-0 text-low hover:text-hi"
+              >
+                {"\u2715"}
+              </button>
             </div>
           )}
 
