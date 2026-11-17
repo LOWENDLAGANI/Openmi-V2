@@ -147,9 +147,9 @@ begin
   end if;
 
   update public.profiles
-     set credit_balance = credit_balance + p_amount
+     set wallet_credit = wallet_credit + p_amount
    where id = v_target
-  returning credit_balance into v_balance;
+  returning wallet_credit into v_balance;
 
   if not found then
     raise exception 'admin: account has no profile' using errcode = 'P0002';
@@ -444,7 +444,7 @@ begin
 
   perform pg_advisory_xact_lock(hashtext('credit:' || p_owner::text));
 
-  select credit_balance
+  select wallet_credit
     into v_balance
     from public.profiles
    where id = p_owner
@@ -461,7 +461,7 @@ begin
   v_balance := v_balance - v_amount;
 
   update public.profiles
-     set credit_balance = v_balance
+     set wallet_credit = v_balance
    where id = p_owner;
 
   insert into public.credit_transactions
@@ -510,7 +510,7 @@ begin
     raise exception 'credit: no reservation for this run' using errcode = 'P0002';
   end if;
 
-  select credit_balance
+  select wallet_credit
     into v_balance
     from public.profiles
    where id = p_owner
@@ -544,7 +544,7 @@ begin
     v_balance := v_balance + v_refund;
 
     update public.profiles
-       set credit_balance = v_balance
+       set wallet_credit = v_balance
      where id = p_owner;
 
     insert into public.credit_transactions
@@ -604,9 +604,9 @@ begin
   end if;
 
   update public.profiles
-     set credit_balance = credit_balance + v_amount
+     set wallet_credit = wallet_credit + v_amount
    where id = v_uid
-   returning credit_balance into v_balance;
+   returning wallet_credit into v_balance;
 
   if v_balance is null then
     raise exception 'credit: no profile' using errcode = 'P0002';
@@ -665,9 +665,9 @@ begin
   end if;
 
   update public.profiles
-     set credit_balance = credit_balance + v_amount
+     set wallet_credit = wallet_credit + v_amount
    where id = v_uid
-   returning credit_balance into v_balance;
+   returning wallet_credit into v_balance;
 
   if v_balance is null then
     raise exception 'credit: no profile' using errcode = 'P0002';
@@ -735,9 +735,9 @@ begin
          where id = new.id;
 
         update public.profiles
-           set credit_balance = credit_balance + 5
+           set wallet_credit = wallet_credit + 5
          where id = v_inviter
-         returning credit_balance into v_inviter_balance;
+         returning wallet_credit into v_inviter_balance;
 
         insert into public.credit_transactions
           (owner, kind, amount, balance_after, reference)
@@ -745,9 +745,9 @@ begin
           (v_inviter, 'invite', 5, v_inviter_balance, new.id::text);
 
         update public.profiles
-           set credit_balance = credit_balance + 5
+           set wallet_credit = wallet_credit + 5
          where id = new.id
-         returning credit_balance into v_balance;
+         returning wallet_credit into v_balance;
 
         insert into public.credit_transactions
           (owner, kind, amount, balance_after, reference)
@@ -881,7 +881,7 @@ begin
     raise exception 'adjustment: amount is zero' using errcode = '22023';
   end if;
 
-  select credit_balance into v_balance
+  select wallet_credit into v_balance
     from public.profiles
    where id = p_owner
    for update;
@@ -896,7 +896,7 @@ begin
     raise exception 'adjustment: balance cannot go negative' using errcode = '22003';
   end if;
 
-  update public.profiles set credit_balance = v_balance where id = p_owner;
+  update public.profiles set wallet_credit = v_balance where id = p_owner;
 
   insert into public.credit_transactions
     (owner, kind, amount, balance_after, reference)
@@ -949,10 +949,10 @@ begin
    where code = v_code.code;
 
   update public.profiles
-     set credit_balance = credit_balance + v_code.credit_amount,
+     set wallet_credit = wallet_credit + v_code.credit_amount,
          has_paid = case when v_code.kind = 'topup' then true else has_paid end
    where id = v_uid
-   returning credit_balance into v_balance;
+   returning wallet_credit into v_balance;
 
   v_ledger_kind := case when v_code.kind = 'topup' then 'topup' else 'adjustment' end;
 
@@ -1008,9 +1008,9 @@ begin
    where code = v_code.code;
 
   update public.profiles
-     set credit_balance = credit_balance + v_code.credit_amount
+     set wallet_credit = wallet_credit + v_code.credit_amount
    where id = p_owner
-   returning credit_balance into v_balance;
+   returning wallet_credit into v_balance;
 
   if v_balance is null then
     raise exception 'credit: no profile' using errcode = 'P0002';
@@ -1164,16 +1164,16 @@ begin
 
   -- A free hour has nothing to give back; the mark above is its whole refund.
   if v_amount <= 0 then
-    select p.credit_balance into v_balance
+    select p.wallet_credit into v_balance
       from public.profiles p
      where p.id = p_owner;
     return v_balance;
   end if;
 
   update public.profiles
-     set credit_balance = credit_balance + v_amount
+     set wallet_credit = wallet_credit + v_amount
    where id = p_owner
-   returning credit_balance into v_balance;
+   returning wallet_credit into v_balance;
 
   insert into public.credit_transactions
     (owner, kind, amount, balance_after, session_id, reference)
@@ -1227,16 +1227,16 @@ begin
 
   -- A free hour has nothing to give back; the mark above is its whole refund.
   if v_amount <= 0 then
-    select p.credit_balance into v_balance
+    select p.wallet_credit into v_balance
       from public.profiles p
      where p.id = v_uid;
     return v_balance;
   end if;
 
   update public.profiles
-     set credit_balance = credit_balance + v_amount
+     set wallet_credit = wallet_credit + v_amount
    where id = v_uid
-   returning credit_balance into v_balance;
+   returning wallet_credit into v_balance;
 
   insert into public.credit_transactions
     (owner, kind, amount, balance_after, session_id, reference)
@@ -1293,7 +1293,7 @@ begin
 
   if v_decision = 'approved' then
     update public.profiles
-       set credit_balance = credit_balance + v_credit,
+       set wallet_credit = wallet_credit + v_credit,
            has_paid = has_paid or v_days > 0,
            paid_until = case
              when v_days > 0 then
@@ -1302,7 +1302,7 @@ begin
              else paid_until
            end
      where id = v_row.owner
-    returning credit_balance into v_balance;
+    returning wallet_credit into v_balance;
 
     if not found then
       raise exception 'review: no profile for the request'
