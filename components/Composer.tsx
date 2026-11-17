@@ -49,6 +49,7 @@ export function Composer({
   onEffortChange,
   meter,
   activeChatId,
+  repo,
   paidActive,
   streaming,
   stopping,
@@ -65,6 +66,8 @@ export function Composer({
   onEffortChange: (effort: ReasoningEffort) => void;
   meter: ContextMeter | null;
   activeChatId: string | null;
+  /** The repository this chat is pinned to, for the placeholder. */
+  repo?: string | null;
   /** Whether a paid pass is live; the picker marks the models that need one. */
   paidActive: boolean;
   streaming: boolean;
@@ -74,6 +77,9 @@ export function Composer({
   onSend: (content: string) => void;
   onStop: () => void;
 }) {
+  // Named in the placeholder: a field that says what it can see invites a
+  // question it can answer, and a blank "Ask anything" invites one it cannot.
+  const repoName = repo ? (repo.split("/").pop() ?? repo) : null;
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -173,7 +179,11 @@ export function Composer({
             }}
             rows={1}
             placeholder={
-              providerReady ? "Ask anything…" : "Chat is unavailable right now."
+              providerReady
+                ? repoName
+                  ? `Ask about ${repoName}…`
+                  : "Ask what to build, or attach a repository…"
+                : "Chat is unavailable right now."
             }
             className="composer-input max-h-[168px] min-h-[40px] flex-1 px-2 py-2.5 text-[15px] leading-snug focus:outline-none"
           />
@@ -222,18 +232,26 @@ export function Composer({
         </div>
       </Beam>
 
-      {/* The send button refuses an over-cap message, so the count appears
-          before the press instead of as an error after it. */}
-      {text.length > MESSAGE_WARN_CHARS && (
-        <p
-          className={`mt-1 px-2 text-right text-[10px] ${
-            text.length > MAX_MESSAGE_CHARS ? "text-danger" : "text-low"
-          }`}
-        >
-          {text.length.toLocaleString()} /{" "}
-          {MAX_MESSAGE_CHARS.toLocaleString()} characters
-        </p>
-      )}
+      {/* The keyboard convention is stated once, where it is used, and hidden
+          on a touch layout where Enter is a newline and only the button sends.
+          The over-cap count sits on the same line: the send button refuses the
+          message, so the number appears before the press, not as an error
+          after it. */}
+      <div className="mt-1 flex items-center justify-between gap-2 px-2 text-[10px] text-low">
+        <span className="hidden sm:inline">
+          Enter to send · Shift + Enter for a new line
+        </span>
+        {text.length > MESSAGE_WARN_CHARS && (
+          <span
+            className={`ml-auto tabular-nums ${
+              text.length > MAX_MESSAGE_CHARS ? "text-danger" : "text-low"
+            }`}
+          >
+            {text.length.toLocaleString()} /{" "}
+            {MAX_MESSAGE_CHARS.toLocaleString()} characters
+          </span>
+        )}
+      </div>
     </form>
   );
 }

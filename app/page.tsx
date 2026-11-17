@@ -143,11 +143,14 @@ export default async function HomePage() {
                 Start with GitHub
                 <span aria-hidden="true">→</span>
               </Link>
+              {/* One primary action above the fold. The second path is a link,
+                  not a second button: two equal-weight buttons is the pattern
+                  that makes a hero look undecided. */}
               <a
                 href="#how"
-                className="btn lift px-5 py-2.5 text-[13.5px] text-mid hover:text-hi"
+                className="text-[13px] text-mid underline decoration-line-strong underline-offset-4 transition-colors hover:text-hi hover:decoration-current"
               >
-                See a turn run
+                See a turn run ↓
               </a>
               <span className="text-[12px] text-low">
                 No card. Sign in with GitHub.

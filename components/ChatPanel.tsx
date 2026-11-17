@@ -205,6 +205,8 @@ export function ChatPanel({
   const [meter, setMeter] = useState<ContextMeter | null>(null);
   const [lastSent, setLastSent] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  /** True when a streaming turn has gone quiet for longer than a reader waits. */
+  const [stalled, setStalled] = useState(false);
   const [backgroundRunning, setBackgroundRunning] = useState(initialRunning);
 
   // A stored run can outlive the tab that started it. When the server says one
@@ -331,6 +333,21 @@ export function ChatPanel({
       window.clearInterval(timer);
     };
   }, [backgroundRunning, streaming, activeChatId, router]);
+
+  // A silent stream is the state a reader cannot tell from a dead connection.
+  // Twelve seconds without a token, a step or a line of thinking is long enough
+  // to be worth saying out loud; any new output clears it again.
+  useEffect(() => {
+    if (!streaming) {
+      setStalled(false);
+      return;
+    }
+
+    setStalled(false);
+    const timer = window.setTimeout(() => setStalled(true), 12_000);
+
+    return () => window.clearTimeout(timer);
+  }, [streaming, pending.length, steps.length, thinking.length]);
 
   // Follow the transcript only while the reader is already at the end. A
   // tween per token is a stutter, so streaming jumps and a finished message is
@@ -1065,7 +1082,7 @@ export function ChatPanel({
             </h2>
 
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              {suggestions.slice(0, 2).map((suggestion) => (
+              {suggestions.slice(0, 3).map((suggestion) => (
                 <button
                   key={suggestion.label}
                   type="button"
@@ -1139,7 +1156,11 @@ export function ChatPanel({
               thinking.length > 0 ||
               shots.length > 0 ||
               backgroundRunning) && (
-              <article className="min-w-0 max-w-[94%]" aria-live="polite">
+              <article
+                className="min-w-0 max-w-[94%]"
+                aria-live="polite"
+                aria-busy={streaming}
+              >
 
                 {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
@@ -1166,6 +1187,12 @@ export function ChatPanel({
                     validPaths={validPaths}
                     chatId={activeChatId ?? ""}
                   />
+                )}
+                {streaming && stalled && pending.length === 0 && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-low">
+                    Still working. No answer text yet — the steps above are what
+                    the turn has done.
+                  </p>
                 )}
                 {streaming && pending.length > 0 && (
                   <span aria-hidden="true" className="stream-caret" />
@@ -1303,6 +1330,7 @@ export function ChatPanel({
             paidActive={paidActive}
             meter={meter}
             activeChatId={activeChatId}
+            repo={repo ? repo.fullName : null}
             streaming={streaming}
             stopping={stopping}
             providerReady={providerReady}
