@@ -140,6 +140,33 @@ export function dailyAllowance(paidActive: boolean): number {
 }
 
 /**
+ * The calendar date in a member's own timezone, as YYYY-MM-DD.
+ *
+ * The database settles the daily allowance against this same date (its own
+ * `now() at time zone profiles.timezone`), so a page that has to say whether
+ * today's refresh has happened must compute the date the same way. Doing it in
+ * UTC would claim a refresh is due eight hours early in Kuala Lumpur.
+ */
+export function localDay(
+  timeZone: string | null | undefined,
+  when: Date = new Date()
+): string {
+  const format = (zone: string) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(when);
+
+  try {
+    return format(timeZone || "UTC");
+  } catch {
+    return format("UTC");
+  }
+}
+
+/**
  * The calendar date a pass ends, in the member's own timezone.
  *
  * A pass ending at 00:30 in Kuala Lumpur is still the previous day in UTC, and

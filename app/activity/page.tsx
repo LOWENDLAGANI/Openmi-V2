@@ -17,6 +17,7 @@ import {
   formatPassDate,
   formatPassRemaining,
   isLowBalance,
+  localDay,
 } from "@/lib/credits";
 import { readCreditProfile, refillDailyCredit } from "@/lib/credits/store";
 import { getSession } from "@/lib/session";
@@ -158,6 +159,16 @@ export default async function ActivityPage({
     ? new Date(current.expires_at).getTime() > Date.now()
     : false;
 
+  // The daily refresh, made legible. The database settles against the member's
+  // local date and tops up to the allowance rather than stacking on top of it,
+  // so "nothing changed" is a real outcome — and without this panel it is
+  // indistinguishable from "the refresh never ran".
+  const allowance = dailyAllowance(profile.paidActive);
+  const today = localDay(profile.timezone);
+  const lastDaily = ledger.find((row) => row.kind === "daily") ?? null;
+  const settledToday = profile.creditDay === today;
+  const alreadyAtAllowance = profile.balance >= allowance;
+
   return (
     <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -244,6 +255,67 @@ export default async function ActivityPage({
         ) : null}
       </section>
 
+      <section className="panel mt-5 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
+            Daily refresh
+          </h2>
+          <p className="font-mono text-[10.5px] text-low">
+            midnight · {profile.timezone}
+          </p>
+        </div>
+
+        <p className="mt-2 text-[12.5px] leading-relaxed text-mid">
+          {settledToday
+            ? `Settled for ${profile.creditDay}. The next one is at midnight in ${profile.timezone}.`
+            : `Not settled for ${today} yet. Opening a chat or reloading this page settles it.`}
+        </p>
+
+        {/* A member in Kuala Lumpur on the default UTC profile waits until 08:00
+            for "midnight", which reads as a refresh that never happened. The
+            reset follows this zone, and the zone is editable on this page. */}
+        <p className="mt-1.5 text-[10.5px] leading-relaxed text-low">
+          The reset follows {profile.timezone}, not this device. If that is not
+          where you are, change it under “Daily refill timezone” below.
+        </p>
+
+        <dl className="mt-3 grid gap-3 font-mono text-[11px] sm:grid-cols-3">
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.12em] text-low">
+              allowance
+            </dt>
+            <dd className="mt-0.5 text-hi">{formatCredit(allowance)} / day</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.12em] text-low">
+              last grant
+            </dt>
+            <dd className="mt-0.5 text-hi">
+              {lastDaily
+                ? `+${formatCredit(Number(lastDaily.amount))} on ${
+                    lastDaily.reference ?? utc(lastDaily.created_at)
+                  }`
+                : "none yet"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.12em] text-low">
+              balance now
+            </dt>
+            <dd className="mt-0.5 text-hi">{formatCredit(profile.balance)}</dd>
+          </div>
+        </dl>
+
+        {alreadyAtAllowance && (
+          <p className="mt-3 text-[11.5px] leading-relaxed text-low">
+            A refill tops up to the allowance; it does not stack. At{" "}
+            {formatCredit(profile.balance)} Credit there is nothing to add until
+            the balance drops below {formatCredit(allowance)}, which is why a
+            settled day can leave the ledger unchanged.
+          </p>
+        )}
+      </section>
+
       <div className="mt-5 grid gap-5 md:grid-cols-2">
         <section className="panel p-5">
           <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
@@ -280,7 +352,9 @@ export default async function ActivityPage({
 
       <section className="panel mt-5 overflow-hidden">
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pb-3 pt-5">
-          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">Ledger</h2>
+          <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
+            Credit history
+          </h2>
           <p className="text-[10.5px] text-low">
             Every balance change is a row; the amounts sum to the balance above.
           </p>

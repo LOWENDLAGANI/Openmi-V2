@@ -242,6 +242,17 @@ export function Sidebar({
             </SubmitButton>
           </form>
         </div>
+
+        {/* The account area is where a member looks for their own things; the
+            balance chip links here too, but a labelled way in is what makes the
+            history findable without guessing that a number is a button. */}
+        <Link
+          href="/activity"
+          className="mt-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-[10.5px] font-medium text-mid transition-colors hover:bg-hover hover:text-hi"
+        >
+          <Glyph name="clock" className="size-3.5" />
+          Credit history
+        </Link>
       </div>
     </aside>
   );

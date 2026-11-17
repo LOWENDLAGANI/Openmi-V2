@@ -1,6 +1,7 @@
 import "server-only";
 
 import { formatCredit } from "@/lib/credits";
+import { callRpc } from "@/lib/rpc-fallback";
 import { modelHourCredit, modelName } from "@/lib/models";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -48,6 +49,8 @@ export type CreditProfile = {
   balance: number;
   /** Paid credit, spent only after the daily balance cannot cover a charge. */
   wallet: number;
+  /** The local date the allowance was last settled for; null before the first. */
+  creditDay: string | null;
   timezone: string;
   /** True while a paid pass is running: this is what decides the allowance. */
   paidActive: boolean;
@@ -68,9 +71,17 @@ export async function refillDailyCredit(supabase: Client): Promise<number | null
   // by the arguments it is given. Sending it explicitly (null means "the
   // signed-in account") is what makes the call match; omitting it addressed a
   // zero-argument function that does not exist.
-  const { data, error } = await supabase.rpc("refill_daily_credit", {
-    p_owner: null,
-  });
+  //
+  // The second name is the pre-rename one. A deployment that has not pushed
+  // 053 yet still has `refill_daily_dew`, and swopping on it is a no-op that
+  // looks exactly like "the allowance never refilled".
+  const { data, error } = await callRpc<number>(
+    async (name) => {
+      const result = await supabase.rpc(name, { p_owner: null });
+      return { data: result.data as number | null, error: result.error };
+    },
+    ["refill_daily_credit", "refill_daily_dew"]
+  );
 
   if (error || data === null || data === undefined) return null;
   return Number(data);
@@ -304,7 +315,7 @@ export async function readCreditProfile(
   const { data } = await supabase
     .from("profiles")
     .select(
-      "credit_balance, wallet_credit, timezone, has_paid, paid_until, invite_code, invited_by"
+      "credit_balance, wallet_credit, credit_day, timezone, has_paid, paid_until, invite_code, invited_by"
     )
     .eq("id", owner)
     .maybeSingle();
@@ -314,6 +325,7 @@ export async function readCreditProfile(
   const row = data as {
     credit_balance: number | string;
     wallet_credit?: number | string;
+    credit_day?: string | null;
     timezone: string;
     has_paid: boolean;
     paid_until: string | null;
@@ -326,6 +338,7 @@ export async function readCreditProfile(
   return {
     balance: Number(row.credit_balance),
     wallet: Number(row.wallet_credit ?? 0),
+    creditDay: row.credit_day ?? null,
     timezone: row.timezone ?? "UTC",
     paidActive: paidUntil !== null && Date.parse(paidUntil) > Date.now(),
     paidUntil,
