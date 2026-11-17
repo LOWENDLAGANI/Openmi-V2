@@ -102,10 +102,7 @@ export function Composer({
   // is refused after the field has already been cleared, which loses the draft
   // a reader spent minutes writing. The button refuses it first.
   const tooLong = text.length > MAX_MESSAGE_CHARS;
-  // A running turn is not a reason to refuse the message. Every product worth
-  // copying keeps the composer live mid-run and puts the line in a queue, so
-  // `streaming` is not part of this: the panel decides what a press means.
-  const canSend = !tooLong && text.trim().length > 0;
+  const canSend = !streaming && !tooLong && text.trim().length > 0;
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -213,12 +210,7 @@ export function Composer({
             <button
               type="submit"
               disabled={!canSend}
-              aria-label={streaming ? "Queue message" : "Send message"}
-              title={
-                streaming
-                  ? "Queue — sends when this turn ends"
-                  : "Send message"
-              }
+              aria-label="Send message"
               className={`lift mb-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
                 canSend ? "bg-accent text-on-accent" : "send-idle"
               }`}
@@ -246,9 +238,7 @@ export function Composer({
           after it. */}
       <div className="mt-1 flex items-center justify-between gap-2 px-2 text-[10px] text-low">
         <span className="hidden sm:inline">
-          {streaming
-            ? "Enter queues it · Shift + Enter for a new line"
-            : "Enter to send · Shift + Enter for a new line"}
+          Enter to send · Shift + Enter for a new line
         </span>
         {text.length > MESSAGE_WARN_CHARS && (
           <span
