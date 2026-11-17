@@ -360,8 +360,26 @@ export async function appendRunMessages(
     })),
   });
 
-  if (error) return 0;
-  return typeof data === "number" ? data : 0;
+  // A deployment that has not pushed migration 054 has no such function. The
+  // batch is one statement, so a failure here wrote nothing — and returning 0
+  // would hand the worker an empty history, which is the worst outcome: the
+  // answer would quietly forget the conversation. Fall back to the per-row
+  // write this replaced. Slower, same transcript.
+  if (error) {
+    let written = 0;
+
+    for (const message of messages) {
+      const index = await appendRunMessage(admin, runId, message.role, {
+        text: message.text,
+      });
+
+      if (index !== null) written += 1;
+    }
+
+    return written;
+  }
+
+  return typeof data === "number" ? data : messages.length;
 }
 
 /**

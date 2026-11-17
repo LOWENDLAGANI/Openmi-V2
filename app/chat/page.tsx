@@ -35,7 +35,7 @@ import { readConnection, readToken } from "@/lib/github/token";
 import type { CodeSearch, FileView, RepoSummary } from "@/lib/github/types";
 import { listMessages } from "@/lib/messages";
 import { oauthConfigured } from "@/lib/oauth/github";
-import { readAdminAccess } from "@/lib/admin/access";
+import { readAdminAccess, type AdminAccess } from "@/lib/admin/access";
 import {
   firstAvailableModel,
   hasModel,
@@ -44,6 +44,7 @@ import {
 } from "@/lib/models";
 import { modelCatalogue, providersConfigured } from "@/lib/providers";
 import { checkpointsEnabled } from "@/lib/execution/checkpoints/plan";
+import { soft } from "@/lib/soft";
 import { filesEnabled } from "@/lib/files/plan";
 import { previewEnabled } from "@/lib/execution/preview/plan";
 import { RUN_HEARTBEAT_STALE_MS, RUN_QUEUE_WAIT_MS } from "@/lib/runs/limits";
@@ -347,9 +348,11 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   // The citation index is a GitHub round trip, so it is started before the
   // first await and settled alongside the database reads. Sequenced after them,
   // it added its whole latency to the transcript for no reason.
+  // A citation index that cannot be read leaves citations as plain text; it is
+  // not a reason to lose the conversation.
   const citationPaths =
     chat.repo_full_name && chat.repo_base_sha
-      ? readCitationPaths(session, chat.repo_full_name, chat.repo_base_sha)
+      ? soft(readCitationPaths(session, chat.repo_full_name, chat.repo_base_sha), [])
       : Promise.resolve<string[]>([]);
 
   const [
@@ -402,7 +405,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .eq("branch", chat.repo_branch ?? "main")
       .maybeSingle(),
     citationPaths,
-    readAdminAccess(session),
+    soft(readAdminAccess(session), { state: "forbidden", email: null } as AdminAccess),
   ]);
 
   const models = modelsForReader(modelCatalogue(), access.state === "admin");
@@ -562,7 +565,10 @@ async function DraftChat({
 }) {
   // The page already holds the session, so this is the operator check alone
   // rather than a second auth round trip on the way to drawing a draft.
-  const access = await readAdminAccess(session);
+  const access = await soft(readAdminAccess(session), {
+    state: "forbidden",
+    email: null,
+  } as AdminAccess);
   const models = modelsForReader(modelCatalogue(), access.state === "admin");
 
   // The composer offers a price before the chat exists, so it needs both
@@ -662,7 +668,9 @@ export default async function ChatPage({
         "id, title, folder_id, repo_full_name, repo_branch, repo_base_sha, model, created_at, updated_at, deleted_at, last_message_at"
       )
       .order("updated_at", { ascending: false }),
-    readConnection(supabase, user.id),
+    // A connection that cannot be read is the "connect GitHub" state, not a
+    // failed page: the chat and its history are still readable.
+    soft(readConnection(supabase, user.id), null),
     supabase
       .from("profiles")
       .select("credit_balance, wallet_credit")
