@@ -21,7 +21,7 @@ import { VersionPanel } from "@/components/VersionPanel";
  * edit in Files survives a look at Versions or the repository.
  */
 
-type Tab = "repository" | "files" | "versions" | "preview";
+type Tab = "repository" | "files" | "versions" | "changes" | "preview";
 
 export function SandboxDock({
   chatId,
@@ -29,6 +29,7 @@ export function SandboxDock({
   versions,
   preview,
   repository,
+  changes,
 }: {
   chatId: string;
   files: boolean;
@@ -36,11 +37,17 @@ export function SandboxDock({
   preview: boolean;
   /** The repository browser, rendered by the page and shown as the first tab. */
   repository?: ReactNode;
+  /**
+   * What was published to GitHub, rendered by the page. It is its own tab
+   * because undo lives there now that an applied change has no review card.
+   */
+  changes?: ReactNode;
 }) {
   const available: Array<{ id: Tab; label: string }> = [];
   if (repository) available.push({ id: "repository", label: "Repository" });
   if (files) available.push({ id: "files", label: "Files" });
   if (versions) available.push({ id: "versions", label: "Versions" });
+  if (changes) available.push({ id: "changes", label: "Changes" });
   if (preview) available.push({ id: "preview", label: "Preview" });
 
   const [picked, setPicked] = useState<Tab | null>(null);
@@ -85,6 +92,9 @@ export function SandboxDock({
 
       <FileEditor chatId={chatId} enabled={files} active={tab === "files"} />
       <VersionPanel chatId={chatId} enabled={versions} active={tab === "versions"} />
+      {changes ? (
+        <div className={tab === "changes" ? "" : "hidden"}>{changes}</div>
+      ) : null}
       <PreviewPanel chatId={chatId} enabled={preview} active={tab === "preview"} />
     </div>
   );

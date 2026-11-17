@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { connectGithub, disconnectGithub } from "@/app/github/actions";
 import { AppShell } from "@/components/AppShell";
+import { AppliedChanges } from "@/components/AppliedChanges";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ChatSkeleton } from "@/components/ChatSkeleton";
 import { SandboxDock } from "@/components/SandboxDock";
@@ -881,6 +882,12 @@ export default async function ChatPage({
               preview={previewEnabled()}
               repository={
                 <RepoSurface session={session} params={params} chat={activeChat} />
+              }
+              changes={
+                <AppliedChanges
+                  supabase={session.supabase}
+                  chatId={activeChat.id}
+                />
               }
             />
           </Suspense>

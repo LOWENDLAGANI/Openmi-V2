@@ -460,6 +460,50 @@ export type ChangesetLoad = {
   error: string | null;
 };
 
+export const MAX_APPLIED_ROWS = 5;
+
+export type AppliedChangeset = {
+  id: string;
+  repo_full_name: string;
+  branch_name: string | null;
+  commit_sha: string | null;
+  merge_commit_sha: string | null;
+  created_at: string;
+};
+
+export type AppliedLoad = {
+  changesets: AppliedChangeset[];
+  error: string | null;
+};
+
+/**
+ * The published changes this chat can still undo.
+ *
+ * The applied review card is gone — a change already in the repository has
+ * nothing left to decide — but undoing one is still a decision, and it used to
+ * live on that card. These are the same rows the card would have shown, read
+ * for the panel that now owns the button. Only a change with a merge commit and
+ * no revert is undoable; `lib/changesets/undo.ts` refuses everything else again
+ * on the way to GitHub.
+ */
+export async function loadAppliedChangesets(
+  supabase: Client,
+  chatId: string
+): Promise<AppliedLoad> {
+  const { data, error } = await supabase
+    .from("changesets")
+    .select("id, repo_full_name, branch_name, commit_sha, merge_commit_sha, created_at")
+    .eq("chat_id", chatId)
+    .eq("status", "committed")
+    .not("merge_commit_sha", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(MAX_APPLIED_ROWS);
+
+  if (error) return { changesets: [], error: error.message };
+
+  return { changesets: (data ?? []) as AppliedChangeset[], error: null };
+}
+
 export async function loadChangesets(
   supabase: Client,
   chatId: string
