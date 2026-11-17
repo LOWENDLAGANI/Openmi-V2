@@ -52,6 +52,6 @@ test("every route that waits has a branded loading state", () => {
     expect(existsSync(new URL(`..${path}`, import.meta.url))).toBe(true);
   }
 
-  expect(SKELETON).toContain("Spinner");
+  expect(SKELETON).not.toContain("Spinner");
   expect(SKELETON).toContain("skeleton");
 });

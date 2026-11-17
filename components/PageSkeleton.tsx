@@ -1,4 +1,3 @@
-import { Spinner } from "@/components/Loading";
 
 /**
  * The shape of a page while the server is still answering.
@@ -24,10 +23,7 @@ export function PageSkeleton({
       className={`mx-auto w-full ${width} px-5 py-8 sm:px-8`}
     >
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5 rounded-full border border-line bg-card px-3.5 py-1.5">
-          <Spinner size={14} className="text-accent" />
-          <span className="eyebrow">{label}</span>
-        </div>
+        <div className="skeleton h-6 w-32 rounded-full" />
         <div className="skeleton h-8 w-24 rounded-full" />
       </div>
 

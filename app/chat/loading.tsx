@@ -1,5 +1,4 @@
 import { ChatSkeleton } from "@/components/ChatSkeleton";
-import { Spinner } from "@/components/Loading";
 
 /**
  * The workspace while the server reads GitHub.
@@ -20,7 +19,7 @@ export default function ChatLoading() {
     >
       <aside className="hidden border-r border-line bg-raised p-4 md:block">
         <div className="flex items-center gap-2.5 px-1 pb-5">
-          <Spinner size={16} className="text-accent" />
+          <div className="skeleton size-4 rounded-full" />
           <div className="skeleton h-4 w-24 rounded-full" />
         </div>
         <div className="skeleton h-10 w-full rounded-full" />
@@ -45,8 +44,7 @@ export default function ChatLoading() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Spinner size={14} className="text-accent" />
-            <span className="eyebrow hidden sm:inline">loading</span>
+            <div className="skeleton h-4 w-16 rounded-full" />
           </div>
         </div>
 

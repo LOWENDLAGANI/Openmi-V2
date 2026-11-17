@@ -1,4 +1,3 @@
-import { Spinner } from "@/components/Loading";
 
 /**
  * The conversation while it streams in.
@@ -27,10 +26,7 @@ export function ChatSkeleton({
       <div className="flex items-center gap-2 pb-3">
         <div className="skeleton h-6 w-40 rounded-full" />
         <div className="skeleton h-6 w-20 rounded-full" />
-        <span className="ml-auto flex items-center gap-2">
-          <Spinner size={13} className="text-accent" />
-          <span className="sr-only">{label}</span>
-        </span>
+        <div className="skeleton ml-auto h-6 w-16 rounded-full" />
       </div>
 
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 overflow-hidden py-2">
