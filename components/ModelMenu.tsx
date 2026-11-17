@@ -91,7 +91,7 @@ export function ModelMenu({
           {current?.name ?? value}
         </span>
         {current?.paidOnly === true && !paidActive && (
-          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.08em] text-accent-text">
+          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] text-accent-text">
             paid
           </span>
         )}
@@ -149,7 +149,7 @@ export function ModelMenu({
                           {option.name}
                         </span>
                         {locked && (
-                          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.08em] text-accent-text">
+                          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] text-accent-text">
                             paid
                           </span>
                         )}

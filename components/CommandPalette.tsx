@@ -212,7 +212,7 @@ export function CommandPalette() {
 
           {loading && <Spinner size={14} />}
 
-          <kbd className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[9.5px] text-low">
+          <kbd className="rounded border border-line-strong px-1.5 py-0.5 text-[9.5px] text-low">
             esc
           </kbd>
         </div>
@@ -265,7 +265,7 @@ export function CommandPalette() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2 font-mono text-[9.5px] uppercase tracking-[0.12em] text-low">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2 text-[9.5px] text-low">
           <span>↑ ↓ move · enter open</span>
           <span>{results.length} result{results.length === 1 ? "" : "s"}</span>
         </div>

@@ -27,14 +27,14 @@
   --bg-raised: #ffffff;
   --card: #ffffff;
   --chip: #ffffff;
-  --hover: #f3f4f6;
+  --hover: #e7eaef;
   --elevated: #ffffff;
   --dock: #ffffff;
 
-  --line: #e5e7eb;
-  --line-strong: #d1d5db;
-  --card-border: #e5e7eb;
-  --chip-border: #e5e7eb;
+  --line: #d9dde3;
+  --line-strong: #c3c8d1;
+  --card-border: #d9dde3;
+  --chip-border: #d9dde3;
   --card-shadow:
     0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
 
@@ -43,12 +43,12 @@
   --text-mid: #4b5563;
   --text-low: #6b7280;
 
-  --accent: #0066ff;
-  --accent-text: #0052cc;
-  --accent-soft: rgba(0, 102, 255, 0.1);
+  --accent: #0f766e;
+  --accent-text: #0c5f58;
+  --accent-soft: rgba(15, 118, 110, 0.1);
   --on-accent: #ffffff;
 
-  --bubble-user: #0066ff;
+  --bubble-user: #0f766e;
   --bubble-user-text: #ffffff;
 
   --danger: #b91c1c;
@@ -59,7 +59,7 @@
   --warn-bg: #fffbeb;
   --warn-border: #fde68a;
   --warn-strong: #78350f;
-  --azure: #0066ff;
+  --azure: #0f766e;
   --code: #b45309;
 
   /* Flat on purpose: a gradient behind white cards is what makes a light chat
@@ -89,14 +89,14 @@ html.dark {
   --text-mid: #8ba396;
   --text-low: #7d9287;
 
-  --accent: #6ec294;
-  --accent-text: #a9d8bb;
-  --accent-soft: rgba(110, 194, 148, 0.15);
+  --accent: #3eb89a;
+  --accent-text: #7dd3b8;
+  --accent-soft: rgba(62, 184, 154, 0.15);
   /* The accent is a light green, so the ink on it is the night canvas rather
      than white: white on #6ec294 is a 2:1 pair. */
   --on-accent: #08120d;
 
-  --bubble-user: #2f6b48;
+  --bubble-user: #1f5a4a;
   --bubble-user-text: #ffffff;
 
   --danger: #fca5a5;
@@ -107,7 +107,7 @@ html.dark {
   --warn-bg: rgba(251, 191, 36, 0.07);
   --warn-border: rgba(251, 191, 36, 0.2);
   --warn-strong: #fde68a;
-  --azure: #5b9bd5;
+  --azure: #3eb89a;
   --code: #e08e6b;
 
   --surface:
@@ -202,8 +202,8 @@ html.ink {
      are copied from its tailwind config so the two products measure the same. */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  --font-display: var(--font-fraunces), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
 }
@@ -267,13 +267,15 @@ html.ink {
 }
 
 @layer components {
-  /* The small, wide-tracked monospace label that carries most of the metadata. */
+  /* A small, quiet label. Sentence case, no tracking-out, no monospace: the
+     template-chrome look is the tell we are deliberately not using. */
   .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 10px;
+    font-family: var(--font-sans);
+    font-size: 11px;
     line-height: 1.5;
-    letter-spacing: 0.17em;
-    text-transform: uppercase;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    font-weight: 500;
     color: var(--text-low);
   }
 

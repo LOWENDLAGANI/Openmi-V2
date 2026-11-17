@@ -46,7 +46,7 @@ export function ThinkingPill({
     <div
       role="status"
       aria-live="polite"
-      className={`flex w-fit max-w-full items-center gap-2.5 rounded-full bg-accent-soft px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-text ${className}`}
+      className={`flex w-fit max-w-full items-center gap-2.5 rounded-full bg-accent-soft px-4 py-2.5 text-[10.5px] text-accent-text ${className}`}
     >
       {icon ?? <Spinner size={15} className="text-accent-text" />}
       <span className="min-w-0 truncate">{label}</span>

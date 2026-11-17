@@ -59,7 +59,7 @@ export function CreditChip({
     <Link
       href="/activity"
       title={`${CREDIT_PER_HOUR} Credit per hour. Wallet ${formatCredit(wallet)}.`}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] ${
         low ? "border-warn/35 bg-warn/8 text-warn" : "border-line bg-card text-low"
       }`}
     >

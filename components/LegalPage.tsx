@@ -60,7 +60,7 @@ export function LegalPage({
       <h1 className="mt-3 text-balance text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
         {title}
       </h1>
-      <p className="mt-3 text-[12px] font-mono uppercase tracking-[0.12em] text-low">
+      <p className="mt-3 text-[12px] text-low">
         Last updated {updated}
       </p>
       <p className="mt-4 text-pretty text-[14px] leading-relaxed text-mid">{intro}</p>

@@ -382,7 +382,7 @@ export default async function AdminPage({
         </div>
       </header>
 
-      <p className="mt-3 max-w-2xl font-mono text-[10.5px] text-low">
+      <p className="mt-3 max-w-2xl text-[10.5px] text-low">
         {access.email ?? access.userId}
       </p>
 
@@ -441,7 +441,7 @@ export default async function AdminPage({
             className="rounded-2xl border border-line bg-card px-4 py-3"
           >
             <p className="eyebrow">{stat.label}</p>
-            <p className="mt-1 font-mono text-[20px] leading-none text-hi">
+            <p className="mt-1 text-[20px] leading-none text-hi">
               {stat.value}
             </p>
           </div>
@@ -520,21 +520,21 @@ export default async function AdminPage({
                     >
                       {member.email ?? member.handle ?? member.id}
                     </p>
-                    <p className="mt-0.5 font-mono text-[10px] text-low">
+                    <p className="mt-0.5 text-[10px] text-low">
                       joined {utc(member.created_at)}
                       {pass ? ` · ${pass}` : ""}
                     </p>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-mono text-[10.5px] text-low">
+                    <span className="text-[10.5px] text-low">
                       {formatCredit(Number(member.credit_balance))} credit
                     </span>
                     <StatusPill tone={active ? "ok" : "optional"}>
                       {active ? "paid" : "free"}
                     </StatusPill>
                     {stopped && (
-                      <span className="rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-danger">
+                      <span className="rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-[10px] text-danger">
                         stopped
                       </span>
                     )}
@@ -659,7 +659,7 @@ export default async function AdminPage({
                     {row.email ?? row.handle ?? row.user_id ?? "signed-out visitor"}
                   </p>
                   <span
-                    className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] ${severityClass(row.severity)}`}
+                    className={`rounded-full border px-2 py-0.5 text-[10px] ${severityClass(row.severity)}`}
                   >
                     {row.severity}
                   </span>
@@ -669,7 +669,7 @@ export default async function AdminPage({
                   {row.summary}
                 </p>
 
-                <p className="mt-1 break-words font-mono text-[10.5px] text-low">
+                <p className="mt-1 break-words text-[10.5px] text-low">
                   {row.kind}
                   {row.route ? ` · ${row.route}` : ""}
                   {row.handle ? ` · @${row.handle}` : ""} · {utc(row.created_at)}
@@ -739,7 +739,7 @@ export default async function AdminPage({
                     <p className="truncate text-[12px] text-hi">
                       {row.email ?? row.id}
                     </p>
-                    <p className="font-mono text-[10px] text-low">
+                    <p className="text-[10px] text-low">
                       {row.ban_reason ?? "no reason recorded"} ·{" "}
                       {row.ban_expires_at ? `until ${utc(row.ban_expires_at)}` : "permanent"}
                     </p>
@@ -797,7 +797,7 @@ export default async function AdminPage({
                     <StatusPill tone="pending">pending</StatusPill>
                   </div>
 
-                  <p className="mt-1 break-words font-mono text-[10.5px] text-low">
+                  <p className="mt-1 break-words text-[10.5px] text-low">
                     {plan?.name ?? row.plan} · RM{" "}
                     {Number(row.amount).toFixed(2)} · ref {row.reference} ·{" "}
                     {utc(row.created_at)}
@@ -824,10 +824,10 @@ export default async function AdminPage({
                         {row.receipt_name ?? "receipt unavailable"}
                       </span>
                     )}
-                    <span className="font-mono text-[10px] text-low">
+                    <span className="text-[10px] text-low">
                       balance {formatCredit(Number(member?.credit_balance ?? 0))}
                     </span>
-                    <span className="font-mono text-[10px] text-low">
+                    <span className="text-[10px] text-low">
                       {paidActive(member?.paid_until) ? "paid" : "free"}
                     </span>
                   </div>
@@ -844,7 +844,7 @@ export default async function AdminPage({
                       step="1"
                       defaultValue={plan?.credit ?? 0}
                       aria-label="Credit to grant"
-                      className="field py-1.5 font-mono text-[12px]"
+                      className="field py-1.5 text-[12px]"
                     />
                     <input
                       name="note"
@@ -909,7 +909,7 @@ export default async function AdminPage({
                 type="number"
                 step="1"
                 required
-                className="field py-1.5 font-mono text-[12px]"
+                className="field py-1.5 text-[12px]"
               />
             </Field>
             <Field label="Reason">
@@ -950,7 +950,7 @@ export default async function AdminPage({
                 min="1"
                 step="1"
                 required
-                className="field py-1.5 font-mono text-[12px]"
+                className="field py-1.5 text-[12px]"
               />
             </Field>
             <Field label="How many">
@@ -961,7 +961,7 @@ export default async function AdminPage({
                 max="50"
                 defaultValue="5"
                 required
-                className="field py-1.5 font-mono text-[12px]"
+                className="field py-1.5 text-[12px]"
               />
             </Field>
             <Field label="Note">
@@ -990,10 +990,10 @@ export default async function AdminPage({
                   key={row.code}
                   className="flex flex-wrap items-center justify-between gap-2 py-2"
                 >
-                  <span className="break-all font-mono text-[11px] text-hi">
+                  <span className="break-all text-[11px] text-hi">
                     {row.code}
                   </span>
-                  <span className="font-mono text-[10px] text-low">
+                  <span className="text-[10px] text-low">
                     {formatCredit(Number(row.credit_amount))} Credit ·{" "}
                     {row.redeemed_at ? "redeemed" : "unused"}
                   </span>
@@ -1046,7 +1046,7 @@ export default async function AdminPage({
                     <p className="truncate text-[11.5px] text-body">
                       {profiles.get(row.user_id)?.email ?? row.user_id}
                     </p>
-                    <p className="font-mono text-[10px] text-low">
+                    <p className="text-[10px] text-low">
                       since {utc(row.granted_at)}
                     </p>
                   </div>
@@ -1089,7 +1089,7 @@ export default async function AdminPage({
                   </p>
                   <div className="flex items-center gap-2">
                     {row.status === "approved" && row.credit_granted !== null && (
-                      <span className="font-mono text-[10px] text-accent-text">
+                      <span className="text-[10px] text-accent-text">
                         +{row.credit_granted} credit
                       </span>
                     )}
@@ -1098,7 +1098,7 @@ export default async function AdminPage({
                     </StatusPill>
                   </div>
                 </div>
-                <p className="mt-0.5 font-mono text-[10px] text-low">
+                <p className="mt-0.5 text-[10px] text-low">
                   ref {row.reference} · {utc(row.decided_at)}
                 </p>
                 {row.decision_note && (

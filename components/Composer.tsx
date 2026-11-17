@@ -111,7 +111,7 @@ export function Composer({
                 ? "Every message in this chat is covered for the hour."
                 : "The hour starts when the first message sends."
             }
-            className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-low sm:inline-flex"
+            className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 text-[9.5px] text-low sm:inline-flex"
           >
             <span
               aria-hidden="true"
@@ -202,7 +202,7 @@ export function Composer({
           before the press instead of as an error after it. */}
       {text.length > MESSAGE_WARN_CHARS && (
         <p
-          className={`mt-1 px-2 text-right font-mono text-[10px] ${
+          className={`mt-1 px-2 text-right text-[10px] ${
             text.length > MAX_MESSAGE_CHARS ? "text-danger" : "text-low"
           }`}
         >

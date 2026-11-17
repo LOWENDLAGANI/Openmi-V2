@@ -88,7 +88,7 @@ export function AdSlot({
           className="mx-auto grid w-full place-items-center rounded-xl border border-dashed border-line-strong bg-raised/60 px-3 text-center"
           style={{ minHeight: spec.height, maxWidth: spec.width }}
         >
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-low">
+          <p className="text-[10px] text-low">
             {spec.label} · {spec.width}×{spec.height}
           </p>
         </div>

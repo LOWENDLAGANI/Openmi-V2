@@ -199,7 +199,7 @@ export default async function PayPage({
             <p className="eyebrow">balance</p>
             <p className="mt-1 text-[clamp(2rem,5vw,2.7rem)] font-semibold leading-none tracking-[-0.04em] tabular-nums text-hi">
               {formatCredit(profile?.balance ?? 0)}{" "}
-              <span className="text-[0.42em] font-medium uppercase tracking-[0.08em] text-low">
+              <span className="text-[0.42em] font-medium text-low">
                 credit
               </span>
             </p>
@@ -236,9 +236,9 @@ export default async function PayPage({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-raised px-4 py-3">
           <div>
             <p className="eyebrow">wallet credit</p>
-            <p className="mt-0.5 font-mono text-[16px] leading-none tabular-nums text-hi">
+            <p className="mt-0.5 text-[16px] leading-none tabular-nums text-hi">
               {formatCredit(profile?.wallet ?? 0)}{" "}
-              <span className="text-[10px] uppercase tracking-[0.1em] text-low">
+              <span className="text-[10px] text-low">
                 credit
               </span>
             </p>
@@ -302,7 +302,7 @@ export default async function PayPage({
             Plans
           </h2>
           {TOPUP_PAUSED ? (
-            <span className="rounded-full border border-line-strong px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-low">
+            <span className="rounded-full border border-line-strong px-3 py-1.5 text-[10px] text-low">
               checkout paused
             </span>
           ) : (
@@ -326,7 +326,7 @@ export default async function PayPage({
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[13px] font-semibold text-hi">{plan.name}</p>
                 <p
-                  className="font-mono text-[11px] tabular-nums text-low"
+                  className="text-[11px] tabular-nums text-low"
                   title={`Charged as RM ${plan.price} on the payment page`}
                 >
                   {localPrices
@@ -334,13 +334,13 @@ export default async function PayPage({
                     : `RM ${plan.price}`}
                 </p>
               </div>
-              <p className="mt-2 font-mono text-[20px] leading-none tabular-nums text-accent-text">
+              <p className="mt-2 text-[20px] leading-none tabular-nums text-accent-text">
                 {plan.credit}
-                <span className="ml-1 text-[10px] uppercase tracking-[0.12em] text-low">
+                <span className="ml-1 text-[10px] text-low">
                   credit
                 </span>
               </p>
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-low">
+              <p className="mt-1 text-[10px] text-low">
                 {plan.days} days
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-mid">
@@ -406,7 +406,7 @@ export default async function PayPage({
               step="0.01"
               inputMode="decimal"
               placeholder={String(PLANS[0]?.price ?? "")}
-              className="field py-2 font-mono text-[12px]"
+              className="field py-2 text-[12px]"
             />
           </label>
 
@@ -444,7 +444,7 @@ export default async function PayPage({
               type="file"
               required
               accept="image/png,image/jpeg,image/webp,application/pdf"
-              className="field w-full max-w-full cursor-pointer py-1.5 text-[11.5px] file:mr-3 file:max-w-[45%] file:truncate file:rounded-full file:border-0 file:bg-chip file:px-3 file:py-1 file:font-mono file:text-[10px] file:uppercase file:tracking-[0.12em] file:text-mid"
+              className="field w-full max-w-full cursor-pointer py-1.5 text-[11.5px] file:mr-3 file:max-w-[45%] file:truncate file:rounded-full file:border-0 file:bg-chip file:px-3 file:py-1 file:file:text-[10px] file:uppercase file:tracking-[0.12em] file:text-mid"
             />
             <span className="mt-1 block px-1 text-[10px] text-low">
               PNG, JPEG, WebP or PDF, up to 5 MB.
@@ -497,14 +497,14 @@ export default async function PayPage({
                       <p className="text-[12.5px] font-semibold text-hi">
                         {plan?.name ?? row.plan}
                       </p>
-                      <span className="font-mono text-[10.5px] text-low">
+                      <span className="text-[10.5px] text-low">
                         RM {Number(row.amount).toFixed(2)} · {utc(row.created_at)}
                       </span>
                     </div>
                     <StatusPill tone={state.tone}>{state.label}</StatusPill>
                   </div>
 
-                  <p className="mt-1 break-all font-mono text-[10.5px] text-low">
+                  <p className="mt-1 break-all text-[10.5px] text-low">
                     ref {row.reference}
                   </p>
 

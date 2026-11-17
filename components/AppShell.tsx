@@ -70,7 +70,7 @@ export function AppShell({
             </button>
 
             <div className="min-w-0">
-              <p className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-low">
+              <p className="text-[9.5px] text-low">
                 {eyebrow}
               </p>
               <h1 className="truncate text-[15px] font-medium tracking-[-0.02em] text-hi">

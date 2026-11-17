@@ -221,7 +221,7 @@ export default async function ActivityPage({
           }`}
         >
           {formatCredit(profile.balance)}{" "}
-          <span className="text-[0.42em] font-medium uppercase tracking-[0.08em] text-low">
+          <span className="text-[0.42em] font-medium text-low">
             credit
           </span>
         </p>
@@ -232,7 +232,7 @@ export default async function ActivityPage({
         </p>
 
         {profile.paidUntil && (
-          <p className="mt-2 font-mono text-[10.5px] text-low">
+          <p className="mt-2 text-[10.5px] text-low">
             {profile.paidActive
               ? `pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} · ${formatPassRemaining(profile.paidUntil)}`
               : `pass ended ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}`}
@@ -260,7 +260,7 @@ export default async function ActivityPage({
           <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-hi">
             Daily refresh
           </h2>
-          <p className="font-mono text-[10.5px] text-low">
+          <p className="text-[10.5px] text-low">
             midnight · {profile.timezone}
           </p>
         </div>
@@ -279,15 +279,15 @@ export default async function ActivityPage({
           where you are, change it under “Daily refill timezone” below.
         </p>
 
-        <dl className="mt-3 grid gap-3 font-mono text-[11px] sm:grid-cols-3">
+        <dl className="mt-3 grid gap-3 text-[11px] sm:grid-cols-3">
           <div>
-            <dt className="text-[10px] uppercase tracking-[0.12em] text-low">
+            <dt className="text-[10px] text-low">
               allowance
             </dt>
             <dd className="mt-0.5 text-hi">{formatCredit(allowance)} / day</dd>
           </div>
           <div>
-            <dt className="text-[10px] uppercase tracking-[0.12em] text-low">
+            <dt className="text-[10px] text-low">
               last grant
             </dt>
             <dd className="mt-0.5 text-hi">
@@ -299,7 +299,7 @@ export default async function ActivityPage({
             </dd>
           </div>
           <div>
-            <dt className="text-[10px] uppercase tracking-[0.12em] text-low">
+            <dt className="text-[10px] text-low">
               balance now
             </dt>
             <dd className="mt-0.5 text-hi">{formatCredit(profile.balance)}</dd>
@@ -325,7 +325,7 @@ export default async function ActivityPage({
             Share this code at sign-up. Both sides get {INVITE_REWARD_CREDIT} Credit,
             once per account, up to {MAX_INVITES_PER_ACCOUNT} rewarded accounts.
           </p>
-          <p className="mt-3 rounded-2xl bg-canvas px-4 py-2.5 font-mono text-[15px] tracking-[0.14em] text-hi">
+          <p className="mt-3 rounded-2xl bg-canvas px-4 py-2.5 text-[15px] tracking-[0.14em] text-hi">
             {profile.inviteCode ?? "—"}
           </p>
           <p className="mt-1.5 text-[10.5px] text-low">
@@ -382,22 +382,22 @@ export default async function ActivityPage({
 
                   return (
                     <tr key={row.id} className="border-t border-line">
-                      <td className="py-2 pl-5 pr-3 font-mono text-[10.5px] text-low">
+                      <td className="py-2 pl-5 pr-3 text-[10.5px] text-low">
                         {utc(row.created_at)}
                       </td>
                       <td className="text-body">{KIND_LABEL[row.kind] ?? row.kind}</td>
                       <td
-                        className={`text-right font-mono ${
+                        className={`text-right ${
                           amount < 0 ? "text-danger" : "text-accent-text"
                         }`}
                       >
                         {amount > 0 ? "+" : ""}
                         {formatCredit(amount)}
                       </td>
-                      <td className="text-right font-mono text-mid">
+                      <td className="text-right text-mid">
                         {formatCredit(Number(row.balance_after))}
                       </td>
-                      <td className="max-w-[180px] truncate pl-3 pr-5 font-mono text-[10.5px] text-low">
+                      <td className="max-w-[180px] truncate pl-3 pr-5 text-[10.5px] text-low">
                         {row.reference ?? "—"}
                       </td>
                     </tr>
@@ -426,7 +426,7 @@ export default async function ActivityPage({
             {perChat.map((row) => (
               <li key={row.chatId} className="flex justify-between gap-3 py-2">
                 <span className="min-w-0 truncate text-body">{row.title}</span>
-                <span className="shrink-0 font-mono text-[10.5px] text-mid">
+                <span className="shrink-0 text-[10.5px] text-mid">
                   ~{row.tokens.toLocaleString()} tokens
                 </span>
               </li>

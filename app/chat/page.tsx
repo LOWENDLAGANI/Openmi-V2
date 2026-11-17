@@ -114,7 +114,7 @@ function TokenForm() {
         autoComplete="off"
         spellCheck={false}
         placeholder="github_pat_… or ghp_…"
-        className="field py-2.5 font-mono text-[12px]"
+        className="field py-2.5 text-[12px]"
       />
       <SubmitButton
         className="btn btn-primary w-full py-2.5 text-[13px]"
@@ -139,7 +139,7 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
         <>
           <p className="mt-3 text-[13px] leading-relaxed text-mid">
             Authorise Openmi on GitHub once. GitHub asks for the{" "}
-            <span className="font-mono text-[11.5px] text-hi">repo</span> scope
+            <span className="text-[11.5px] text-hi">repo</span> scope
             — read and write access to your repositories — because that is what
             opening a pull request needs. The grant is sealed on our server, not
             kept in your browser, and you can revoke it from GitHub at any time.
@@ -150,11 +150,8 @@ function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
             className="btn btn-primary mt-5 w-full py-2.5 text-[13px]"
           >
             Continue with GitHub
-            <span aria-hidden="true" className="text-[13px] leading-none">
-              →
-            </span>
           </a>
-          <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-low">
+          <p className="mt-2 text-center text-[10px] text-low">
             nothing to copy or paste
           </p>
 
@@ -282,7 +279,7 @@ async function RepoSurface({
             <h2 className="mt-1.5 text-[24px] font-semibold tracking-[-0.02em] text-hi">
               One chat, one repository.
             </h2>
-            <p className="mt-2 font-mono text-[10.5px] text-low">
+            <p className="mt-2 text-[10.5px] text-low">
               @{github.connection.login} ·{" "}
               {github.connection.scopes.length > 0
                 ? github.connection.scopes.join(", ")
@@ -466,7 +463,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             safe. If this deployment was just updated, a database migration may
             still be pending — an operator can check the setup report.
           </p>
-          <p className="mt-1 font-mono text-[10.5px] opacity-80">
+          <p className="mt-1 text-[10.5px] opacity-80">
             {proposals.error}
           </p>
         </div>
@@ -831,7 +828,7 @@ export default async function ChatPage({
         ) : (
           <>
             GitHub connected as{" "}
-            <span className="font-mono text-hi">{params.connected}</span>.
+            <span className="text-hi">{params.connected}</span>.
           </>
         )}
       </p>

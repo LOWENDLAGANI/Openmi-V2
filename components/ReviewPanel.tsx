@@ -46,7 +46,7 @@ function DiffBlock({ text }: { text: string }) {
   if (text.length === 0) return null;
 
   return (
-    <pre className="max-h-64 overflow-auto rounded-xl border border-line bg-canvas px-3 py-2 font-mono text-[11px] leading-[1.6]">
+    <pre className="max-h-64 overflow-auto rounded-xl border border-line bg-canvas px-3 py-2 text-[11px] leading-[1.6]">
       {text.split("\n").map((line, index) => {
         const tone = line.startsWith("+")
           ? "text-accent-text"
@@ -116,7 +116,7 @@ export function ReviewPanel({
                   Proposed changes
                 </span>
               </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-low">
+              <span className="text-[10px] text-low">
                 {changeset.files.length} file(s) · +{additions} −{deletions} ·{" "}
                 {STATUS_LABEL[status]}
               </span>
@@ -170,12 +170,12 @@ export function ReviewPanel({
                     className="overflow-hidden rounded-2xl border border-line bg-raised"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-                      <p className="min-w-0 truncate font-mono text-[11.5px] text-body">
+                      <p className="min-w-0 truncate text-[11.5px] text-body">
                         {file.path}
                       </p>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-[10px] text-low">
+                        <span className="text-[10px] text-low">
                           {file.error
                             ? "not applied"
                             : `+${file.additions} −${file.deletions}`}

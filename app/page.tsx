@@ -52,7 +52,7 @@ export default async function HomePage() {
               <ThemeSwitcher variant="icon" />
             </div>
 
-            <h1 className="mt-7 max-w-[19ch] text-balance text-[clamp(1.75rem,4.6vw,2.5rem)] font-semibold leading-[1.05] tracking-[-0.045em] text-hi">
+            <h1 className="mt-7 max-w-[16ch] text-balance text-[clamp(2rem,5.2vw,3rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-hi" style={{ fontFamily: "var(--font-display)" }}>
               Point it at a repo. Get a diff you can merge.
             </h1>
 
@@ -65,15 +65,9 @@ export default async function HomePage() {
             <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
               <Link
                 href="/login"
-                className="btn btn-primary lift group px-5 py-2.5 text-[13.5px]"
+                className="btn btn-primary lift px-5 py-2.5 text-[13.5px]"
               >
                 Start with GitHub
-                <span
-                  aria-hidden="true"
-                  className="text-[14px] leading-none transition-transform duration-150 group-hover:translate-x-0.5"
-                >
-                  →
-                </span>
               </Link>
               <Link
                 href="/pay"
@@ -83,7 +77,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <dl className="mt-7 flex flex-wrap gap-x-7 gap-y-2 border-t border-line pt-4 text-[12px]">
+            <dl className="mt-8 flex flex-wrap gap-x-8 gap-y-2 border-t border-line pt-4 text-[12px]">
               <div className="flex items-baseline gap-2">
                 <dt className="text-low">Hour of work</dt>
                 <dd className="font-medium tabular-nums text-hi">
@@ -118,7 +112,7 @@ export default async function HomePage() {
                 Support
               </a>
               <span className="ml-auto text-[11.5px] tabular-nums text-low">
-                GitHub sign-in · no card
+                GitHub sign-in, no card
               </span>
             </nav>
           </div>

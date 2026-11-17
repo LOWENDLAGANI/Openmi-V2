@@ -51,7 +51,7 @@ export default async function BannedPage() {
 
       {reason ? (
         <p className="mt-5 rounded-2xl border border-line bg-card px-4 py-3 text-[13px] leading-relaxed text-mid">
-          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-low">
+          <span className="text-[10px] text-low">
             reason
           </span>
           <span className="mt-1 block text-hi">{reason}</span>

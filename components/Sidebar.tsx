@@ -215,7 +215,7 @@ export function Sidebar({
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft font-mono text-[11px] uppercase text-accent-text"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-medium text-accent-text"
           >
             {initial}
           </span>

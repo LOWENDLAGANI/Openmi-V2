@@ -182,7 +182,7 @@ export default function AboutPage() {
       </section>
 
       <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
-        <p className="eyebrow">openmi · review before push</p>
+        <p className="eyebrow">Openmi</p>
         <div className="flex items-center gap-3">
           <Link href="/terms" className="eyebrow hover:text-hi">
             terms

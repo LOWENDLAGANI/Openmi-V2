@@ -195,7 +195,7 @@ export function AuthForm({
 
       <div className="my-4 flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-low">
+        <span className="text-[11px] text-low">
           or
         </span>
         <span className="h-px flex-1 bg-line" />

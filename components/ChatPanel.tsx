@@ -821,7 +821,7 @@ export function ChatPanel({
                 repo ? "bg-accent" : "bg-line-strong"
               }`}
             />
-            <span className="truncate font-mono text-[10px] uppercase tracking-[0.1em] text-mid">
+            <span className="truncate text-[11px] text-mid">
               {repo ? repo.fullName : "no repository"}
             </span>
           </span>
@@ -846,7 +846,7 @@ export function ChatPanel({
             ref={heroRef}
             className="flex h-full flex-col items-center justify-center py-10 text-center"
           >
-            <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+            <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi" style={{ fontFamily: "var(--font-display)" }}>
               {(repo ? "What should Openmi do?" : "What are you building?")
                 .split(" ")
                 .map((word, index, words) => (
@@ -977,7 +977,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={jumpToLatest}
-              className="pointer-events-auto rounded-full border border-line-strong bg-card px-3 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-mid shadow-[0_8px_20px_rgba(0,0,0,0.22)] hover:text-hi"
+              className="pointer-events-auto rounded-full border border-line-strong bg-card px-3 py-1 text-[11px] text-mid shadow-[0_8px_20px_rgba(0,0,0,0.22)] hover:text-hi"
             >
               {streaming ? "new output ↓" : "jump to end ↓"}
             </button>
@@ -1149,7 +1149,7 @@ function ThinkingBlock({ text, live = false }: { text: string; live?: boolean })
       className="mb-2 rounded-2xl border border-line bg-raised/60 px-3 py-1.5"
       data-live={live ? "true" : "false"}
     >
-      <summary className="cursor-pointer font-mono text-[9.5px] uppercase tracking-[0.1em] text-low">
+      <summary className="cursor-pointer text-[11px] text-low">
         {live ? "thinking…" : "reasoning"}
       </summary>
       <p className="mt-1.5 whitespace-pre-wrap break-words text-[11.5px] leading-relaxed text-mid [overflow-wrap:anywhere]">
@@ -1229,7 +1229,7 @@ function ShotStrip({ shots }: { shots: Shot[] }) {
             alt={shot.caption}
             className="block w-full"
           />
-          <figcaption className="border-t border-line px-3 py-1.5 font-mono text-[10px] text-low">
+          <figcaption className="border-t border-line px-3 py-1.5 text-[11px] text-low">
             {shot.caption}
           </figcaption>
         </figure>

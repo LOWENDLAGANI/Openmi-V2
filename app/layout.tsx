@@ -1,6 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 
+import { Fraunces } from "next/font/google";
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+  axes: ["opsz"],
+});
+
 import { AdBlockGate } from "@/components/AdBlockGate";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -61,7 +70,7 @@ export default function RootLayout({
       <head>
         <script src="/theme-boot.js" />
       </head>
-      <body className="app-surface min-h-dvh bg-canvas text-body antialiased">
+      <body className={`${fraunces.variable} app-surface min-h-dvh bg-canvas text-body antialiased`}>
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>

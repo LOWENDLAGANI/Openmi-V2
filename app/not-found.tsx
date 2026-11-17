@@ -22,7 +22,7 @@ export default function NotFound() {
       </header>
 
       <section className="flex flex-1 flex-col justify-center py-12">
-        <p className="eyebrow text-accent-text">404 · not found</p>
+        <p className="eyebrow text-accent-text">Not found</p>
         <h1 className="mt-4 max-w-xl text-[clamp(2.2rem,7vw,3.8rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-hi">
           This page is not here.
         </h1>
@@ -45,8 +45,8 @@ export default function NotFound() {
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line py-5">
-        <p className="eyebrow">openmi · review before push</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-low">
+        <p className="eyebrow">Openmi</p>
+        <p className="text-[10px] text-low">
           one branch · observed exit codes
         </p>
       </footer>

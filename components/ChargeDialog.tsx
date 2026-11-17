@@ -122,7 +122,7 @@ export function ChargeDialog({
                   </span>
                 )}
               </span>
-              <span className="font-mono text-[12px] text-accent-text">
+              <span className="text-[12px] text-accent-text">
                 {formatCredit(hourPrice)} Credit
               </span>
             </button>
@@ -142,7 +142,7 @@ export function ChargeDialog({
         )}
 
         <div className="mt-4 flex items-center justify-between gap-2">
-          <p className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-low">
+          <p className="text-[9.5px] text-low">
             charged once
           </p>
           <button

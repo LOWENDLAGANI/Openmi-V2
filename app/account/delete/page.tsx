@@ -98,7 +98,7 @@ export default async function DeleteAccountPage({
 
   return (
     <Shell>
-      <p className="mt-10 text-[12px] font-mono uppercase tracking-[0.14em] text-low">
+      <p className="mt-10 text-[12px] text-low">
         your data
       </p>
       <h1 className="mt-3 text-balance text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
@@ -174,10 +174,10 @@ export default async function DeleteAccountPage({
           <>
             <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-mid">
               Signed in as{" "}
-              <span className="break-all font-mono text-[11.5px] text-hi">
+              <span className="break-all text-[11.5px] text-hi">
                 {session.user.email ?? "an account without an address"}
               </span>
-              . Type <span className="font-mono text-hi">DELETE</span> to confirm.
+              . Type <span className="text-hi">DELETE</span> to confirm.
               There is no second step and no undo.
             </p>
 
@@ -194,7 +194,7 @@ export default async function DeleteAccountPage({
                 autoCapitalize="characters"
                 spellCheck={false}
                 placeholder="DELETE"
-                className="field w-full py-2 font-mono text-[12px] sm:max-w-[200px]"
+                className="field w-full py-2 text-[12px] sm:max-w-[200px]"
               />
               <SubmitButton
                 className="btn py-2.5 text-[12.5px] text-danger"
@@ -236,7 +236,7 @@ export default async function DeleteAccountPage({
       </section>
 
       <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
-        <p className="eyebrow">openmi · your data, your call</p>
+        <p className="eyebrow">Your data, your call</p>
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/privacy" className="eyebrow hover:text-hi">
             privacy

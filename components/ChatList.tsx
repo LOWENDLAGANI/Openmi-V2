@@ -242,7 +242,7 @@ export function ChatList({
       aria-label="Chats"
       className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3"
     >
-      <p className="px-3 pb-1.5 pt-2 font-mono text-[9.5px] uppercase tracking-[0.14em] text-low">
+      <p className="px-3 pb-1.5 pt-2 text-[9.5px] text-low">
         Chats
       </p>
 
@@ -280,7 +280,7 @@ export function ChatList({
               <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-body">
                 {folder.name}
               </span>
-              <span className="shrink-0 font-mono text-[10px] text-low">
+              <span className="shrink-0 text-[10px] text-low">
                 {items.length}
               </span>
             </summary>
@@ -302,7 +302,7 @@ export function ChatList({
               )}
 
               <details className="mt-0.5">
-                <summary className="cursor-pointer list-none px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-low hover:text-hi">
+                <summary className="cursor-pointer list-none px-3 py-1 text-[9.5px] text-low hover:text-hi">
                   settings
                 </summary>
 

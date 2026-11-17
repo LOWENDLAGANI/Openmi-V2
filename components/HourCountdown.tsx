@@ -54,11 +54,11 @@ export function HourCountdown({
       className="mx-4 mt-3 flex items-center justify-between gap-2 rounded-xl border border-line bg-card px-3 py-2"
       title="The hour is paid for; every turn inside it is free."
     >
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-low">
+      <span className="text-[9.5px] text-low">
         hour left
       </span>
       <span
-        className="font-mono text-[12.5px] leading-none tabular-nums text-hi"
+        className="text-[12.5px] leading-none tabular-nums text-hi"
         aria-label="Time left in the running hour"
       >
         {remaining === null
