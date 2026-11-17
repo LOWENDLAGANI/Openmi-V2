@@ -29,6 +29,13 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NavProgress } from "@/components/NavProgress";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import {
+  SITE_DESCRIPTION,
+  SITE_LOCALE,
+  SITE_NAME,
+  SITE_TITLE,
+  siteUrl,
+} from "@/lib/seo";
 import "./globals.css";
 
 /**
@@ -39,11 +46,49 @@ import "./globals.css";
  * stacks live in app/globals.css so one file owns the typography.
  */
 
+/**
+ * The document's own description, inherited by every page that does not write
+ * one. `metadataBase` is what makes that inheritance safe: without it Next warns
+ * on every relative URL and social scrapers resolve them against nothing, so a
+ * page's `openGraph.images` or canonical link becomes a local path in a crawler's
+ * log instead of a URL.
+ *
+ * A page stays out of the index by overriding `robots` — /admin, /setup, /banned
+ * and /account/delete do — rather than by being told so here.
+ */
 export const metadata: Metadata = {
-  title: "Openmi: your repository, with a reviewer built in",
-  description:
-    "Connect GitHub, pick a repository, and chat with a model that reads the code and proposes edits. Nothing is pushed until you approve.",
-  applicationName: "Openmi",
+  metadataBase: new URL(siteUrl()),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      // A snippet is the whole result for a page like this one: letting Google
+      // use all of it, and a large thumbnail, is the difference between a
+      // listing that explains the product and a truncated line of it.
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: SITE_LOCALE,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  // `summary` rather than `summary_large_image`: there is no social card image,
+  // and a large-image card with nothing in it is a grey rectangle.
+  twitter: {
+    card: "summary",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

@@ -13,6 +13,9 @@ export const metadata = {
   title: "Delete your account — Openmi",
   description:
     "Delete your Openmi account and the data we hold for it yourself. No request form, no waiting for a reply: sign in, confirm, and the account and its data are removed.",
+  // A deletion page in a search result is an invitation to a form that only
+  // works for the account that opened it.
+  robots: { index: false, follow: false },
 };
 
 /**
