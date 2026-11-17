@@ -3,6 +3,7 @@ import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
 import {
   openChatSandbox,
   releaseChatSandbox,
+  renewChatSandboxLease,
 } from "@/lib/execution/chat-env/open";
 import { MISSION_WORKDIR } from "@/lib/execution/mission/budget";
 import {
@@ -42,6 +43,11 @@ export type OpenWorkspaceResult =
        * next message must find it); a run's own box is paused.
        */
       release: () => Promise<void>;
+      /**
+       * Holds the claim on a chat's box while the run works. Absent for a run's
+       * own box, which nobody else can claim.
+       */
+      renew?: () => Promise<void>;
     }
   | { ok: false; message: string };
 
@@ -207,6 +213,9 @@ async function openChatWorkspace(
         rowId: opened.row.id,
         handle: opened.handle,
       });
+    },
+    renew: async () => {
+      await renewChatSandboxLease({ admin, rowId: opened.row.id });
     },
   };
 }

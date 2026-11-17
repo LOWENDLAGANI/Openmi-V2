@@ -379,7 +379,7 @@ The lazy `ensure()` becomes:
 ```ts
 const opened = await openChatSandbox({
   chatId, owner, repo, sha,
-  leaseMs: CHAT_SANDBOX_LEASE_MS,   // 10 min, above maxDuration = 300 s
+  leaseMs: CHAT_SANDBOX_LEASE_MS,   // 5 min, renewed by the run's heartbeat
 });
 if (!opened.ok) return failure(opened.message);
 sandbox = opened.handle;

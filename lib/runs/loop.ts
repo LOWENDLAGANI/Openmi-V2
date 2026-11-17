@@ -142,6 +142,8 @@ export async function executeRun(
   let sandbox: SandboxHandle | null = null;
   /** How this run gives its workspace back; set once the box is open. */
   let releaseWorkspace: (() => Promise<void>) | null = null;
+  /** How this run keeps its claim on a chat's workspace; null until it has one. */
+  let renewWorkspace: (() => Promise<void>) | null = null;
   let status: RunStatus = "failed";
   let stopReason = "error";
   let failure: string | null = null;
@@ -173,8 +175,13 @@ export async function executeRun(
   // A lease is refreshed while the loop runs so the reaper can tell a slow run
   // from a dead worker. A failed refresh means this worker lost the run, and
   // the next step's compare-and-set refuses it anyway.
+  //
+  // The same tick renews the claim on the chat's workspace. One interval, two
+  // records: a worker that stops reporting must lose the disk as well as the
+  // row, or the next message waits on a lease nobody is going to renew.
   const lease = setInterval(() => {
     void heartbeat(admin, runId, run.worker_id ?? "");
+    void renewWorkspace?.().catch(() => {});
   }, RUN_STREAM_HEARTBEAT_MS);
 
   try {
@@ -208,6 +215,7 @@ export async function executeRun(
 
     sandbox = opened.sandbox;
     releaseWorkspace = opened.release;
+    renewWorkspace = opened.renew ?? null;
 
     // A chat's workspace belongs to its `chat_sandboxes` row, not to this run.
     // The run sweep lists only `kind: "run"` boxes and the chat sweep reads the
@@ -791,6 +799,10 @@ export async function executeRun(
 
     // A chat's workspace is released so the next message finds it; a run's own
     // box is paused, which releases compute and keeps the disk for its TTL.
+    // Nothing renews a claim after this point, so it is dropped before the box
+    // is handed back: a stale lease is a chat nobody else can open.
+    renewWorkspace = null;
+
     if (releaseWorkspace) await releaseWorkspace().catch(() => {});
     else if (sandbox) await pauseRunWorkspace(sandbox);
 

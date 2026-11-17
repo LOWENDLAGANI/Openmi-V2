@@ -34,6 +34,7 @@ import {
   RUN_HEARTBEAT_STALE_MS,
   RUN_QUEUE_NOTICE_MS,
   RUN_QUEUE_WAIT_MS,
+  RUN_STREAM_HEARTBEAT_MS,
   checkRunQuota,
 } from "@/lib/runs/limits";
 import {
@@ -574,9 +575,12 @@ function streamRun(input: StreamInput): NextResponse {
       let toldAboutQueue = false;
       let settleTried = false;
       const summaries = new Map<string, string>();
+      /** When this stream last wrote a byte, so a silent run keeps it open. */
+      let lastWrite = Date.now();
 
       const send = (event: string, data: unknown) => {
         if (closed) return;
+        lastWrite = Date.now();
         try {
           controller.enqueue(
             encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -777,6 +781,19 @@ function streamRun(input: StreamInput): NextResponse {
           send("paused", { turn: run.id, cursor });
           close();
           return;
+        }
+
+        // A run can be silent for minutes while a build or an install grinds.
+        // A stream that writes nothing is closed by proxies that never see a
+        // byte, which looked like a dropped turn; a comment line keeps it open
+        // and every SSE reader ignores it.
+        if (Date.now() - lastWrite >= RUN_STREAM_HEARTBEAT_MS) {
+          lastWrite = Date.now();
+          try {
+            controller.enqueue(encoder.encode(": keep-alive\n\n"));
+          } catch {
+            closed = true;
+          }
         }
 
         await sleep(POLL_MS);

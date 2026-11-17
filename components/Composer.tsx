@@ -81,7 +81,11 @@ export function Composer({
     element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
   }, [text]);
 
-  const canSend = !streaming && text.trim().length > 0;
+  // The count below is a warning, but the cap is the server's: sending past it
+  // is refused after the field has already been cleared, which loses the draft
+  // a reader spent minutes writing. The button refuses it first.
+  const tooLong = text.length > MAX_MESSAGE_CHARS;
+  const canSend = !streaming && !tooLong && text.trim().length > 0;
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

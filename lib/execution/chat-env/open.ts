@@ -409,4 +409,32 @@ export async function releaseChatSandbox(input: {
   if (input.handle) await refreshTtl(input.handle);
 }
 
+/**
+ * Holds the claim a live turn already has.
+ *
+ * The lease is short enough that a worker that died stops blocking its chat's
+ * workspace, which only works if a worker that is still alive keeps saying so.
+ * The run loop calls this on its own heartbeat, so one interval keeps both the
+ * run row and the disk it is using alive.
+ */
+export async function renewChatSandboxLease(input: {
+  admin: Admin;
+  rowId: string;
+  now?: number;
+  leaseMs?: number;
+}): Promise<boolean> {
+  const now = input.now ?? Date.now();
+
+  const { data } = await input.admin
+    .from("chat_sandboxes")
+    .update({
+      lease_until: leaseUntil(now, input.leaseMs),
+      last_active_at: new Date(now).toISOString(),
+    })
+    .eq("id", input.rowId)
+    .select("id");
+
+  return Array.isArray(data) && data.length > 0;
+}
+
 export type { ChatSandboxRow };

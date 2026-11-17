@@ -56,8 +56,17 @@ export const CHAT_SANDBOX_DEFAULT_MAX_PER_OWNER = 3;
 export const CHAT_SANDBOX_MIN_PER_OWNER = 1;
 export const CHAT_SANDBOX_MAX_PER_OWNER = 10;
 
-/** Longer than `maxDuration = 300`, so a turn can never outlive its lease. */
-export const CHAT_SANDBOX_LEASE_MS = 10 * 60_000;
+/**
+ * How long one claim on a chat's workspace lasts.
+ *
+ * A turn is a worker run, not a 300-second function: it can last fifteen minutes
+ * and a long seed sits between the claim and the first command. The worker
+ * renews this on every heartbeat while it works, so the window only has to
+ * survive a claim, a seed and one interval — and a worker that dies stops
+ * renewing, which frees the workspace instead of locking it for the length of a
+ * run nobody is executing.
+ */
+export const CHAT_SANDBOX_LEASE_MS = 5 * 60_000;
 
 /** A `provisioning` row older than this, with no lease, is an orphan. */
 export const CHAT_SANDBOX_PROVISION_ORPHAN_MS = 15 * 60_000;

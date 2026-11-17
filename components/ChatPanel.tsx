@@ -464,7 +464,8 @@ export function ChatPanel({
       thinking: string;
       steps: StepLine[];
       shots: Shot[];
-      cursor: number;
+      /** Null when the server did not name one; the route then uses its own. */
+      cursor: number | null;
     }
   ) {
     const continuation = typeof turnToken === "string";
@@ -498,8 +499,12 @@ export function ChatPanel({
     if (!resume) setNotices([]);
 
     let pausedToken: string | null = null;
-    /** Where this window stopped in the run's event log, for the next one. */
-    let pausedCursor = 0;
+    /**
+     * Where this window stopped in the run's event log, for the next one. Null
+     * when the server did not say: replaying from zero would append the whole
+     * answer a second time on top of the text already carried over.
+     */
+    let pausedCursor: number | null = null;
     let assembled = resume?.text ?? "";
     let thinkingText = resume?.thinking ?? "";
     let sawDone = false;
@@ -558,7 +563,7 @@ export function ChatPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           continuation
-            ? { chatId: activeChatId, turn: turnToken, cursor: resume?.cursor ?? 0 }
+            ? { chatId: activeChatId, turn: turnToken, cursor: resume?.cursor ?? null }
             : {
                 chatId: activeChatId ?? undefined,
                 content,
@@ -739,7 +744,7 @@ export function ChatPanel({
         if (event === "paused") {
           pausedToken = typeof payload.turn === "string" ? payload.turn : null;
           pausedCursor =
-            typeof payload.cursor === "number" ? payload.cursor : 0;
+            typeof payload.cursor === "number" ? payload.cursor : null;
           return;
         }
 
@@ -755,12 +760,16 @@ export function ChatPanel({
           const seq = typeof payload.seq === "number" ? payload.seq : null;
           // The answer and its reasoning are read back from the database row the
           // worker wrote, so a dropped stream or a missed delta cannot leave a
-          // different sentence on screen than the one stored. The stream's copy
-          // is only the fallback when the row has not arrived.
+          // different sentence on screen than the one stored. The one exception
+          // is a row shorter than the stream: that row was cut at the storage
+          // cap, and the longer copy is what the model actually wrote.
+          const rowContent =
+            typeof payload.content === "string" ? payload.content : "";
+          // The row is the answer as stored, the stream is the same answer as it
+          // arrived. A row shorter than what reached this tab was cut at the
+          // storage cap, so the longer copy is the one the model actually wrote.
           const storedContent =
-            typeof payload.content === "string" && payload.content.length > 0
-              ? payload.content
-              : assembled;
+            rowContent.length >= assembled.length ? rowContent : assembled;
           const storedThinking =
             typeof payload.thinking === "string" && payload.thinking.length > 0
               ? payload.thinking
@@ -938,6 +947,17 @@ export function ChatPanel({
         shots: shotLog,
         cursor: pausedCursor,
       });
+    }
+
+    // A chat created by this turn is adopted even when the stream ended without
+    // a "done" — a stop, a dropped connection, a refused continuation. Otherwise
+    // the tab stays on the draft URL and the conversation, with the answer the
+    // worker is still writing, has no address to come back to.
+    if (!resuming && createdChatRef.current) {
+      const id = createdChatRef.current;
+      createdChatRef.current = null;
+      router.replace(`/chat?chat=${id}`, { scroll: false });
+      router.refresh();
     }
   }
 
