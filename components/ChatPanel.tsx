@@ -634,14 +634,29 @@ export function ChatPanel({
         if (event === "done") {
           const id = typeof payload.id === "string" ? payload.id : `assistant-${Date.now()}`;
           const seq = typeof payload.seq === "number" ? payload.seq : null;
+          // The answer and its reasoning are read back from the database row the
+          // worker wrote, so a dropped stream or a missed delta cannot leave a
+          // different sentence on screen than the one stored. The stream's copy
+          // is only the fallback when the row has not arrived.
+          const storedContent =
+            typeof payload.content === "string" && payload.content.length > 0
+              ? payload.content
+              : assembled;
+          const storedThinking =
+            typeof payload.thinking === "string" && payload.thinking.length > 0
+              ? payload.thinking
+              : thinkingText;
+          const storedSteps = Array.isArray(payload.steps)
+            ? (payload.steps as StepLine[])
+            : [...stepLog];
           // The server appends the same note when it stores a stopped answer, so
           // the card on screen and the row in the transcript say the same thing.
           const content =
             payload.stopped === "aborted"
-              ? `${assembled}\n\n_(stopped before this answer finished)_`
+              ? `${storedContent}\n\n_(stopped before this answer finished)_`
               : payload.stopped === "partial"
-                ? `${assembled}\n\n_(this answer stopped before it finished)_`
-                : assembled;
+                ? `${storedContent}\n\n_(this answer stopped before it finished)_`
+                : storedContent;
 
           setMessages((current) => [
             ...current,
@@ -651,8 +666,8 @@ export function ChatPanel({
               content,
               seq,
               model,
-              thinking: thinkingText,
-              steps: [...stepLog],
+              thinking: storedThinking,
+              steps: storedSteps,
               shots: [...shotLog],
             },
           ]);

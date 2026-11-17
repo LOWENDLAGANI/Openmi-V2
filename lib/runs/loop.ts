@@ -18,6 +18,7 @@ import {
   type WireMessage,
 } from "@/lib/providers";
 import type { SandboxHandle } from "@/lib/execution/provider";
+import type { AgentStep } from "@/lib/types";
 import { serverEnv } from "@/lib/env";
 
 import { collectRunArtifacts } from "./artifacts";
@@ -130,6 +131,8 @@ export async function executeRun(
   // which is what a cancelled or failed run has to show.
   let answerText = "";
   let collectedText = "";
+  /** The steps the model took, in the shape the transcript stores. */
+  const chatSteps: AgentStep[] = [];
   /** Everything the model thought, for the chat's folded reasoning block. */
   let collectedReasoning = "";
   let changedFiles: string[] = [];
@@ -476,6 +479,13 @@ export async function executeRun(
           summary: toolSummary(call.name, args),
         });
 
+        chatSteps.push({
+          tool: call.name,
+          detail: toolSummary(call.name, args),
+          state: "start",
+          command: typeof args?.command === "string" ? args.command : undefined,
+        });
+
         const toolStartedAt = Date.now();
         let result: RunToolResult;
 
@@ -547,6 +557,33 @@ export async function executeRun(
           durationMs,
         });
 
+        // Keep the stored step in step with the one the reader watched: a
+        // finished tool replaces its start entry rather than adding a second.
+        {
+          let index = -1;
+          for (let i = chatSteps.length - 1; i >= 0; i -= 1) {
+            if (
+              chatSteps[i].state === "start" &&
+              chatSteps[i].tool === call.name
+            ) {
+              index = i;
+              break;
+            }
+          }
+
+          const finished: AgentStep = {
+            tool: call.name,
+            detail: toolSummary(call.name, args),
+            state: result.isError ? "error" : "done",
+            command:
+              typeof args?.command === "string" ? args.command : undefined,
+            output: previewText(result.text, 400),
+          };
+
+          if (index >= 0) chatSteps[index] = finished;
+          else chatSteps.push(finished);
+        }
+
         await appendEvent(admin, runId, "tool.finished", {
           name: call.name,
           isError: result.isError,
@@ -615,6 +652,7 @@ export async function executeRun(
         sandbox,
         text: status === "done" ? answerText : collectedText,
         thinking: collectedReasoning,
+        steps: chatSteps,
         files: changedFiles,
         token: chatToken,
         sealKey: serverEnv().githubTokenKey,

@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { EditRequest } from "@/lib/changesets";
+import type { AgentStep } from "@/lib/types";
 import {
   addEdits,
   createChangeset,
@@ -46,7 +47,8 @@ export async function appendChatAnswer(
   run: RunRow,
   text: string,
   tokens: number,
-  thinking = ""
+  thinking = "",
+  steps: AgentStep[] = []
 ): Promise<boolean> {
   if (!run.chat_id || text.trim().length === 0) return false;
 
@@ -59,7 +61,7 @@ export async function appendChatAnswer(
     p_tokens: tokens,
     p_thinking:
       thinking.trim().length > 0 ? thinking.slice(0, 40_000) : null,
-    p_steps: [],
+    p_steps: steps.slice(0, 60),
   });
 
   return !error;
@@ -185,6 +187,7 @@ export async function deliverChatTurn(input: {
   sandbox: SandboxHandle | null;
   text: string;
   thinking?: string;
+  steps?: AgentStep[];
   files: string[];
   token: string | null;
   sealKey: string | null;
@@ -199,7 +202,8 @@ export async function deliverChatTurn(input: {
     run,
     input.text,
     input.tokens,
-    input.thinking ?? ""
+    input.thinking ?? "",
+    input.steps ?? []
   ).catch(() => false);
 
   if (!input.sandbox) {

@@ -597,6 +597,25 @@ function streamRun(input: StreamInput): NextResponse {
         }
       }
 
+      // The assistant row this run will write, if it writes one, is the first
+      // one after this seq. Capturing it here keeps a previous answer from being
+      // reported as the result of a run that produced nothing.
+      let lastAssistantSeqBefore = 0;
+      try {
+        const { data: before } = await session.supabase
+          .from("messages")
+          .select("seq")
+          .eq("chat_id", chatId)
+          .eq("role", "assistant")
+          .order("seq", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const seq = (before as { seq?: number } | null)?.seq;
+        if (typeof seq === "number") lastAssistantSeqBefore = seq;
+      } catch {
+        lastAssistantSeqBefore = 0;
+      }
+
       const deadline = Date.now() + WINDOW_MS;
       let idle = 0;
 
@@ -749,7 +768,7 @@ function streamRun(input: StreamInput): NextResponse {
       // `run.finished`, so both reads below are racing nothing.
       const { data: stored } = await session.supabase
         .from("messages")
-        .select("id, seq")
+        .select("id, seq, content, thinking, steps")
         .eq("chat_id", chatId)
         .eq("role", "assistant")
         .order("seq", { ascending: false })
@@ -758,7 +777,19 @@ function streamRun(input: StreamInput): NextResponse {
 
       send("changeset", {});
 
-      const row = stored as { id?: string; seq?: number } | null;
+      const row = stored as {
+        id?: string;
+        seq?: number;
+        content?: string | null;
+        thinking?: string | null;
+        steps?: unknown;
+      } | null;
+
+      // Only a row newer than the one that existed before this run started
+      // counts as this run's answer. Otherwise a failed run with no message
+      // would be reported with a previous turn's text.
+      const isNewAssistant =
+        typeof row?.seq === "number" && row.seq > lastAssistantSeqBefore;
       const stopped =
         terminalStatus === "cancelled"
           ? "aborted"
@@ -780,10 +811,17 @@ function streamRun(input: StreamInput): NextResponse {
 
       if (settledMessage) {
         send("error", { message: settledMessage });
-      } else if (!sawError || row?.id) {
+      } else if (!sawError || isNewAssistant) {
         send("done", {
-          id: row?.id ?? `assistant-${run.id}`,
-          seq: typeof row?.seq === "number" ? row.seq : null,
+          id: isNewAssistant ? row?.id ?? `assistant-${run.id}` : `assistant-${run.id}`,
+          seq: isNewAssistant && typeof row?.seq === "number" ? row.seq : null,
+          // The transcript is the source of truth: the answer and its reasoning
+          // come from the row the worker wrote, not from the stream a tab may
+          // have missed. Steps ride along when the worker stored them. A run
+          // that produced no stored answer carries nothing from an earlier turn.
+          content: isNewAssistant && typeof row?.content === "string" ? row.content : null,
+          thinking: isNewAssistant && typeof row?.thinking === "string" ? row.thinking : null,
+          steps: isNewAssistant && Array.isArray(row?.steps) ? row.steps : null,
           ...(stopped ? { stopped } : {}),
           status: terminalStatus ?? "done",
         });
