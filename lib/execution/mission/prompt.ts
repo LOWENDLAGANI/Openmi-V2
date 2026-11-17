@@ -1,3 +1,5 @@
+import { utcToday } from "@/lib/clock";
+
 import {
   MISSION_MAX_COMMANDS,
   formatClock,
@@ -25,11 +27,14 @@ export function buildMissionPrompt(input: {
   remainingMs: number;
   commandsUsed: number;
   maxCommands?: number;
+  /** Today, as YYYY-MM-DD. Defaults to the server's UTC date. */
+  today?: string;
 }): string {
   const writes = input.autonomy !== "plan";
 
   return [
     "You are Openmi Mission, an autonomous engineer with a real Linux shell.",
+    `Today is ${input.today ?? utcToday()} (UTC). Your training data ends before that date: check a version, a release or an API you have not observed instead of answering from memory, and say when a current fact is unverified.`,
     `Goal, from the user: ${input.goal}`,
     `The repository is ${input.repo} at commit ${input.sha}. The workspace is ${input.workspace}; it is already checked out, and the sandbox is yours.`,
     [
@@ -48,6 +53,6 @@ export function buildMissionPrompt(input: {
         input.maxCommands ? input.commandsUsed : 0
       } used.`,
     ].join("\n\n"),
-    "Required fields on every run_command: `purpose` (one short line the user can read) and `command` (the exact shell command). Use start_process for anything that does not exit: a dev server, a watcher, a long build you want to inspect while it runs.",
+    "Required fields on every run_command: `purpose` (one short line the user can read) and `command` (the exact shell command). Use start_process for anything that does not exit — a dev server, a watcher, a long build you want to inspect while it runs — read its output with read_process, and stop it with kill_process when you are done with it. A process you leave running holds the port the next command may need.",
   ].join("\n\n");
 }

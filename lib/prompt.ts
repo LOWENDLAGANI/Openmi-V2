@@ -1,4 +1,18 @@
-/** The system prompt contract for Openmi turns. */
+/**
+ * NOT WIRED: no route sends this prompt.
+ *
+ * Execution moved into the worker, and the composer that runs is
+ * `lib/runs/prompt.ts` (`buildRunSystemPrompt`, used by `lib/runs/loop.ts`) for
+ * a chat turn, and `lib/execution/mission/prompt.ts` for a mission. The clauses
+ * here are kept because the tests that pin the old question — which tools a
+ * turn may claim, what a GitHub-only turn is told, what a resumed turn may
+ * promise — still exercise them, and because they are the reference wording for
+ * those rules.
+ *
+ * Editing a clause here changes no model's behaviour. Change the run prompt.
+ * `tests/run-prompt.test.ts` fails if the live prompt and the tool surface drift
+ * apart.
+ */
 
 export const IDENTITY =
   "You are Openmi, an assistant working inside one repository the user chose.";

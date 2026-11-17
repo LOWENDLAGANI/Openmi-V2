@@ -3,6 +3,8 @@ import {
   RUN_TREE_MAX_CHARS,
   RUN_TREE_MAX_PATHS,
 } from "./limits";
+import { utcToday } from "@/lib/clock";
+
 import { RUN_WORKDIR } from "./tools";
 import type { SandboxHandle } from "@/lib/execution/provider";
 
@@ -22,6 +24,23 @@ export const RUN_AGENT_ID = "openmi-run";
 export const RUN_IDENTITY =
   "You are Openmi's web agent. You work inside one isolated Linux workspace that belongs to this run, and you finish the reader's request there.";
 
+/**
+ * The clock and the knowledge cutoff.
+ *
+ * A model with no date in its prompt writes last year's date into a changelog,
+ * and answers "what is the latest version" from its weights. Both are falsifiable
+ * in one command, so the prompt says which day it is, admits the cutoff, and
+ * names where the answer really lives — the lockfile, the registry, the docs.
+ */
+export function runTimeClause(today: string): string {
+  return [
+    `Today is ${today} (UTC).`,
+    "Your training data ends before that date, so treat anything that could have changed since then as unknown until you check it: library versions, releases, API shapes, prices, advisories and dates.",
+    "Check them against the evidence you have — the manifest and lockfile in the workspace, or the registry and documentation from the sandbox (`npm view <pkg> version`, `pip index versions <pkg>`, a releases page over https) — and quote what came back.",
+    "If you cannot check a current fact, say it is unverified instead of answering from memory, and never write a date into a file that you did not check against today's.",
+  ].join(" ");
+}
+
 export const RUN_OPERATING_RULES = [
   "Act, do not interview. Decide the approach, do the work, then say what you did. Do not ask for permission and do not stop at a plan when the request can be carried out.",
   "Inspect before you answer. Read the files, search the symbol, run the command. Do not assume a file, an API or a configuration value you have not seen.",
@@ -39,7 +58,7 @@ export const RUN_TOOLS_CLAUSE = [
   "- edit_file: replace one exact, unique piece of text in a file.",
   "- search_code: ripgrep the workspace, up to 40 hits.",
   "- list_files: list repository paths, optionally under one directory, up to 200.",
-  "- run_command: run one shell command and read its exit code and output tail.",
+  "- run_command: run one shell command and read its exit code and output tail. It reaches the public internet where the sandbox's network policy allows it; loopback, private ranges and cloud metadata addresses are refused.",
   "- git_history: the repository's real commit history, which the workspace snapshot does not have. Recent commits, the commits that touched one path, or one commit's message and diffs.",
   "- github_read: pull requests, issues, their comments, check runs and branches — the things the workspace cannot see. Read-only.",
   "- github_action: comment on an issue or pull request, open, close, reopen or label an issue, or merge a pull request. Only when the reader asked for that exact action in this conversation.",
@@ -103,8 +122,16 @@ export function buildRunSystemPrompt(input: {
   sha: string | null;
   tree: readonly string[];
   instructions: string | null;
+  /** Today, as YYYY-MM-DD. Defaults to the server's UTC date. */
+  today?: string;
 }): string {
-  const head = [RUN_IDENTITY, RUN_OPERATING_RULES, RUN_TOOLS_CLAUSE, RUN_UNTRUSTED_DATA_CLAUSE];
+  const head = [
+    RUN_IDENTITY,
+    runTimeClause(input.today ?? utcToday()),
+    RUN_OPERATING_RULES,
+    RUN_TOOLS_CLAUSE,
+    RUN_UNTRUSTED_DATA_CLAUSE,
+  ];
 
   const about =
     input.repo && input.sha
