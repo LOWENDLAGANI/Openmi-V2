@@ -37,7 +37,7 @@ import {
   checkRunQuota,
 } from "@/lib/runs/limits";
 import {
-  appendRunMessage,
+  appendRunMessages,
   createRun,
   readEventsSince,
   readQuota,
@@ -345,11 +345,25 @@ export async function POST(request: Request) {
     createdChat = true;
   }
 
-  const { data: chat, error } = await session.supabase
-    .from("chats")
-    .select("id, repo_full_name, repo_base_sha")
-    .eq("id", chatId)
-    .maybeSingle();
+  // The trial grant and the chat lookup are independent reads of two different
+  // tables, so they travel together: awaiting the grant first put a whole round
+  // trip between the request and the gate it feeds.
+  const sealKey = serverEnv().githubTokenKey;
+  const callerIp = requestIp(request.headers);
+
+  const trialGrant =
+    callerIp && sealKey
+      ? grantTrialCredit(admin, session.user.id, hashIp(callerIp, sealKey))
+      : Promise.resolve(0);
+
+  const [{ data: chat, error }] = await Promise.all([
+    session.supabase
+      .from("chats")
+      .select("id, repo_full_name, repo_base_sha")
+      .eq("id", chatId)
+      .maybeSingle(),
+    trialGrant,
+  ]);
 
   if (error) return json({ error: error.message }, 500);
   if (!chat) return json({ error: "That chat does not exist." }, 404);
@@ -360,16 +374,9 @@ export async function POST(request: Request) {
       : null;
   const sha = typeof chat.repo_base_sha === "string" ? chat.repo_base_sha : null;
 
-  const sealKey = serverEnv().githubTokenKey;
-
-  // Trial Credit is granted here, not at signup: this is the first point in the
-  // flow where the request has an address, and the grant is capped per address
-  // per day.
-  const callerIp = requestIp(request.headers);
-
-  if (callerIp && sealKey) {
-    await grantTrialCredit(admin, session.user.id, hashIp(callerIp, sealKey));
-  }
+  // Trial Credit is granted above, not at signup: this is the first point in
+  // the flow where the request has an address, and the grant is capped per
+  // address per day. It settles before the gate below reads the balance.
 
   // Charged once per running hour, and the database reuses a live hour, so a
   // second message inside it costs nothing. A refusal here happens before any
@@ -388,7 +395,12 @@ export async function POST(request: Request) {
   let userMessage = null;
 
   try {
-    userMessage = await appendMessage(session.supabase, chatId, "user", content, model);
+    // Writing the message and ageing out the account's leftover runs touch
+    // different rows; running them together saves a round trip on every send.
+    [userMessage] = await Promise.all([
+      appendMessage(session.supabase, chatId, "user", content, model),
+      settleStalledRuns(admin, session.user.id),
+    ]);
   } catch (caught) {
     return json(
       { error: caught instanceof Error ? caught.message : "The message was not saved." },
@@ -400,11 +412,12 @@ export async function POST(request: Request) {
 
   // A worker that died — or a deployment with no worker at all — leaves its run
   // in the one-live-run index, which would refuse every new chat with "you
-  // already have a run in progress" for good. Age the account's leftovers out
-  // before asking the quota, so a leftover is not a permanent lockout.
-  await settleStalledRuns(admin, session.user.id);
-
-  const quota = await readQuota(admin, session.user.id);
+  // already have a run in progress" for good. Its leftovers were aged out above,
+  // before the quota is asked, so a leftover is not a permanent lockout.
+  const [quota, transcript] = await Promise.all([
+    readQuota(admin, session.user.id),
+    listMessages(session.supabase, chatId),
+  ]);
   const decision = checkRunQuota(quota);
 
   if (!decision.allowed) {
@@ -415,7 +428,7 @@ export async function POST(request: Request) {
   }
 
   const runId = randomUUID();
-  const history = recentHistory(await listMessages(session.supabase, chatId));
+  const history = recentHistory(transcript);
 
   const queueRun = () =>
     createRun(admin, {
@@ -478,20 +491,23 @@ export async function POST(request: Request) {
     }
   }
 
+  // The conversation behind the message travels with the run: the worker builds
+  // its model call from these rows, so the answer remembers the chat without
+  // the chat route having to run anything. One call, in order — a call per row
+  // was up to twelve sequential round trips before the stream could open.
+  await appendRunMessages(
+    admin,
+    runId,
+    history.map((message) => ({ role: message.role, text: message.content }))
+  );
+
   // A worker on a host that sleeps without traffic does not know this row
   // exists until something reaches it, and nothing on this host does. One ping
   // per queued run is what makes the run start on its own instead of waiting
-  // for someone to open the worker's health URL.
+  // for someone to open the worker's health URL. It is sent after the history
+  // is written, so a woken worker cannot claim a run whose transcript is still
+  // arriving.
   wakeWorker();
-
-  // The conversation behind the message travels with the run: the worker builds
-  // its model call from these rows, so the answer remembers the chat without
-  // the chat route having to run anything.
-  for (const message of history) {
-    await appendRunMessage(admin, runId, message.role, {
-      text: message.content,
-    }).catch(() => null);
-  }
 
   const greeting = createdChat ? chatId : null;
 

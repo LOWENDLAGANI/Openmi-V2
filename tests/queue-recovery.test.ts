@@ -252,8 +252,10 @@ test("the app settles before queuing, and the read that drives the spinner agree
   const turn = read("app/api/chat/turn/route.ts");
 
   // Before the quota read — otherwise the leftover is what the quota counts.
-  const settleAt = chat.indexOf("await settleStalledRuns(admin, session.user.id)");
-  const quotaAt = chat.indexOf("const quota = await readQuota(admin, session.user.id)");
+  // It runs in the same batch as the message write, so the assertion is about
+  // order in the source, not about the exact statement it is nested in.
+  const settleAt = chat.indexOf("settleStalledRuns(admin, session.user.id)");
+  const quotaAt = chat.indexOf("readQuota(admin, session.user.id)");
   expect(settleAt).toBeGreaterThan(-1);
   expect(quotaAt).toBeGreaterThan(settleAt);
 

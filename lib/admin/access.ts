@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { isVerifiedAllowlistedAdmin } from "@/lib/admin/allowlist";
 import { syncAdminControl } from "@/lib/admin/control";
 import { adminPanelEnabled } from "@/lib/admin/switches";
-import { getSession } from "@/lib/session";
+import { getSession, type Session } from "@/lib/session";
 
 /**
  * Admin access is decided here, on the server, from two facts:
@@ -37,8 +37,11 @@ export type AdminAccess =
       via: "allowlist" | "role";
     };
 
-export async function readAdminAccess(): Promise<AdminAccess> {
-  const session = await getSession();
+export async function readAdminAccess(
+  /** A session the caller already resolved, so the page is not asked twice. */
+  existing?: Session
+): Promise<AdminAccess> {
+  const session = existing ?? (await getSession());
 
   // Before a configuration claim is read, so a deployment that is not set up
   // can still reach /setup — but before any identity is trusted.

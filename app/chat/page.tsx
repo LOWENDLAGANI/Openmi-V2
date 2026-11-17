@@ -344,11 +344,6 @@ async function RepoSurface({
 }
 
 async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
-  // An operator-only model is shown to an operator and to nobody else. The
-  // routes refuse it again; this is what keeps it out of a stranger's picker.
-  const access = await readAdminAccess();
-  const models = modelsForReader(modelCatalogue(), access.state === "admin");
-
   // The citation index is a GitHub round trip, so it is started before the
   // first await and settled alongside the database reads. Sequenced after them,
   // it added its whole latency to the transcript for no reason.
@@ -364,6 +359,11 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     profileResult,
     autoApproval,
     validPaths,
+    // An operator-only model is shown to an operator and to nobody else. The
+    // routes refuse it again; this is what keeps it out of a stranger's picker.
+    // It is read with the rest: waiting for it first serialised a whole round
+    // trip in front of every other read.
+    access,
   ] =
     await Promise.all([
     listMessages(session.supabase, chat.id),
@@ -402,7 +402,10 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .eq("branch", chat.repo_branch ?? "main")
       .maybeSingle(),
     citationPaths,
+    readAdminAccess(session),
   ]);
+
+  const models = modelsForReader(modelCatalogue(), access.state === "admin");
 
   const balances = (profileResult.data ?? {}) as {
     credit_balance?: number | string;
@@ -510,18 +513,33 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
  *
  * Failure is an empty list, not an error: a transcript whose citations stay
  * plain text is still a transcript, and a GitHub outage should not blank a
- * conversation that is already stored.
+ * conversation that is already stored. The same goes for a slow repository:
+ * the index is a convenience, so it is given a deadline and the transcript is
+ * drawn without it rather than waiting on GitHub for as long as it takes.
  */
+const CITATION_INDEX_MS = 1_000;
+
 async function readCitationPaths(
   session: SignedIn,
   fullName: string,
   sha: string
 ): Promise<string[]> {
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+
   try {
     const github = await readToken(session.supabase, session.user.id);
     if (!github) return [];
 
-    const tree = await getTree(github.token, fullName, sha);
+    const timeout = new Promise<null>((resolve) => {
+      deadline = setTimeout(() => resolve(null), CITATION_INDEX_MS);
+    });
+
+    const tree = await Promise.race([
+      getTree(github.token, fullName, sha),
+      timeout,
+    ]);
+
+    if (!tree) return [];
 
     return tree.entries
       .filter((entry) => entry.type === "blob")
@@ -529,45 +547,46 @@ async function readCitationPaths(
       .slice(0, MAX_PATH_INDEX);
   } catch {
     return [];
+  } finally {
+    if (deadline) clearTimeout(deadline);
   }
 }
 
 async function DraftChat({
   repo,
+  session,
 }: {
   repo: { fullName: string; branch: string; sha: string } | null;
+  /** Resolved by the page. Asking again here cost `getUser` and a profile read. */
+  session: SignedIn;
 }) {
-  const access = await readAdminAccess();
+  // The page already holds the session, so this is the operator check alone
+  // rather than a second auth round trip on the way to drawing a draft.
+  const access = await readAdminAccess(session);
   const models = modelsForReader(modelCatalogue(), access.state === "admin");
 
   // The composer offers a price before the chat exists, so it needs both
   // balances. Reading them here keeps the call site a repository and nothing
   // else, which is what the draft-chat test pins.
-  let credit = { balance: 0, wallet: 0 };
-  let paidActive = false;
-  const session = await getSession();
+  const { data } = await session.supabase
+    .from("profiles")
+    .select("credit_balance, wallet_credit, paid_until")
+    .eq("id", session.user.id)
+    .maybeSingle();
 
-  if (session.state === "signed-in") {
-    const { data } = await session.supabase
-      .from("profiles")
-      .select("credit_balance, wallet_credit, paid_until")
-      .eq("id", session.user.id)
-      .maybeSingle();
+  const row = (data ?? {}) as {
+    credit_balance?: number | string;
+    wallet_credit?: number | string;
+    paid_until?: string | null;
+  };
 
-    const row = (data ?? {}) as {
-      credit_balance?: number | string;
-      wallet_credit?: number | string;
-      paid_until?: string | null;
-    };
+  const credit = {
+    balance: Number(row.credit_balance ?? 0),
+    wallet: Number(row.wallet_credit ?? 0),
+  };
 
-    credit = {
-      balance: Number(row.credit_balance ?? 0),
-      wallet: Number(row.wallet_credit ?? 0),
-    };
-
-    const paidUntil = row.paid_until ?? null;
-    paidActive = paidUntil !== null && Date.parse(paidUntil) > Date.now();
-  }
+  const paidUntil = row.paid_until ?? null;
+  const paidActive = paidUntil !== null && Date.parse(paidUntil) > Date.now();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -622,11 +641,20 @@ export default async function ChatPage({
   const { supabase, user } = session;
   const trashView = params.trash === "1";
 
-  // The daily allowance is settled before anything is rendered, so the chip
-  // shows the balance the next turn will actually use.
-  await refillDailyCredit(supabase);
+  // The daily allowance is settled alongside the reads rather than in front of
+  // them. Awaiting it first held the sidebar, header and account bar behind a
+  // write none of them depend on; its return value is the post-refill balance,
+  // so the chip still shows exactly what the next turn will spend.
+  const refill = refillDailyCredit(supabase);
 
-  const [foldersResult, chatsResult, connection, profileResult, hourResult] = await Promise.all([
+  const [
+    foldersResult,
+    chatsResult,
+    connection,
+    profileResult,
+    hourResult,
+    refilledBalance,
+  ] = await Promise.all([
     supabase.from("folders").select("id, name, created_at").order("name"),
     supabase
       .from("chats")
@@ -648,11 +676,15 @@ export default async function ChatPage({
       .eq("owner", user.id)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle(),
+    refill,
   ]);
 
-  const creditBalance = Number(
-    (profileResult.data as { credit_balance?: number | string } | null)?.credit_balance ?? 0
-  );
+  const creditBalance =
+    refilledBalance ??
+    Number(
+      (profileResult.data as { credit_balance?: number | string } | null)
+        ?.credit_balance ?? 0
+    );
   const creditWallet = Number(
     (profileResult.data as { wallet_credit?: number | string } | null)?.wallet_credit ?? 0
   );
@@ -753,7 +785,7 @@ export default async function ChatPage({
   } else if (!connection) {
     body = <ConnectPanel oauthEnabled={oauthConfigured()} />;
   } else if (draft) {
-    body = <DraftChat repo={draftRepo} />;
+    body = <DraftChat repo={draftRepo} session={session} />;
   } else if (activeChat && (!workspaceView || filesView)) {
     // The conversation streams into a boundary of its own instead of holding
     // the page. Awaiting it here made every GitHub read part of the first byte:
@@ -773,7 +805,7 @@ export default async function ChatPage({
       </Suspense>
     );
   } else {
-    body = <DraftChat repo={latestRepo} />;
+    body = <DraftChat repo={latestRepo} session={session} />;
   }
 
   const banner =

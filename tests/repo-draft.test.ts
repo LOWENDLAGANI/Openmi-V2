@@ -25,7 +25,10 @@ test("a draft chat forwards its repository with the first message", () => {
 test("new chats inherit the repository the reader is looking at", () => {
   expect(PAGE).toContain("const draftRepo");
   expect(PAGE).toContain("const currentRepo");
-  expect(PAGE).toContain("<DraftChat repo={draftRepo} />");
+  expect(PAGE).toContain("<DraftChat");
+  expect(PAGE).toContain("repo={draftRepo}");
+  // The draft receives the page's session instead of resolving its own.
+  expect(PAGE).toContain("session={session}");
   expect(PAGE).toContain("repo={currentRepo}");
   expect(SIDEBAR).toContain("const newChatHref");
   expect(SIDEBAR).toContain("href={newChatHref}");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 
 import { parseBlocks, parseInline } from "@/lib/markdown";
 
@@ -212,8 +212,12 @@ function Heading({ level, text, known, repo, chatId }: {
  * Everything visible is text the page built: no markdown library, no raw HTML.
  * List markers and emphasis are consumed here rather than printed, which is why
  * a `*` bullet no longer reaches the reader as an asterisk.
+ *
+ * Memoised because a streaming answer re-renders the panel on every token: the
+ * transcript behind it parses the same unchanged content each time otherwise,
+ * which is what made a long conversation stutter while an answer arrived.
  */
-export function MessageBody({
+export const MessageBody = memo(function MessageBody({
   content,
   repo,
   validPaths,
@@ -320,4 +324,4 @@ export function MessageBody({
       })}
     </div>
   );
-}
+});

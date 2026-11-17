@@ -338,6 +338,33 @@ export async function appendRunMessage(
 }
 
 /**
+ * Appends a whole transcript in one call, in the order given.
+ *
+ * The chat route hands the worker the tail of the conversation before the run
+ * is queued. One call per row made that the longest stretch between a message
+ * being sent and its answer starting; `append_run_messages` numbers the rows in
+ * array order in a single round trip. Returns how many were written.
+ */
+export async function appendRunMessages(
+  admin: Client,
+  runId: string,
+  messages: Array<{ role: RunMessageRow["role"]; text: string }>
+): Promise<number> {
+  if (messages.length === 0) return 0;
+
+  const { data, error } = await admin.rpc("append_run_messages", {
+    p_run: runId,
+    p_messages: messages.map((message) => ({
+      role: message.role,
+      content: { text: message.text },
+    })),
+  });
+
+  if (error) return 0;
+  return typeof data === "number" ? data : 0;
+}
+
+/**
  * Starts one step, by compare-and-set on the run row.
  *
  * Null means the run is no longer running or was cancelled between steps. That
