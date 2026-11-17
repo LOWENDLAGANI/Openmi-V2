@@ -393,6 +393,18 @@ unavailable.
 Auto's own `gpt-oss-120b` entry in its free UnoRouter pool is a different id and
 is untouched by this.
 
+## Thinking effort
+
+DeepSeek V4.1 flash thinks before it answers, and how hard it thinks is the
+reader's call: **Fast** turns thinking off (`reasoning_effort: none`), **High** is
+the provider's own default, and **Max** is the deepest setting. The control
+appears with that model and nowhere else — a model whose vendor does not document
+an effort is never sent one, because a field a provider does not define is a 400
+rather than a preference. The choice travels with the message and is recorded on
+the run (`056_run_effort.sql`), so every step of one turn is paced the same way; a
+run with no recorded effort — one written before that migration — runs at the
+provider's default instead of an invented level.
+
 ## Premium models
 
 Claude Haiku 4.5 is served through Straitly and is part of the paid plan. An

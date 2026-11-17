@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ReasoningEffort } from "@/lib/models/effort";
+
 import type { RunEventRow } from "./events";
 import { RUN_STALE_AFTER_MS } from "./limits";
 
@@ -40,6 +42,14 @@ export type RunRow = {
   base_sha: string | null;
   prompt: string;
   model: string;
+  /**
+   * The thinking effort this turn asked for, for the model that takes one.
+   *
+   * Null is the provider's own default, not a missing decision: a row written
+   * before 056 ran — or by a model with no effort setting — reads as null and the
+   * worker applies the default rather than inventing a level.
+   */
+  effort: ReasoningEffort | null;
   status: RunStatus;
   stop_reason: string | null;
   error: string | null;
@@ -120,7 +130,7 @@ function normalizeRun(row: Record<string, unknown>): RunRow {
 }
 
 export const RUN_COLUMNS =
-  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, credit_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
+  "id, owner, chat_id, repo_full_name, base_sha, prompt, model, effort, status, stop_reason, error, sandbox_id, worker_id, steps, input_tokens, output_tokens, cost_usd, cancel_requested, credit_session_id, last_event_seq, created_at, started_at, heartbeat_at, ended_at";
 
 export async function createRun(
   admin: Client,
@@ -132,6 +142,8 @@ export async function createRun(
     baseSha: string | null;
     prompt: string;
     model: string;
+    /** The thinking effort the message asked for; null is the provider default. */
+    effort?: ReasoningEffort | null;
     /** Set by a chat turn: the hour that is refunded if the run fails. */
     creditSessionId?: string | null;
   }
@@ -146,6 +158,7 @@ export async function createRun(
       base_sha: input.baseSha,
       prompt: input.prompt,
       model: input.model,
+      effort: input.effort ?? null,
       credit_session_id: input.creditSessionId ?? null,
       status: "queued",
     })

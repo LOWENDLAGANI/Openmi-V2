@@ -18,11 +18,13 @@ import { MessageBody } from "@/components/MessageBody";
 import { PendingButton } from "@/components/PendingButton";
 import { showComposerAd } from "@/lib/ads";
 import {
+  DEFAULT_REASONING_EFFORT,
   modelHourCredit,
   modelName,
   modelRequiresPaid,
   type ModelCapability,
   type ModelId,
+  type ReasoningEffort,
 } from "@/lib/models";
 import type { AgentStep, Message } from "@/lib/types";
 
@@ -183,6 +185,11 @@ export function ChatPanel({
     toTranscript(initialMessages)
   );
   const [model, setModel] = useState<ModelId>(initialModel);
+  // The thinking effort the next message asks for. DeepSeek's own default, so a
+  // reader who never touches the control gets what the model would have done.
+  const [effort, setEffort] = useState<ReasoningEffort>(
+    DEFAULT_REASONING_EFFORT
+  );
   const [composer, setComposer] = useState<ComposerCommand>({ text: "", nonce: 0 });
   const [pending, setPending] = useState("");
   const [thinking, setThinking] = useState("");
@@ -568,6 +575,7 @@ export function ChatPanel({
                 chatId: activeChatId ?? undefined,
                 content,
                 model,
+                effort,
                 path: pinnedPath,
                 // A draft carries the repository it was started from, so the
                 // row is created with the pin instead of losing it.
@@ -1290,6 +1298,8 @@ export function ChatPanel({
               setModel(id as ModelId);
               setPaidGate(null);
             }}
+            effort={effort}
+            onEffortChange={setEffort}
             paidActive={paidActive}
             meter={meter}
             activeChatId={activeChatId}

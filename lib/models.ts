@@ -13,6 +13,19 @@
 
 import { CREDIT_PER_HOUR } from "./credits";
 
+// Thinking effort is its own vocabulary, shared by the picker and the worker, so
+// it lives in one pure module and is re-exported here for the components that
+// already import the catalogue.
+export {
+  DEFAULT_REASONING_EFFORT,
+  EFFORT_MODELS,
+  REASONING_EFFORTS,
+  effortOrDefault,
+  isReasoningEffort,
+  modelSupportsEffort,
+  type ReasoningEffort,
+} from "./models/effort";
+
 export type ModelId = string;
 
 export type ModelCategory = "general" | "coding" | "reasoning";

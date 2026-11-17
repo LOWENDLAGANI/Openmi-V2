@@ -11,6 +11,7 @@ import { AUTO_ROUTES, routeForModel } from "@/lib/models/routes";
 import { MAX_CHAIN_LENGTH, planChain } from "@/lib/routing/chain";
 import { classifyTask } from "@/lib/routing/classify";
 import { CREDIT_PER_HOUR } from "@/lib/credits";
+import { reasoningRequest, type ReasoningEffort } from "@/lib/models/effort";
 import {
   EmptyCompletionError,
   ProviderError,
@@ -56,6 +57,14 @@ export type Provider = {
    * is how a successful reply became "the provider returned an empty answer".
    */
   thinksByDefault?: boolean;
+  /**
+   * This vendor documents a thinking-effort setting for the model it serves.
+   *
+   * Only such a provider is ever sent `thinking` or `reasoning_effort`. A field
+   * a vendor does not define is a 400 at best and a different answer at worst,
+   * so the capability is declared here rather than assumed from the model name.
+   */
+  supportsEffort?: boolean;
 };
 
 export type ChatMessage = {
@@ -81,6 +90,7 @@ const STRAITLY: Provider = {
   model: "deepseek-v4-1-flash-1017",
   keyName: "STRAITLY_API_KEY",
   thinksByDefault: true,
+  supportsEffort: true,
 };
 
 const DEEPSEEK: Provider = {
@@ -90,6 +100,7 @@ const DEEPSEEK: Provider = {
   model: "deepseek-flash",
   keyName: "DEEPSEEK_API_KEY",
   thinksByDefault: true,
+  supportsEffort: true,
 };
 
 /**
@@ -556,12 +567,15 @@ export async function* streamChat({
   apiKeys,
   messages,
   tools,
+  effort,
   signal,
 }: {
   provider: Provider;
   apiKeys: string[];
   messages: WireMessage[];
   tools: AgentToolDefinition[];
+  /** The reader's thinking effort; null means the provider's own default. */
+  effort?: ReasoningEffort | null;
   signal: AbortSignal;
 }): AsyncGenerator<ChatEvent> {
   const keys = apiKeys.map((key) => key.trim()).filter((key) => key.length > 0);
@@ -581,6 +595,7 @@ export async function* streamChat({
         apiKey,
         messages,
         tools,
+        effort,
         signal,
       })) {
         produced = true;
@@ -605,12 +620,14 @@ async function* streamChatOnce({
   apiKey,
   messages,
   tools,
+  effort,
   signal,
 }: {
   provider: Provider;
   apiKey: string;
   messages: WireMessage[];
   tools: AgentToolDefinition[];
+  effort?: ReasoningEffort | null;
   signal: AbortSignal;
 }): AsyncGenerator<ChatEvent> {
   const response = await fetch(provider.endpoint, {
@@ -637,6 +654,10 @@ async function* streamChatOnce({
       stream: true,
       temperature: 0.2,
       max_tokens: completionBudget(provider),
+      // Only the vendor that documents an effort setting is sent one. `fast`
+      // turns thinking off; `high` and `max` name the level. A provider that has
+      // never heard of the field is handed a request it can validate.
+      ...(provider.supportsEffort && effort ? reasoningRequest(effort) : {}),
     }),
     signal,
   });

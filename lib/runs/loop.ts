@@ -10,6 +10,7 @@ import { refundReasonFor } from "@/lib/credits/refund";
 import { autoWriteEnabled } from "@/lib/github/autowrite";
 import { readToken } from "@/lib/github/token";
 import { AUTO_MODEL, type ModelId } from "@/lib/models";
+import { effortOrDefault, modelSupportsEffort } from "@/lib/models/effort";
 import {
   autoChain,
   providerKeys,
@@ -185,10 +186,18 @@ export async function executeRun(
   }, RUN_STREAM_HEARTBEAT_MS);
 
   try {
+    // The effort this turn asked for, for the one model that takes one. A row
+    // with none — an older run, or a model with no setting — is the provider's
+    // own default, never a level invented here.
+    const effort = modelSupportsEffort(run.model)
+      ? effortOrDefault(run.effort)
+      : null;
+
     await appendEvent(admin, runId, "run.started", {
       runId,
       model: run.model,
       agentId: RUN_AGENT_ID,
+      ...(effort ? { effort } : {}),
     });
 
     // The token is read in the worker, used once to fetch a tarball, and never
@@ -381,6 +390,7 @@ export async function executeRun(
             apiKeys: providerKeys(provider),
             messages,
             tools: RUN_TOOL_SPECS,
+            effort,
             signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
           })) {
             if (event.type === "text") {

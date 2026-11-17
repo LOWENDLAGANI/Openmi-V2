@@ -4,9 +4,16 @@ import { useEffect, useRef, useState } from "react";
 
 import { Beam } from "@/components/Beam";
 import { ContextCircle } from "@/components/ContextCircle";
+import { EffortMenu } from "@/components/EffortMenu";
 import { ModelMenu } from "@/components/ModelMenu";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
-import { modelHourCredit, type ModelCapability, type ModelId } from "@/lib/models";
+import {
+  modelHourCredit,
+  modelSupportsEffort,
+  type ModelCapability,
+  type ModelId,
+  type ReasoningEffort,
+} from "@/lib/models";
 
 /** How close to the server's cap the counter appears, so it is not noise. */
 const MESSAGE_WARN_CHARS = Math.floor(MAX_MESSAGE_CHARS * 0.9);
@@ -38,6 +45,8 @@ export function Composer({
   models,
   model,
   onModelChange,
+  effort,
+  onEffortChange,
   meter,
   activeChatId,
   paidActive,
@@ -51,6 +60,9 @@ export function Composer({
   models: ModelCapability[];
   model: ModelId;
   onModelChange: (id: string) => void;
+  /** The thinking effort the next message will ask for. */
+  effort: ReasoningEffort;
+  onEffortChange: (effort: ReasoningEffort) => void;
   meter: ContextMeter | null;
   activeChatId: string | null;
   /** Whether a paid pass is live; the picker marks the models that need one. */
@@ -99,12 +111,20 @@ export function Composer({
           reference parks its context ring there: a message field with four
           chips inside it stops reading as one field. */}
       <div className="mb-1 flex items-center justify-between gap-2 px-1">
-        <ModelMenu
-          models={models}
-          value={model}
-          onChange={(id) => onModelChange(id as ModelId)}
-          paidActive={paidActive}
-        />
+        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+          <ModelMenu
+            models={models}
+            value={model}
+            onChange={(id) => onModelChange(id as ModelId)}
+            paidActive={paidActive}
+          />
+
+          {/* Effort only exists where the provider documents it, so the control
+              appears with the model instead of sitting there doing nothing. */}
+          {modelSupportsEffort(model) && (
+            <EffortMenu value={effort} onChange={onEffortChange} />
+          )}
+        </div>
 
         <div className="flex min-w-0 items-center gap-1.5">
           {/* What the next message costs, so the price is never a surprise

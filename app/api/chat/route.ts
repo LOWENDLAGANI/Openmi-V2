@@ -20,10 +20,12 @@ import { isSameOrigin } from "@/lib/http/origin";
 import { appendMessage, listMessages, recentHistory } from "@/lib/messages";
 import {
   adminOnlyRefusal,
+  effortOrDefault,
   firstAvailableModel,
   hasModel,
   modelRequiresAdmin,
   modelRequiresPaid,
+  modelSupportsEffort,
   paidOnlyRefusal,
   type ModelId,
 } from "@/lib/models";
@@ -91,6 +93,8 @@ type ChatRequest = {
    * event and everything written during the handover is never delivered.
    */
   cursor?: unknown;
+  /** The thinking effort this message asked for, for the model that takes one. */
+  effort?: unknown;
   repo?: unknown;
   branch?: unknown;
   sha?: unknown;
@@ -266,6 +270,13 @@ export async function POST(request: Request) {
   const model: ModelId = hasModel(modelOptions, body.model)
     ? (body.model as string)
     : firstAvailableModel(modelOptions);
+
+  // The effort is the reader's choice for the model that takes one. A model with
+  // no effort setting records nothing, rather than a level that would never be
+  // sent and would make the row claim a decision nobody made.
+  const effort = modelSupportsEffort(model)
+    ? effortOrDefault(body.effort)
+    : null;
 
   // A paid-only model is judged before a chat row, an hour or a message exists:
   // a refused send costs nothing and leaves nothing behind. The hour trigger in
@@ -456,6 +467,7 @@ export async function POST(request: Request) {
       baseSha: sha,
       prompt: content,
       model,
+      effort,
       creditSessionId: credit.session.sessionId,
     });
 
