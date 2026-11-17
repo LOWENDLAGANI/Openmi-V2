@@ -31,6 +31,7 @@ test("the picker offers Auto and the one model this deployment serves", () => {
     "auto",
     "deepseek-flash",
     "claude-haiku",
+    "gpt-oss",
     "gpt-6-luna",
   ]);
   expect(DEFAULT_MODEL).toBe("deepseek-flash");
@@ -38,11 +39,13 @@ test("the picker offers Auto and the one model this deployment serves", () => {
     "Auto",
     "DeepSeek V4.1 flash",
     "Claude Haiku 4.5",
+    "GPT-OSS 120B",
     "GPT-6 Luna",
   ]);
   expect(modelName("auto")).toBe("Auto");
   expect(modelName("deepseek-flash")).toBe("DeepSeek V4.1 flash");
   expect(modelName("claude-haiku")).toBe("Claude Haiku 4.5");
+  expect(modelName("gpt-oss")).toBe("GPT-OSS 120B");
   expect(modelName("unknown-model")).toBe("unknown-model");
 
   // Auto is a real entry now; the retired concrete models are still gone.
@@ -153,6 +156,7 @@ test("the operator-only model is hidden from readers and refused on the server",
     "auto",
     "deepseek-flash",
     "claude-haiku",
+    "gpt-oss",
   ]);
   expect(modelsForReader(MODELS, true).map((model) => model.id)).toContain(
     "gpt-6-luna"

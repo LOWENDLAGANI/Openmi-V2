@@ -379,6 +379,20 @@ Nothing about a handover reaches the reader: no notice, no vendor name, no
 fails after text was written, the partial answer is kept and reported as partial;
 if none wrote anything, the last error is the turn's one failure.
 
+## Open-weight model
+
+GPT-OSS 120B (`gpt-oss` in the picker) is OpenAI's open-weight model, served
+strictly through Straitly under the upstream id `openai/gpt-oss-120b`. It is a
+single-provider route with no fallback: unlike Auto, it never quietly answers
+from a different model, because the reader chose this one. It is available to
+any account and its hour costs the catalogue default, 3 Credit — the price is
+written into `model_hour_credit` by `055_gpt_oss_model.sql`, so the picker and
+the charge agree. It needs `STRAITLY_API_KEY`; without it the entry is listed as
+unavailable.
+
+Auto's own `gpt-oss-120b` entry in its free UnoRouter pool is a different id and
+is untouched by this.
+
 ## Premium models
 
 Claude Haiku 4.5 is served through Straitly and is part of the paid plan. An

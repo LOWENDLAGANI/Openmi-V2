@@ -49,11 +49,11 @@ test("the documented Credit numbers are the exported constants", () => {
 });
 
 test("an hour is priced per model, and the database agrees with the catalogue", () => {
-  // 052 is the current definition: it lists the operator-only model beside the
-  // paid one and DeepSeek's 3. 051 added the paid model, 041 made Auto free, and
-  // 025/026 are history.
+  // 055 is the current definition: it lists GPT-OSS beside the operator-only
+  // model, the paid one and DeepSeek's 3. 052 added the gateway model, 051 the
+  // paid one, 041 made Auto free, and 025/026 are history.
   const migration = readFileSync(
-    new URL("../supabase/migrations/052_experiential_gateway.sql", import.meta.url),
+    new URL("../supabase/migrations/055_gpt_oss_model.sql", import.meta.url),
     "utf8"
   );
 

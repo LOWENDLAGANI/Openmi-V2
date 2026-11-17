@@ -134,6 +134,10 @@ export const BUILTIN_ROUTES: Record<string, ModelRoute> = {
   // The paid-only model. One provider, no fallback: a request that fails here
   // fails, rather than silently answering on something the reader did not buy.
   "claude-haiku": { provider: "straitly", upstream: "claude-haiku-4-5" },
+  // The open-weight GPT-OSS model, served only through Straitly. One provider
+  // and no fallback: the reader chose this model, and a quiet substitution is
+  // not it. Auto keeps its own `gpt-oss-120b` pool entry above, untouched.
+  "gpt-oss": { provider: "straitly", upstream: "openai/gpt-oss-120b" },
   // The operator-only model. Its id is the gateway's own model id, so the
   // upstream string is the same as the picker's — the gateway does the routing,
   // and there is no fallback to a model the operator did not choose.

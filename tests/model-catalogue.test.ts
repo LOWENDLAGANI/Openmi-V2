@@ -125,6 +125,23 @@ test("the paid-only model is one Straitly route, with no free fallback", () => {
   expect(AUTO_ROUTES["claude-haiku"]).toBeUndefined();
 });
 
+test("GPT-OSS is one Straitly route, and Auto keeps its open-weight pool", () => {
+  // The named model is served by Straitly and nothing else: the reader picked
+  // it, so a silent failover would answer from a model they did not choose.
+  expect(BUILTIN_ROUTES["gpt-oss"]).toEqual({
+    provider: "straitly",
+    upstream: "openai/gpt-oss-120b",
+  });
+
+  // Auto's UnoRouter pool has had its own gpt-oss entries all along; they are
+  // different ids and none of them is remapped by naming the model here.
+  expect(AUTO_ROUTES["gpt-oss-120b"]).toEqual({
+    provider: "openrouter",
+    upstream: "gpt-oss-120b:free",
+  });
+  expect(AUTO_ROUTES["gpt-oss"]).toBeUndefined();
+});
+
 test("the operator-only model is one Experiential route, at the gateway's own id", () => {
   // The gateway does the routing, so the picker id, the upstream id and the
   // gateway's model id are one string. No fallback: answering from another

@@ -110,6 +110,15 @@ export const MODELS: ModelCapability[] = [
     paidOnly: true,
   },
   {
+    id: "gpt-oss",
+    name: "GPT-OSS 120B",
+    category: "general",
+    blurb: "OpenAI's open-weight model, served through Straitly.",
+    images: false,
+    documents: false,
+    creditPerHour: 3,
+  },
+  {
     id: "gpt-6-luna",
     name: "GPT-6 Luna",
     category: "general",
