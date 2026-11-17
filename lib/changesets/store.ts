@@ -64,6 +64,17 @@ export type ReviewChangeset = ChangesetRow & { files: ChangesetFileRow[] };
 
 export const MAX_REVIEW_CARDS = 2;
 
+/**
+ * The statuses whose card has nothing left to ask.
+ *
+ * A card is a question: accept this, or apply it. Once the change has been
+ * written — or undone afterwards — the question is answered, and the transcript
+ * already carries the outcome as `changeset.applied`. Loading the row back would
+ * leave a "Proposed changes · Applied" card sitting above every later turn, so a
+ * published change is not read back at all.
+ */
+const SETTLED_STATUSES = '("committed","reverted")';
+
 type Failure = { ok: false; error: string };
 
 export async function createChangeset(
@@ -459,6 +470,9 @@ export async function loadChangesets(
       "id, status, base_sha, repo_full_name, expires_at, created_at, reviewed_at, branch_name, commit_sha, merge_commit_sha, reverted_commit_sha, pr_url, pr_number, failure"
     )
     .eq("chat_id", chatId)
+    // A published change is finished business; only the ones still waiting on the
+    // reader come back.
+    .not("status", "in", SETTLED_STATUSES)
     .order("created_at", { ascending: false })
     .limit(MAX_REVIEW_CARDS);
 
