@@ -63,7 +63,7 @@ export function PathFilter({
               <li key={path}>
                 <Link
                   href={hrefFor(path)}
-                  className="block truncate rounded-full px-3 py-1.5 font-mono text-[11px] text-body hover:bg-hover hover:text-hi"
+                  className="block truncate rounded-lg px-3 py-1.5 font-mono text-[11px] text-body hover:bg-hover hover:text-hi"
                 >
                   {path}
                 </Link>
