@@ -209,7 +209,7 @@ export function Workspace(props: WorkspaceProps) {
                 <li>
                   <Link
                     href={href(base, { dir: segments.slice(0, -1).join("/") })}
-                    className="block rounded-full px-3 py-1.5 font-mono text-[11.5px] text-low hover:bg-hover hover:text-hi"
+                    className="block rounded-lg px-3 py-1.5 font-mono text-[11.5px] text-low hover:bg-hover hover:text-hi"
                   >
                     ..
                   </Link>
@@ -224,7 +224,7 @@ export function Workspace(props: WorkspaceProps) {
                     <li key={entry.path}>
                       <Link
                         href={href(base, { dir: entry.path })}
-                        className="block truncate rounded-full px-3 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
+                        className="block truncate rounded-lg px-3 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
                       >
                         {entry.path.split("/").pop()}/
                       </Link>
@@ -234,7 +234,7 @@ export function Workspace(props: WorkspaceProps) {
                       <Link
                         href={href(base, { path: entry.path, dir })}
                         aria-current={path === entry.path ? "true" : undefined}
-                        className={`block truncate rounded-full px-3 py-1.5 text-[12px] hover:bg-hover hover:text-hi ${
+                        className={`block truncate rounded-lg px-3 py-1.5 text-[12px] hover:bg-hover hover:text-hi ${
                           path === entry.path
                             ? "bg-accent-soft font-medium text-hi"
                             : "text-body"
@@ -299,7 +299,7 @@ export function Workspace(props: WorkspaceProps) {
                           path: hit.path,
                           line: hit.line ? String(hit.line) : undefined,
                         })}
-                        className="block truncate rounded-full px-3 py-1.5 font-mono text-[11px] text-body hover:bg-hover hover:text-hi"
+                        className="block truncate rounded-lg px-3 py-1.5 font-mono text-[11px] text-body hover:bg-hover hover:text-hi"
                       >
                         {hit.path}
                         {hit.line ? `:${hit.line}` : ""}
