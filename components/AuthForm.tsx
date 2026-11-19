@@ -158,7 +158,7 @@ export function AuthForm({
       <div
         role="tablist"
         aria-label="Sign in or create an account"
-        className="grid grid-cols-2 gap-1 rounded-full bg-canvas p-1"
+        className="grid grid-cols-2 gap-1 rounded-xl bg-canvas p-1"
       >
         {(["signin", "signup"] as const).map((value) => (
           <button
@@ -171,7 +171,7 @@ export function AuthForm({
               setError(null);
               setNotice(null);
             }}
-            className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
+            className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
               mode === value
                 ? "bg-card text-hi shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
                 : "text-mid hover:text-hi"
