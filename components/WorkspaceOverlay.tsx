@@ -48,7 +48,7 @@ export function WorkspaceOverlay({
         role="dialog"
         aria-modal="true"
         aria-label="Workspace"
-        className="fade-in relative z-10 flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-canvas sm:max-h-[92vh] sm:max-w-6xl sm:flex-none sm:rounded-3xl sm:border sm:border-line sm:shadow-[0_24px_60px_-30px_rgba(17,24,39,0.45)]"
+        className="fade-in relative z-10 flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-canvas sm:max-h-[92vh] sm:max-w-6xl sm:flex-none sm:rounded-2xl sm:border sm:border-line sm:shadow-[0_24px_56px_-28px_rgba(17,24,39,0.4)]"
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2 md:px-6">
           <p className="eyebrow">workspace</p>
