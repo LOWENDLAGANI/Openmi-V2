@@ -163,7 +163,7 @@ export function CommandPalette() {
         role="dialog"
         aria-modal="true"
         aria-label="Search chats and messages"
-        className="animate-pop relative w-full max-w-xl overflow-hidden rounded-2xl border border-line-strong bg-card shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+        className="animate-pop relative w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_-20px_rgba(0,0,0,0.4)]"
       >
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <svg
@@ -211,7 +211,7 @@ export function CommandPalette() {
 
           {loading && <div className="skeleton size-4 rounded-full" />}
 
-          <kbd className="rounded border border-line-strong px-1.5 py-0.5 text-[9.5px] text-low">
+          <kbd className="rounded-md border border-line px-1.5 py-0.5 text-[9.5px] text-low">
             esc
           </kbd>
         </div>
@@ -251,7 +251,7 @@ export function CommandPalette() {
                     aria-selected={index === active}
                     onMouseEnter={() => setActive(index)}
                     onClick={() => choose(result)}
-                    className={`flex w-full items-start gap-2.5 rounded-xl px-3 py-2 text-left ${
+                    className={`flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left ${
                       index === active ? "bg-elevated" : "hover:bg-hover"
                     }`}
                   >
