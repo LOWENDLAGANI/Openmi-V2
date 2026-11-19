@@ -16,12 +16,12 @@ export function SearchLauncher() {
       onClick={() => window.dispatchEvent(new Event("openmi:search"))}
       aria-label="Search chats and messages"
       title="Search chats and messages (Ctrl+K)"
-      className="rail-icon grid size-10 place-items-center rounded-xl"
+      className="rail-icon grid size-9 place-items-center rounded-xl"
     >
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
-        className="size-[19px]"
+        className="size-[18px]"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.6"
