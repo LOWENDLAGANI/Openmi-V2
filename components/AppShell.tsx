@@ -54,7 +54,7 @@ export function AppShell({
       )}
 
       <main className="flex h-dvh min-w-0 flex-col md:h-full md:min-h-0">
-        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 py-2.5 backdrop-blur-xl md:px-7">
+        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
@@ -70,10 +70,10 @@ export function AppShell({
             </button>
 
             <div className="min-w-0">
-              <p className="text-[9.5px] text-low">
+              <p className="text-[10px] text-low">
                 {eyebrow}
               </p>
-              <h1 className="truncate text-[15px] font-medium tracking-[-0.02em] text-hi">
+              <h1 className="truncate text-[15px] font-semibold tracking-[-0.015em] text-hi">
                 {title}
               </h1>
             </div>
@@ -88,7 +88,7 @@ export function AppShell({
 
         {banner}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 md:px-7 md:pb-7">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 md:px-8 md:pb-8">
           {children}
         </div>
       </main>
