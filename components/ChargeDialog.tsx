@@ -83,14 +83,14 @@ export function ChargeDialog({
   return (
     <div
       ref={backdrop}
-      className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]"
     >
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby="charge-heading"
-        className="w-full max-w-sm rounded-3xl border border-line bg-card p-5 shadow-[0_28px_60px_-30px_rgba(0,0,0,0.65)]"
+        className="w-full max-w-sm rounded-2xl border border-line bg-card p-5 shadow-[0_24px_56px_-28px_rgba(0,0,0,0.5)]"
       >
         <h2
           id="charge-heading"
@@ -110,7 +110,7 @@ export function ChargeDialog({
               type="button"
               disabled={pending}
               onClick={onConfirm}
-              className="lift flex w-full items-center justify-between rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-left disabled:opacity-60"
+              className="flex w-full items-center justify-between rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-left transition-colors hover:bg-accent/15 disabled:opacity-60"
             >
               <span>
                 <span className="block text-[12.5px] font-semibold text-hi">
@@ -128,7 +128,7 @@ export function ChargeDialog({
             </button>
           </div>
         ) : (
-          <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3">
+          <div className="mt-4 rounded-xl border border-warn/30 bg-warn/8 px-4 py-3">
             <p className="text-[11.5px] leading-relaxed text-warn">
               Not enough Credit.
             </p>
