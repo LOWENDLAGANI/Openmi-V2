@@ -65,7 +65,7 @@ export function ThemeSwitcher({
         onClick={() => apply(next.id)}
         aria-label={`Theme: ${current.label}. Switch to ${next.label}`}
         title={`Theme: ${current.label} · switch to ${next.label}`}
-        className={`grid size-9 shrink-0 place-items-center rounded-full text-mid transition-colors hover:bg-hover hover:text-hi ${className}`}
+        className={`grid size-9 shrink-0 place-items-center rounded-xl text-mid transition-colors hover:bg-hover hover:text-hi ${className}`}
       >
         <svg
           aria-hidden="true"
@@ -86,7 +86,7 @@ export function ThemeSwitcher({
     <div
       role="group"
       aria-label="Theme"
-      className={`inline-flex items-center gap-1 rounded-full border border-line bg-card p-1 ${className}`}
+      className={`inline-flex items-center gap-0.5 rounded-xl border border-line bg-card p-0.5 ${className}`}
     >
       {THEMES.map((option) => {
         const active = option.id === theme;
@@ -98,7 +98,7 @@ export function ThemeSwitcher({
             onClick={() => apply(option.id)}
             aria-pressed={active}
             title={`${option.label} theme`}
-            className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[10.5px] transition-colors ${
+            className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10.5px] transition-colors ${
               active
                 ? "bg-elevated text-hi"
                 : "text-low hover:bg-hover hover:text-hi"
