@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { guestEnabled } from "./lib/guest";
+
 /**
  * A paint-saving gate, not an authorization decision.
  *
@@ -12,6 +14,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * (`@supabase/ssr`) instead of a bearer token held in JavaScript.
  */
 export function middleware(request: NextRequest) {
+  // TEMPORARY GUEST MODE — see lib/guest.ts. Remove before publishing.
+  if (guestEnabled()) return NextResponse.next();
+
   const hasSessionCookie = request.cookies
     .getAll()
     .some(

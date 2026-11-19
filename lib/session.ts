@@ -2,6 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
+import { guestEnabled, guestSession } from "./guest";
 import { supabaseServer } from "./supabase/server";
 
 export type Session =
@@ -37,6 +38,10 @@ export type Session =
  * that keys off an email — the admin allowlist first — reads both.
  */
 export async function getSession(): Promise<Session> {
+  // TEMPORARY GUEST MODE — see lib/guest.ts. Remove this branch before
+  // publishing; it is the only place a real session is bypassed.
+  if (guestEnabled()) return guestSession();
+
   const supabase = await supabaseServer();
   if (!supabase) return { state: "unconfigured" };
 

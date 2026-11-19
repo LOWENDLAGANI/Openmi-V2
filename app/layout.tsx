@@ -25,6 +25,7 @@ const instrument = Instrument_Sans({
 });
 
 import { AdBlockGate } from "@/components/AdBlockGate";
+import { guestEnabled } from "@/lib/guest";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NavProgress } from "@/components/NavProgress";
@@ -138,6 +139,13 @@ export default function RootLayout({
         <CommandPalette />
         <AdBlockGate />
         {children}
+        {guestEnabled() && (
+          <div className="pointer-events-none fixed inset-x-0 top-16 z-[95] flex justify-center">
+            <span className="rounded-full border border-warn/40 bg-warn-bg px-3 py-1 text-[11px] text-warn shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
+              Guest preview — nothing is saved
+            </span>
+          </div>
+        )}
         <ServiceWorker />
         <CookieConsent />
       </body>
