@@ -73,9 +73,9 @@ export function SandboxDock({
                 role="tab"
                 aria-selected={active}
                 onClick={() => setPicked(entry.id)}
-                className={`rounded-full px-2.5 py-1 text-[11.5px] transition-colors ${
+                className={`rounded-lg px-2.5 py-1.5 text-[11.5px] transition-colors ${
                   active
-                    ? "bg-raised font-medium text-hi"
+                    ? "bg-elevated font-medium text-hi shadow-[inset_0_0_0_1px_var(--line)]"
                     : "text-mid hover:bg-hover hover:text-hi"
                 }`}
               >
