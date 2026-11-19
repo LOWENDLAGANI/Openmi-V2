@@ -1238,7 +1238,7 @@ export function ChatPanel({
             {conflict.chatId && (
               <a
                 href={`/chat?chat=${conflict.chatId}`}
-                className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+                className="rounded-lg border border-warn/40 px-2.5 py-1 text-[11px] hover:bg-warn/10"
               >
                 Open that chat
               </a>
@@ -1247,7 +1247,7 @@ export function ChatPanel({
               onAction={() => endAndRetry(conflict)}
               disabled={streaming}
               pendingText="Ending…"
-              className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+              className="rounded-lg border border-warn/40 px-2.5 py-1 text-[11px] hover:bg-warn/10"
             >
               End session &amp; retry
             </PendingButton>
@@ -1271,7 +1271,7 @@ export function ChatPanel({
           <div className="flex items-center gap-2">
             <a
               href="/pay"
-              className="rounded-full border border-accent/40 px-2.5 py-0.5 text-[11px] text-accent-text hover:opacity-90"
+              className="rounded-lg border border-accent/40 px-2.5 py-1 text-[11px] text-accent-text hover:bg-accent/10"
             >
               See plans
             </a>
@@ -1299,7 +1299,7 @@ export function ChatPanel({
               onAction={retry}
               disabled={streaming}
               pendingText="Retrying…"
-              className="rounded-full border border-danger/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+              className="rounded-lg border border-danger/40 px-2.5 py-1 text-[11px] hover:bg-danger/10"
             >
               Retry
             </PendingButton>
