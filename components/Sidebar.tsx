@@ -135,7 +135,7 @@ export function Sidebar({
         >
           <OpenmiMark size={36} className="shrink-0" />
           <span className="min-w-0">
-            <span className="block truncate text-[23px] font-semibold leading-none tracking-[-0.045em] text-hi">
+            <span className="block truncate text-[20px] font-semibold leading-none tracking-[-0.03em] text-hi">
               Openmi
             </span>
           </span>
@@ -146,7 +146,7 @@ export function Sidebar({
         <Link
           href={newChatHref}
           aria-label="New chat"
-          className="rail-cta flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-medium text-hi"
+          className="rail-cta flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] font-medium text-hi"
         >
           <Glyph name="compose" className="size-[18px]" />
           New chat
@@ -173,34 +173,34 @@ export function Sidebar({
           href="/chat?view=repos"
           aria-label="Repositories"
           title="Repositories"
-          className="rail-icon grid size-10 place-items-center rounded-xl"
+          className="rail-icon grid size-9 place-items-center rounded-xl"
         >
-          <Glyph name="folder" className="size-[19px]" />
+          <Glyph name="folder" className="size-[18px]" />
         </Link>
         <Link
           href="/activity"
           aria-label="Activity"
           title="Activity"
-          className="rail-icon grid size-10 place-items-center rounded-xl"
+          className="rail-icon grid size-9 place-items-center rounded-xl"
         >
-          <Glyph name="clock" className="size-[19px]" />
+          <Glyph name="clock" className="size-[18px]" />
         </Link>
         <Link
           href="/pay"
           aria-label="Plans and receipts"
           title="Plans and receipts"
-          className="rail-icon grid size-10 place-items-center rounded-xl"
+          className="rail-icon grid size-9 place-items-center rounded-xl"
         >
-          <Glyph name="receipt" className="size-[19px]" />
+          <Glyph name="receipt" className="size-[18px]" />
         </Link>
         <Link
           href={trashView ? "/chat" : "/chat?trash=1"}
           aria-label={trashView ? "Back to chats" : `Trash, ${trashedCount} chat(s)`}
           title={trashView ? "Back to chats" : "Trash"}
           aria-current={trashView ? "page" : undefined}
-          className="rail-icon relative grid size-10 place-items-center rounded-xl"
+          className="rail-icon relative grid size-9 place-items-center rounded-xl"
         >
-          <Glyph name="trash" className="size-[19px]" />
+          <Glyph name="trash" className="size-[18px]" />
           {trashedCount > 0 && (
             <span className="pointer-events-none absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[8px] font-bold text-on-accent">
               {trashedCount > 99 ? "99+" : trashedCount}
@@ -236,7 +236,7 @@ export function Sidebar({
               ariaLabel="Sign out"
               title="Sign out"
               pendingText=""
-              className="rail-icon grid size-9 place-items-center rounded-full"
+              className="rail-icon grid size-9 place-items-center rounded-xl"
             >
               <Glyph name="signout" className="size-[18px]" />
             </SubmitButton>
