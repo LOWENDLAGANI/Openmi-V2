@@ -92,7 +92,7 @@ export function TrashList({ chats }: { chats: Chat[] }) {
                 <ConfirmSubmit
                   message="Permanently delete this chat and its messages?"
                   optimisticText="Deleted"
-                  className="rounded-full border border-danger/30 bg-danger/8 px-3 py-1 text-[11px] text-danger hover:opacity-90"
+                  className="rounded-lg border border-danger/30 bg-danger/8 px-3 py-1 text-[11px] text-danger transition-colors hover:brightness-110"
                 >
                   Delete forever
                 </ConfirmSubmit>
