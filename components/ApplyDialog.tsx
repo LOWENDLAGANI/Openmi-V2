@@ -90,7 +90,7 @@ export function ApplyDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="apply-heading"
-        className="w-full max-w-md rounded-3xl border border-line bg-card p-5 shadow-[0_28px_60px_-30px_rgba(0,0,0,0.65)]"
+        className="w-full max-w-md rounded-2xl border border-line bg-card p-5 shadow-[0_24px_56px_-28px_rgba(0,0,0,0.5)]"
       >
         <p className="eyebrow">one question</p>
         <h2
