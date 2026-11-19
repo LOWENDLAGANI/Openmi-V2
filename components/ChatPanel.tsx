@@ -1034,14 +1034,14 @@ export function ChatPanel({
     <div className="fade-in mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-card px-3 py-1">
+          <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <span
               aria-hidden="true"
               className={`size-1.5 shrink-0 rounded-full ${
                 repo ? "bg-accent" : "bg-line-strong"
               }`}
             />
-            <span className="truncate text-[11px] text-mid">
+            <span className="truncate text-[11.5px] text-mid">
               {repo ? repo.fullName : "no repository"}
             </span>
           </span>
@@ -1066,7 +1066,7 @@ export function ChatPanel({
             ref={heroRef}
             className="flex h-full flex-col items-center justify-center py-10 text-center"
           >
-            <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi" style={{ fontFamily: "var(--font-display)" }}>
+            <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.03em] text-hi" style={{ fontFamily: "var(--font-display)" }}>
               {(repo ? "What should Openmi do?" : "What are you building?")
                 .split(" ")
                 .map((word, index, words) => (
@@ -1088,7 +1088,7 @@ export function ChatPanel({
                   type="button"
                   onClick={() => beginSend(suggestion.prompt)}
                   disabled={streaming}
-                  className="motion-chip group flex items-center gap-2 rounded-full border border-line-strong bg-card px-4 py-2 text-[12px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
+                  className="motion-chip group flex items-center gap-2 rounded-xl border border-line bg-card px-3.5 py-2 text-[12px] text-mid shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-line-strong hover:bg-hover hover:text-hi"
                 >
                   <span
                     aria-hidden="true"
@@ -1207,7 +1207,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={jumpToLatest}
-              className="pointer-events-auto rounded-full border border-line-strong bg-card px-3 py-1 text-[11px] text-mid shadow-[0_8px_20px_rgba(0,0,0,0.22)] hover:text-hi"
+              className="pointer-events-auto rounded-full border border-line bg-card px-3 py-1.5 text-[11px] text-mid shadow-[0_10px_28px_rgba(0,0,0,0.14)] transition-colors hover:border-line-strong hover:text-hi"
             >
               {streaming ? "new output ↓" : "jump to end ↓"}
             </button>
@@ -1216,7 +1216,7 @@ export function ChatPanel({
       </div>
 
       {notices.length > 0 && (
-        <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2">
+        <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-card px-4 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
           {notices.map((notice, index) => (
             <li
               key={`${notice}-${index}`}
@@ -1231,7 +1231,7 @@ export function ChatPanel({
       {conflict && (
         <div
           role="alert"
-          className="mb-2 space-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] text-warn"
+          className="mb-2 space-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3 text-[11.5px] text-warn"
         >
           <p className="break-words leading-relaxed">{conflict.message}</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -1265,7 +1265,7 @@ export function ChatPanel({
       {paidGate && (
         <div
           role="alert"
-          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-hi"
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3 text-[12px] text-hi"
         >
           <span className="min-w-0 break-words">{paidGate}</span>
           <div className="flex items-center gap-2">
@@ -1289,7 +1289,7 @@ export function ChatPanel({
       {error && (
         <div
           role="alert"
-          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-3 text-[12px] text-danger"
         >
           <span className="min-w-0 break-words">
             <RetryNotice message={error} />
@@ -1307,7 +1307,7 @@ export function ChatPanel({
         </div>
       )}
 
-      <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2 md:-mx-7 md:px-7">
+      <div className="composer-dock -mx-4 mt-3 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-3 md:-mx-8 md:px-8">
         <div className="mx-auto w-full max-w-3xl">
           {showComposerAd(activeChatId) && (
             <div className="mb-1.5 flex justify-center">
