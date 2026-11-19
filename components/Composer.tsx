@@ -140,7 +140,7 @@ export function Composer({
                 : "Ask what to build, or attach a repository…"
               : "Chat is unavailable right now."
           }
-          className="composer-input max-h-[224px] min-h-[28px] w-full px-3.5 pb-1 pt-3 leading-6 focus:outline-none"
+          className="composer-input max-h-[224px] min-h-[52px] w-full px-3.5 pb-1 pt-3 leading-6 focus:outline-none"
         />
 
         <div className="flex items-end justify-between gap-2 px-2 pb-2 pt-1">
