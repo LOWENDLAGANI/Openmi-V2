@@ -1032,23 +1032,15 @@ export function ChatPanel({
 
   return (
     <div className="fade-in mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-            <span
-              aria-hidden="true"
-              className={`size-1.5 shrink-0 rounded-full ${
-                repo ? "bg-accent" : "bg-line-strong"
-              }`}
-            />
-            <span className="truncate text-[11.5px] text-mid">
-              {repo ? repo.fullName : "no repository"}
-            </span>
-          </span>
-
+      {/* The repository belongs under the greeting while the thread is empty, the
+          way the reference puts its project chip there. Once there is something
+          to read, it moves to the strip above the transcript so it stays
+          visible without pushing the conversation down. */}
+      {(messages.length > 0 || pending.length > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+          <RepoPill repo={repo} />
         </div>
-
-      </div>
+      )}
 
       <div
         ref={scrollRef}
@@ -1066,8 +1058,8 @@ export function ChatPanel({
             ref={heroRef}
             className="flex h-full flex-col items-center justify-center py-10 text-center"
           >
-            <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.03em] text-hi" style={{ fontFamily: "var(--font-display)" }}>
-              {(repo ? "What should Openmi do?" : "What are you building?")
+            <h2 className="text-[30px] font-normal leading-[1.15] tracking-[-0.02em] text-hi">
+              {(repo ? "What should Openmi build?" : "What can I help build?")
                 .split(" ")
                 .map((word, index, words) => (
                   <span key={`${word}-${index}`} className="motion-word inline-block">
@@ -1081,6 +1073,10 @@ export function ChatPanel({
                 ))}
             </h2>
 
+            <div className="mt-4">
+              <RepoPill repo={repo} />
+            </div>
+
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {suggestions.slice(0, 3).map((suggestion) => (
                 <button
@@ -1088,12 +1084,8 @@ export function ChatPanel({
                   type="button"
                   onClick={() => beginSend(suggestion.prompt)}
                   disabled={streaming}
-                  className="motion-chip group flex items-center gap-2 rounded-xl border border-line bg-card px-3.5 py-2 text-[12px] text-mid shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-line-strong hover:bg-hover hover:text-hi"
+                  className="motion-chip rounded-full bg-chip px-3.5 py-1.5 text-[12px] text-mid transition-colors hover:bg-hover hover:text-hi"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="size-1.5 rounded-full bg-accent/60 group-hover:bg-accent"
-                  />
                   {suggestion.label}
                 </button>
               ))}
@@ -1468,6 +1460,39 @@ function ShotStrip({ shots }: { shots: Shot[] }) {
         </figure>
       ))}
     </div>
+  );
+}
+
+/**
+ * The repository this conversation can see.
+ *
+ * In the empty state it is the project chip under the greeting; once the thread
+ * has messages it sits in the strip above the transcript. One component so the
+ * two placements cannot drift apart.
+ */
+function RepoPill({ repo }: { repo: { fullName: string } | null }) {
+  return (
+    <span
+      title={repo ? repo.fullName : "No repository attached to this chat"}
+      className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-full bg-chip px-3.5 py-2 text-[13px] text-mid"
+    >
+      <svg
+        aria-hidden="true"
+        focusable="false"
+        viewBox="0 0 24 24"
+        className="size-4 shrink-0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h3l1.6 2h8.4A1.5 1.5 0 0 1 20 9.5v8A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5Z" />
+      </svg>
+      <span className="truncate">
+        {repo ? repo.fullName : "No repository"}
+      </span>
+    </span>
   );
 }
 

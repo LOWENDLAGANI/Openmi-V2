@@ -140,10 +140,10 @@ export function Composer({
                 : "Ask what to build, or attach a repository…"
               : "Chat is unavailable right now."
           }
-          className="composer-input max-h-[224px] min-h-[52px] w-full px-3.5 pb-1 pt-3 leading-6 focus:outline-none"
+          className="composer-input max-h-[224px] min-h-[52px] w-full px-4 pb-1 pt-3.5 leading-6 focus:outline-none"
         />
 
-        <div className="flex items-end justify-between gap-2 px-2 pb-2 pt-1">
+        <div className="flex items-end justify-between gap-2 px-2.5 pb-2.5 pt-1">
           <div className="flex min-w-0 items-center gap-0.5 overflow-visible">
             <ModelMenu
               models={models}
@@ -212,14 +212,14 @@ export function Composer({
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`grid size-8 shrink-0 place-items-center rounded-xl transition-colors active:scale-[0.98] ${
-                canSend ? "bg-accent text-on-accent hover:brightness-110" : "send-idle"
+              className={`grid size-9 shrink-0 place-items-center rounded-full transition-colors active:scale-[0.98] ${
+                canSend ? "send-ready" : "send-idle"
               }`}
             >
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
-                className="size-4"
+                className="size-[18px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2.2"
