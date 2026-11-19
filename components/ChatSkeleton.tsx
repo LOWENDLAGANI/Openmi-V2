@@ -42,7 +42,7 @@ export function ChatSkeleton({
 
         {/* The composer's height is reserved, so the page does not jump when the
             real capsule replaces this block. */}
-        <div className="skeleton mt-auto h-28 w-full rounded-[28px] border border-line" />
+        <div className="skeleton mt-auto h-24 w-full rounded-2xl border border-line" />
       </div>
     </div>
   );
