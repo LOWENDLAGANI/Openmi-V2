@@ -17,6 +17,9 @@ import {
 /** How close to the server's cap the counter appears, so it is not noise. */
 const MESSAGE_WARN_CHARS = Math.floor(MAX_MESSAGE_CHARS * 0.9);
 
+/** The field stops growing here; past it the draft scrolls inside the card. */
+const MESSAGE_FIELD_MAX = 224;
+
 export type ContextMeter = {
   usedChars: number;
   budgetChars: number;
@@ -95,7 +98,7 @@ export function Composer({
     const element = textareaRef.current;
     if (!element) return;
     element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
+    element.style.height = `${Math.min(element.scrollHeight, MESSAGE_FIELD_MAX)}px`;
   }, [text]);
 
   // The count below is a warning, but the cap is the server's: sending past it
@@ -111,10 +114,12 @@ export function Composer({
   }
 
   return (
-    <form onSubmit={submit}>
-      {/* The field and its controls are one card, with the toolbar on the bottom
-          edge: the model, the effort and the send control belong to the box they
-          act on, not to a row of chips floating above it. */}
+    <form onSubmit={submit} className="w-full">
+      {/* The field and its controls are one owned surface, with the toolbar on
+          the bottom edge: the model, the effort and the send control belong to
+          the box they act on, not to a row of chips floating above it. The card
+          never changes shape — only its border and shadow answer hover and
+          focus — so a draft does not move under the reader. */}
       <div className="composer-card">
         <textarea
           ref={textareaRef}
@@ -135,11 +140,11 @@ export function Composer({
                 : "Ask what to build, or attach a repository…"
               : "Chat is unavailable right now."
           }
-          className="composer-input max-h-[168px] min-h-[56px] w-full px-3.5 pb-1 pt-3 text-[15px] leading-snug focus:outline-none"
+          className="composer-input max-h-[224px] min-h-[28px] w-full px-3.5 pb-1 pt-3 leading-6 focus:outline-none"
         />
 
-        <div className="flex items-center justify-between gap-2 px-2 pb-2">
-          <div className="flex min-w-0 items-center gap-1 overflow-visible">
+        <div className="flex items-end justify-between gap-2 px-2 pb-2 pt-1">
+          <div className="flex min-w-0 items-center gap-0.5 overflow-visible">
             <ModelMenu
               models={models}
               value={model}
@@ -155,7 +160,7 @@ export function Composer({
             )}
           </div>
 
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+          <div className="flex min-w-0 shrink-0 items-center gap-1">
             {/* What the next message costs, so the price is never a surprise
                 after the answer. */}
             <span
@@ -164,7 +169,7 @@ export function Composer({
                   ? "Every message in this chat is covered for the hour."
                   : "The hour starts when the first message sends."
               }
-              className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 text-[9.5px] text-low sm:inline-flex"
+              className="hidden items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[10px] text-low sm:inline-flex"
             >
               <span
                 aria-hidden="true"
@@ -192,7 +197,7 @@ export function Composer({
                 disabled={stopping}
                 aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
                 title={stopping ? "Stopping…" : "Stop"}
-                className="lift grid size-9 shrink-0 place-items-center rounded-xl border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
+                className="grid size-8 shrink-0 place-items-center rounded-xl border border-line-strong text-hi transition-colors hover:bg-hover active:scale-[0.98] disabled:opacity-60"
               >
                 <span
                   aria-hidden="true"
@@ -207,8 +212,8 @@ export function Composer({
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`lift grid size-9 shrink-0 place-items-center rounded-xl transition-colors ${
-                canSend ? "bg-accent text-on-accent" : "send-idle"
+              className={`grid size-8 shrink-0 place-items-center rounded-xl transition-colors active:scale-[0.98] ${
+                canSend ? "bg-accent text-on-accent hover:brightness-110" : "send-idle"
               }`}
             >
               <svg
@@ -233,7 +238,7 @@ export function Composer({
           The over-cap count sits on the same line: the send button refuses the
           message, so the number appears before the press, not as an error
           after it. */}
-      <div className="mt-1 flex items-center justify-between gap-2 px-2 text-[10px] text-low">
+      <div className="mt-1.5 flex items-center justify-between gap-2 px-1.5 text-[10px] text-low">
         <span className="hidden sm:inline">
           Enter to send · Shift + Enter for a new line
         </span>
