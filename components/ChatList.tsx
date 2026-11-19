@@ -117,7 +117,7 @@ function ChatRow({
         aria-current={active ? "page" : undefined}
         onClick={() => onOpen(chat.id)}
         title={chat.title}
-        className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-1"
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 pr-1"
       >
         <span
           className={`min-w-0 flex-1 truncate text-[13px] ${active ? "font-medium" : ""}`}
@@ -128,12 +128,12 @@ function ChatRow({
 
       <details className="relative shrink-0 pr-1.5">
         <summary
-          className="grid size-7 cursor-pointer list-none place-items-center rounded-full text-[14px] leading-none text-low opacity-0 transition-opacity hover:bg-canvas hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          className="grid size-6 cursor-pointer list-none place-items-center rounded-lg text-[14px] leading-none text-low opacity-0 transition-opacity hover:bg-hover hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
           aria-label={`Options for ${chat.title}`}
         >
           ⋯
         </summary>
-        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-line bg-card p-1.5 shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
+        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-60 rounded-2xl border border-line bg-card p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.18)]">
           <form action={rename} className="flex gap-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <input
@@ -242,7 +242,7 @@ export function ChatList({
       aria-label="Chats"
       className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3"
     >
-      <p className="px-3 pb-1.5 pt-2 text-[9.5px] text-low">
+      <p className="px-3 pb-1.5 pt-2 text-[10px] text-low">
         Chats
       </p>
 
@@ -270,10 +270,10 @@ export function ChatList({
 
         return (
           <details key={folder.id} open className="mt-1">
-            <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 hover:bg-hover">
+            <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-1.5 hover:bg-hover">
               <span
                 aria-hidden="true"
-                className="grid size-8 shrink-0 place-items-center text-low"
+                className="grid size-7 shrink-0 place-items-center text-low"
               >
                 <Glyph name="folder" />
               </span>
@@ -340,7 +340,7 @@ export function ChatList({
       })}
 
       <details className="mt-1">
-        <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 text-[12.5px] text-mid hover:bg-hover hover:text-hi">
+        <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-1.5 text-[12.5px] text-mid hover:bg-hover hover:text-hi">
           <span
             aria-hidden="true"
             className="grid size-8 shrink-0 place-items-center text-low"
