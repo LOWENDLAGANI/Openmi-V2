@@ -49,6 +49,7 @@ import { soft } from "@/lib/soft";
 import { filesEnabled } from "@/lib/files/plan";
 import { previewEnabled } from "@/lib/execution/preview/plan";
 import { RUN_HEARTBEAT_STALE_MS, RUN_QUEUE_WAIT_MS } from "@/lib/runs/limits";
+import { guestEnabled, guestModels } from "@/lib/guest";
 import { getSession } from "@/lib/session";
 import type { Chat, Folder } from "@/lib/types";
 
@@ -406,7 +407,9 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     soft(readAdminAccess(session), { state: "forbidden", email: null } as AdminAccess),
   ]);
 
-  const models = modelsForReader(modelCatalogue(), access.state === "admin");
+  const readerModels = modelsForReader(modelCatalogue(), access.state === "admin");
+  // TEMPORARY GUEST MODE — see lib/guest.ts. Presentation only.
+  const models = guestEnabled() ? guestModels(readerModels) : readerModels;
 
   const balances = (profileResult.data ?? {}) as {
     credit_balance?: number | string;
@@ -498,7 +501,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             initialMessages={messages}
             validPaths={validPaths}
             pinnedPath={null}
-            providerReady={providersConfigured()}
+            providerReady={providersConfigured() || guestEnabled()}
             initialRunning={Boolean(runningTurn.data)}
             paidActive={paidActive}
             credit={credit}
@@ -567,7 +570,9 @@ async function DraftChat({
     state: "forbidden",
     email: null,
   } as AdminAccess);
-  const models = modelsForReader(modelCatalogue(), access.state === "admin");
+  const readerModels = modelsForReader(modelCatalogue(), access.state === "admin");
+  // TEMPORARY GUEST MODE — see lib/guest.ts. Presentation only.
+  const models = guestEnabled() ? guestModels(readerModels) : readerModels;
 
   // The composer offers a price before the chat exists, so it needs both
   // balances. Reading them here keeps the call site a repository and nothing
@@ -604,7 +609,7 @@ async function DraftChat({
         initialMessages={[]}
         validPaths={[]}
         pinnedPath={null}
-        providerReady={providersConfigured()}
+        providerReady={providersConfigured() || guestEnabled()}
         initialRunning={false}
         paidActive={paidActive}
         credit={credit}
