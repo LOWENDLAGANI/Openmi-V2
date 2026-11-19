@@ -104,9 +104,19 @@ export function EffortMenu({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Thinking effort: ${current?.label ?? value}`}
-        className="model-pill lift max-w-[10.5rem] disabled:opacity-50"
+        className="model-pill max-w-[10.5rem] disabled:opacity-50"
       >
-        <span className="min-w-0 truncate text-[11px]">
+        {/* The same dial the reference uses for its thinking control: a clock
+            with its orbit dots, so effort reads as time spent thinking. */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="size-3.5 shrink-0 opacity-80"
+        >
+          <path d="M10.3857 2.50977C14.3486 2.71054 17.5 5.98724 17.5 10C17.5 14.1421 14.1421 17.5 10 17.5C5.85786 17.5 2.5 14.1421 2.5 10C2.5 9.72386 2.72386 9.5 3 9.5C3.27614 9.5 3.5 9.72386 3.5 10C3.5 13.5899 6.41015 16.5 10 16.5C13.5899 16.5 16.5 13.5899 16.5 10C16.5 6.5225 13.7691 3.68312 10.335 3.50879L10 3.5L9.89941 3.49023C9.67145 3.44371 9.5 3.24171 9.5 3C9.5 2.72386 9.72386 2.5 10 2.5L10.3857 2.50977ZM10 5.5C10.2761 5.5 10.5 5.72386 10.5 6V9.69043L13.2236 11.0527C13.4706 11.1762 13.5708 11.4766 13.4473 11.7236C13.3392 11.9397 13.0957 12.0435 12.8711 11.9834L12.7764 11.9473L9.77637 10.4473C9.60698 10.3626 9.5 10.1894 9.5 10V6C9.5 5.72386 9.72386 5.5 10 5.5ZM3.66211 6.94141C4.0273 6.94159 4.32303 7.23735 4.32324 7.60254C4.32324 7.96791 4.02743 8.26446 3.66211 8.26465C3.29663 8.26465 3 7.96802 3 7.60254C3.00021 7.23723 3.29676 6.94141 3.66211 6.94141ZM4.95605 4.29395C5.32146 4.29404 5.61719 4.59063 5.61719 4.95605C5.6171 5.3214 5.3214 5.61709 4.95605 5.61719C4.59063 5.61719 4.29403 5.32146 4.29395 4.95605C4.29395 4.59057 4.59057 4.29395 4.95605 4.29395ZM7.60254 3C7.96802 3 8.26465 3.29663 8.26465 3.66211C8.26446 4.02743 7.96791 4.32324 7.60254 4.32324C7.23736 4.32302 6.94159 4.0273 6.94141 3.66211C6.94141 3.29676 7.23724 3.00022 7.60254 3Z" />
+        </svg>
+        <span className="min-w-0 truncate text-[12px]">
           {current?.label ?? value}
         </span>
         <svg
@@ -139,7 +149,7 @@ export function EffortMenu({
               left: pos.left,
               zIndex: 100,
             }}
-            className="animate-pop max-h-[58vh] w-64 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.22)]"
+            className="animate-pop max-h-[58vh] w-[264px] max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.22)]"
           >
             <div className="pb-1 last:pb-0">
               <p className="eyebrow px-2.5 pb-1 pt-1.5">Thinking effort</p>
@@ -166,11 +176,11 @@ export function EffortMenu({
                   >
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[12px] font-medium">
+                        <span className="truncate text-[13px] font-semibold">
                           {option.label}
                         </span>
                       </span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-low">
+                      <span className="mt-0.5 block text-[11px] leading-snug text-low">
                         {option.blurb}
                       </span>
                     </span>
