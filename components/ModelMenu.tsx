@@ -110,9 +110,9 @@ export function ModelMenu({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Model: ${current?.name ?? value}`}
-        className="model-pill lift max-w-[10.5rem] disabled:opacity-50"
+        className="model-pill max-w-[10.5rem] disabled:opacity-50"
       >
-        <span className="min-w-0 truncate text-[11px]">
+        <span className="min-w-0 truncate text-[12px]">
           {current?.name ?? value}
         </span>
         {current?.paidOnly === true && !paidActive && (
@@ -150,7 +150,7 @@ export function ModelMenu({
               left: pos.left,
               zIndex: 100,
             }}
-            className="animate-pop max-h-[58vh] w-64 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.22)]"
+            className="animate-pop max-h-[58vh] w-[264px] max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.22)]"
           >
             {groups.map((group) => (
               <div key={group.id} className="pb-1 last:pb-0">
@@ -180,7 +180,7 @@ export function ModelMenu({
                     >
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
-                          <span className="truncate text-[12px] font-medium">
+                          <span className="truncate text-[13px] font-semibold">
                             {option.name}
                           </span>
                           {locked && (
@@ -189,7 +189,7 @@ export function ModelMenu({
                             </span>
                           )}
                         </span>
-                        <span className="mt-0.5 block text-[10px] leading-snug text-low">
+                        <span className="mt-0.5 block text-[11px] leading-snug text-low">
                           {locked
                             ? "Paid passes only"
                             : available
