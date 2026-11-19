@@ -38,8 +38,8 @@ export function ContextCircle({
   const usedTokens = estimateTokens(usedChars);
   const budgetTokens = estimateTokens(budgetChars);
 
-  const size = 26;
-  const stroke = 3;
+  const size = 22;
+  const stroke = 2.5;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -72,7 +72,7 @@ export function ContextCircle({
         aria-expanded={open}
         aria-label={`Context: ${percent}% of about ${budgetTokens.toLocaleString()} tokens used`}
         title={`About ${usedTokens.toLocaleString()} of ${budgetTokens.toLocaleString()} tokens of repository context`}
-        className="lift grid size-9 place-items-center rounded-full border border-line bg-card hover:border-line-strong"
+        className="grid size-8 shrink-0 place-items-center rounded-xl border border-line bg-card transition-colors hover:bg-hover active:scale-[0.98]"
       >
         <span className="relative grid place-items-center">
           <svg
@@ -105,7 +105,7 @@ export function ContextCircle({
               style={{ transition: "stroke-dashoffset 320ms ease-out" }}
             />
           </svg>
-          <span className="absolute font-mono text-[8.5px] leading-none text-mid">
+          <span className="absolute font-mono text-[8px] leading-none text-mid">
             {percent}
           </span>
         </span>
@@ -115,7 +115,7 @@ export function ContextCircle({
         <div
           role="group"
           aria-label="Context breakdown"
-          className="animate-pop absolute bottom-full right-0 z-40 mb-2 w-64 rounded-2xl border border-line-strong bg-card p-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.32)]"
+          className="animate-pop absolute bottom-full right-0 z-40 mb-2 w-[264px] rounded-2xl border border-line bg-card p-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.26)]"
         >
           <div className="flex items-baseline justify-between gap-2">
             <p className="eyebrow">context</p>
