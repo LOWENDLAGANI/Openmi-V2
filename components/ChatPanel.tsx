@@ -112,6 +112,13 @@ function toTranscript(rows: Message[]): UiMessage[] {
  * not stored yet is kept after the stored list.
  */
 function mergeTranscript(current: UiMessage[], stored: UiMessage[]): UiMessage[] {
+  // An empty list is not evidence that this tab's conversation is gone. The
+  // refresh after a send can be rendered while the page is still the draft (no
+  // chat id in the URL yet) or while its read is racing the write that stored
+  // the answer. Believing that empty list is what made a sent message vanish
+  // from the column until the chat was opened again from the sidebar.
+  if (stored.length === 0 && current.length > 0) return current;
+
   const storedIds = new Set(stored.map((message) => message.id));
 
   const kept = current.filter((message) => {
@@ -151,6 +158,23 @@ function mergeTranscript(current: UiMessage[], stored: UiMessage[]): UiMessage[]
   }
 
   return kept.length === 0 ? stored : [...stored, ...kept];
+}
+
+/**
+ * Adopts the URL of a chat this tab just created, without a server navigation.
+ *
+ * `router.replace()` is a page render: the transcript sits in a Suspense
+ * boundary, so the column is swapped for its skeleton while the new page
+ * resolves, the panel is remounted, and the answer that only this tab has seen
+ * is thrown away. The URL is all the reader needs to come back to the chat, so
+ * it is written straight into history and the panel keeps its state. The
+ * following `router.refresh()` then re-reads the stored rows into the same
+ * instance.
+ */
+function adoptChatUrl(chatId: string) {
+  const url = `/chat?chat=${encodeURIComponent(chatId)}`;
+  if (`${window.location.pathname}${window.location.search}` === url) return;
+  window.history.replaceState(null, "", url);
 }
 
 export function ChatPanel({
@@ -854,9 +878,7 @@ export function ChatPanel({
           // the answer is safe to re-read. Doing it mid-stream would replace
           // the page underneath the stream.
           if (createdChatRef.current) {
-            router.replace(`/chat?chat=${createdChatRef.current}`, {
-              scroll: false,
-            });
+            adoptChatUrl(createdChatRef.current);
             createdChatRef.current = null;
           }
 
@@ -981,7 +1003,7 @@ export function ChatPanel({
     if (!resuming && createdChatRef.current) {
       const id = createdChatRef.current;
       createdChatRef.current = null;
-      router.replace(`/chat?chat=${id}`, { scroll: false });
+      adoptChatUrl(id);
       router.refresh();
     }
   }
@@ -1364,21 +1386,22 @@ export function ChatPanel({
  * A row says what the step was for, in the model's own words: "install
  * dependencies", "Read lib/runs/tools.ts". The command and its output are one tap
  * away, because the reader who wants proof is not the reader who wants a
- * conversation. A live step shows its state; a stored one is already settled.
+ * conversation. Nothing opens on its own — the column belongs to the answer. A
+ * live step shows its state in the row; a stored one is already settled.
  */
 /**
  * The chain of thought, folded.
  *
  * A thinking model streams what it is weighing before it answers, on a channel
  * of its own. Printing it would put the working out into the conversation, so it
- * folds; dropping it would pretend the model does not think. A live block starts
- * open — the point of reading in real time is to see it think — and a stored one
- * opens on a tap. Neither renders as part of the answer.
+ * folds; dropping it would pretend the model does not think. Both a live block
+ * and a stored one are folded until they are asked for: a panel that opens
+ * itself pushes the answer the reader is waiting for out of the column. Neither
+ * renders as part of the answer.
  */
 function ThinkingBlock({ text, live = false }: { text: string; live?: boolean }) {
   return (
     <details
-      open={live ? true : undefined}
       className="mb-2 rounded-2xl border border-line bg-raised/60 px-3 py-1.5"
       data-live={live ? "true" : "false"}
     >
@@ -1395,15 +1418,18 @@ function ThinkingBlock({ text, live = false }: { text: string; live?: boolean })
 /**
  * One step, with its terminal.
  *
- * A step that ran a command opens with that command and its output in view.
- * The transcript is the only place the sandbox's work survives the turn, and a
- * row that folds itself shut the moment it completes is why a finished run
- * looked like it had done nothing. Collapsing stays the reader's call, and the
- * open state is local so a re-render does not force it back open.
+ * A step that ran a command keeps that command and its output behind the row,
+ * one tap away. The transcript is the only place the sandbox's work survives
+ * the turn, so the row never hides that it ran a command — it only stops the
+ * console from opening itself over the answer. The open state is local, so a
+ * re-render does not force a row shut once the reader has opened it.
  */
 function StepRow({ step }: { step: StepLine }) {
   const hasConsole = Boolean(step.command || step.output);
-  const [open, setOpen] = useState(hasConsole);
+  // Folded until the reader asks. A run with a few commands used to open every
+  // terminal by itself, so the progress console took the column while the
+  // answer was still being written.
+  const [open, setOpen] = useState(false);
 
   return (
     <li className="agent-step" data-state={step.state}>
