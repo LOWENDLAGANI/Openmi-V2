@@ -62,7 +62,7 @@ export function fitness(profile: ModelProfile, task: TaskKind): number {
   }
 
   // At most one point, so it can only order equals.
-  points += Math.min(profile.contextTokens, 1_100_000) / 1_100_000;
+  points += Math.min(profile.contextTokens, 2_000_000) / 2_000_000;
 
   return points;
 }

@@ -22,7 +22,7 @@ export const MISSION_MAX_COMMANDS = 200;
 export const MISSION_MAX_STEPS = 60;
 
 /** Tokens across the whole mission. */
-export const MISSION_MAX_TOKENS = 240_000;
+export const MISSION_MAX_TOKENS = 2_000_000;
 
 /** Output kept from one command. A mission is a stream, not an archive. */
 export const MISSION_MAX_OUTPUT_BYTES = 32_768;

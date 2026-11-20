@@ -11,7 +11,7 @@
 export const RUN_MAX_STEPS = 40;
 
 /** Estimated tokens one run may spend. `ceil(chars / 4)` is the estimate. */
-export const RUN_MAX_TOKENS = 120_000;
+export const RUN_MAX_TOKENS = 2_000_000;
 
 /** Wall clock, from claim to teardown. The sandbox is killed at the same edge. */
 export const RUN_WALL_CLOCK_MS = 15 * 60_000;
@@ -85,7 +85,7 @@ export const RUN_MAX_CONCURRENT = 1;
 export const RUN_DAILY_RUNS = 20;
 
 /** Tokens one account may spend per UTC day, across runs. */
-export const RUN_DAILY_TOKENS = 400_000;
+export const RUN_DAILY_TOKENS = 2_000_000;
 
 /**
  * A price per token, only so a run's cost can be charted. It is an estimate for
@@ -139,7 +139,7 @@ export const RUN_INSTRUCTIONS_MAX_CHARS = 8_000;
  * are dropped (never the system prompt or the first request) and the eviction
  * is reported, so nobody mistakes a compacted run for a complete one.
  */
-export const RUN_CONTEXT_WINDOW_TOKENS = 128_000;
+export const RUN_CONTEXT_WINDOW_TOKENS = 1_000_000;
 export const RUN_COMPACT_AT = 0.8;
 export const RUN_COMPACT_TARGET_CHARS = Math.floor(
   RUN_CONTEXT_WINDOW_TOKENS * RUN_COMPACT_AT * 4

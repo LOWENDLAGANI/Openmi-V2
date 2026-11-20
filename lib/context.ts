@@ -12,7 +12,7 @@
  * kept and the notes say why nothing else was added.
  */
 
-export const MAX_CONTEXT_CHARS = 60_000;
+export const MAX_CONTEXT_CHARS = 4_000_000;
 
 /**
  * Four characters per token is the rule-of-thumb English/code ratio every

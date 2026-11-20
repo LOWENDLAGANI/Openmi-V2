@@ -16,7 +16,7 @@ import { parseSealKey } from "../crypto";
  */
 
 export const MAX_STEPS = 40;
-export const MAX_TURN_TOKENS = 120_000;
+export const MAX_TURN_TOKENS = 2_000_000;
 export const TURN_TTL_MS = 30 * 60 * 1000;
 /** Leave room inside the function's 60s ceiling to write the answer down. */
 export const CONTINUE_AT_MS = 40_000;
