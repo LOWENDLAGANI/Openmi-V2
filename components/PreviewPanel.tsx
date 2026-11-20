@@ -8,10 +8,12 @@ import { useSnapBack } from "@/components/useOptimisticAction";
 /**
  * The app a chat is building, shown beside the transcript.
  *
- * Collapsed by default: a chat that is only reading code should not give up
- * half its height to an empty frame. The panel never invents a state — it
- * renders what the route reports, and a failed start shows the dev server's own
- * last lines rather than a guess about what went wrong.
+ * Collapsed by default, and it stays collapsed on its own initiative: a chat
+ * that is only reading code should not give up half its height to an empty
+ * frame, and a preview that comes up while the reader is elsewhere must not
+ * push the conversation aside. Only the toggle opens it. The panel never
+ * invents a state — it renders what the route reports, and a failed start shows
+ * the dev server's own last lines rather than a guess about what went wrong.
  *
  * The URL is a public sandbox host, and the note under the frame says so. A
  * preview that is quietly reachable by anyone is exactly the kind of claim this
@@ -71,7 +73,6 @@ export function PreviewPanel({
 
       setError(null);
       setStatus(body);
-      if (body.state === "ready") setOpen(true);
     } catch {
       setError("The preview state could not be read.");
     }
@@ -129,8 +130,6 @@ export function PreviewPanel({
         setError(body?.error ?? "The preview could not be changed.");
         snap();
       }
-
-      if (action === "start") setOpen(true);
     } catch {
       setError("The preview request did not reach the server.");
       snap();
