@@ -21,13 +21,9 @@ const SWITCH_MIGRATION = readFileSync(
   new URL("../supabase/migrations/021_drop_autopilot.sql", import.meta.url),
   "utf8"
 );
-// The remember control moved into the client apply card when the dialog arrived,
-// so this reads the component that now owns it rather than the panel that hosts
-// that component. The assertions below are unchanged.
-const PANEL = readFileSync(
-  new URL("../components/ApplyDialog.tsx", import.meta.url),
-  "utf8"
-);
+// The apply card and its dialog are gone: a turn writes its own change, so a
+// standing approval is only ever read by the server, never remembered from a
+// click. These assertions now read the actions and the module that own it.
 
 test("a standing approval is owner-scoped in the database", () => {
   expect(MIGRATION).toContain("branch_autoapprovals");
@@ -36,9 +32,7 @@ test("a standing approval is owner-scoped in the database", () => {
   expect(MIGRATION).toContain("primary key (owner, repo_full_name, branch)");
 });
 
-test("remembering is a choice on the approval card, and it can be turned off", () => {
-  expect(PANEL).toContain('name="remember"');
-  expect(PANEL).toContain("don&apos;t ask again");
+test("a standing approval is remembered by the server, and it can be turned off", () => {
   expect(ACTIONS).toContain("rememberAutoApproval");
   expect(ACTIONS).toContain("forgetBranchAutoApproval");
   expect(MODULE).toContain("readAutoApproval");
@@ -56,5 +50,5 @@ test("an agent turn ends at the card, where a standing approval can answer for i
 
 test("the autopilot switch is gone, and its behaviour is the default", () => {
   expect(SWITCH_MIGRATION).toContain("drop column if exists autopilot");
-  expect(PANEL).not.toContain("autopilot");
+  expect(ACTIONS).not.toContain("autopilot");
 });

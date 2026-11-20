@@ -363,20 +363,11 @@ test("the proposal layer never writes; the run does, from the signed changeset",
     new URL("../lib/runs/chat.ts", import.meta.url),
     "utf8"
   );
-  const panel = readFileSync(
-    new URL("../components/ReviewPanel.tsx", import.meta.url),
-    "utf8"
-  );
 
   // The run settles with a signed changeset, and writing it is one call in the
   // run loop rather than part of building the proposal.
   expect(worker).toContain("finalizeChangeset");
   expect(worker).not.toContain("approveChangesetAndOpenPullRequest");
-
-  // The card still offers the decision, which is what happens with
-  // OPENMI_AUTO_WRITE=off and after a write that could not finish.
-  expect(panel).toContain("<ApplyControl");
-  expect(panel).not.toContain("autoWrite");
 });
 
 // ── The migration ────────────────────────────────────────────────────────────

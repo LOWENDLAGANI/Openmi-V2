@@ -39,19 +39,14 @@ test("the loader returns a result, so success can be told from failure", () => {
   expect(source).toContain("Promise<ChangesetLoad>");
 });
 
-test("the chat page shows the read failure instead of nothing", () => {
+test("the chat page carries no review card above the transcript", () => {
   const source = page();
 
-  expect(source).toContain("proposals.error ?");
-  expect(source).toContain("role=\"alert\"");
-  expect(source).toContain("Your proposals could not be loaded.");
-  expect(source).toContain("{proposals.error}");
-});
-
-test("the page still renders the panel when there are proposals", () => {
-  const source = page();
-
-  expect(source).toContain("proposals.changesets.length > 0");
-  expect(source).toContain("<ReviewPanel");
-  expect(source).toContain("changesets={proposals.changesets}");
+  // The write is the run's, decided when the turn ends, and the transcript says
+  // what happened. There is no card to read and no read whose failure has to be
+  // reported in the column.
+  expect(source).not.toContain("<ReviewPanel");
+  expect(source).not.toContain("loadChangesets");
+  expect(source).not.toContain("proposals.error");
+  expect(source).toContain("<ChatPanel");
 });

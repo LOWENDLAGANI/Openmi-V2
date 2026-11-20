@@ -148,7 +148,4 @@ test("the run carries the model's choice into the write", () => {
   expect(commit).toContain("planWrite(");
   // Only a destination that asked for a merge merges.
   expect(commit).toContain("if (merge && outcome.prUrl");
-
-  const panel = read("components/ReviewPanel.tsx");
-  expect(panel).toContain("Pull request open");
 });

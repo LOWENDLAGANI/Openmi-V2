@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import {
   autoWriteEnabled,
@@ -11,7 +11,6 @@ const read = (path: string) =>
 
 const WORKER = read("lib/runs/loop.ts");
 const PROPOSAL = read("lib/runs/chat.ts");
-const PANEL = read("components/ReviewPanel.tsx");
 const ROUTE = read("app/api/chat/route.ts");
 
 test("auto-write is on unless an operator turns it off", () => {
@@ -57,11 +56,20 @@ test("the reader learns the outcome from the transcript, not a dialog", () => {
   expect(WORKER).toContain("changeset.applied");
   expect(WORKER).toContain("The change was not written");
   expect(ROUTE).toContain("changeset.applied");
-  expect(PANEL).toContain("Changes applied");
+  // The branch and the pull request arrive as a sentence in the conversation.
+  expect(ROUTE).toContain('send("notice", { message: summary })');
 });
 
-test("with auto-write off the card is still where the decision is made", () => {
-  expect(PANEL).toContain("<ApplyControl");
-  // The panel renders what is stored; it never reads the switch itself.
-  expect(PANEL).not.toContain("autoWrite");
+test("no review card or apply dialog stands between the turn and the write", () => {
+  // The chat is the interface: a signed change is written when the turn ends,
+  // so there is no card to accept and no dialog that asks a second time.
+  expect(existsSync(new URL("../components/ReviewPanel.tsx", import.meta.url))).toBe(
+    false
+  );
+  expect(existsSync(new URL("../components/ApplyDialog.tsx", import.meta.url))).toBe(
+    false
+  );
+  expect(existsSync(new URL("../components/ExecutionPanel.tsx", import.meta.url))).toBe(
+    false
+  );
 });
