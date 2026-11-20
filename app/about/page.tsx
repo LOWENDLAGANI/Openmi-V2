@@ -19,16 +19,16 @@ export const metadata = {
 };
 
 const DOES = [
-  "Reads repository files at a pinned commit through a GET-only GitHub client.",
+  "Reads repository files at the commit a chat is pinned to.",
   "Answers with path:line citations that are checked against the tree at that commit.",
-  "Proposes edits as per-file unified diffs; you accept or reject each file.",
-  `By default, writes a ready changeset to one branch named ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
-  "Runs commands in a disposable Linux sandbox when the deployment has an execution key, and reports the exit code it observed.",
+  "Writes edits as per-file unified diffs against the commit the chat is pinned to.",
+  `When a turn finishes with a change, writes it to one branch named ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
+  "When a turn runs in a sandbox, it can install dependencies, run a build and run commands you ask for in the chat's own Linux sandbox, and it reports the exit code it observed.",
   `Charges ${CREDIT_PER_HOUR} Credit for an hour of chat (nothing on Auto) before the provider is called, and records every change in a ledger.`,
 ];
 
 const DOES_NOT = [
-  "It does not run your test suite as a verification step. A verification run records an install or build and its exit code, and no card claims a test that did not run.",
+  "It does not run your test suite as a verification step. It can install or build in its sandbox and report the exit code it saw, and nothing claims a test that did not run.",
   "It does not write to the default branch unless you name it as the destination, or an operator enables default-branch writes for unattended runs.",
   "It does not force a branch update, merge a pull request it did not open, or clean up branches.",
   "It does not generate a project from nothing, and there is no guest mode.",
@@ -63,10 +63,9 @@ export default function AboutPage() {
       </h1>
       <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-mid">
         Openmi is a chat client welded to one GitHub repository. It reads the
-        code, answers with real paths and line numbers, and proposes edits for
-        you to review. A ready change is written to its own branch and applied
-        as a pull request; the default branch is only ever the base unless you
-        name it as the destination.
+        code, answers with real paths and line numbers, and writes the edits it
+        makes to a branch of its own, opening one pull request. The default
+        branch is only ever the base unless you name it as the destination.
       </p>
 
       <section className="mt-12 border-t border-line pt-6">
@@ -122,7 +121,7 @@ export default function AboutPage() {
             {AGENT_BRANCH_PREFIX}&lt;changeset-id&gt;
           </span>
           . The pull request targets the repository&apos;s default branch, and
-          approval squash-merges it. A branch you name is written directly, with
+          the turn squash-merges it. A branch you name is written directly, with
           no pull request; naming the default branch is how you ask for it to be
           written, and an operator can allow that for unattended runs. Any other
           name is checked against git&apos;s own branch rules before a request is
@@ -164,14 +163,14 @@ export default function AboutPage() {
 
       <section className="mt-12 rounded-2xl border border-line bg-card p-5 shadow-[inset_3px_0_0_var(--accent)]">
         <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-          What the review card states
+          What the transcript states
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          The review card states what the model proposed and what you approved.
-          If a sandbox run recorded an exit code, the card says what that
-          command did and nothing more. It never claims a test ran as a
-          verification step, because verification runs install and build only,
-          and a deployment it did not observe is never mentioned.
+          The transcript states what the turn did: the branch it wrote, the pull
+          request it opened or merged, and the exit code of any command it ran.
+          It never claims a test ran as a verification step, because it runs
+          installs and builds only, and a deployment it did not observe is never
+          mentioned. A turn that wrote nothing says so.
           The admin panel names the configuration that is missing instead of
           failing silently.
         </p>

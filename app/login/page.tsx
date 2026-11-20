@@ -61,8 +61,8 @@ export default async function LoginPage({
           </h1>
           <p className="mt-4 text-[13.5px] leading-[1.7] text-mid">
             Your chats, files and repository connection stay private to your
-            account. Changes arrive as their own branch and pull request, and
-            merging is yours to decide.
+            account. Changes arrive as their own branch and pull request, named
+            in the conversation.
           </p>
 
           <div className="rule my-8 max-w-sm" />

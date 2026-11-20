@@ -797,8 +797,9 @@ export function ChatPanel({
           return;
         }
 
-        // The review card is rendered on the server from the stored rows. The
-        // event is only a cue to re-read them; no card state is invented here.
+        // The workspace's published list is rendered on the server from the
+        // stored rows. The event is only a cue to re-read them; nothing is
+        // invented here.
         if (event === "changeset") {
           router.refresh();
           return;

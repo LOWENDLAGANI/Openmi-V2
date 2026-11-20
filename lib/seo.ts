@@ -32,10 +32,10 @@ export function siteUrl(): string {
 
 export const SITE_NAME = "Openmi";
 
-export const SITE_TITLE = "Openmi: your repository, with a reviewer built in";
+export const SITE_TITLE = "Openmi: a repository agent for GitHub";
 
 export const SITE_DESCRIPTION =
-  "Connect GitHub, pick a repository, and chat with a model that reads the code and proposes edits. Nothing is pushed until you approve.";
+  "Connect GitHub, pick a repository, and chat with a model that reads the code, answers with path and line citations, and writes the change to its own branch.";
 
 export const SITE_LOCALE = "en_US";
 

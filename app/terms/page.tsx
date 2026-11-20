@@ -60,7 +60,7 @@ const SECTIONS: LegalSection[] = [
     blocks: [
       {
         kind: "p",
-        text: "Openmi reads the repository you connect, answers with path and line citations, and proposes changes as per-file diffs. Where execution is enabled it can install dependencies, run a build, run commands you ask for inside a disposable Linux sandbox, and report the exit codes it observed. It does not run your test suite as a verification step, and the product does not claim a test, build, commit or deployment that was not observed.",
+        text: "Openmi reads the repository you connect, answers with path and line citations, and writes changes as per-file diffs to a branch of its own, opening one pull request. When a turn runs in a sandbox it can install dependencies, run a build and run commands you ask for inside that chat's Linux sandbox, and it reports the exit codes it observed. It does not run your test suite as a verification step, and the product does not claim a test, build, commit or deployment that was not observed.",
       },
       {
         kind: "p",
@@ -135,15 +135,15 @@ const SECTIONS: LegalSection[] = [
   },
   {
     id: "automation",
-    title: "8. Automatic changes and review",
+    title: "8. Automatic changes",
     blocks: [
       {
         kind: "p",
-        text: "By default a ready change is applied for you: it is written to its own branch, a pull request is opened, and the change is squash-merged, with the resulting commit recorded on the review card. A deployment can instead require your explicit approval before anything is written, in which case the card asks first.",
+        text: "A change is applied for you when the turn that made it finishes: it is written to its own branch, a pull request is opened, and the change is squash-merged, with the resulting branch and pull request named in the conversation. A turn that produced no change says so instead.",
       },
       {
         kind: "p",
-        text: "You can reject a pending change and undo an applied one. A change you name a destination for is written to that branch directly. Nothing is force-pushed, and a branch you did not name is never rewritten. You remain responsible for reviewing a change and for any consequence of applying it.",
+        text: "You can undo an applied change from the workspace. A change you name a destination for is written to that branch directly. Nothing is force-pushed, and a branch you did not name is never rewritten. You remain responsible for reviewing a change and for any consequence of applying it.",
       },
     ],
   },
@@ -283,7 +283,7 @@ export default function TermsPage() {
       eyebrow="legal"
       title="Terms of Service"
       updated={LAST_UPDATED}
-      intro="These terms govern your use of Openmi, an assistant that reads a repository you connect and proposes changes to it. By creating an account or using the service you agree to them. If you do not agree, do not use the service."
+      intro="These terms govern your use of Openmi, an assistant that reads a repository you connect and writes changes to it. By creating an account or using the service you agree to them. If you do not agree, do not use the service."
       sections={SECTIONS}
       contact={{
         title: "20. Contact",

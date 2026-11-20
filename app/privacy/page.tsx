@@ -32,7 +32,7 @@ const SECTIONS: LegalSection[] = [
         items: [
           "Account data. Your email address, the password hash stored by Supabase Auth, a profile row holding preferences such as timezone, and any invite code associated with your account.",
           "GitHub connection. The personal access token or OAuth grant you provide, sealed with AES-256-GCM before storage (only the last four characters are ever displayed back to you), your GitHub user id and username, the scopes you granted, and the repositories you select.",
-          "Content you submit. Chat messages and the answers to them, the repository and commit a chat is pinned to, the files the assistant reads, and the diffs or changesets it proposes.",
+          "Content you submit. Chat messages and the answers to them, the repository and commit a chat is pinned to, the files the assistant reads, and the diffs or changesets it writes.",
           "Execution records, where execution is enabled. Sandbox commands, exit codes, durations and output excerpts, screenshots the browser tool captures, checkpoints, and preview addresses.",
           "Billing records. Your Credit balance and the append-only ledger of charges, refunds, daily allowances, invite rewards and redeem codes; the plan receipts you upload and an operator’s decision on them.",
           "Technical data. A coarse country derived from request headers, used to show currency estimates; request metadata used to enforce rate limits; and error diagnostics.",

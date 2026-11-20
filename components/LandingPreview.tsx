@@ -1,3 +1,5 @@
+import { RUN_MAX_STEPS, RUN_MAX_TOKENS, RUN_WALL_CLOCK_MS } from "@/lib/runs/limits";
+
 /**
  * The product, drawn in HTML.
  *
@@ -38,14 +40,14 @@ const SIGN: Record<DiffLine["kind"], string> = {
 
 /**
  * A turn in the workspace: the question, the answer with its citation, the
- * tools it read, and the diff it proposed — the four things this product
+ * tools it read, and the branch it wrote — the four things this product
  * actually produces, in the order it produces them.
  */
 export function WorkspaceFrame() {
   return (
     <div
       role="img"
-      aria-label="The Openmi workspace. A question about the refund path, an answer citing lib/refunds.ts line 212, three read-only tools, and a proposed diff to lib/refunds.ts awaiting accept or reject."
+      aria-label="The Openmi workspace. A question about the refund path, an answer citing lib/refunds.ts line 212, the tools it read, and the change it wrote to openmi/agent/8f2c1d with one pull request opened."
       className="preview-frame"
     >
       <div aria-hidden="true" className="preview-bar">
@@ -153,13 +155,10 @@ export function WorkspaceFrame() {
 
           <div className="mt-2.5 flex items-center gap-1.5">
             <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-on-accent">
-              Accept file
-            </span>
-            <span className="rounded-full border border-line-strong px-2.5 py-1 text-[11px] text-mid">
-              Reject
+              Written to the branch
             </span>
             <span className="ml-auto hidden font-mono text-[10px] text-low sm:block">
-              1 of 3
+              PR #412 opened
             </span>
           </div>
         </div>
@@ -169,16 +168,19 @@ export function WorkspaceFrame() {
 }
 
 /**
- * What a turn is made of, tool by tool. The names are the four the agent
- * really has on a GitHub-only turn, and the sizes are the caps it really
- * enforces, so the card cannot drift into a nicer story than the product.
+ * What a turn is made of, tool by tool. The names are tools the agent really
+ * has, and the caps come from the same modules the run reads, so this card
+ * cannot drift into a nicer story than the product.
  */
 export function RunTrace() {
+  const minutes = Math.round(RUN_WALL_CLOCK_MS / 60_000);
+  const tokens = `${Math.round(RUN_MAX_TOKENS / 1_000_000)}M`;
+
   const steps = [
-    { tool: "list_files", arg: "≤ 200 paths", note: "the tree at the pin" },
-    { tool: "read_file", arg: "≤ 200 KB", note: "text only" },
-    { tool: "search_code", arg: "≤ 10 hits", note: "then reads the winner" },
-    { tool: "propose_edits", arg: "≤ 24 files", note: "as a unified diff" },
+    { tool: "read_file", arg: "≤ 400 lines", note: "one call, text only" },
+    { tool: "search_code", arg: "≤ 40 hits", note: "ripgrep in the workspace" },
+    { tool: "run_command", arg: "≤ 120 s", note: "exit code and output tail" },
+    { tool: "publish", arg: "one branch", note: "where the change is written" },
   ];
 
   return (
@@ -213,7 +215,7 @@ export function RunTrace() {
       </ol>
 
       <p className="mt-3 border-t border-line pt-2.5 font-mono text-[10.5px] text-low">
-        stops at 40 steps or 120k tokens
+        stops at {RUN_MAX_STEPS} steps, {tokens} tokens or {minutes} minutes
       </p>
     </div>
   );

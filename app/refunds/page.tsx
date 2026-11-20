@@ -51,7 +51,7 @@ const SECTIONS: LegalSection[] = [
           "Credit you have not spent, including a balance left when you stop using the service.",
           "Unused days on a pass, and a pass you decide not to use.",
           "An account you close, suspend or abandon, and a plan you no longer need.",
-          "A model answer you did not find useful, and a change you decided not to merge.",
+          "A model answer you did not find useful, and a change you undid after it was written.",
           "A price or allowance that changed after you bought, which applies to hours started after the change.",
         ],
       },

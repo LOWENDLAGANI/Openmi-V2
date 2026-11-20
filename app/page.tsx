@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Openmi: a repository agent for GitHub",
-  description: `Reads your code at a pinned commit, cites the file and line it used, and proposes the change as a diff you approve. ${CREDIT_PER_HOUR} Credit an hour, ${DAILY_FREE_CREDIT} free every day.`,
+  description: `Reads your code at a pinned commit, cites the file and line it used, and writes the change to its own branch. ${CREDIT_PER_HOUR} Credit an hour, ${DAILY_FREE_CREDIT} free every day.`,
   other: { "page-type": "software", "site-kind": "software" },
 };
 
@@ -49,22 +49,22 @@ const STEPS = [
   },
   {
     title: "Give it a goal",
-    body: "The model lists files, reads them and searches the tree through a GET-only client, and answers with a path and a line for every claim.",
+    body: "The model lists files, reads them and searches the workspace, and answers with a path and a line for every claim.",
   },
   {
-    title: "Review the diff",
-    body: "Each file arrives as a unified diff with three lines of context. Accept a file or reject it, then approve the set that is left.",
+    title: "Write the branch",
+    body: "Each file arrives as a unified diff against the pinned commit. When the turn ends the app writes the branch, opens one pull request and names both in the transcript.",
   },
 ];
 
 const LIMITS = [
   {
     title: "Run your test suite",
-    body: "A verification run records an install or a build and the exit code it saw. The card never claims a test that did not run.",
+    body: "A turn can install or build in its own sandbox and reports the exit code it saw. No test suite is run as a verification step, and nothing claims a test that did not run.",
   },
   {
     title: "Write your default branch",
-    body: "A change goes to openmi/agent/<id> unless you name the destination yourself. Approval opens one pull request.",
+    body: "A change goes to openmi/agent/<id> unless you name the destination yourself. One pull request is opened for it, and the default branch is only written when you ask.",
   },
   {
     title: "Force a branch",
@@ -131,8 +131,8 @@ export default async function HomePage() {
 
             <p className="mt-5 max-w-[54ch] text-pretty text-[15.5px] leading-[1.62] text-mid">
               It reads your code at a pinned commit, cites the file and line it
-              used, and writes the change to its own branch as a diff you
-              approve. Nothing reaches the default branch on its own.
+              used, and writes the change to its own branch. Nothing reaches the
+              default branch on its own.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -153,7 +153,7 @@ export default async function HomePage() {
                 See a turn run ↓
               </a>
               <span className="text-[12px] text-low">
-                No card. Sign in with GitHub.
+                No payment details. Sign in with GitHub.
               </span>
             </div>
 
@@ -190,9 +190,10 @@ export default async function HomePage() {
                 How a turn runs
               </h2>
               <p className="mt-4 max-w-[46ch] text-[14.5px] leading-[1.65] text-mid">
-                Four read-only tools and one that proposes text. The model never
-                holds your token: every GitHub request is built on the server
-                from the token and a path in the pinned tree.
+                Eleven tools over a sandbox seeded from the pinned commit, and a
+                turn that changes a file writes that change to its own branch.
+                The model never holds your token: every GitHub request is built
+                on the server from your sealed token.
               </p>
 
               <ol className="mt-8 border-y border-line">
@@ -237,9 +238,9 @@ export default async function HomePage() {
               What it will not do
             </h2>
             <p className="mt-4 max-w-[52ch] text-pretty text-[14.5px] leading-[1.65] text-mid">
-              The card states what was observed. Where it did nothing, it says
-              that too, which is the part worth reading before you connect a
-              repository.
+              The transcript states what was observed. Where it did nothing, it
+              says that too, which is the part worth reading before you connect
+              a repository.
             </p>
 
             <dl className="mt-10 grid gap-x-12 sm:grid-cols-2">

@@ -32,7 +32,7 @@ export async function AppliedChanges({
     <div className="fade-in">
       <p className="eyebrow px-3 pt-1">published to github</p>
       <p className="mt-1 px-3 pb-2 text-[11px] leading-relaxed text-mid">
-        Undo writes every accepted file back to its content before the change, as
+        Undo writes every changed file back to its content before the change, as
         a new commit on the default branch.
       </p>
 

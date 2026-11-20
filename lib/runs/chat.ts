@@ -23,8 +23,8 @@ import { RUN_WORKDIR } from "./tools";
  *
  *   1. the answer, appended to `messages` so the transcript is the same on every
  *      device and a closed tab loses nothing;
- *   2. the diff, proposed as a changeset so the review card and its
- *      "open a pull request" button keep working.
+ *   2. the diff, recorded as a signed changeset so the run loop can write it
+ *      to a branch when the turn is done.
  *
  * Both are best effort. A run that changed no files has nothing to review, and
  * a message that cannot be written is a failed decoration, not a failed run —

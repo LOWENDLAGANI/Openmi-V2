@@ -347,8 +347,8 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks:
-      "Writing a ready diff to its own branch and pull request without an approval click",
-    hint: 'Defaults to on; set to "off" to require the click on the review card',
+      "Writing a finished turn's change to its own branch and pull request",
+    hint: 'Defaults to on; set to "off" to record a change without writing it — there is no card to apply it from later',
   },
   {
     key: "OPENMI_SANDBOX_TURNS",
