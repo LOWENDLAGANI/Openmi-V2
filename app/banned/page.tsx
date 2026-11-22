@@ -10,14 +10,6 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-/**
- * Where a stopped account lands.
- *
- * It is a page rather than a redirect to sign-in because the cookie is valid:
- * the account is real and the stop is a decision, so the honest thing is to say
- * so — with the reason the operator wrote, and when it ends if it ends. Nothing
- * here links back into the product.
- */
 export default async function BannedPage() {
   const session = await getSession();
 
@@ -36,38 +28,40 @@ export default async function BannedPage() {
 
   return (
     <main className="animate-enter mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-      <p className="eyebrow">account suspended</p>
+      <div className="panel p-6">
+        <p className="text-[12px] font-medium text-danger">Account suspended</p>
 
-      <h1 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
-        This account has been stopped
-      </h1>
+        <h1 className="mt-1.5 text-[22px] font-semibold tracking-[-0.025em] text-hi">
+          This account has been stopped
+        </h1>
 
-      <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
-        {end
-          ? `Access is paused until ${end} UTC.`
-          : "Access is paused until an operator lifts it."}{" "}
-        Runs in progress were cancelled; your chats and files are still there.
-      </p>
-
-      {reason ? (
-        <p className="mt-5 rounded-2xl border border-line bg-card px-4 py-3 text-[13px] leading-relaxed text-mid">
-          <span className="text-[10px] text-low">
-            reason
-          </span>
-          <span className="mt-1 block text-hi">{reason}</span>
+        <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
+          {end
+            ? `Access is paused until ${end} UTC.`
+            : "Access is paused until an operator lifts it."}{" "}
+          Runs in progress were cancelled; your chats and files are still
+          preserved.
         </p>
-      ) : null}
 
-      <p className="mt-6 text-[12.5px] leading-relaxed text-low">
-        If you think this is a mistake, reply to the address you signed up with.
-      </p>
+        {reason ? (
+          <div className="mt-4 rounded-lg border border-line bg-raised px-3.5 py-2.5 text-[13px] leading-relaxed text-mid">
+            <span className="text-[11px] font-medium text-low">Reason</span>
+            <span className="mt-1 block text-hi">{reason}</span>
+          </div>
+        ) : null}
 
-      <Link
-        href="/privacy"
-        className="mt-6 text-[12px] text-low underline decoration-line-strong underline-offset-4 hover:text-mid"
-      >
-        Privacy
-      </Link>
+        <p className="mt-5 text-[12.5px] leading-relaxed text-low">
+          If you think this is a mistake, reply to the address you signed up
+          with.
+        </p>
+
+        <Link
+          href="/privacy"
+          className="mt-4 inline-block text-[12.5px] font-medium text-accent-text underline-offset-4 hover:underline"
+        >
+          Privacy policy
+        </Link>
+      </div>
     </main>
   );
 }

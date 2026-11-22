@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUp, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { ContextCircle } from "@/components/ContextCircle";
@@ -14,7 +15,6 @@ import {
   type ReasoningEffort,
 } from "@/lib/models";
 
-/** How close to the server's cap the counter appears, so it is not noise. */
 const MESSAGE_WARN_CHARS = Math.floor(MAX_MESSAGE_CHARS * 0.9);
 
 export type ContextMeter = {
@@ -23,22 +23,11 @@ export type ContextMeter = {
   notes: string[];
 };
 
-/**
- * A value handed to the composer: an edited message, or an empty field after a
- * send. `nonce` makes the same text count twice, because a second edit of the
- * same message still has to replace what is in the field.
- */
 export type ComposerCommand = { text: string; nonce: number };
 
 /**
- * The message field.
- *
- * The draft is state here rather than in `ChatPanel`, because a keystroke in a
- * field that lives in the transcript's component re-renders the transcript: on
- * a long chat that is hundreds of bubbles and syntax-highlighted blocks per
- * character, which is exactly the input delay web.dev's INP budget measures. The
- * parent still starts sends and hands in edited text; it just no longer renders
- * once per keystroke to do it.
+ * The message composer. Draft state lives locally so typing never re-renders
+ * the transcript above it.
  */
 export function Composer({
   models,
@@ -60,14 +49,11 @@ export function Composer({
   models: ModelCapability[];
   model: ModelId;
   onModelChange: (id: string) => void;
-  /** The thinking effort the next message will ask for. */
   effort: ReasoningEffort;
   onEffortChange: (effort: ReasoningEffort) => void;
   meter: ContextMeter | null;
   activeChatId: string | null;
-  /** The repository this chat is pinned to, for the placeholder. */
   repo?: string | null;
-  /** Whether a paid pass is live; the picker marks the models that need one. */
   paidActive: boolean;
   streaming: boolean;
   stopping: boolean;
@@ -76,21 +62,16 @@ export function Composer({
   onSend: (content: string) => void;
   onStop: () => void;
 }) {
-  // Named in the placeholder: a field that says what it can see invites a
-  // question it can answer, and a blank "Ask anything" invites one it cannot.
   const repoName = repo ? (repo.split("/").pop() ?? repo) : null;
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Adopt whatever the parent handed in, and focus the field it landed in.
   useEffect(() => {
     if (command.nonce === 0) return;
     setText(command.text);
     textareaRef.current?.focus();
   }, [command]);
 
-  // A composer that grows with the question instead of showing a scrollbar
-  // after two lines.
   useEffect(() => {
     const element = textareaRef.current;
     if (!element) return;
@@ -98,11 +79,9 @@ export function Composer({
     element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
   }, [text]);
 
-  // The count below is a warning, but the cap is the server's: sending past it
-  // is refused after the field has already been cleared, which loses the draft
-  // a reader spent minutes writing. The button refuses it first.
   const tooLong = text.length > MAX_MESSAGE_CHARS;
   const canSend = !streaming && !tooLong && text.trim().length > 0;
+  const hourCost = modelHourCredit(model, models);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,9 +91,6 @@ export function Composer({
 
   return (
     <form onSubmit={submit}>
-      {/* The field and its controls are one card, with the toolbar on the bottom
-          edge: the model, the effort and the send control belong to the box they
-          act on, not to a row of chips floating above it. */}
       <div className="composer-card">
         <textarea
           ref={textareaRef}
@@ -135,11 +111,11 @@ export function Composer({
                 : "Ask what to build, or attach a repository…"
               : "Chat is unavailable right now."
           }
-          className="composer-input max-h-[168px] min-h-[56px] w-full px-3.5 pb-1 pt-3 text-[15px] leading-snug focus:outline-none"
+          className="composer-input max-h-[168px] min-h-[56px] w-full px-3.5 pb-1.5 pt-3 text-[14.5px] leading-snug focus:outline-none"
         />
 
-        <div className="flex items-center justify-between gap-2 px-2 pb-2">
-          <div className="flex min-w-0 items-center gap-1 overflow-visible">
+        <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
+          <div className="flex min-w-0 items-center gap-1.5 overflow-visible">
             <ModelMenu
               models={models}
               value={model}
@@ -147,34 +123,27 @@ export function Composer({
               paidActive={paidActive}
             />
 
-            {/* Effort only exists where the provider documents it, so the
-                control appears with the model instead of sitting there doing
-                nothing. */}
             {modelSupportsEffort(model) && (
               <EffortMenu value={effort} onChange={onEffortChange} />
             )}
           </div>
 
           <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-            {/* What the next message costs, so the price is never a surprise
-                after the answer. */}
             <span
               title={
                 activeChatId !== null
                   ? "Every message in this chat is covered for the hour."
                   : "The hour starts when the first message sends."
               }
-              className="hidden items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 text-[9.5px] text-low sm:inline-flex"
+              className="hidden rounded-md border border-line bg-raised px-2 py-1 font-mono text-[10.5px] tabular-nums text-low sm:inline-flex"
             >
-              <span
-                aria-hidden="true"
-                className={`size-1 rounded-full ${
-                  activeChatId !== null ? "bg-accent" : "bg-line-strong"
-                }`}
-              />
               {activeChatId !== null
-                ? `hour · ${modelHourCredit(model, models)} credit`
-                : "pay on send"}
+                ? hourCost === 0
+                  ? "free turn"
+                  : `${hourCost} credit / hr`
+                : hourCost === 0
+                  ? "auto · free"
+                  : `${hourCost} credit on send`}
             </span>
 
             {meter && (
@@ -192,13 +161,11 @@ export function Composer({
                 disabled={stopping}
                 aria-label={stopping ? "Stopping the turn" : "Stop the turn"}
                 title={stopping ? "Stopping…" : "Stop"}
-                className="lift grid size-9 shrink-0 place-items-center rounded-xl border border-line-strong text-hi hover:bg-hover disabled:opacity-60"
+                className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-strong bg-card text-hi transition-colors hover:bg-hover disabled:opacity-60"
               >
-                <span
+                <Square
                   aria-hidden="true"
-                  className={`size-3 rounded-[3px] bg-current ${
-                    stopping ? "animate-blink" : ""
-                  }`}
+                  className={`size-3.5 fill-current ${stopping ? "animate-blink" : ""}`}
                 />
               </button>
             )}
@@ -207,44 +174,30 @@ export function Composer({
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`lift grid size-9 shrink-0 place-items-center rounded-xl transition-colors ${
-                canSend ? "bg-accent text-on-accent" : "send-idle"
+              className={`grid size-8 shrink-0 place-items-center rounded-lg transition-colors ${
+                canSend
+                  ? "bg-accent text-on-accent hover:opacity-95"
+                  : "send-idle"
               }`}
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="size-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 19V5M6 11l6-6 6 6" />
-              </svg>
+              <ArrowUp aria-hidden="true" className="size-4" strokeWidth={2.25} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* The keyboard convention is stated once, where it is used, and hidden
-          on a touch layout where Enter is a newline and only the button sends.
-          The over-cap count sits on the same line: the send button refuses the
-          message, so the number appears before the press, not as an error
-          after it. */}
-      <div className="mt-1 flex items-center justify-between gap-2 px-2 text-[10px] text-low">
+      <div className="mt-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-low">
         <span className="hidden sm:inline">
-          Enter to send · Shift + Enter for a new line
+          Enter to send · Shift + Enter for new line
         </span>
         {text.length > MESSAGE_WARN_CHARS && (
           <span
-            className={`ml-auto tabular-nums ${
+            className={`ml-auto font-mono tabular-nums ${
               text.length > MAX_MESSAGE_CHARS ? "text-danger" : "text-low"
             }`}
           >
             {text.length.toLocaleString()} /{" "}
-            {MAX_MESSAGE_CHARS.toLocaleString()} characters
+            {MAX_MESSAGE_CHARS.toLocaleString()} chars
           </span>
         )}
       </div>

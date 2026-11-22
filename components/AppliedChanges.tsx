@@ -1,17 +1,8 @@
+import { ExternalLink, GitCommit } from "lucide-react";
+
 import { undoChangeset } from "@/app/chat/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { loadAppliedChangesets } from "@/lib/changesets/store";
-
-/**
- * Undo, where it can be found.
- *
- * The applied review card is no longer rendered: a change that reached the
- * repository has nothing left to decide, and the transcript already says it was
- * written. Undo was the one thing on that card still worth a click, so the rows
- * it acted on are listed here, in the workspace dialog. The write behind the
- * button is unchanged — `lib/changesets/undo.ts` re-checks ownership, the merge
- * commit and the not-already-undone rule before GitHub is touched.
- */
 
 type Reader = Parameters<typeof loadAppliedChangesets>[0];
 
@@ -29,26 +20,28 @@ export async function AppliedChanges({
   const { changesets, error } = await loadAppliedChangesets(supabase, chatId);
 
   return (
-    <div className="fade-in">
-      <p className="eyebrow px-3 pt-1">published to github</p>
-      <p className="mt-1 px-3 pb-2 text-[11px] leading-relaxed text-mid">
-        Undo writes every changed file back to its content before the change, as
-        a new commit on the default branch.
-      </p>
+    <div className="fade-in panel overflow-hidden">
+      <div className="border-b border-line bg-raised px-4 py-3">
+        <p className="text-[13px] font-semibold text-hi">Published to GitHub</p>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-mid">
+          Undo writes every changed file back to its prior content as a new
+          commit on the default branch.
+        </p>
+      </div>
 
       {error ? (
         <p
           role="alert"
-          className="border-t border-line px-3 py-2 text-[11px] leading-relaxed text-danger"
+          className="px-4 py-3 text-[12px] leading-relaxed text-danger"
         >
           The published changes could not be read: {error}
         </p>
       ) : changesets.length === 0 ? (
-        <p className="border-t border-line px-3 py-2 text-[11px] leading-relaxed text-mid">
+        <p className="px-4 py-4 text-[12.5px] leading-relaxed text-mid">
           Nothing published from this chat yet.
         </p>
       ) : (
-        <ul className="divide-y divide-line border-t border-line">
+        <ul className="divide-y divide-line">
           {changesets.map((change) => {
             const sha = change.merge_commit_sha ?? change.commit_sha ?? "";
             const branch = change.branch_name ?? "the default branch";
@@ -56,15 +49,16 @@ export async function AppliedChanges({
             return (
               <li
                 key={change.id}
-                className="flex flex-wrap items-center gap-2 px-3 py-2"
+                className="flex flex-wrap items-center gap-2.5 px-4 py-3"
               >
-                <span className="font-mono text-[10.5px] text-low">
+                <GitCommit aria-hidden="true" className="size-3.5 shrink-0 text-low" strokeWidth={1.75} />
+                <span className="rounded-md border border-line bg-raised px-1.5 py-0.5 font-mono text-[11px] text-mid">
                   {sha.slice(0, 7)}
                 </span>
-                <span className="min-w-0 truncate font-mono text-[11.5px] text-hi">
+                <span className="min-w-0 truncate font-mono text-[12px] font-medium text-hi">
                   {branch}
                 </span>
-                <span className="text-[10.5px] text-low">
+                <span className="font-mono text-[11px] text-low">
                   {stamp(change.created_at)}
                 </span>
 
@@ -74,9 +68,10 @@ export async function AppliedChanges({
                       href={`https://github.com/${change.repo_full_name}/commit/${sha}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10.5px] text-accent-text underline-offset-2 hover:underline"
+                      className="btn px-2.5 py-1 text-[11.5px]"
                     >
-                      View
+                      <span>View</span>
+                      <ExternalLink aria-hidden="true" className="size-3" strokeWidth={1.75} />
                     </a>
                   )}
 
@@ -84,7 +79,7 @@ export async function AppliedChanges({
                     <input type="hidden" name="changesetId" value={change.id} />
                     <input type="hidden" name="chatId" value={chatId} />
                     <SubmitButton
-                      className="btn px-2 py-0.5 text-[10.5px]"
+                      className="btn px-2.5 py-1 text-[11.5px]"
                       optimisticText="Undoing…"
                     >
                       Undo

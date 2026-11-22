@@ -1,19 +1,9 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-/**
- * The repository browser as a dialog, opened from the header button.
- *
- * It used to be a page: `?view=files` replaced the conversation with the file
- * tree and the code view, so opening a citation meant leaving the chat you were
- * reading. Here the chat stays mounted underneath and the tree arrives in a
- * layer of its own, closed with the button, Escape or the backdrop.
- *
- * Closing replaces the history entry rather than pushing one, so Back returns
- * to wherever the reader came from instead of reopening the panel.
- */
 export function WorkspaceOverlay({
   closeHref,
   children,
@@ -36,7 +26,7 @@ export function WorkspaceOverlay({
   }, [closeHref, router]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black/45 p-0 sm:items-center sm:justify-center sm:p-6">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black/50 p-0 backdrop-blur-[2px] sm:items-center sm:justify-center sm:p-6">
       <button
         type="button"
         aria-label="Close workspace"
@@ -48,16 +38,17 @@ export function WorkspaceOverlay({
         role="dialog"
         aria-modal="true"
         aria-label="Workspace"
-        className="fade-in relative z-10 flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-canvas sm:max-h-[92vh] sm:max-w-6xl sm:flex-none sm:rounded-3xl sm:border sm:border-line sm:shadow-[0_24px_60px_-30px_rgba(17,24,39,0.45)]"
+        className="fade-in relative z-10 flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-canvas sm:max-h-[92vh] sm:max-w-6xl sm:flex-none sm:rounded-xl sm:border sm:border-line-strong sm:shadow-[0_28px_72px_rgba(0,0,0,0.45)]"
       >
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2 md:px-6">
-          <p className="eyebrow">workspace</p>
+        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-line bg-raised px-4 md:px-6">
+          <p className="text-[12.5px] font-semibold text-hi">Workspace</p>
           <button
             type="button"
             onClick={() => router.replace(closeHref)}
-            className="btn px-3 py-1 text-[11.5px]"
+            className="btn gap-1.5 px-2.5 py-1 text-[12px]"
           >
-            Close
+            <X aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+            <span>Close</span>
           </button>
         </div>
 

@@ -1,3 +1,4 @@
+import { FolderGit2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -87,22 +88,23 @@ function Panel({
 }) {
   return (
     <div className="mx-auto max-w-md py-20 text-center">
-      <p className="eyebrow">stop</p>
-      <h2 className="mt-2 text-[19px] font-semibold tracking-[-0.02em] text-hi">{title}</h2>
-      <p className="mt-2 text-[13px] leading-relaxed text-mid">{message}</p>
-      {href && action && (
-        <Link href={href} className="btn mt-6">
-          {action}
-        </Link>
-      )}
+      <div className="panel p-6">
+        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-hi">{title}</h2>
+        <p className="mt-2 text-[13px] leading-relaxed text-mid">{message}</p>
+        {href && action && (
+          <Link href={href} className="btn mt-5">
+            {action}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
 
 function TokenForm() {
   return (
-    <form action={connectGithub} className="panel mt-4 space-y-3 p-4">
-      <label htmlFor="github-token" className="eyebrow block px-1">
+    <form action={connectGithub} className="panel mt-4 space-y-3 p-5">
+      <label htmlFor="github-token" className="block text-[12.5px] font-medium text-body">
         Personal access token
       </label>
       <input
@@ -113,7 +115,7 @@ function TokenForm() {
         autoComplete="off"
         spellCheck={false}
         placeholder="github_pat_… or ghp_…"
-        className="field py-2.5 text-[12px]"
+        className="field py-2 font-mono text-[12.5px]"
       />
       <SubmitButton
         className="btn btn-primary w-full py-2.5 text-[13px]"
@@ -128,49 +130,50 @@ function TokenForm() {
 
 function ConnectPanel({ oauthEnabled }: { oauthEnabled: boolean }) {
   return (
-    <div className="mx-auto w-full max-w-xl py-8">
-      <p className="eyebrow">step one</p>
-      <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-hi">
-        Connect GitHub
-      </h2>
+    <div className="mx-auto w-full max-w-xl py-10">
+      <div className="panel p-6 sm:p-7">
+        <p className="text-[12px] font-medium text-accent-text">Step 1 · GitHub</p>
+        <h2 className="mt-1.5 text-[22px] font-semibold tracking-[-0.025em] text-hi">
+          Connect GitHub
+        </h2>
 
-      {oauthEnabled ? (
-        <>
-          <p className="mt-3 text-[13px] leading-relaxed text-mid">
-            Authorise Openmi on GitHub once. GitHub asks for the{" "}
-            <span className="text-[11.5px] text-hi">repo</span> scope
-            — read and write access to your repositories — because that is what
-            opening a pull request needs. The grant is sealed on our server, not
-            kept in your browser, and you can revoke it from GitHub at any time.
-          </p>
+        {oauthEnabled ? (
+          <>
+            <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
+              Authorise Openmi on GitHub once. GitHub requests the{" "}
+              <code className="rounded bg-raised px-1.5 py-0.5 font-mono text-[12px] text-hi">
+                repo
+              </code>{" "}
+              scope so Openmi can read your codebase and open pull requests. The
+              grant stays sealed on the server and can be revoked on GitHub at
+              any time.
+            </p>
 
-          <a
-            href="/auth/github"
-            className="btn btn-primary mt-5 w-full py-2.5 text-[13px]"
-          >
-            Continue with GitHub
-          </a>
-          <p className="mt-2 text-center text-[10px] text-low">
-            nothing to copy or paste
-          </p>
+            <a
+              href="/auth/github"
+              className="btn btn-primary mt-5 w-full py-2.5 text-[13px]"
+            >
+              Continue with GitHub
+            </a>
 
-          <details className="mt-6">
-            <summary className="cursor-pointer text-[12px] font-medium text-mid hover:text-hi">
-              Use a personal access token instead
-            </summary>
+            <details className="mt-5 border-t border-line pt-4">
+              <summary className="cursor-pointer text-[12.5px] font-medium text-mid hover:text-hi">
+                Use a personal access token instead
+              </summary>
+              <TokenForm />
+            </details>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
+              Paste a fine-grained token with contents, pull requests, and
+              metadata access. It is sealed with AES-256-GCM on the server, and
+              only its last four characters are ever displayed again.
+            </p>
             <TokenForm />
-          </details>
-        </>
-      ) : (
-        <>
-          <p className="mt-3 text-[13px] leading-relaxed text-mid">
-            Paste a fine-grained token with contents, pull requests and metadata
-            access. It is sealed with AES-256-GCM on the server, and only its
-            last four characters are ever shown again.
-          </p>
-          <TokenForm />
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -271,14 +274,13 @@ async function RepoSurface({
     }
 
     return (
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="mx-auto w-full max-w-3xl py-4">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-5">
           <div>
-            <p className="eyebrow">pick a repository</p>
-            <h2 className="mt-1.5 text-[24px] font-semibold tracking-[-0.02em] text-hi">
-              One chat, one repository.
+            <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-hi">
+              Select a repository
             </h2>
-            <p className="mt-2 text-[10.5px] text-low">
+            <p className="mt-1.5 font-mono text-[11.5px] text-low">
               @{github.connection.login} ·{" "}
               {github.connection.scopes.length > 0
                 ? github.connection.scopes.join(", ")
@@ -291,7 +293,7 @@ async function RepoSurface({
             <ConfirmSubmit
               message="Disconnect GitHub? The sealed token is deleted, an OAuth grant is revoked on GitHub, and the workspace stops reading repositories."
               optimisticText="Disconnected"
-              className="btn px-3 py-1.5 text-[11.5px]"
+              className="btn px-3 py-1.5 text-[12px]"
             >
               Disconnect
             </ConfirmSubmit>
@@ -426,16 +428,15 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {!repo && (
-        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-[11.5px] text-mid">
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-line-strong" />
-          No repository attached.
+        <div className="mx-auto mb-3 flex w-full max-w-3xl flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-[12px] text-mid">
+          <span>No repository attached to this thread.</span>
           <Link
             href={`/chat?chat=${chat.id}&view=repos`}
             className="font-medium text-accent-text hover:underline"
           >
-            Pick one
+            Attach repository
           </Link>
-        </p>
+        </div>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -817,9 +818,10 @@ export default async function ChatPage({
           {activeChat?.repo_full_name && activeChat.repo_base_sha && (
             <Link
               href={`/chat?chat=${activeChat.id}&repo=${encodeURIComponent(activeChat.repo_full_name)}&branch=${encodeURIComponent(activeChat.repo_branch ?? "")}&sha=${activeChat.repo_base_sha}&view=files`}
-              className="btn px-3 py-1.5 text-[11.5px]"
+              className="btn px-2.5 py-1.5 text-[12px]"
             >
-              Workspace
+              <FolderGit2 aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              <span>Workspace</span>
             </Link>
           )}
 

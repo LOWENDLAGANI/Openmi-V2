@@ -1,26 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 
-import { Fraunces, Instrument_Sans } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
-const fraunces = Fraunces({
+const geistSans = Geist({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-geist-sans",
   display: "swap",
-  axes: ["opsz"],
 });
 
-/**
- * The landing page's text face.
- *
- * The app keeps the operating system's own face so it reads as a native
- * window; the front door gets a grotesque with a little more character, which
- * is what stops a marketing page looking like a settings screen. One extra
- * file, one variable, and only `.lp` uses it.
- */
-const instrument = Instrument_Sans({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-instrument",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -107,7 +98,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f8f9fa",
+  themeColor: "#fafafa",
 };
 
 /**
@@ -130,7 +121,7 @@ export default function RootLayout({
         <script src="/theme-boot.js" />
       </head>
       <body
-        className={`${fraunces.variable} ${instrument.variable} app-surface min-h-dvh bg-canvas text-body antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-canvas text-body antialiased`}
       >
         <Suspense fallback={null}>
           <NavProgress />

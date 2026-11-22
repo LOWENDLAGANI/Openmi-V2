@@ -6,16 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { estimateTokens } from "@/lib/context";
 
 /**
- * The context budget as one ring.
- *
- * A 26px donut in the composer header: the arc turns from sage to amber at 70%
- * and to red at 95%, so "nearly full" reads before a number does. The popover
- * repeats the exact figures and lists the server's own notes about what was
- * trimmed — no trim is invented here, the strings come from the same object the
- * request was assembled from.
- *
- * When the budget is spent the popover offers a new chat, because a full
- * context is the one case where the next turn cannot carry what it should.
+ * Context budget donut indicator in the composer bar.
  */
 export function ContextCircle({
   usedChars,
@@ -29,21 +20,25 @@ export function ContextCircle({
   const [open, setOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement | null>(null);
 
-  const ratio = budgetChars > 0 ? Math.min(Math.max(usedChars / budgetChars, 0), 1) : 0;
+  const ratio =
+    budgetChars > 0 ? Math.min(Math.max(usedChars / budgetChars, 0), 1) : 0;
   const percent = Math.round(ratio * 100);
   const full = percent >= 100;
 
-  // The arc is drawn from the exact character count the assembler produced;
-  // the figures beside it are the token estimate that same count implies.
   const usedTokens = estimateTokens(usedChars);
   const budgetTokens = estimateTokens(budgetChars);
 
-  const size = 26;
-  const stroke = 3;
+  const size = 24;
+  const stroke = 2.75;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  const tone = full || percent >= 95 ? "#ef6b6b" : percent >= 70 ? "#f5b544" : "#7fd1a1";
+  const tone =
+    full || percent >= 95
+      ? "var(--danger)"
+      : percent >= 70
+        ? "var(--warn)"
+        : "var(--accent)";
 
   useEffect(() => {
     if (!open) return;
@@ -72,7 +67,7 @@ export function ContextCircle({
         aria-expanded={open}
         aria-label={`Context: ${percent}% of about ${budgetTokens.toLocaleString()} tokens used`}
         title={`About ${usedTokens.toLocaleString()} of ${budgetTokens.toLocaleString()} tokens of repository context`}
-        className="lift grid size-9 place-items-center rounded-full border border-line bg-card hover:border-line-strong"
+        className="grid size-8 place-items-center rounded-lg border border-line bg-raised transition-colors hover:border-line-strong hover:bg-hover"
       >
         <span className="relative grid place-items-center">
           <svg
@@ -89,7 +84,7 @@ export function ContextCircle({
               r={radius}
               fill="none"
               stroke="var(--text-low)"
-              strokeOpacity="0.18"
+              strokeOpacity="0.2"
               strokeWidth={stroke}
             />
             <circle
@@ -105,7 +100,7 @@ export function ContextCircle({
               style={{ transition: "stroke-dashoffset 320ms ease-out" }}
             />
           </svg>
-          <span className="absolute font-mono text-[8.5px] leading-none text-mid">
+          <span className="absolute font-mono text-[8px] font-medium leading-none tabular-nums text-mid">
             {percent}
           </span>
         </span>
@@ -115,28 +110,30 @@ export function ContextCircle({
         <div
           role="group"
           aria-label="Context breakdown"
-          className="animate-pop absolute bottom-full right-0 z-40 mb-2 w-64 rounded-2xl border border-line-strong bg-card p-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.32)]"
+          className="animate-pop absolute bottom-full right-0 z-40 mb-2 w-72 rounded-xl border border-line-strong bg-card p-3.5 shadow-[0_20px_48px_rgba(0,0,0,0.3)]"
         >
           <div className="flex items-baseline justify-between gap-2">
-            <p className="eyebrow">context</p>
-            <p className="font-mono text-[10px] text-low">{percent}% used</p>
+            <p className="text-[12px] font-medium text-hi">Context budget</p>
+            <p className="font-mono text-[11px] tabular-nums text-low">
+              {percent}% used
+            </p>
           </div>
 
-          <p className="mt-2 font-mono text-[11.5px] text-hi">
+          <p className="mt-2 font-mono text-[12px] tabular-nums text-hi">
             ≈ {usedTokens.toLocaleString()}
             <span className="text-low"> / {budgetTokens.toLocaleString()} tokens</span>
           </p>
 
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-chip">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-sm bg-raised">
             <div
-              className="h-full rounded-full transition-[width] duration-300"
+              className="h-full rounded-sm transition-[width] duration-300"
               style={{ width: `${Math.max(percent, 1)}%`, backgroundColor: tone }}
             />
           </div>
 
-          <p className="mt-2.5 text-[10.5px] leading-relaxed text-low">
-            Tokens of repository context sent with the last turn, estimated from
-            its characters at four characters per token.
+          <p className="mt-2.5 text-[11px] leading-relaxed text-low">
+            Estimated tokens of repository context sent with the last turn at
+            four characters per token.
           </p>
 
           {notes.length > 0 && (
@@ -144,19 +141,15 @@ export function ContextCircle({
               {notes.map((note) => (
                 <li
                   key={note}
-                  className="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-mid"
+                  className="text-[11px] leading-relaxed text-warn"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="mt-[6px] size-1 shrink-0 rounded-full bg-warn"
-                  />
-                  <span>{note}</span>
+                  {note}
                 </li>
               ))}
             </ul>
           )}
 
-          <p className="mt-2 border-t border-line pt-2 text-[10px] leading-relaxed text-low">
+          <p className="mt-2 border-t border-line pt-2 text-[10.5px] leading-relaxed text-low">
             The file you have open is never trimmed. If it fills the budget, it
             is kept and the notes say why nothing else was added.
           </p>
@@ -165,7 +158,7 @@ export function ContextCircle({
             <Link
               href="/chat?new=1"
               onClick={() => setOpen(false)}
-              className="btn btn-primary mt-2.5 w-full py-1.5 text-[11.5px]"
+              className="btn btn-primary mt-2.5 w-full py-1.5 text-[12px]"
             >
               Start a new chat
             </Link>

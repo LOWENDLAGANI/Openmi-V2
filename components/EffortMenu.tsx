@@ -1,22 +1,11 @@
 "use client";
 
+import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/models";
 
-/**
- * Thinking effort, for the model that takes one.
- *
- * Three settings rather than a slider: the provider accepts exactly these, and a
- * control that looked continuous would be lying about what it sends. `Fast` is
- * not a smaller answer — it turns thinking off, so the first token is the answer
- * instead of the start of a chain of thought.
- *
- * This is a popover like the model picker: grouped presentation does not apply
- * (there is only one group), but the same open/close, keyboard and selection
- * behaviour keeps the two controls feeling like one family.
- */
 export function EffortMenu({
   value,
   onChange,
@@ -69,7 +58,6 @@ export function EffortMenu({
     };
   }, [open]);
 
-  /** Arrow keys walk the options; Enter is the button's own activation. */
   function onPanelKey(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
@@ -90,8 +78,7 @@ export function EffortMenu({
           ? 0
           : options.length - 1
         : (index + step + options.length) % options.length;
-    const target = options[targetIndex];
-    target?.focus();
+    options[targetIndex]?.focus();
   }
 
   return (
@@ -104,24 +91,18 @@ export function EffortMenu({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Thinking effort: ${current?.label ?? value}`}
-        className="model-pill lift max-w-[10.5rem] disabled:opacity-50"
+        className="model-pill max-w-[10.5rem] disabled:opacity-50"
       >
-        <span className="min-w-0 truncate text-[11px]">
+        <span className="min-w-0 truncate text-[12px]">
           {current?.label ?? value}
         </span>
-        <svg
+        <ChevronDown
           aria-hidden="true"
-          viewBox="0 0 24 24"
-          className={`size-3 shrink-0 text-low transition-transform duration-200 ${
+          className={`size-3.5 shrink-0 text-low transition-transform duration-150 ${
             open ? "rotate-180" : ""
           }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+          strokeWidth={1.75}
+        />
       </button>
 
       {open &&
@@ -139,10 +120,12 @@ export function EffortMenu({
               left: pos.left,
               zIndex: 100,
             }}
-            className="animate-pop max-h-[58vh] w-64 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.22)]"
+            className="animate-pop max-h-[58vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-line-strong bg-card p-1.5 shadow-[0_24px_56px_rgba(0,0,0,0.28)]"
           >
             <div className="pb-1 last:pb-0">
-              <p className="eyebrow px-2.5 pb-1 pt-1.5">Thinking effort</p>
+              <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-low">
+                Thinking effort
+              </p>
 
               {REASONING_EFFORTS.map((option) => {
                 const active = option.id === value;
@@ -158,36 +141,27 @@ export function EffortMenu({
                       onChange(option.id);
                       setOpen(false);
                     }}
-                    className={`flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                    className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
                       active
                         ? "bg-elevated text-hi"
                         : "text-body hover:bg-hover hover:text-hi"
                     }`}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[12px] font-medium">
-                          {option.label}
-                        </span>
+                      <span className="block truncate text-[12.5px] font-medium">
+                        {option.label}
                       </span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-low">
+                      <span className="mt-0.5 block text-[11px] leading-snug text-low">
                         {option.blurb}
                       </span>
                     </span>
 
                     {active && (
-                      <svg
+                      <Check
                         aria-hidden="true"
-                        viewBox="0 0 24 24"
                         className="mt-0.5 size-3.5 shrink-0 text-accent-text"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="m5 12.5 4.5 4.5L19 7.5" />
-                      </svg>
+                        strokeWidth={2.25}
+                      />
                     )}
                   </button>
                 );

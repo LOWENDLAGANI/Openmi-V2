@@ -1,3 +1,4 @@
+import { Check, XCircle } from "lucide-react";
 import Link from "next/link";
 
 import { AboutLogoGate } from "@/components/AboutLogoGate";
@@ -5,8 +6,8 @@ import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
-  DAILY_FREE_CREDIT,
   CREDIT_PER_HOUR,
+  DAILY_FREE_CREDIT,
   INVITE_REWARD_CREDIT,
   LOW_BALANCE_CREDIT,
   MAX_INVITES_PER_ACCOUNT,
@@ -15,188 +16,198 @@ import {
 } from "@/lib/credits";
 
 export const metadata = {
-  title: "About · Openmi",
+  title: "About — Openmi",
 };
 
 const DOES = [
   "Reads repository files at the commit a chat is pinned to.",
-  "Answers with path:line citations that are checked against the tree at that commit.",
+  "Answers with path:line citations verified against the tree at that commit.",
   "Writes edits as per-file unified diffs against the commit the chat is pinned to.",
-  `When a turn finishes with a change, writes it to one branch named ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
-  "When a turn runs in a sandbox, it can install dependencies, run a build and run commands you ask for in the chat's own Linux sandbox, and it reports the exit code it observed.",
-  `Charges ${CREDIT_PER_HOUR} Credit for an hour of chat (nothing on Auto) before the provider is called, and records every change in a ledger.`,
+  `When a turn finishes with a change, writes it to ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
+  "Runs installs, builds, and requested commands in an isolated Linux sandbox and reports the exact exit code observed.",
+  `Charges ${CREDIT_PER_HOUR} Credit for an hour of chat (free on Auto) before the provider is called, recording every change in an append-only ledger.`,
 ];
 
 const DOES_NOT = [
-  "It does not run your test suite as a verification step. It can install or build in its sandbox and report the exit code it saw, and nothing claims a test that did not run.",
-  "It does not write to the default branch unless you name it as the destination, or an operator enables default-branch writes for unattended runs.",
-  "It does not force a branch update, merge a pull request it did not open, or clean up branches.",
-  "It does not generate a project from nothing, and there is no guest mode.",
-  "It does not take card payments in this app; payment happens on the hosted page, and top-ups arrive as redeem codes.",
+  "It does not run your test suite as a verification step. It runs installs and builds in its sandbox, reports the observed exit code, and never claims a test that did not run.",
+  "It does not write to the default branch unless you name it as the destination or an operator enables default-branch writes for unattended runs.",
+  "It does not force-push a branch, merge a pull request it did not open, or delete branches.",
+  "It does not generate a project without an account or repository; there is no guest mode.",
+  "It does not collect card details in this app; payments run on the hosted checkout page, and top-ups arrive via redeem codes or approved receipts.",
 ];
 
 export default function AboutPage() {
   return (
-    <main className="animate-enter mx-auto w-full max-w-3xl px-5 py-8 sm:px-8">
-      <header className="flex items-center justify-between gap-2">
-        <Link href="/" aria-label="Openmi home">
-          <Brand />
-        </Link>
-        <nav className="flex items-center gap-1.5">
-          <ThemeSwitcher variant="icon" />
-          <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
-            Open workspace
+    <div className="min-h-dvh">
+      <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between gap-2 px-5 sm:px-8">
+          <Link href="/" aria-label="Openmi home">
+            <Brand />
           </Link>
-        </nav>
+          <nav className="flex items-center gap-2">
+            <ThemeSwitcher variant="icon" />
+            <Link href="/chat" className="btn px-3.5 py-1.5 text-[12.5px]">
+              Open workspace
+            </Link>
+          </nav>
+        </div>
       </header>
 
-      <section
-        aria-label="Openmi"
-        className="mt-10 flex flex-col items-center gap-3 border-y border-line py-10"
-      >
-        <AboutLogoGate />
-      </section>
+      <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-10 sm:px-8">
+        <section
+          aria-label="Openmi"
+          className="flex flex-col items-center justify-center rounded-xl border border-line bg-card py-10 shadow-[var(--card-shadow)]"
+        >
+          <AboutLogoGate />
+        </section>
 
-      <p className="eyebrow mt-10">the contract</p>
-      <h1 className="mt-3 max-w-2xl text-balance text-[clamp(1.9rem,5vw,2.9rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
-        What Openmi does, and what it does not.
-      </h1>
-      <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-mid">
-        Openmi is a chat client welded to one GitHub repository. It reads the
-        code, answers with real paths and line numbers, and writes the edits it
-        makes to a branch of its own, opening one pull request. The default
-        branch is only ever the base unless you name it as the destination.
-      </p>
+        <div className="mt-10 border-b border-line pb-8">
+          <h1 className="max-w-2xl text-balance text-[clamp(1.9rem,4.5vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
+            What Openmi does, and what it refuses to do
+          </h1>
+          <p className="mt-4 max-w-2xl text-[14.5px] leading-[1.65] text-mid">
+            Openmi is a workspace bound to a single GitHub repository per thread.
+            It inspects code at a pinned commit, cites real file paths and line
+            numbers, and writes edits to an isolated branch with a pull request.
+          </p>
+        </div>
 
-      <section className="mt-12 border-t border-line pt-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-            What it does
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <section className="panel p-6">
+            <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3">
+              <h2 className="text-[15.5px] font-semibold tracking-[-0.02em] text-hi">
+                Capabilities
+              </h2>
+              <span className="font-mono text-[11px] text-low">
+                {String(DOES.length).padStart(2, "0")} guarantees
+              </span>
+            </div>
+            <ul className="mt-4 space-y-3">
+              {DOES.map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <Check
+                    aria-hidden="true"
+                    className="mt-1 size-3.5 shrink-0 text-accent-text"
+                    strokeWidth={2}
+                  />
+                  <span className="text-[13px] leading-relaxed text-mid">
+                    {item}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="panel p-6">
+            <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3">
+              <h2 className="text-[15.5px] font-semibold tracking-[-0.02em] text-hi">
+                Explicit boundaries
+              </h2>
+              <span className="font-mono text-[11px] text-low">Refusals</span>
+            </div>
+            <ul className="mt-4 space-y-3">
+              {DOES_NOT.map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <XCircle
+                    aria-hidden="true"
+                    className="mt-1 size-3.5 shrink-0 text-danger"
+                    strokeWidth={1.75}
+                  />
+                  <span className="text-[13px] leading-relaxed text-mid">
+                    {item}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <section className="mt-10 border-t border-line pt-8">
+          <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+            Branch policy
           </h2>
-          <span className="eyebrow">
-            {String(DOES.length).padStart(2, "0")} things
-          </span>
-        </div>
-        <ul className="mt-4 divide-y divide-line">
-          {DOES.map((item) => (
-            <li key={item} className="flex items-start gap-3 py-3">
-              <span
-                aria-hidden="true"
-                className="mt-[7px] size-1.5 shrink-0 rounded-full bg-accent"
-              />
-              <span className="text-[13px] leading-relaxed text-mid">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
+            The head branch is derived from the changeset identifier:{" "}
+            <code className="rounded bg-raised px-1.5 py-0.5 font-mono text-[12px] text-hi">
+              {AGENT_BRANCH_PREFIX}&lt;changeset-id&gt;
+            </code>
+            . The pull request targets the repository&apos;s default branch, and
+            the turn squash-merges it. Naming a custom branch writes there
+            directly without opening a pull request; naming the default branch
+            explicitly requests a direct write. Any branch name is validated
+            against git&apos;s branch naming rules before a request is made.
+          </p>
+        </section>
 
-      <section className="mt-12 border-t border-line pt-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-            What it does not do
+        <section className="mt-8 border-t border-line pt-8">
+          <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+            Hourly pricing &amp; Credit
           </h2>
-          <span className="eyebrow">refusals</span>
-        </div>
-        <ul className="mt-4 divide-y divide-line">
-          {DOES_NOT.map((item) => (
-            <li key={item} className="flex items-start gap-3 py-3">
-              <span
-                aria-hidden="true"
-                className="mt-[7px] size-1.5 shrink-0 rounded-full bg-danger"
-              />
-              <span className="text-[13px] leading-relaxed text-mid">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
+            One hour of chat costs {CREDIT_PER_HOUR} Credit, or nothing on Auto,
+            charged once before the model provider is called. Further turns
+            inside that hour carry no charge. The daily allowance is{" "}
+            {DAILY_FREE_CREDIT} Credit, or {PAID_DAILY_FREE_CREDIT} while a paid
+            plan is active. A {TRIAL_CREDIT} Credit trial credit is granted once
+            per account, capped at one trial per address in any 24-hour window.
+            The balance indicator warns below {LOW_BALANCE_CREDIT} Credit. An
+            invite rewards both accounts {INVITE_REWARD_CREDIT} Credit, up to{" "}
+            {MAX_INVITES_PER_ACCOUNT} rewarded accounts per inviter.
+          </p>
+          <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
+            Every purchase is final: Credit, plans, and passes are non-refundable
+            and never auto-renew. If the model provider returns no answer at all,
+            the hour is automatically returned to your balance by the meter; a
+            turn stopped after text arrived keeps its hour because the partial
+            answer is preserved. Every change appears as an append-only ledger
+            entry on{" "}
+            <Link
+              href="/activity"
+              className="font-medium text-accent-text underline-offset-2 hover:underline"
+            >
+              the activity page
+            </Link>
+            . Read the{" "}
+            <Link
+              href="/refunds"
+              className="font-medium text-accent-text underline-offset-2 hover:underline"
+            >
+              refund and cancellation policy
+            </Link>{" "}
+            for full terms.
+          </p>
+        </section>
 
-      <section className="mt-12 border-t border-line pt-6">
-        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-          Branch policy
-        </h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          The head branch is derived from the changeset, never supplied by the
-          caller:{" "}
-          <span className="font-mono text-[12px] text-body">
-            {AGENT_BRANCH_PREFIX}&lt;changeset-id&gt;
-          </span>
-          . The pull request targets the repository&apos;s default branch, and
-          the turn squash-merges it. A branch you name is written directly, with
-          no pull request; naming the default branch is how you ask for it to be
-          written, and an operator can allow that for unattended runs. Any other
-          name is checked against git&apos;s own branch rules before a request is
-          made.
-        </p>
-      </section>
+        <section className="panel mt-8 p-6">
+          <h2 className="text-[15.5px] font-semibold tracking-[-0.02em] text-hi">
+            What every transcript reports
+          </h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-mid">
+            Every transcript states directly what the turn accomplished: the
+            branch written, the pull request opened or merged, and the exit code
+            of any sandbox command. Unobserved checks or deployments are never
+            claimed, and a turn that modified no files states that clearly.
+          </p>
+        </section>
 
-      <section className="mt-12 border-t border-line pt-6">
-        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-          What an hour costs
-        </h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          One hour of chat costs {CREDIT_PER_HOUR} Credit, or nothing on Auto,
-          charged once before the provider call. More turns inside the hour are free. The daily allowance
-          is {DAILY_FREE_CREDIT} Credit, or {PAID_DAILY_FREE_CREDIT} while a paid plan is
-          active. A {TRIAL_CREDIT} Credit trial credit is granted once per account, with
-          at most one trial per address in any 24-hour period. The balance turns
-          amber below {LOW_BALANCE_CREDIT} Credit. An invite rewards both sides{" "}
-          {INVITE_REWARD_CREDIT} Credit, up to {MAX_INVITES_PER_ACCOUNT} rewarded
-          accounts per inviter.
-        </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Every purchase is final: Credit, plans and passes are not refundable and
-          cannot be cancelled. A pass ends on its own and never renews. If the
-          provider never returns an answer at all, that hour is released back to
-          your balance by the meter (a correction, not a refund), and a turn
-          stopped after text arrived keeps its hour, because the answer is kept.
-          Everything is an append-only ledger row on{" "}
-          <Link href="/activity" className="text-accent-text underline-offset-2 hover:underline">
-            the activity page
-          </Link>
-          ; the{" "}
-          <Link href="/refunds" className="text-accent-text underline-offset-2 hover:underline">
-            refund and cancellation policy
-          </Link>{" "}
-          states the terms.
-        </p>
-      </section>
-
-      <section className="mt-12 rounded-2xl border border-line bg-card p-5 shadow-[inset_3px_0_0_var(--accent)]">
-        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-hi">
-          What the transcript states
-        </h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          The transcript states what the turn did: the branch it wrote, the pull
-          request it opened or merged, and the exit code of any command it ran.
-          It never claims a test ran as a verification step, because it runs
-          installs and builds only, and a deployment it did not observe is never
-          mentioned. A turn that wrote nothing says so.
-          The admin panel names the configuration that is missing instead of
-          failing silently.
-        </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-mid">
-          Deployment status lives in an internal admin panel, separate from the
-          product.
-        </p>
-      </section>
-
-      <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6">
-        <p className="eyebrow">Openmi</p>
-        <div className="flex items-center gap-3">
-          <Link href="/terms" className="eyebrow hover:text-hi">
-            terms
-          </Link>
-          <Link href="/privacy" className="eyebrow hover:text-hi">
-            privacy
-          </Link>
-          <Link href="/refunds" className="eyebrow hover:text-hi">
-            refunds
-          </Link>
-          <Link href="/" className="eyebrow hover:text-hi">
-            back to the start
-          </Link>
-        </div>
-      </footer>
-    </main>
+        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
+          <p className="font-mono text-low">© 2026 Openmi</p>
+          <div className="flex flex-wrap items-center gap-4 text-mid">
+            <Link href="/terms" className="hover:text-hi">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-hi">
+              Privacy
+            </Link>
+            <Link href="/refunds" className="hover:text-hi">
+              Refunds
+            </Link>
+            <Link href="/" className="hover:text-hi">
+              Home
+            </Link>
+          </div>
+        </footer>
+      </main>
+    </div>
   );
 }

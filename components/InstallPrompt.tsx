@@ -44,7 +44,7 @@ export function InstallPrompt() {
       type="button"
       aria-label="Install Openmi"
       title="Install Openmi"
-      className="rail-icon grid size-9 place-items-center rounded-full"
+      className="rail-icon grid size-8 place-items-center rounded-lg"
       onClick={() => {
         void prompt
           .prompt()

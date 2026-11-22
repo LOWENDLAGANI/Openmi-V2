@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Copy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
 import { parseBlocks, parseInline } from "@/lib/markdown";
@@ -12,12 +13,6 @@ type Segment =
 
 const CITATION = /(?<![\w/.-])((?:[\w.-]+\/)*[\w.-]+\.[A-Za-z0-9]{1,8}):(\d{1,6})/g;
 
-/**
- * A citation is a link only when it resolves at the pinned commit.
- *
- * The server passes the paths that exist in that commit, so a model that
- * invents `lib/nope.ts:12` produces text the reader can see is not a link.
- */
 function splitCitations(text: string, known: Set<string>): Segment[] {
   const parts: Segment[] = [];
   let cursor = 0;
@@ -79,7 +74,7 @@ function Citations({
           <a
             key={index}
             href={`/chat?${params.toString()}`}
-            className="rounded-full bg-accent-soft px-1.5 py-0.5 font-mono text-[12px] text-accent-text no-underline transition-colors [overflow-wrap:anywhere] hover:bg-accent/20"
+            className="rounded-md border border-accent/25 bg-accent-soft px-1.5 py-0.5 font-mono text-[12px] text-accent-text no-underline transition-colors [overflow-wrap:anywhere] hover:bg-accent/15"
             title={`Open ${segment.path} at line ${segment.line}`}
           >
             {segment.text}
@@ -90,7 +85,6 @@ function Citations({
   );
 }
 
-/** One inline run: emphasis, inline code, links, and citations inside text. */
 function InlineRun({
   text,
   repo,
@@ -124,7 +118,7 @@ function InlineRun({
             return (
               <code
                 key={index}
-                className="rounded-md border border-line/70 bg-raised px-1.5 py-0.5 font-mono text-[12.5px] text-hi [overflow-wrap:anywhere]"
+                className="rounded-md border border-line bg-raised px-1.5 py-0.5 font-mono text-[12.5px] text-hi [overflow-wrap:anywhere]"
               >
                 {token.text}
               </code>
@@ -166,31 +160,49 @@ function CodeBlock({ lang, text }: { lang: string; text: string }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1_500);
     } catch {
-      // A clipboard the browser refuses is not worth an error in the answer.
+      // Clipboard denial is silently ignored.
     }
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-card">
-      <div className="flex items-center justify-between gap-2 border-b border-line/70 bg-raised px-3 py-1.5">
-        <span className="eyebrow">{lang || "code"}</span>
+    <div className="overflow-hidden rounded-xl border border-line bg-card">
+      <div className="flex items-center justify-between gap-2 border-b border-line bg-raised px-3.5 py-1.5">
+        <span className="font-mono text-[11px] font-medium text-low">
+          {lang || "code"}
+        </span>
         <button
           type="button"
           onClick={() => void copy()}
           className="thread-tool"
           aria-label="Copy this code block"
         >
-          {copied ? "copied" : "copy"}
+          {copied ? (
+            <>
+              <Check aria-hidden="true" className="size-3 text-accent-text" strokeWidth={2} />
+              <span>Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy aria-hidden="true" className="size-3" strokeWidth={1.75} />
+              <span>Copy</span>
+            </>
+          )}
         </button>
       </div>
-      <pre className="max-w-full overflow-x-auto px-3 py-2.5 font-mono text-[12px] leading-[1.65] text-body">
+      <pre className="max-w-full overflow-x-auto px-3.5 py-3 font-mono text-[12px] leading-[1.65] text-body">
         <code>{text}</code>
       </pre>
     </div>
   );
 }
 
-function Heading({ level, text, known, repo, chatId }: {
+function Heading({
+  level,
+  text,
+  known,
+  repo,
+  chatId,
+}: {
   level: 1 | 2 | 3 | 4;
   text: string;
   known: Set<string>;
@@ -206,17 +218,6 @@ function Heading({ level, text, known, repo, chatId }: {
   );
 }
 
-/**
- * Renders an answer as the structure it was written in.
- *
- * Everything visible is text the page built: no markdown library, no raw HTML.
- * List markers and emphasis are consumed here rather than printed, which is why
- * a `*` bullet no longer reaches the reader as an asterisk.
- *
- * Memoised because a streaming answer re-renders the panel on every token: the
- * transcript behind it parses the same unchanged content each time otherwise,
- * which is what made a long conversation stutter while an answer arrived.
- */
 export const MessageBody = memo(function MessageBody({
   content,
   repo,
@@ -232,7 +233,7 @@ export const MessageBody = memo(function MessageBody({
   const known = useMemo(() => new Set(validPaths), [validPaths]);
 
   return (
-    <div className="prose-chat space-y-3 break-words text-[14px] leading-[1.72] text-body">
+    <div className="prose-chat space-y-3 break-words text-[14px] leading-[1.7] text-body">
       {blocks.map((block, index) => {
         switch (block.kind) {
           case "code":
@@ -252,12 +253,12 @@ export const MessageBody = memo(function MessageBody({
 
           case "bullets":
             return (
-              <ul key={index} className="space-y-1.5">
+              <ul key={index} className="space-y-1.5 pl-1">
                 {block.items.map((item, itemIndex) => (
                   <li key={itemIndex} className="flex gap-2.5">
                     <span
                       aria-hidden="true"
-                      className="mt-[0.62em] size-[5px] shrink-0 rounded-full bg-line-strong"
+                      className="mt-[0.65em] size-[4px] shrink-0 rounded-full bg-mid"
                     />
                     <span className="min-w-0 flex-1">
                       <InlineRun
@@ -295,7 +296,7 @@ export const MessageBody = memo(function MessageBody({
             return (
               <blockquote
                 key={index}
-                className="border-l-2 border-accent/40 pl-3 text-mid"
+                className="border-l-2 border-accent/50 pl-3.5 text-mid"
               >
                 <InlineRun
                   text={block.text}

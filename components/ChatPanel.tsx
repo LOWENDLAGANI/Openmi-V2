@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  Check,
+  ChevronRight,
+  Copy,
+  GitBranch,
+  Pencil,
+  Terminal,
+  XCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -13,6 +22,7 @@ import {
 } from "@/components/Composer";
 import { CREDIT_EVENT } from "@/components/CreditChip";
 import { scrollToBottom, useEnter, useStagger } from "@/components/Motion";
+import { OpenmiMark } from "@/components/OpenmiMark";
 import { RetryNotice } from "@/components/RetryNotice";
 import { MessageBody } from "@/components/MessageBody";
 import { PendingButton } from "@/components/PendingButton";
@@ -1055,22 +1065,26 @@ export function ChatPanel({
 
   return (
     <div className="fade-in mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-card px-3 py-1">
-            <span
+          <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-line bg-card px-2.5 py-1">
+            <GitBranch
               aria-hidden="true"
-              className={`size-1.5 shrink-0 rounded-full ${
-                repo ? "bg-accent" : "bg-line-strong"
+              className={`size-3.5 shrink-0 ${
+                repo ? "text-accent-text" : "text-low"
               }`}
+              strokeWidth={1.75}
             />
-            <span className="truncate text-[11px] text-mid">
+            <span className="truncate font-mono text-[11.5px] font-medium text-mid">
               {repo ? repo.fullName : "no repository"}
             </span>
           </span>
-
+          {repo?.branch ? (
+            <span className="hidden rounded-md border border-line bg-raised px-2 py-1 font-mono text-[11px] text-low sm:inline">
+              {repo.branch}
+            </span>
+          ) : null}
         </div>
-
       </div>
 
       <div
@@ -1087,43 +1101,50 @@ export function ChatPanel({
         {messages.length === 0 && pending.length === 0 && steps.length === 0 ? (
           <div
             ref={heroRef}
-            className="flex h-full flex-col items-center justify-center py-10 text-center"
+            className="flex h-full flex-col items-center justify-center px-2 py-10 text-center"
           >
-            <h2 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-hi" style={{ fontFamily: "var(--font-display)" }}>
+            <OpenmiMark size={28} className="mb-4" />
+            <h2 className="text-[26px] font-semibold leading-[1.12] tracking-[-0.03em] text-hi sm:text-[30px]">
               {(repo ? "What should Openmi do?" : "What are you building?")
                 .split(" ")
                 .map((word, index, words) => (
                   <span key={`${word}-${index}`} className="motion-word inline-block">
                     {word}
-                    {/* Every word but the last carries its space inside the
-                        span: an inline-block word swallows the whitespace
-                        between elements, so "Openmi do?" was rendering as
-                        "Openmido?". */}
                     {index === words.length - 1 ? "" : "\u00A0"}
                   </span>
                 ))}
             </h2>
+            <p className="mt-2 max-w-md text-[13px] text-mid">
+              {repo
+                ? `Pinned to ${repo.fullName}${repo.sha ? ` @ ${repo.sha.slice(0, 7)}` : ""}. Citations and edits stay scoped to this commit.`
+                : "Attach a repository from the sidebar or start a general thread below."}
+            </p>
 
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <div
+              className={`mt-7 grid w-full max-w-2xl gap-2.5 ${
+                repo ? "sm:grid-cols-3" : "sm:grid-cols-2"
+              }`}
+            >
               {suggestions.slice(0, 3).map((suggestion) => (
                 <button
                   key={suggestion.label}
                   type="button"
                   onClick={() => beginSend(suggestion.prompt)}
                   disabled={streaming}
-                  className="motion-chip group flex items-center gap-2 rounded-full border border-line-strong bg-card px-4 py-2 text-[12px] text-mid transition-colors hover:border-accent/40 hover:text-hi"
+                  className="motion-chip group flex flex-col items-start rounded-xl border border-line bg-card p-3.5 text-left shadow-[var(--card-shadow)] transition-colors hover:border-line-strong hover:bg-raised disabled:opacity-50"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="size-1.5 rounded-full bg-accent/60 group-hover:bg-accent"
-                  />
-                  {suggestion.label}
+                  <span className="text-[13px] font-semibold text-hi group-hover:text-accent-text">
+                    {suggestion.label}
+                  </span>
+                  <span className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-low">
+                    {suggestion.prompt}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div className="space-y-7">
+          <div className="space-y-6">
             {messages.map((message) =>
               message.role === "user" ? (
                 <EnteringArticle
@@ -1136,14 +1157,15 @@ export function ChatPanel({
                   <button
                     type="button"
                     onClick={() => seedComposer(message.content)}
-                    className="thread-tool mr-1"
+                    className="thread-tool mr-0.5"
                   >
-                    edit
+                    <Pencil aria-hidden="true" className="size-3" strokeWidth={1.75} />
+                    <span>Edit</span>
                   </button>
                 </EnteringArticle>
               ) : (
                 <EnteringArticle key={message.id} className="group min-w-0 max-w-[94%]">
-                  <div className="flex items-center justify-between gap-2 pb-1">
+                  <div className="flex items-center justify-between gap-2 pb-1.5">
                     <span className={`model-badge ${badgeFor(message.model)}`}>
                       {modelLabel(message.model)}
                     </span>
@@ -1152,7 +1174,17 @@ export function ChatPanel({
                       onClick={() => void copy(message.id, message.content)}
                       className="thread-tool opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                     >
-                      {copiedId === message.id ? "copied" : "copy"}
+                      {copiedId === message.id ? (
+                        <>
+                          <Check aria-hidden="true" className="size-3 text-accent-text" strokeWidth={2} />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy aria-hidden="true" className="size-3" strokeWidth={1.75} />
+                          <span>Copy</span>
+                        </>
+                      )}
                     </button>
                   </div>
                   <div className="msg-ai-card">
@@ -1184,18 +1216,13 @@ export function ChatPanel({
                 aria-live="polite"
                 aria-busy={streaming}
               >
-
                 {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
-                {/* `live` follows the turn, not the panel: a console kept after
-                    a failure must not still claim to be running. */}
                 {steps.length > 0 && <StepList steps={steps} live={streaming} />}
 
                 {shots.length > 0 && <ShotStrip shots={shots} />}
 
                 {pending.length === 0 ? (
-                  // Only while a turn is in flight. A console kept from a failed
-                  // turn must not put a "thinking" pill back on screen.
                   (streaming || backgroundRunning) && (
                     <AiThinking
                       steps={steps}
@@ -1212,7 +1239,7 @@ export function ChatPanel({
                   />
                 )}
                 {streaming && stalled && pending.length === 0 && (
-                  <p className="mt-1 text-[11px] leading-relaxed text-low">
+                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-low">
                     Still working. No answer text yet — the steps above are what
                     the turn has done.
                   </p>
@@ -1230,7 +1257,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={jumpToLatest}
-              className="pointer-events-auto rounded-full border border-line-strong bg-card px-3 py-1 text-[11px] text-mid shadow-[0_8px_20px_rgba(0,0,0,0.22)] hover:text-hi"
+              className="pointer-events-auto rounded-lg border border-line-strong bg-card px-3 py-1.5 text-[11.5px] font-medium text-mid shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:text-hi"
             >
               {streaming ? "new output ↓" : "jump to end ↓"}
             </button>
@@ -1239,11 +1266,11 @@ export function ChatPanel({
       </div>
 
       {notices.length > 0 && (
-        <ul className="mb-2 space-y-1 rounded-2xl border border-line bg-raised px-4 py-2">
+        <ul className="mb-2 space-y-1 rounded-xl border border-line bg-raised px-4 py-2.5">
           {notices.map((notice, index) => (
             <li
               key={`${notice}-${index}`}
-              className="break-words text-[10.5px] leading-relaxed text-mid"
+              className="break-words text-[11.5px] leading-relaxed text-mid"
             >
               {notice}
             </li>
@@ -1254,14 +1281,14 @@ export function ChatPanel({
       {conflict && (
         <div
           role="alert"
-          className="mb-2 space-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[11.5px] text-warn"
+          className="mb-2 space-y-2 rounded-xl border border-warn/30 bg-warn/8 px-4 py-3 text-[12px] text-warn"
         >
           <p className="break-words leading-relaxed">{conflict.message}</p>
           <div className="flex flex-wrap items-center gap-2">
             {conflict.chatId && (
               <a
                 href={`/chat?chat=${conflict.chatId}`}
-                className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+                className="rounded-lg border border-warn/40 px-2.5 py-1 text-[11.5px] font-medium hover:opacity-90"
               >
                 Open that chat
               </a>
@@ -1270,14 +1297,14 @@ export function ChatPanel({
               onAction={() => endAndRetry(conflict)}
               disabled={streaming}
               pendingText="Ending…"
-              className="rounded-full border border-warn/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+              className="rounded-lg border border-warn/40 px-2.5 py-1 text-[11.5px] font-medium hover:opacity-90"
             >
               End session &amp; retry
             </PendingButton>
             <button
               type="button"
               onClick={() => setConflict(null)}
-              className="text-[11px] underline-offset-2 hover:underline"
+              className="text-[11.5px] underline-offset-2 hover:underline"
             >
               Dismiss
             </button>
@@ -1288,20 +1315,20 @@ export function ChatPanel({
       {paidGate && (
         <div
           role="alert"
-          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-hi"
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12.5px] text-hi"
         >
           <span className="min-w-0 break-words">{paidGate}</span>
           <div className="flex items-center gap-2">
             <a
               href="/pay"
-              className="rounded-full border border-accent/40 px-2.5 py-0.5 text-[11px] text-accent-text hover:opacity-90"
+              className="rounded-lg border border-accent/40 px-2.5 py-1 text-[11.5px] font-medium text-accent-text hover:opacity-90"
             >
               See plans
             </a>
             <button
               type="button"
               onClick={() => setPaidGate(null)}
-              className="text-[11px] text-mid underline-offset-2 hover:underline"
+              className="text-[11.5px] text-mid underline-offset-2 hover:underline"
             >
               Dismiss
             </button>
@@ -1312,7 +1339,7 @@ export function ChatPanel({
       {error && (
         <div
           role="alert"
-          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12.5px] text-danger"
         >
           <span className="min-w-0 break-words">
             <RetryNotice message={error} />
@@ -1322,7 +1349,7 @@ export function ChatPanel({
               onAction={retry}
               disabled={streaming}
               pendingText="Retrying…"
-              className="rounded-full border border-danger/40 px-2.5 py-0.5 text-[11px] hover:opacity-90"
+              className="rounded-lg border border-danger/40 px-2.5 py-1 text-[11.5px] font-medium hover:opacity-90"
             >
               Retry
             </PendingButton>
@@ -1330,7 +1357,7 @@ export function ChatPanel({
         </div>
       )}
 
-      <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2 md:-mx-7 md:px-7">
+      <div className="composer-dock -mx-4 mt-2 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-2.5 md:-mx-6 md:px-6">
         <div className="mx-auto w-full max-w-3xl">
           {showComposerAd(activeChatId) && (
             <div className="mb-1.5 flex justify-center">
@@ -1381,74 +1408,47 @@ export function ChatPanel({
   );
 }
 
-/**
- * What the model did, folded into the answer it produced.
- *
- * A row says what the step was for, in the model's own words: "install
- * dependencies", "Read lib/runs/tools.ts". The command and its output are one tap
- * away, because the reader who wants proof is not the reader who wants a
- * conversation. Nothing opens on its own — the column belongs to the answer. A
- * live step shows its state in the row; a stored one is already settled.
- */
-/**
- * The chain of thought, folded.
- *
- * A thinking model streams what it is weighing before it answers, on a channel
- * of its own. Printing it would put the working out into the conversation, so it
- * folds; dropping it would pretend the model does not think. Both a live block
- * and a stored one are folded until they are asked for: a panel that opens
- * itself pushes the answer the reader is waiting for out of the column. Neither
- * renders as part of the answer.
- */
 function ThinkingBlock({ text, live = false }: { text: string; live?: boolean }) {
   return (
     <details
-      className="mb-2 rounded-2xl border border-line bg-raised/60 px-3 py-1.5"
+      className="mb-2.5 rounded-lg border border-line bg-raised/70 px-3 py-2"
       data-live={live ? "true" : "false"}
     >
-      <summary className="cursor-pointer text-[11px] text-low">
-        {live ? "thinking…" : "reasoning"}
+      <summary className="cursor-pointer text-[11.5px] font-medium text-low hover:text-mid">
+        {live ? "Thinking…" : "Reasoning"}
       </summary>
-      <p className="mt-1.5 whitespace-pre-wrap break-words text-[11.5px] leading-relaxed text-mid [overflow-wrap:anywhere]">
+      <p className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-relaxed text-mid [overflow-wrap:anywhere]">
         {text}
       </p>
     </details>
   );
 }
 
-/**
- * One step, with its terminal.
- *
- * A step that ran a command keeps that command and its output behind the row,
- * one tap away. The transcript is the only place the sandbox's work survives
- * the turn, so the row never hides that it ran a command — it only stops the
- * console from opening itself over the answer. The open state is local, so a
- * re-render does not force a row shut once the reader has opened it.
- */
 function StepRow({ step }: { step: StepLine }) {
   const hasConsole = Boolean(step.command || step.output);
-  // Folded until the reader asks. A run with a few commands used to open every
-  // terminal by itself, so the progress console took the column while the
-  // answer was still being written.
   const [open, setOpen] = useState(false);
 
   return (
     <li className="agent-step" data-state={step.state}>
       <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary>
-          <span aria-hidden="true" className="agent-step-icon">
-            {step.state === "start"
-              ? "…"
-              : step.state === "error"
-                ? "✕"
-                : hasConsole
-                  ? "›_"
-                  : "·"}
+          <span aria-hidden="true" className="agent-step-icon inline-flex items-center">
+            {step.state === "start" ? (
+              "…"
+            ) : step.state === "error" ? (
+              <XCircle className="size-3.5 text-danger" strokeWidth={2} />
+            ) : hasConsole ? (
+              <Terminal className="size-3.5 text-mid" strokeWidth={1.75} />
+            ) : (
+              <Check className="size-3.5 text-accent-text" strokeWidth={2} />
+            )}
           </span>
           <span className="agent-step-title">{step.detail}</span>
-          <span aria-hidden="true" className="agent-step-chevron">
-            ›
-          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className="agent-step-chevron size-3.5"
+            strokeWidth={1.75}
+          />
         </summary>
         {step.command && <pre className="agent-step-command">{step.command}</pre>}
         {step.output && step.output.trim().length > 0 && (
@@ -1469,19 +1469,13 @@ function StepList({ steps, live = false }: { steps: StepLine[]; live?: boolean }
   );
 }
 
-/**
- * Screenshots the sandbox returned, each with the line that describes it.
- *
- * The caption is the page's own status snapshot — title, HTTP status, viewport,
- * console error count — so the reader can tell a working page from a 500.
- */
 function ShotStrip({ shots }: { shots: Shot[] }) {
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-2.5 space-y-2">
       {shots.map((shot, index) => (
         <figure
           key={`${shot.caption}-${index}`}
-          className="overflow-hidden rounded-2xl border border-line bg-card"
+          className="overflow-hidden rounded-xl border border-line bg-card"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -1489,7 +1483,7 @@ function ShotStrip({ shots }: { shots: Shot[] }) {
             alt={shot.caption}
             className="block w-full"
           />
-          <figcaption className="border-t border-line px-3 py-1.5 text-[11px] text-low">
+          <figcaption className="border-t border-line bg-raised px-3 py-1.5 font-mono text-[11px] text-low">
             {shot.caption}
           </figcaption>
         </figure>
@@ -1498,7 +1492,6 @@ function ShotStrip({ shots }: { shots: Shot[] }) {
   );
 }
 
-/** One transcript entry, animated once when it joins the conversation. */
 function EnteringArticle({
   className,
   children,

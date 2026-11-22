@@ -9,10 +9,6 @@ type Mode = "signin" | "signup";
 
 /**
  * Carries the intended post-login destination across the OAuth round trip.
- *
- * Supabase only honours `redirectTo` values on its redirect allow list, and a
- * query string is not matched, so the destination cannot travel in the URL.
- * A same-site cookie survives the top-level navigation to Google and back.
  */
 function setNextCookie(next: string) {
   if (typeof document === "undefined") return;
@@ -97,12 +93,6 @@ export function AuthForm({
     }
   }
 
-  /**
-   * Google is an OAuth provider, so the browser only starts the redirect: the
-   * code lands on /auth/callback, which exchanges it for a session cookie. The
-   * provider has to be enabled in Supabase Auth; when it is not, the error says
-   * so instead of looking like a network failure.
-   */
   async function google() {
     if (!configured) return;
 
@@ -116,10 +106,6 @@ export function AuthForm({
     setError(null);
     setNotice(null);
 
-    // Supabase drops query parameters from `redirectTo` when they are not on
-    // its redirect allow list, which silently sends the user to the Site URL
-    // (the landing page) instead of here. Keep the allow-listed path clean and
-    // carry the intended destination in a short-lived cookie instead.
     setNextCookie(next);
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -142,11 +128,11 @@ export function AuthForm({
 
   if (!configured) {
     return (
-      <div className="panel mt-8 p-5">
-        <p className="text-[13.5px] font-semibold text-hi">
+      <div className="panel p-6">
+        <p className="text-[14px] font-semibold text-hi">
           Sign-in is unavailable
         </p>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
+        <p className="mt-1.5 text-[13px] leading-relaxed text-mid">
           The accounts service is unreachable right now. Try again shortly.
         </p>
       </div>
@@ -154,11 +140,11 @@ export function AuthForm({
   }
 
   return (
-    <div className="panel mt-8 p-4 sm:p-5">
+    <div className="panel p-5 sm:p-6">
       <div
         role="tablist"
         aria-label="Sign in or create an account"
-        className="grid grid-cols-2 gap-1 rounded-full bg-canvas p-1"
+        className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-raised p-1"
       >
         {(["signin", "signup"] as const).map((value) => (
           <button
@@ -171,9 +157,9 @@ export function AuthForm({
               setError(null);
               setNotice(null);
             }}
-            className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
+            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
               mode === value
-                ? "bg-card text-hi shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+                ? "bg-card text-hi shadow-[var(--card-shadow)]"
                 : "text-mid hover:text-hi"
             }`}
           >
@@ -190,20 +176,21 @@ export function AuthForm({
         className="btn mt-4 w-full gap-2 py-2.5 text-[13px]"
       >
         <GoogleMark />
-        {busy ? "Opening Google" : "Continue with Google"}
+        {busy ? "Opening Google…" : "Continue with Google"}
       </button>
 
       <div className="my-4 flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
-        <span className="text-[11px] text-low">
-          or
-        </span>
+        <span className="text-[11.5px] text-low">or with email</span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="eyebrow block px-1 pb-1.5">
+          <label
+            htmlFor="email"
+            className="mb-1.5 block text-[12.5px] font-medium text-body"
+          >
             Email
           </label>
           <input
@@ -214,13 +201,16 @@ export function AuthForm({
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="field py-2.5"
+            className="field py-2"
             placeholder="you@example.com"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="eyebrow block px-1 pb-1.5">
+          <label
+            htmlFor="password"
+            className="mb-1.5 block text-[12.5px] font-medium text-body"
+          >
             Password
           </label>
           <input
@@ -232,15 +222,18 @@ export function AuthForm({
             autoComplete={mode === "signin" ? "current-password" : "new-password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="field py-2.5"
+            className="field py-2"
             placeholder="At least 8 characters"
           />
         </div>
 
         {mode === "signup" && (
           <div>
-            <label htmlFor="invite-code" className="eyebrow block px-1 pb-1.5">
-              Invite code (optional)
+            <label
+              htmlFor="invite-code"
+              className="mb-1.5 block text-[12.5px] font-medium text-body"
+            >
+              Invite code <span className="font-normal text-low">(optional)</span>
             </label>
             <input
               id="invite-code"
@@ -250,7 +243,7 @@ export function AuthForm({
               maxLength={64}
               autoComplete="off"
               spellCheck={false}
-              className="field py-2.5 font-mono text-[12px]"
+              className="field py-2 font-mono text-[12.5px]"
               placeholder="From the account that invited you"
             />
           </div>
@@ -259,7 +252,7 @@ export function AuthForm({
         {error && (
           <p
             role="alert"
-            className="rounded-2xl border border-danger/25 bg-danger/8 px-4 py-2.5 text-[12px] text-danger"
+            className="rounded-lg border border-danger/30 bg-danger/8 px-3.5 py-2.5 text-[12.5px] text-danger"
           >
             {error}
           </p>
@@ -267,7 +260,7 @@ export function AuthForm({
         {notice && (
           <p
             role="status"
-            className="rounded-2xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12px] text-accent-text"
+            className="rounded-lg border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[12.5px] text-accent-text"
           >
             {notice}
           </p>
@@ -281,19 +274,17 @@ export function AuthForm({
         >
           {busy
             ? mode === "signin"
-              ? "Signed in"
-              : "Account created"
+              ? "Signing in…"
+              : "Creating account…"
             : mode === "signin"
               ? "Sign in"
               : "Create account"}
         </button>
       </form>
-
     </div>
   );
 }
 
-/** The four-colour mark, so the button reads as Google before the label does. */
 function GoogleMark() {
   return (
     <svg

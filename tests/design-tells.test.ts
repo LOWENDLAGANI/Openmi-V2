@@ -4,11 +4,11 @@ import { existsSync, readFileSync } from "node:fs";
 /**
  * The tells this product refuses, pinned.
  *
- * These are not style preferences: each one was a measurable marker in the 2026
- * studies of generated sites — an animated gradient border on the primary
- * control, gradient-clipped headline type, a page that calls itself honest, a
- * screenshot of a design that no longer exists. A future edit can still add
- * one, but it has to delete a failing test first.
+ * These are not style preferences: each one was a measurable marker of
+ * generated-site clichés — animated gradient borders, gradient-clipped
+ * headline type, faux macOS traffic-light dots, pulsing dot badges, purple/
+ * lavender dark themes, radial glow backdrops, or editorial serif+cream
+ * templates. A future edit can still add one, but it has to fail a test first.
  */
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -21,8 +21,6 @@ const PACKAGE = JSON.parse(read("package.json")) as {
 test("the composer is one surface, not a glowing frame", () => {
   const composer = read("components/Composer.tsx");
 
-  // A rainbow animated border around the message field is the single most
-  // recognisable generated-UI ornament, and it was here.
   expect(composer).not.toContain("Beam");
   expect(existsSync(at("components/Beam.tsx"))).toBe(false);
   expect(PACKAGE.dependencies?.["border-beam"]).toBeUndefined();
@@ -31,8 +29,6 @@ test("the composer is one surface, not a glowing frame", () => {
 test("no gradient is applied to type", () => {
   const css = read("app/globals.css");
 
-  // A heading whose colour has to fade to stay interesting is decoration
-  // applied to typography, and its light end fails contrast on a phone.
   expect(css).not.toContain(".gradient-text");
 
   for (const file of ["app/page.tsx", "components/LandingPreview.tsx"]) {
@@ -44,16 +40,36 @@ test("no gradient is applied to type", () => {
 test("the landing page shows facts instead of labelling the page", () => {
   const landing = read("app/page.tsx");
 
-  // No uppercase kicker above every heading, and no page calling itself honest:
-  // both are counted generation tells, and neither is information.
   expect(landing).not.toContain("uppercase");
   expect(landing.toLowerCase()).not.toContain("honest");
   expect(read("app/about/page.tsx")).not.toContain("The honesty rule");
 });
 
 test("no screenshot of a design that no longer exists", () => {
-  // A committed landing-page.png went stale the moment the page was rebuilt;
-  // the product is drawn in HTML, which cannot drift from the app.
   expect(existsSync(at("landing-page.png"))).toBe(false);
   expect(read("components/LandingPreview.tsx")).toContain("role=\"img\"");
+});
+
+test("precision typography and zero AI-slop visual tropes", () => {
+  const layout = read("app/layout.tsx");
+  const css = read("app/globals.css");
+  const preview = read("components/LandingPreview.tsx");
+  const about = read("app/about/page.tsx");
+
+  // No editorial-serif + Instrument Sans cliché
+  expect(layout).not.toContain("Fraunces");
+  expect(layout).not.toContain("Instrument_Sans");
+  expect(layout).toContain("Geist");
+
+  // No purple/lavender ink theme or radial dark-mode glow
+  expect(css).not.toContain("#a09ad8");
+  expect(css).not.toContain("#1b1826");
+  const darkBlock = css.slice(css.indexOf("html.dark {"), css.indexOf("html.ink {"));
+  expect(darkBlock).not.toContain("radial-gradient");
+
+  // No macOS traffic lights, pulsing badge dots, or left-stripe callout cards
+  expect(css).not.toContain(".preview-dots");
+  expect(css).not.toContain("badge-pulse");
+  expect(preview).not.toContain("preview-dots");
+  expect(about).not.toContain("shadow-[inset_3px_0_0_var(--accent)]");
 });

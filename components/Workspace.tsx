@@ -1,3 +1,4 @@
+import { ExternalLink, FileCode2, Folder, GitBranch } from "lucide-react";
 import Link from "next/link";
 
 import { PathFilter } from "@/components/PathFilter";
@@ -65,7 +66,7 @@ function CodeView({ text, highlight }: { text: string; highlight: number | null 
   const shown = lines.slice(0, MAX_VIEW_LINES);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-card">
+    <div className="overflow-hidden rounded-xl border border-line bg-card">
       <div className="max-h-[70vh] overflow-auto">
         <ol className="min-w-max py-2 font-mono text-[12px] leading-[1.7]">
           {shown.map((content, index) => {
@@ -79,8 +80,8 @@ function CodeView({ text, highlight }: { text: string; highlight: number | null 
                 className={`flex gap-4 px-4 ${active ? "bg-accent-soft" : ""}`}
               >
                 <span
-                  className={`w-9 shrink-0 select-none text-right ${
-                    active ? "text-accent-text" : "text-low"
+                  className={`w-9 shrink-0 select-none text-right tabular-nums ${
+                    active ? "font-medium text-accent-text" : "text-low"
                   }`}
                 >
                   {number}
@@ -95,7 +96,7 @@ function CodeView({ text, highlight }: { text: string; highlight: number | null 
       </div>
 
       {lines.length > shown.length && (
-        <p className="border-t border-line px-4 py-2 text-[11px] text-mid">
+        <p className="border-t border-line bg-raised px-4 py-2 text-[11.5px] text-mid">
           Showing the first {shown.length} of {lines.length} lines.
         </p>
       )}
@@ -133,29 +134,35 @@ export function Workspace(props: WorkspaceProps) {
 
   return (
     <div className="fade-in mx-auto w-full max-w-6xl space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
         <div className="min-w-0">
-          <p className="eyebrow">workspace</p>
-          <h2 className="mt-1 flex items-center gap-2 truncate text-[21px] font-semibold tracking-[-0.02em] text-hi">
-            {repo.fullName}
+          <div className="flex items-center gap-2">
+            <h2 className="truncate text-[19px] font-semibold tracking-[-0.02em] text-hi">
+              {repo.fullName}
+            </h2>
             {repo.private && (
-              <span className="eyebrow rounded-full bg-chip px-2 py-0.5">private</span>
+              <span className="rounded-md border border-line bg-raised px-2 py-0.5 text-[11px] font-medium text-mid">
+                private
+              </span>
             )}
-          </h2>
+          </div>
           <p
-            className="mt-1 font-mono text-[11px] text-low"
+            className="mt-1 flex items-center gap-1.5 font-mono text-[11.5px] text-low"
             title="Every read below resolves at this commit."
           >
-            {sha.slice(0, 7)} · {branch}
+            <GitBranch className="size-3.5" strokeWidth={1.75} />
+            <span>{sha.slice(0, 7)}</span>
+            <span>·</span>
+            <span>{branch}</span>
           </p>
         </div>
 
-        <Link href={pickerHref} className="btn px-4 py-1.5 text-[12px]">
+        <Link href={pickerHref} className="btn px-3.5 py-1.5 text-[12px]">
           Change repository
         </Link>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="min-w-0 space-y-3">
           <form action="/chat" method="get" className="flex items-center gap-1.5">
             {chatId && <input type="hidden" name="chat" value={chatId} />}
@@ -164,7 +171,7 @@ export function Workspace(props: WorkspaceProps) {
               name="branch"
               defaultValue={branch}
               aria-label="Branch"
-              className="field min-w-0 flex-1 px-3 py-1.5 text-[12px]"
+              className="field min-w-0 flex-1 px-2.5 py-1.5 text-[12px]"
             >
               {branches.map((name) => (
                 <option key={name} value={name}>
@@ -187,8 +194,8 @@ export function Workspace(props: WorkspaceProps) {
           />
 
           <nav aria-label="Repository files" className="panel p-2">
-            <p className="flex flex-wrap items-center gap-1 px-2 pb-2 pt-1 font-mono text-[11px] text-low">
-              <Link href={href(base)} className="hover:text-hi">
+            <p className="flex flex-wrap items-center gap-1 px-2 pb-2 pt-1 font-mono text-[11.5px] text-low">
+              <Link href={href(base)} className="font-medium hover:text-hi">
                 {repo.name}
               </Link>
               {segments.map((segment, index) => {
@@ -204,12 +211,12 @@ export function Workspace(props: WorkspaceProps) {
               })}
             </p>
 
-            <ul className="max-h-[46vh] overflow-y-auto">
+            <ul className="max-h-[46vh] space-y-0.5 overflow-y-auto">
               {dir && (
                 <li>
                   <Link
                     href={href(base, { dir: segments.slice(0, -1).join("/") })}
-                    className="block rounded-full px-3 py-1.5 font-mono text-[11.5px] text-low hover:bg-hover hover:text-hi"
+                    className="block rounded-md px-2.5 py-1.5 font-mono text-[12px] text-low hover:bg-hover hover:text-hi"
                   >
                     ..
                   </Link>
@@ -217,16 +224,17 @@ export function Workspace(props: WorkspaceProps) {
               )}
 
               {entries.length === 0 ? (
-                <li className="px-3 py-1.5 text-[11.5px] text-low">Empty directory.</li>
+                <li className="px-2.5 py-1.5 text-[12px] text-low">Empty directory.</li>
               ) : (
                 entries.map((entry) =>
                   entry.type === "tree" ? (
                     <li key={entry.path}>
                       <Link
                         href={href(base, { dir: entry.path })}
-                        className="block truncate rounded-full px-3 py-1.5 text-[12px] text-mid hover:bg-hover hover:text-hi"
+                        className="flex items-center gap-2 truncate rounded-md px-2.5 py-1.5 text-[12.5px] text-mid hover:bg-hover hover:text-hi"
                       >
-                        {entry.path.split("/").pop()}/
+                        <Folder aria-hidden="true" className="size-3.5 shrink-0 text-low" strokeWidth={1.75} />
+                        <span className="truncate">{entry.path.split("/").pop()}/</span>
                       </Link>
                     </li>
                   ) : (
@@ -234,13 +242,14 @@ export function Workspace(props: WorkspaceProps) {
                       <Link
                         href={href(base, { path: entry.path, dir })}
                         aria-current={path === entry.path ? "true" : undefined}
-                        className={`block truncate rounded-full px-3 py-1.5 text-[12px] hover:bg-hover hover:text-hi ${
+                        className={`flex items-center gap-2 truncate rounded-md px-2.5 py-1.5 text-[12.5px] hover:bg-hover hover:text-hi ${
                           path === entry.path
-                            ? "bg-accent-soft font-medium text-hi"
+                            ? "bg-accent-soft font-medium text-accent-text"
                             : "text-body"
                         }`}
                       >
-                        {entry.path.split("/").pop()}
+                        <FileCode2 aria-hidden="true" className="size-3.5 shrink-0 opacity-60" strokeWidth={1.75} />
+                        <span className="truncate">{entry.path.split("/").pop()}</span>
                       </Link>
                     </li>
                   )
@@ -249,7 +258,7 @@ export function Workspace(props: WorkspaceProps) {
             </ul>
 
             {tree.truncated && (
-              <p className="px-3 pt-2 text-[10.5px] text-low">
+              <p className="px-2.5 pt-2 text-[11px] text-low">
                 Tree truncated at {tree.entries.length} entries.
               </p>
             )}
@@ -263,7 +272,7 @@ export function Workspace(props: WorkspaceProps) {
             <input
               name="q"
               defaultValue={search?.query ?? ""}
-              placeholder="Search code in this repository"
+              placeholder="Search code in repository…"
               aria-label="Search code"
               className="field px-3 py-1.5 text-[12px]"
             />
@@ -275,7 +284,7 @@ export function Workspace(props: WorkspaceProps) {
           {searchError && (
             <p
               role="alert"
-              className="rounded-2xl border border-danger/25 bg-danger/8 px-3 py-2 text-[11px] text-danger"
+              className="rounded-lg border border-danger/25 bg-danger/8 px-3 py-2 text-[11.5px] text-danger"
             >
               {searchError}
             </p>
@@ -283,15 +292,15 @@ export function Workspace(props: WorkspaceProps) {
 
           {search && (
             <section className="panel p-2">
-              <p className="eyebrow px-2 pb-1.5 pt-1">
-                {search.totalCount} github match{search.totalCount === 1 ? "" : "es"} ·{" "}
+              <p className="px-2 pb-1.5 pt-1 font-mono text-[11px] text-low">
+                {search.totalCount} match{search.totalCount === 1 ? "" : "es"} ·{" "}
                 {search.hits.length} shown
               </p>
 
               {search.hits.length === 0 ? (
-                <p className="px-2 pb-1 text-[11.5px] text-mid">No code match.</p>
+                <p className="px-2 pb-1 text-[12px] text-mid">No code matches.</p>
               ) : (
-                <ul className="max-h-[30vh] overflow-y-auto">
+                <ul className="max-h-[30vh] space-y-0.5 overflow-y-auto">
                   {search.hits.map((hit) => (
                     <li key={hit.path}>
                       <Link
@@ -299,7 +308,7 @@ export function Workspace(props: WorkspaceProps) {
                           path: hit.path,
                           line: hit.line ? String(hit.line) : undefined,
                         })}
-                        className="block truncate rounded-full px-3 py-1.5 font-mono text-[11px] text-body hover:bg-hover hover:text-hi"
+                        className="block truncate rounded-md px-2.5 py-1.5 font-mono text-[11.5px] text-body hover:bg-hover hover:text-hi"
                       >
                         {hit.path}
                         {hit.line ? `:${hit.line}` : ""}
@@ -308,28 +317,28 @@ export function Workspace(props: WorkspaceProps) {
                   ))}
                 </ul>
               )}
-
             </section>
           )}
         </aside>
 
-        <section className="min-w-0 space-y-2">
+        <section className="min-w-0 space-y-2.5">
           {file ? (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
-                <p className="min-w-0 truncate font-mono text-[12px] text-body">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-raised px-3.5 py-2">
+                <p className="min-w-0 truncate font-mono text-[12px] font-medium text-hi">
                   {file.path}
                 </p>
-                <div className="flex items-center gap-3 font-mono text-[10.5px] text-low">
-                  <span>{file.bytes.toLocaleString()} bytes</span>
+                <div className="flex items-center gap-3 font-mono text-[11px] text-low">
+                  <span className="tabular-nums">{file.bytes.toLocaleString()} bytes</span>
                   {externalUrl && (
                     <a
                       href={externalUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="hover:text-hi"
+                      className="inline-flex items-center gap-1 text-accent-text hover:underline"
                     >
-                      github ↗
+                      <span>GitHub</span>
+                      <ExternalLink className="size-3" strokeWidth={1.75} />
                     </a>
                   )}
                 </div>
@@ -339,15 +348,15 @@ export function Workspace(props: WorkspaceProps) {
           ) : fileError ? (
             <p
               role="alert"
-              className="panel px-5 py-4 text-[12.5px] text-mid"
+              className="panel px-5 py-4 text-[13px] text-danger"
             >
               {fileError}
             </p>
           ) : (
-            <div className="rounded-3xl border border-dashed border-line-strong px-6 py-20 text-center">
-              <p className="eyebrow">nothing open</p>
-              <p className="mt-2 text-[17px] font-semibold tracking-[-0.02em] text-hi">
-                Pick a file from the tree.
+            <div className="rounded-xl border border-dashed border-line-strong bg-raised/40 px-6 py-24 text-center">
+              <p className="text-[12px] font-medium text-low">No file selected</p>
+              <p className="mt-1.5 text-[16px] font-semibold tracking-[-0.02em] text-hi">
+                Pick a file from the repository tree.
               </p>
             </div>
           )}

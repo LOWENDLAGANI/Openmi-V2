@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { readConsent, writeConsent, type ConsentChoice } from "@/lib/consent";
 
@@ -25,21 +24,20 @@ export function CookieConsent() {
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-card/95 px-4 py-3 backdrop-blur sm:px-6"
+      className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-4xl rounded-xl border border-line-strong bg-card/95 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-md sm:inset-x-6 sm:bottom-5"
     >
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p className="text-[12.5px] leading-relaxed text-mid">
-          Openmi uses an essential session cookie to keep you signed in, and a
-          functional cookie to remember your region. Banner advertising is
-          served by Adsterra and is loaded only if you accept; it may set its own
-          cookies. Read the{" "}
+          Openmi uses an essential session cookie to keep you signed in and a
+          functional cookie for your selected region. Banner advertising by
+          Adsterra loads only if you accept. Read the{" "}
           <Link
             href="/privacy#cookies"
-            className="text-accent-text underline-offset-2 hover:underline"
+            className="font-medium text-accent-text underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
           >
             cookie section
           </Link>{" "}
-          of the Privacy Policy for the full list.
+          of the Privacy Policy for details.
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <button

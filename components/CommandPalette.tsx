@@ -1,19 +1,11 @@
 "use client";
 
+import { CornerDownLeft, FileText, MessageSquare, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { MIN_QUERY_CHARS } from "@/lib/search";
-
-/**
- * Ctrl/Cmd+K: one box over this account's chats and messages.
- *
- * The search runs on the server under RLS — this app has no local database, so
- * a client-side index would either be empty or a privacy problem. Results are
- * debounced and aborted on each keystroke, and the dialog is keyboard-first:
- * arrows move, Enter opens, Escape closes.
- */
 
 type ChatHit = { id: string; title: string; updatedAt: string };
 type MessageHit = {
@@ -46,7 +38,7 @@ export function CommandPalette() {
         kind: "chat" as const,
         id: chat.id,
         title: chat.title,
-        hint: "chat",
+        hint: "Chat thread",
       })),
       ...messages.map((message) => ({
         kind: "message" as const,
@@ -59,7 +51,6 @@ export function CommandPalette() {
     [chats, messages]
   );
 
-  // Opening from anywhere: the shortcut, or the sidebar button's event.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -89,8 +80,6 @@ export function CommandPalette() {
     return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
-  // Debounced, aborted search. A keystroke cancels the request it replaced, so
-  // a slow answer cannot overwrite a newer one.
   useEffect(() => {
     if (!open) return;
 
@@ -150,34 +139,23 @@ export function CommandPalette() {
 
   if (!open) return null;
 
-  const body = createPortal(
+  return createPortal(
     <div className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[12vh]">
       <button
         type="button"
         aria-label="Close search"
         onClick={() => setOpen(false)}
-        className="fade-in absolute inset-0 bg-black/55 backdrop-blur-[3px]"
+        className="fade-in absolute inset-0 bg-black/50 backdrop-blur-[2px]"
       />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Search chats and messages"
-        className="animate-pop relative w-full max-w-xl overflow-hidden rounded-2xl border border-line-strong bg-card shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+        className="animate-pop relative w-full max-w-xl overflow-hidden rounded-xl border border-line-strong bg-card shadow-[0_28px_72px_rgba(0,0,0,0.42)]"
       >
-        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="size-4 shrink-0 text-low"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m16.5 16.5 4 4" />
-          </svg>
+        <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
+          <Search aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
 
           <input
             ref={inputRef}
@@ -191,7 +169,9 @@ export function CommandPalette() {
               }
               if (event.key === "ArrowDown") {
                 event.preventDefault();
-                setActive((current) => (results.length === 0 ? 0 : (current + 1) % results.length));
+                setActive((current) =>
+                  results.length === 0 ? 0 : (current + 1) % results.length
+                );
               }
               if (event.key === "ArrowUp") {
                 event.preventDefault();
@@ -206,84 +186,95 @@ export function CommandPalette() {
             }}
             placeholder="Search chats and messages…"
             aria-label="Search chats and messages"
-            className="min-w-0 flex-1 bg-transparent text-[14px] text-body placeholder:text-low focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-[14px] text-hi placeholder:text-low focus:outline-none"
           />
 
-          {loading && <div className="skeleton size-4 rounded-full" />}
+          {loading && <div className="skeleton size-4 rounded-md" />}
 
-          <kbd className="rounded border border-line-strong px-1.5 py-0.5 text-[9.5px] text-low">
+          <kbd className="rounded-md border border-line bg-raised px-1.5 py-0.5 font-mono text-[10px] text-low">
             esc
           </kbd>
         </div>
 
-        <div className="max-h-[52vh] overflow-y-auto p-2">
+        <div className="max-h-[52vh] overflow-y-auto p-1.5">
           {query.trim().length < MIN_QUERY_CHARS ? (
-            <p className="px-3 py-6 text-center text-[12px] leading-relaxed text-low">
-              Type at least {MIN_QUERY_CHARS} characters.
+            <p className="px-3 py-8 text-center text-[12.5px] leading-relaxed text-low">
+              Type at least {MIN_QUERY_CHARS} characters to search your threads.
             </p>
           ) : error ? (
-            <p role="alert" className="px-3 py-6 text-center text-[12px] text-danger">
+            <p role="alert" className="px-3 py-8 text-center text-[12.5px] text-danger">
               {error}
             </p>
           ) : results.length === 0 ? (
             loading ? (
-              <div className="space-y-2 px-3 py-4">
+              <div className="space-y-1.5 px-2 py-3">
                 {Array.from({ length: 3 }).map((_, index) => (
                   <div
                     key={index}
-                    className="skeleton h-9 rounded-xl"
+                    className="skeleton h-10 rounded-lg"
                     style={{ animationDelay: `${index * 90}ms` }}
                   />
                 ))}
               </div>
             ) : (
-              <p className="px-3 py-6 text-center text-[12px] text-low">
-                No chat or message matches that.
+              <p className="px-3 py-8 text-center text-[12.5px] text-low">
+                No matching chats or messages.
               </p>
             )
           ) : (
-            <ul role="listbox" aria-label="Search results">
-              {results.map((result, index) => (
-                <li key={`${result.kind}-${result.id}`}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={index === active}
-                    onMouseEnter={() => setActive(index)}
-                    onClick={() => choose(result)}
-                    className={`flex w-full items-start gap-2.5 rounded-xl px-3 py-2 text-left ${
-                      index === active ? "bg-elevated" : "hover:bg-hover"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
-                        result.kind === "chat" ? "bg-accent" : "bg-line-strong"
+            <ul role="listbox" aria-label="Search results" className="space-y-0.5">
+              {results.map((result, index) => {
+                const Icon = result.kind === "chat" ? MessageSquare : FileText;
+                const isSelected = index === active;
+                return (
+                  <li key={`${result.kind}-${result.id}`}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onMouseEnter={() => setActive(index)}
+                      onClick={() => choose(result)}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+                        isSelected ? "bg-elevated text-hi" : "hover:bg-hover"
                       }`}
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[12.5px] font-medium text-hi">
-                        {result.title}
+                    >
+                      <Icon
+                        aria-hidden="true"
+                        className={`size-4 shrink-0 ${
+                          isSelected ? "text-accent-text" : "text-low"
+                        }`}
+                        strokeWidth={1.75}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-hi">
+                          {result.title}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11.5px] text-low">
+                          {result.hint}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] text-low">
-                        {result.hint}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
+                      {isSelected && (
+                        <CornerDownLeft
+                          aria-hidden="true"
+                          className="size-3.5 shrink-0 text-low"
+                        />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2 text-[9.5px] text-low">
-          <span>↑ ↓ move · enter open</span>
-          <span>{results.length} result{results.length === 1 ? "" : "s"}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-raised px-4 py-2 font-mono text-[11px] text-low">
+          <span>↑↓ navigate · ↵ open</span>
+          <span className="tabular-nums">
+            {results.length} result{results.length === 1 ? "" : "s"}
+          </span>
         </div>
       </div>
     </div>,
     document.body
   );
-
-  return body;
 }

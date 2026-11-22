@@ -139,14 +139,14 @@ export function PreviewPanel({
     }
   }
 
-  const dot =
+  const tone =
     state === "ready"
-      ? "bg-accent"
+      ? "text-[color:var(--diff-add)]"
       : state === "starting"
-        ? "bg-warn"
+        ? "text-warn"
         : state === "failed"
-          ? "bg-danger"
-          : "bg-line-strong";
+          ? "text-danger"
+          : "text-low";
 
   return (
     <div className={active ? "" : "hidden"}>
@@ -155,13 +155,12 @@ export function PreviewPanel({
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="flex min-w-0 items-center gap-1.5 text-[11px] text-mid hover:text-hi"
+          className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-mid hover:text-hi"
         >
           <span aria-hidden="true" className="text-low">
             {open ? "▾" : "▸"}
           </span>
-          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dot}`} />
-          <span className="truncate">
+          <span className={`truncate font-medium ${tone}`}>
             {LABEL[state]}
             {status?.port ? ` · port ${status.port}` : ""}
           </span>

@@ -3,12 +3,7 @@ import type { ReactNode } from "react";
 import { OpenmiMark } from "@/components/OpenmiMark";
 
 /**
- * The loading vocabulary: one spinner, one pill, used everywhere.
- *
- * The spinner is the brand mark on its axis rather than a generic ring, so a
- * wait looks like part of the product. It is decoration only: the text beside
- * it carries the meaning, and the global reduced-motion rule stops the
- * rotation for anyone who asks for that.
+ * The loading vocabulary: one spinner, one status bar, used everywhere.
  */
 export function Spinner({
   size = 16,
@@ -28,17 +23,12 @@ export function Spinner({
   );
 }
 
-/**
- * The "still working" pill. The animated dots are hidden from assistive tech;
- * the label is announced once, politely, instead of on every repaint.
- */
 export function ThinkingPill({
   label,
   icon,
   className = "",
 }: {
   label: string;
-  /** The mark beside the label; the brand spinner unless a caller supplies one. */
   icon?: ReactNode;
   className?: string;
 }) {
@@ -46,15 +36,10 @@ export function ThinkingPill({
     <div
       role="status"
       aria-live="polite"
-      className={`flex w-fit max-w-full items-center gap-2.5 rounded-full bg-accent-soft px-4 py-2.5 text-[10.5px] text-accent-text ${className}`}
+      className={`flex w-fit max-w-full items-center gap-2 rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] font-medium text-mid ${className}`}
     >
-      {icon ?? <Spinner size={15} className="text-accent-text" />}
+      {icon ?? <Spinner size={14} className="text-accent-text" />}
       <span className="min-w-0 truncate">{label}</span>
-      <span className="computing inline-flex gap-[2px]" aria-hidden="true">
-        <span>·</span>
-        <span>·</span>
-        <span>·</span>
-      </span>
     </div>
   );
 }

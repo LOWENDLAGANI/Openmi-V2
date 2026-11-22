@@ -335,12 +335,12 @@ export function AdBlockGate() {
       data-adblock-gate=""
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-canvas px-4 py-10"
     >
-      <div className="w-full max-w-md rounded-3xl border border-line bg-card p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
-        <p className="eyebrow">advertisement check</p>
+      <div className="w-full max-w-md rounded-xl border border-line-strong bg-card p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+        <p className="eyebrow">Advertisement check</p>
 
         <h2
           id="adblock-title"
-          className="mt-2 text-[21px] font-semibold leading-tight tracking-[-0.02em] text-hi"
+          className="mt-2 text-[20px] font-semibold leading-tight tracking-[-0.02em] text-hi"
         >
           Openmi is paused because your ad blocker is on
         </h2>
@@ -371,7 +371,7 @@ export function AdBlockGate() {
           type="button"
           onClick={checkAgain}
           disabled={checking}
-          className="mt-5 w-full rounded-full bg-accent px-4 py-2.5 text-[13px] font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="btn btn-primary mt-5 w-full py-2.5 text-[13px]"
         >
           {checking ? "Checking…" : "I turned it off — check again"}
         </button>

@@ -1,13 +1,9 @@
 "use client";
 
+import { Search } from "lucide-react";
+
 /**
- * The discoverable half of Ctrl/Cmd+K: a button that asks the palette to open.
- *
- * The palette owns the dialog and the keyboard shortcut; this only dispatches
- * the event, so the sidebar stays a server component. It is drawn as one of the
- * rail's five tool icons, matching the reference: the field this replaced took a
- * full row of a 292px column to say one word, and looked like an input nobody
- * could type in. The title carries the shortcut instead.
+ * Opens the global Cmd/Ctrl+K search command palette from the sidebar.
  */
 export function SearchLauncher() {
   return (
@@ -16,20 +12,15 @@ export function SearchLauncher() {
       onClick={() => window.dispatchEvent(new Event("openmi:search"))}
       aria-label="Search chats and messages"
       title="Search chats and messages (Ctrl+K)"
-      className="rail-icon grid size-10 place-items-center rounded-xl"
+      className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 text-[12.5px] text-low transition-colors hover:border-line-strong hover:text-hi"
     >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="size-[19px]"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      >
-        <circle cx="10.8" cy="10.8" r="6.3" />
-        <path d="m16 16 4 4" />
-      </svg>
+      <span className="flex min-w-0 items-center gap-2">
+        <Search aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.75} />
+        <span className="truncate">Search…</span>
+      </span>
+      <kbd className="rounded border border-line bg-raised px-1.5 py-0.5 font-mono text-[10px] leading-none text-low">
+        ⌘K
+      </kbd>
     </button>
   );
 }

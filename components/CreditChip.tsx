@@ -1,5 +1,6 @@
 "use client";
 
+import { Coins } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -10,16 +11,6 @@ export const CREDIT_EVENT = "openmi:credit";
 
 export type CreditUpdate = { balance: number; wallet?: number };
 
-/**
- * The Credit chip in the header.
- *
- * The server renders the balance the page was built with, but a turn charges
- * before it answers, so waiting for a re-render leaves a stale number on screen
- * for the length of a model call. The chat stream publishes the balance the
- * charge produced as a window event and this chip shows it at once. The server
- * value still wins whenever it changes: the event is a hint, the profile row is
- * the truth.
- */
 export function CreditChip({
   initialBalance,
   initialWallet,
@@ -30,8 +21,6 @@ export function CreditChip({
   const [balance, setBalance] = useState(initialBalance);
   const [wallet, setWallet] = useState(initialWallet);
 
-  // A refresh re-renders the server component with the read balance; adopt it
-  // rather than keep a number the database has already moved past.
   useEffect(() => {
     setBalance(initialBalance);
     setWallet(initialWallet);
@@ -59,12 +48,14 @@ export function CreditChip({
     <Link
       href="/activity"
       title={`${CREDIT_PER_HOUR} Credit per hour. Wallet ${formatCredit(wallet)}.`}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] ${
-        low ? "border-warn/35 bg-warn/8 text-warn" : "border-line bg-card text-low"
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium tabular-nums transition-colors ${
+        low
+          ? "border-warn/35 bg-warn/10 text-warn hover:border-warn/60"
+          : "border-line bg-card text-mid hover:border-line-strong hover:text-hi"
       }`}
     >
-      <span aria-hidden="true" className="size-1 rounded-full bg-current" />
-      credit {formatCredit(balance)}
+      <Coins aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.75} />
+      <span>{formatCredit(balance)} Credit</span>
     </Link>
   );
 }

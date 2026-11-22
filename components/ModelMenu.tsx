@@ -1,20 +1,11 @@
 "use client";
 
+import { Check, ChevronDown, Lock } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { MODEL_CATEGORIES, type ModelCapability } from "@/lib/models";
 
-/**
- * The model picker.
- *
- * A native `<select>` cannot carry a description, a group heading and a disabled
- * reason without looking like a form control from another product. This is a
- * popover that opens upward out of the composer: grouped by capability, closed on
- * an outside pointer or Escape, and reachable from the keyboard (arrows move,
- * Enter chooses). It still knows nothing about providers — only the public name,
- * the blurb and whether a key exists.
- */
 export function ModelMenu({
   models,
   value,
@@ -25,7 +16,6 @@ export function ModelMenu({
   models: ModelCapability[];
   value: string;
   onChange: (id: string) => void;
-  /** The picker shows what a pass unlocks; it is not what enforces it. */
   paidActive?: boolean;
   disabled?: boolean;
 }) {
@@ -70,7 +60,6 @@ export function ModelMenu({
     };
   }, [open]);
 
-  /** Arrow keys walk the options; Enter is the button's own activation. */
   function onPanelKey(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
@@ -91,8 +80,7 @@ export function ModelMenu({
           ? 0
           : options.length - 1
         : (index + step + options.length) % options.length;
-    const target = options[targetIndex];
-    target?.focus();
+    options[targetIndex]?.focus();
   }
 
   const groups = MODEL_CATEGORIES.map((category) => ({
@@ -110,29 +98,21 @@ export function ModelMenu({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Model: ${current?.name ?? value}`}
-        className="model-pill lift max-w-[10.5rem] disabled:opacity-50"
+        className="model-pill max-w-[11.5rem] disabled:opacity-50"
       >
-        <span className="min-w-0 truncate text-[11px]">
+        <span className="min-w-0 truncate text-[12px]">
           {current?.name ?? value}
         </span>
         {current?.paidOnly === true && !paidActive && (
-          <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] text-accent-text">
-            paid
-          </span>
+          <Lock aria-hidden="true" className="size-3 shrink-0 text-accent-text" strokeWidth={2} />
         )}
-        <svg
+        <ChevronDown
           aria-hidden="true"
-          viewBox="0 0 24 24"
-          className={`size-3 shrink-0 text-low transition-transform duration-200 ${
+          className={`size-3.5 shrink-0 text-low transition-transform duration-150 ${
             open ? "rotate-180" : ""
           }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+          strokeWidth={1.75}
+        />
       </button>
 
       {open &&
@@ -150,11 +130,13 @@ export function ModelMenu({
               left: pos.left,
               zIndex: 100,
             }}
-            className="animate-pop max-h-[58vh] w-64 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl border border-line bg-card p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.22)]"
+            className="animate-pop max-h-[58vh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-line-strong bg-card p-1.5 shadow-[0_24px_56px_rgba(0,0,0,0.28)]"
           >
             {groups.map((group) => (
-              <div key={group.id} className="pb-1 last:pb-0">
-                <p className="eyebrow px-2.5 pb-1 pt-1.5">{group.label}</p>
+              <div key={group.id} className="pb-1.5 last:pb-0">
+                <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-low">
+                  {group.label}
+                </p>
 
                 {group.options.map((option) => {
                   const available = option.available !== false;
@@ -172,7 +154,7 @@ export function ModelMenu({
                         onChange(option.id);
                         setOpen(false);
                       }}
-                      className={`flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                      className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
                         active
                           ? "bg-elevated text-hi"
                           : "text-body hover:bg-hover hover:text-hi"
@@ -180,18 +162,18 @@ export function ModelMenu({
                     >
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
-                          <span className="truncate text-[12px] font-medium">
+                          <span className="truncate text-[12.5px] font-medium">
                             {option.name}
                           </span>
                           {locked && (
-                            <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] text-accent-text">
-                              paid
+                            <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent-text">
+                              Pass
                             </span>
                           )}
                         </span>
-                        <span className="mt-0.5 block text-[10px] leading-snug text-low">
+                        <span className="mt-0.5 block text-[11px] leading-snug text-low">
                           {locked
-                            ? "Paid passes only"
+                            ? "Requires an active pass"
                             : available
                               ? option.blurb
                               : "Provider key missing"}
@@ -199,18 +181,11 @@ export function ModelMenu({
                       </span>
 
                       {active && (
-                        <svg
+                        <Check
                           aria-hidden="true"
-                          viewBox="0 0 24 24"
                           className="mt-0.5 size-3.5 shrink-0 text-accent-text"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="m5 12.5 4.5 4.5L19 7.5" />
-                        </svg>
+                          strokeWidth={2.25}
+                        />
                       )}
                     </button>
                   );

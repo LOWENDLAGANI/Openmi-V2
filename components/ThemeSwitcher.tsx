@@ -1,22 +1,18 @@
 "use client";
 
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 /**
- * The three appearances, as a class on <html>.
+ * The three appearances, applied as a class on <html>.
  *
- * Light is the default and has no class of its own; Dark and Ink are `dark` and
- * `ink`. The ids stay `paper|dark|ink` because they are already written into
- * people's localStorage: renaming them would reset every saved appearance to
- * the default. Only the labels follow the reference. The value is read once on
- * mount — never during render — so the server and the first client render
- * agree. `localStorage` is the only store; the bootstrap script in the root
- * layout applies it before paint.
+ * The stored ids stay `paper | dark | ink` so existing `localStorage` entries
+ * keep working seamlessly; `ink` now renders our Midnight Slate palette.
  */
 const THEMES = [
-  { id: "paper", label: "Light", swatch: "#0066ff", className: "" },
-  { id: "dark", label: "Dark", swatch: "#6ec294", className: "dark" },
-  { id: "ink", label: "Ink", swatch: "#a09ad8", className: "ink" },
+  { id: "paper", label: "Light", swatch: "#fafafa", className: "" },
+  { id: "dark", label: "Dark", swatch: "#09090b", className: "dark" },
+  { id: "ink", label: "Slate", swatch: "#192230", className: "ink" },
 ] as const;
 
 type ThemeId = (typeof THEMES)[number]["id"];
@@ -30,7 +26,6 @@ export function ThemeSwitcher({
   variant = "segmented",
 }: {
   className?: string;
-  /** `icon` is one button that cycles the themes, for the sidebar's account bar. */
   variant?: "segmented" | "icon";
 }) {
   const [theme, setTheme] = useState<ThemeId>("paper");
@@ -59,25 +54,18 @@ export function ThemeSwitcher({
     const current = THEMES[index] ?? THEMES[0];
     const next = THEMES[(index + 1) % THEMES.length];
 
+    const Icon =
+      current.id === "paper" ? Sun : current.id === "dark" ? Moon : Monitor;
+
     return (
       <button
         type="button"
         onClick={() => apply(next.id)}
         aria-label={`Theme: ${current.label}. Switch to ${next.label}`}
-        title={`Theme: ${current.label} · switch to ${next.label}`}
-        className={`grid size-9 shrink-0 place-items-center rounded-full text-mid transition-colors hover:bg-hover hover:text-hi ${className}`}
+        title={`Theme: ${current.label} — switch to ${next.label}`}
+        className={`grid size-8 shrink-0 place-items-center rounded-lg border border-transparent text-mid transition-colors hover:border-line hover:bg-hover hover:text-hi ${className}`}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="size-[18px]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.7"
-        >
-          <circle cx="12" cy="12" r="8.2" />
-          <path d="M12 3.8a8.2 8.2 0 0 1 0 16.4Z" fill="currentColor" stroke="none" />
-        </svg>
+        <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
       </button>
     );
   }
@@ -86,7 +74,7 @@ export function ThemeSwitcher({
     <div
       role="group"
       aria-label="Theme"
-      className={`inline-flex items-center gap-1 rounded-full border border-line bg-card p-1 ${className}`}
+      className={`inline-flex items-center gap-0.5 rounded-lg border border-line bg-raised p-0.5 ${className}`}
     >
       {THEMES.map((option) => {
         const active = option.id === theme;
@@ -98,15 +86,15 @@ export function ThemeSwitcher({
             onClick={() => apply(option.id)}
             aria-pressed={active}
             title={`${option.label} theme`}
-            className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[10.5px] transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
               active
-                ? "bg-elevated text-hi"
-                : "text-low hover:bg-hover hover:text-hi"
+                ? "bg-card text-hi shadow-[var(--card-shadow)]"
+                : "text-low hover:text-hi"
             }`}
           >
             <span
               aria-hidden="true"
-              className="size-2 rounded-full border border-line-strong"
+              className="size-2 rounded-sm border border-line-strong"
               style={{ backgroundColor: option.swatch }}
             />
             {option.label}

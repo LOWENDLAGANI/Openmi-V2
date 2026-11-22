@@ -130,11 +130,11 @@ export function AboutLogoGate() {
           <div
             role="dialog"
             aria-label="Admin verification"
-            className="animate-pop fixed bottom-4 right-4 z-[70] w-[calc(100%-2rem)] max-w-xs rounded-3xl border border-line-strong bg-card p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
+            className="animate-pop fixed bottom-4 right-4 z-[70] w-[calc(100%-2rem)] max-w-xs rounded-xl border border-line-strong bg-card p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="eyebrow">restricted</p>
+                <p className="eyebrow">Restricted</p>
                 <p className="mt-1 text-[14px] font-semibold tracking-[-0.02em] text-hi">
                   Admin verification
                 </p>
@@ -146,7 +146,7 @@ export function AboutLogoGate() {
                   setError(null);
                 }}
                 aria-label="Close admin verification"
-                className="grid size-6 shrink-0 place-items-center rounded-full text-[14px] leading-none text-low hover:bg-hover hover:text-hi"
+                className="grid size-6 shrink-0 place-items-center rounded-md text-[14px] leading-none text-low hover:bg-hover hover:text-hi"
               >
                 ×
               </button>

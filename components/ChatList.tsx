@@ -1,5 +1,6 @@
 "use client";
 
+import { Folder as FolderIcon, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState } from "react";
 
@@ -13,22 +14,6 @@ import {
 } from "@/app/chat/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { Chat, Folder } from "@/lib/types";
-
-/**
- * The chat list, painted before the server agrees.
- *
- * Trashing a chat, moving it to a folder and deleting a folder are all list
- * edits the reader already decided on, so the list makes them on the click: the
- * row leaves, the chat changes group, the folder's chats fall back to ungrouped.
- * `useOptimistic` ties every guess to the form action that produced it — if the
- * action throws or the guard refuses it, the guess is discarded and the list
- * paints the server's version again. That is the rollback, and the reader never
- * sat through a round trip to watch a row disappear.
- *
- * Creating a folder is the one edit left server-first: its name is settled
- * locally but its id is not, so a guessed group could not hold the folder's own
- * settings forms.
- */
 
 type Change =
   | { kind: "trash"; chatId: string }
@@ -66,7 +51,6 @@ function apply(board: Board, change: Change): Board {
     };
   }
 
-  // Deleting a folder keeps its chats; they are ungrouped, not removed.
   return {
     folders: board.folders.filter((folder) => folder.id !== change.folderId),
     chats: board.chats.map((chat) =>
@@ -110,30 +94,32 @@ function ChatRow({
   return (
     <div
       data-active={active}
-      className="rail-row group relative flex items-center rounded-xl"
+      className="rail-row group relative flex items-center rounded-lg"
     >
       <Link
         href={`/chat?chat=${chat.id}`}
         aria-current={active ? "page" : undefined}
         onClick={() => onOpen(chat.id)}
         title={chat.title}
-        className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-1"
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2.5 pr-1"
       >
         <span
-          className={`min-w-0 flex-1 truncate text-[13px] ${active ? "font-medium" : ""}`}
+          className={`min-w-0 flex-1 truncate text-[13px] ${
+            active ? "font-medium text-hi" : ""
+          }`}
         >
           {chat.title}
         </span>
       </Link>
 
-      <details className="relative shrink-0 pr-1.5">
+      <details className="relative shrink-0 pr-1">
         <summary
-          className="grid size-7 cursor-pointer list-none place-items-center rounded-full text-[14px] leading-none text-low opacity-0 transition-opacity hover:bg-canvas hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          className="grid size-6 cursor-pointer list-none place-items-center rounded-md text-low opacity-0 transition-opacity hover:bg-card hover:text-hi focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
           aria-label={`Options for ${chat.title}`}
         >
-          ⋯
+          <MoreHorizontal aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
         </summary>
-        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-line bg-card p-1.5 shadow-[0_18px_40px_-24px_rgba(17,24,39,0.28)]">
+        <div className="animate-pop absolute right-0 top-full z-30 mt-1 w-60 rounded-xl border border-line-strong bg-card p-2 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.35)]">
           <form action={rename} className="flex gap-1.5">
             <input type="hidden" name="chatId" value={chat.id} />
             <input
@@ -142,20 +128,20 @@ function ChatRow({
               required
               maxLength={60}
               aria-label={`Rename ${chat.title}`}
-              className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
+              className="field min-w-0 flex-1 px-2 py-1 text-[11.5px]"
             />
-            <SubmitButton className="btn px-2 py-1 text-[11px]" optimisticText="Renamed">
+            <SubmitButton className="btn px-2.5 py-1 text-[11px]" optimisticText="Renamed">
               Rename
             </SubmitButton>
           </form>
 
-          <form action={move} className="mt-1.5 flex gap-1.5 border-t border-line pt-1.5">
+          <form action={move} className="mt-2 flex gap-1.5 border-t border-line pt-2">
             <input type="hidden" name="chatId" value={chat.id} />
             <select
               name="folderId"
               defaultValue={chat.folder_id ?? ""}
               aria-label="Folder"
-              className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
+              className="field min-w-0 flex-1 px-2 py-1 text-[11.5px]"
             >
               <option value="">No folder</option>
               {folders.map((folder) => (
@@ -164,15 +150,15 @@ function ChatRow({
                 </option>
               ))}
             </select>
-            <SubmitButton className="btn px-2 py-1 text-[11px]" optimisticText="Moved">
+            <SubmitButton className="btn px-2.5 py-1 text-[11px]" optimisticText="Moved">
               Move
             </SubmitButton>
           </form>
 
-          <form action={trash} className="mt-1.5 border-t border-line pt-1.5">
+          <form action={trash} className="mt-2 border-t border-line pt-2">
             <input type="hidden" name="chatId" value={chat.id} />
             <SubmitButton
-              className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-mid hover:bg-hover hover:text-hi"
+              className="w-full rounded-md px-2 py-1.5 text-left text-[11.5px] font-medium text-danger hover:bg-danger/10"
               optimisticText="Trashed"
             >
               Move to trash
@@ -195,9 +181,6 @@ export function ChatList({
 }) {
   const [board, change] = useOptimistic<Board, Change>({ chats, folders }, apply);
 
-  // A click answers in the same frame, even though the row it opens is a server
-  // render. Without this the highlight waited for the response — long enough to
-  // look ignored, and the reason a reader clicks a second time.
   const [opening, setOpening] = useState<string | null>(null);
   const openingTimer = useRef<number | null>(null);
 
@@ -219,8 +202,6 @@ export function ChatList({
   function open(chatId: string) {
     setOpening(chatId);
 
-    // Backstop: a navigation that never lands (an offline tab, a failed RSC
-    // fetch) must not leave a row looking active forever.
     if (openingTimer.current !== null) window.clearTimeout(openingTimer.current);
     openingTimer.current = window.setTimeout(() => {
       openingTimer.current = null;
@@ -240,15 +221,15 @@ export function ChatList({
   return (
     <nav
       aria-label="Chats"
-      className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+      className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-2.5"
     >
-      <p className="px-3 pb-1.5 pt-2 text-[9.5px] text-low">
-        Chats
+      <p className="px-2.5 pb-1.5 text-[11px] font-medium text-low">
+        Recent threads
       </p>
 
       {ungrouped.length === 0 ? (
-        <p className="px-3 pb-1.5 text-[11.5px] leading-relaxed text-low">
-          Nothing here yet.
+        <p className="px-2.5 pb-2 text-[12px] leading-relaxed text-low">
+          No threads yet.
         </p>
       ) : (
         <div className="space-y-0.5">
@@ -269,25 +250,24 @@ export function ChatList({
         const items = inFolder(folder.id);
 
         return (
-          <details key={folder.id} open className="mt-1">
-            <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 hover:bg-hover">
-              <span
+          <details key={folder.id} open className="mt-2">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-hover">
+              <FolderIcon
                 aria-hidden="true"
-                className="grid size-8 shrink-0 place-items-center text-low"
-              >
-                <Glyph name="folder" />
-              </span>
+                className="size-3.5 shrink-0 text-low"
+                strokeWidth={1.75}
+              />
               <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-body">
                 {folder.name}
               </span>
-              <span className="shrink-0 text-[10px] text-low">
+              <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-low">
                 {items.length}
               </span>
             </summary>
 
-            <div className="space-y-0.5 pl-2">
+            <div className="mt-0.5 space-y-0.5 pl-2">
               {items.length === 0 ? (
-                <p className="px-3 py-1 text-[11px] text-low">Empty folder.</p>
+                <p className="px-2.5 py-1 text-[11.5px] text-low">Empty folder.</p>
               ) : (
                 items.map((chat) => (
                   <ChatRow
@@ -302,8 +282,8 @@ export function ChatList({
               )}
 
               <details className="mt-0.5">
-                <summary className="cursor-pointer list-none px-3 py-1 text-[9.5px] text-low hover:text-hi">
-                  settings
+                <summary className="cursor-pointer list-none px-2.5 py-1 text-[11px] text-low hover:text-hi">
+                  Folder settings
                 </summary>
 
                 <form action={renameFolder} className="mt-1 flex gap-1.5 px-2">
@@ -314,7 +294,7 @@ export function ChatList({
                     required
                     maxLength={60}
                     aria-label={`Rename ${folder.name}`}
-                    className="field min-w-0 flex-1 px-2 py-1 text-[11px]"
+                    className="field min-w-0 flex-1 px-2 py-1 text-[11.5px]"
                   />
                   <SubmitButton className="btn px-2 py-1 text-[11px]" optimisticText="Saved">
                     Save
@@ -339,54 +319,26 @@ export function ChatList({
         );
       })}
 
-      <details className="mt-1">
-        <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl px-3 py-2 text-[12.5px] text-mid hover:bg-hover hover:text-hi">
-          <span
-            aria-hidden="true"
-            className="grid size-8 shrink-0 place-items-center text-low"
-          >
-            <Glyph name="plus" />
-          </span>
+      <details className="mt-2">
+        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-mid hover:bg-hover hover:text-hi">
+          <Plus aria-hidden="true" className="size-3.5 shrink-0 text-low" strokeWidth={1.75} />
           New folder
         </summary>
 
-        <form action={createFolder} className="mt-1 flex gap-1.5 px-2 pb-2">
+        <form action={createFolder} className="mt-1.5 flex gap-1.5 px-2 pb-2">
           <input
             name="name"
             required
             maxLength={60}
             placeholder="Folder name"
             aria-label="New folder name"
-            className="field min-w-0 flex-1 px-3 py-1.5 text-[11px]"
+            className="field min-w-0 flex-1 px-2.5 py-1.5 text-[11.5px]"
           />
-          <SubmitButton className="btn px-3 py-1.5 text-[11px]" optimisticText="Added">
+          <SubmitButton className="btn px-2.5 py-1.5 text-[11.5px]" optimisticText="Added">
             Add
           </SubmitButton>
         </form>
       </details>
     </nav>
-  );
-}
-
-/** The two glyphs this list draws; the rail owns the rest. */
-function Glyph({ name }: { name: "folder" | "plus" }) {
-  return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      viewBox="0 0 24 24"
-      className="size-[17px] shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {name === "folder" ? (
-        <path d="M3.8 7.6a2 2 0 0 1 2-2h3.1l1.8 2.1h7.5a2 2 0 0 1 2 2v6.7a2 2 0 0 1-2 2H5.8a2 2 0 0 1-2-2Z" />
-      ) : (
-        <path d="M12 5.5v13M5.5 12h13" />
-      )}
-    </svg>
   );
 }
