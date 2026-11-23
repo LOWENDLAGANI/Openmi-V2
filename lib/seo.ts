@@ -35,7 +35,7 @@ export const SITE_NAME = "Openmi";
 export const SITE_TITLE = "Openmi — Free GitHub coding agent, priced by the hour";
 
 export const SITE_DESCRIPTION =
-  "Ad-supported browser coding agent for GitHub with cloud Linux sandboxes, live previews, verified line citations, and isolated pull requests. Free on Auto, 6 free Credit daily.";
+  "Ad-supported browser coding agent for GitHub with cloud Linux sandboxes, live previews, verified line citations, and isolated pull requests. 6 free Credit daily, 3 Credit per hour.";
 
 export const SITE_LOCALE = "en_US";
 

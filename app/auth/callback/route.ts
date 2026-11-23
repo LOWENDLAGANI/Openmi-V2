@@ -29,11 +29,32 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await supabaseServer();
-    await supabase?.auth.exchangeCodeForSession(code);
+    if (supabase) {
+      await supabase.auth.exchangeCodeForSession(code);
+
+      const cookieRef = request.cookies.get("openmi_ref")?.value;
+      if (cookieRef) {
+        try {
+          const decoded = decodeURIComponent(cookieRef).trim();
+          if (/^[A-Za-z0-9_-]{3,32}$/.test(decoded)) {
+            await supabase.rpc("claim_invite_code", { p_code: decoded });
+          }
+        } catch {
+          // Best-effort attribution; never block sign-in.
+        }
+      }
+    }
   }
 
   const response = NextResponse.redirect(new URL(next, url.origin));
   response.cookies.set("openmi_next", "", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: url.protocol === "https:",
+    path: "/",
+    maxAge: 0,
+  });
+  response.cookies.set("openmi_ref", "", {
     httpOnly: false,
     sameSite: "lax",
     secure: url.protocol === "https:",

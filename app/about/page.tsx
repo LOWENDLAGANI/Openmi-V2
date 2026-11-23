@@ -25,7 +25,7 @@ const DOES = [
   "Writes edits as per-file unified diffs against the commit the chat is pinned to.",
   `When a turn finishes with a change, writes it to ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
   "Runs installs, builds, and requested commands in an isolated Linux sandbox and reports the exact exit code observed.",
-  `Charges ${CREDIT_PER_HOUR} Credit for an hour of chat (free on Auto) before the provider is called, recording every change in an append-only ledger.`,
+  `Charges ${CREDIT_PER_HOUR} Credit for an hour of chat before the provider is called, recording every change in an append-only ledger.`,
 ];
 
 const DOES_NOT = [
@@ -144,14 +144,15 @@ export default function AboutPage() {
             Hourly pricing &amp; Credit
           </h2>
           <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
-            One hour of chat costs {CREDIT_PER_HOUR} Credit, or nothing on Auto,
-            charged once before the model provider is called. Further turns
+            One hour of chat costs {CREDIT_PER_HOUR} Credit, charged once before
+            the model provider is called. Further turns
             inside that hour carry no charge. The daily allowance is{" "}
             {DAILY_FREE_CREDIT} Credit, or {PAID_DAILY_FREE_CREDIT} while a paid
             plan is active. A {TRIAL_CREDIT} Credit trial credit is granted once
             per account, capped at one trial per address in any 24-hour window.
             The balance indicator warns below {LOW_BALANCE_CREDIT} Credit. An
-            invite rewards both accounts {INVITE_REWARD_CREDIT} Credit, up to{" "}
+            invite rewards both accounts {INVITE_REWARD_CREDIT} Credit once the
+            invited account activates its first paid pass, up to{" "}
             {MAX_INVITES_PER_ACCOUNT} rewarded accounts per inviter.
           </p>
           <p className="mt-3 text-[13.5px] leading-relaxed text-mid">

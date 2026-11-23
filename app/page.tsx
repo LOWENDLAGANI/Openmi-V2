@@ -33,7 +33,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Openmi — Free GitHub coding agent, priced by the hour",
-  description: `Ad-supported browser coding agent for GitHub with cloud sandboxes, live previews, and isolated pull requests. Free on Auto, ${DAILY_FREE_CREDIT} free Credit every day, or ${CREDIT_PER_HOUR} Credit per hour on named models.`,
+  description: `Ad-supported browser coding agent for GitHub with cloud sandboxes, live previews, and isolated pull requests. ${DAILY_FREE_CREDIT} free Credit every day, ${CREDIT_PER_HOUR} Credit per hour with unlimited follow-up turns.`,
   other: { "page-type": "software", "site-kind": "software" },
 };
 
@@ -54,7 +54,7 @@ const HIGHLIGHTS = [
   {
     icon: Globe,
     title: "Free every day, equal worldwide",
-    body: `Auto mode is free, and every account refills to ${DAILY_FREE_CREDIT} Credit at local midnight—the same daily allowance in every country, funded by ads.`,
+    body: `Every account refills to ${DAILY_FREE_CREDIT} Credit at local midnight—the same daily allowance in every country, funded by ads.`,
   },
   {
     icon: Layers,
@@ -86,8 +86,8 @@ const FEATURES = [
   },
   {
     icon: Cpu,
-    title: "Multi-model router & effort control",
-    body: "Auto routes across coding, reasoning, search, and vision models at zero cost. Switch to DeepSeek V4.1 Flash (Fast, High, or Max effort), GPT-OSS 120B, or Claude Haiku 4.5.",
+    title: "Frontier models & effort control",
+    body: "Pick DeepSeek V4.1 Flash (with Fast, High, or Max thinking effort), GPT-OSS 120B, or unlock Claude Haiku 4.5 with an active pass.",
   },
   {
     icon: GitBranch,
@@ -220,14 +220,14 @@ export default async function HomePage({
                   <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
                     {ref}
                   </code>
-                  ) — create an account to claim +{INVITE_REWARD_CREDIT} bonus
-                  Credit.
+                  ) — both accounts earn +{INVITE_REWARD_CREDIT} bonus Credit
+                  when you activate your first paid pass.
                 </p>
                 <Link
                   href={loginHref}
                   className="btn btn-primary px-3 py-1.5 text-[12px]"
                 >
-                  Claim +{INVITE_REWARD_CREDIT} Credit
+                  Apply invite code
                 </Link>
               </div>
             )}
@@ -254,8 +254,9 @@ export default async function HomePage({
                 <p className="mt-5 max-w-[56ch] text-pretty text-[15.5px] leading-[1.65] text-mid">
                   Skip the $20/mo subscription and token meters. Connect a
                   GitHub repository, run builds in a cloud Linux sandbox,
-                  preview live apps, and ship verified pull requests—free on
-                  Auto, with {DAILY_FREE_CREDIT} free Credit every day.
+                  preview live apps, and ship verified pull requests—with{" "}
+                  {DAILY_FREE_CREDIT} free Credit every day and {CREDIT_PER_HOUR}{" "}
+                  Credit per hour.
                 </p>
 
                 <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -278,13 +279,6 @@ export default async function HomePage({
               <div className="lg:col-span-4">
                 <dl className="grid grid-cols-3 divide-x divide-line rounded-xl border border-line bg-card shadow-[var(--card-shadow)]">
                   <div className="px-3.5 py-3">
-                    <dt className="text-[11.5px] text-low">Auto mode</dt>
-                    <dd className="mt-1 font-mono text-[14px] font-semibold text-hi">
-                      Free
-                    </dd>
-                    <p className="mt-0.5 text-[11px] text-low">0 Credit/hr</p>
-                  </div>
-                  <div className="px-3.5 py-3">
                     <dt className="text-[11.5px] text-low">Daily free</dt>
                     <dd className="mt-1 font-mono text-[14px] font-semibold tabular-nums text-hi">
                       {DAILY_FREE_CREDIT} Credit
@@ -294,13 +288,20 @@ export default async function HomePage({
                     </p>
                   </div>
                   <div className="px-3.5 py-3">
-                    <dt className="text-[11.5px] text-low">Named hour</dt>
+                    <dt className="text-[11.5px] text-low">Per hour</dt>
                     <dd className="mt-1 font-mono text-[14px] font-semibold tabular-nums text-hi">
                       {CREDIT_PER_HOUR} Credit
                     </dd>
                     <p className="mt-0.5 text-[11px] text-low">
                       Unlimited turns
                     </p>
+                  </div>
+                  <div className="px-3.5 py-3">
+                    <dt className="text-[11.5px] text-low">Trial grant</dt>
+                    <dd className="mt-1 font-mono text-[14px] font-semibold tabular-nums text-hi">
+                      {TRIAL_CREDIT} Credit
+                    </dd>
+                    <p className="mt-0.5 text-[11px] text-low">First turn</p>
                   </div>
                 </dl>
               </div>
@@ -485,16 +486,15 @@ export default async function HomePage({
                 Free every day. Upgrade only when you need more hours.
               </h2>
               <p className="mt-4 text-[14.5px] leading-[1.65] text-mid">
-                Auto mode is free, and a named model costs {CREDIT_PER_HOUR}{" "}
-                Credit for a full hour of unlimited follow-up turns in that
-                conversation. Ads fund the daily free tier so you never need a
-                credit card to start.
+                Every model hour costs {CREDIT_PER_HOUR} Credit for a full hour
+                of unlimited follow-up turns in that conversation. Ads fund the
+                daily free tier so you never need a credit card to start.
               </p>
               <p className="mt-3 text-[13px] leading-relaxed text-low">
                 Fixed-term passes never auto-renew. When a pass expires, your
                 account simply returns to the {DAILY_FREE_CREDIT} Credit daily
                 allowance. Invite friends to earn +{INVITE_REWARD_CREDIT} Credit
-                for both accounts.
+                for both accounts once they activate their first paid pass.
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -530,14 +530,14 @@ export default async function HomePage({
                 <ul className="mt-5 space-y-2.5 border-t border-line pt-4 text-[13px] text-mid">
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>Unlimited Auto mode (0 Credit/hr)</span>
+                    <span>
+                      {CREDIT_PER_HOUR} Credit per hour (unlimited follow-up
+                      turns)
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>
-                      {TRIAL_CREDIT} Credit trial + {INVITE_REWARD_CREDIT} Credit
-                      per invite
-                    </span>
+                    <span>{TRIAL_CREDIT} Credit one-time trial grant</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
@@ -615,8 +615,8 @@ export default async function HomePage({
                 Stop paying per token. Ship on GitHub for free.
               </h2>
               <p className="mt-2.5 text-[14px] text-mid">
-                Connect your repository in seconds—start with Auto mode for free
-                and {DAILY_FREE_CREDIT} Credit every day.
+                Connect your repository in seconds—start with {TRIAL_CREDIT}{" "}
+                trial Credit and {DAILY_FREE_CREDIT} free Credit every day.
               </p>
             </div>
             <Link

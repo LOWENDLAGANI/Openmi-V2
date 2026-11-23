@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Pricing & passes — Openmi",
-  description: `Free on Auto, ${DAILY_FREE_CREDIT} free Credit every day worldwide, or fixed-term passes with ${PAID_DAILY_FREE_CREDIT} Credit/day and zero auto-renewal.`,
+  description: `${DAILY_FREE_CREDIT} free Credit every day worldwide, ${CREDIT_PER_HOUR} Credit per hour with unlimited follow-up turns, or fixed-term passes with ${PAID_DAILY_FREE_CREDIT} Credit/day and zero auto-renewal.`,
 };
 
 function cleanRef(raw: string | undefined): string | null {
@@ -71,7 +71,9 @@ export default async function PricingPage({
   const dailyFreeHours = Math.floor(DAILY_FREE_CREDIT / CREDIT_PER_HOUR);
   const paidDailyHours = Math.floor(PAID_DAILY_FREE_CREDIT / CREDIT_PER_HOUR);
 
-  const publicModels = MODELS.filter((model) => !model.adminOnly);
+  const publicModels = MODELS.filter(
+    (model) => !model.adminOnly && model.id !== "auto"
+  );
   const startHref = signedIn
     ? "/chat"
     : ref
@@ -129,14 +131,14 @@ export default async function PricingPage({
               <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
                 {ref}
               </code>{" "}
-              is active — create your account to claim +{INVITE_REWARD_CREDIT}{" "}
-              bonus Credit.
+              is active — both accounts earn +{INVITE_REWARD_CREDIT} bonus
+              Credit once you activate your first paid pass.
             </p>
             <Link
               href={startHref}
               className="btn btn-primary px-3 py-1.5 text-[12px]"
             >
-              Claim bonus
+              Sign up with code
             </Link>
           </div>
         )}
@@ -147,9 +149,9 @@ export default async function PricingPage({
               Priced by the hour. Free every day.
             </h2>
             <p className="mt-3 text-pretty text-[14.5px] leading-[1.65] text-mid">
-              Auto mode is free, and named models cost {CREDIT_PER_HOUR} Credit
-              for a full hour of unlimited follow-up turns. Fixed-term passes
-              never auto-renew and no credit card is stored in the app.
+              Every model costs {CREDIT_PER_HOUR} Credit for a full hour of
+              unlimited follow-up turns in that chat. Fixed-term passes never
+              auto-renew and no credit card is stored in the app.
             </p>
           </div>
 
@@ -204,7 +206,10 @@ export default async function PricingPage({
               <ul className="mt-5 space-y-2.5 border-t border-line pt-4 text-[13px] text-mid">
                 <li className="flex items-start gap-2">
                   <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                  <span>Unlimited Auto mode (0 Credit/hr)</span>
+                  <span>
+                    {CREDIT_PER_HOUR} Credit per hour (unlimited follow-up
+                    turns)
+                  </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
@@ -213,8 +218,8 @@ export default async function PricingPage({
                 <li className="flex items-start gap-2">
                   <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
                   <span>
-                    +{INVITE_REWARD_CREDIT} Credit per invite (up to{" "}
-                    {MAX_INVITES_PER_ACCOUNT})
+                    +{INVITE_REWARD_CREDIT} Credit per invite on their first
+                    paid pass (up to {MAX_INVITES_PER_ACCOUNT})
                   </span>
                 </li>
                 <li className="flex items-start gap-2">

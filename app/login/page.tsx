@@ -88,8 +88,8 @@ export default async function LoginPage({
             <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11.5px] text-hi">
               {ref}
             </code>{" "}
-            applied — create your account below to claim +{INVITE_REWARD_CREDIT}{" "}
-            bonus Credit.
+            applied — both accounts receive +{INVITE_REWARD_CREDIT} bonus Credit
+            when you activate your first paid pass.
           </p>
         )}
 

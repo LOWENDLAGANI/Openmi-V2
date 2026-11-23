@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { CREDIT_PER_HOUR, DAILY_FREE_CREDIT } from "@/lib/credits";
+import { CREDIT_PER_HOUR, DAILY_FREE_CREDIT, TRIAL_CREDIT } from "@/lib/credits";
 
 export const runtime = "edge";
 
@@ -102,16 +102,20 @@ export default function OpenGraphImage() {
           }}
         >
           {[
-            { label: "Auto mode", value: "Free", sub: "0 Credit / hr" },
             {
               label: "Daily free",
               value: `${DAILY_FREE_CREDIT} Credit`,
               sub: `${dailyHours} hrs/day worldwide`,
             },
             {
-              label: "Named hour",
+              label: "Per hour",
               value: `${CREDIT_PER_HOUR} Credit`,
               sub: "Unlimited follow-up turns",
+            },
+            {
+              label: "Trial grant",
+              value: `${TRIAL_CREDIT} Credit`,
+              sub: "Included on first turn",
             },
             {
               label: "Paid passes",

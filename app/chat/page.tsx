@@ -396,7 +396,9 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     soft(readAdminAccess(session), { state: "forbidden", email: null } as AdminAccess),
   ]);
 
-  const models = modelsForReader(modelCatalogue(), access.state === "admin");
+  const models = modelsForReader(modelCatalogue(), access.state === "admin").filter(
+    (model) => model.id !== "auto"
+  );
 
   const balances = (profileResult.data ?? {}) as {
     credit_balance?: number | string;
@@ -527,7 +529,9 @@ async function DraftChat({
     state: "forbidden",
     email: null,
   } as AdminAccess);
-  const models = modelsForReader(modelCatalogue(), access.state === "admin");
+  const models = modelsForReader(modelCatalogue(), access.state === "admin").filter(
+    (model) => model.id !== "auto"
+  );
 
   // The composer offers a price before the chat exists, so it needs both
   // balances. Reading them here keeps the call site a repository and nothing

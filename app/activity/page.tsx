@@ -335,7 +335,8 @@ export default async function ActivityPage({
             </h2>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
               Share this code at sign-up. Both sides earn {INVITE_REWARD_CREDIT}{" "}
-              Credit, up to {MAX_INVITES_PER_ACCOUNT} rewarded accounts.
+              Credit once the invited account activates its first paid pass, up
+              to {MAX_INVITES_PER_ACCOUNT} rewarded accounts.
             </p>
             <p className="mt-3 rounded-lg border border-line bg-raised px-3.5 py-2.5 font-mono text-[15px] font-semibold tracking-[0.14em] text-hi">
               {profile.inviteCode ?? "—"}

@@ -16,6 +16,14 @@ function setNextCookie(next: string) {
   document.cookie = `openmi_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
 }
 
+function setInviteCookie(code: string) {
+  if (typeof document === "undefined") return;
+  const trimmed = code.trim();
+  if (!trimmed) return;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `openmi_ref=${encodeURIComponent(trimmed)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
+}
+
 export function AuthForm({
   next,
   configured,
@@ -109,6 +117,7 @@ export function AuthForm({
     setNotice(null);
 
     setNextCookie(next);
+    setInviteCookie(inviteCode);
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
