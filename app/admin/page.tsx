@@ -200,6 +200,7 @@ export default async function AdminPage({
     creditHeldResult,
     selfAdminResult,
     codesResult,
+    openFeedbackResult,
   ] = await Promise.all([
     admin
       .from("payment_requests")
@@ -243,6 +244,10 @@ export default async function AdminPage({
       .select("code, credit_amount, note, created_at, redeemed_at")
       .order("created_at", { ascending: false })
       .limit(12),
+    admin
+      .from("user_feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open"),
   ]);
 
   const giveawayCodes = (codesResult.data ?? []) as Array<{
@@ -261,6 +266,7 @@ export default async function AdminPage({
 
   const adminCount = adminCountResult.count ?? adminRows.length;
   const pendingTotal = pendingCountResult.count ?? pending.length;
+  const openFeedbackTotal = openFeedbackResult.count ?? 0;
   const creditHeld = creditHeldResult.error ? null : Number(creditHeldResult.data ?? 0);
   const selfIsStoredAdmin = Boolean(selfAdminResult.data);
   const paymentsError =
@@ -376,6 +382,13 @@ export default async function AdminPage({
           <StatusPill tone={access.via === "allowlist" ? "pending" : "ok"}>
             {access.via === "allowlist" ? "allowlist" : "admin role"}
           </StatusPill>
+          <Link
+            href="/admin/feedback"
+            className="btn btn-primary px-3.5 py-1.5 text-[12px]"
+          >
+            Reports &amp; suggestions
+            {openFeedbackTotal > 0 ? ` (${openFeedbackTotal})` : ""}
+          </Link>
           <Link href="/chat" className="btn px-3.5 py-1.5 text-[12px]">
             Back to chats
           </Link>
@@ -426,10 +439,11 @@ export default async function AdminPage({
         </p>
       )}
 
-      <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           { label: "members", value: String(membersResult.count ?? 0) },
           { label: "receipts waiting", value: String(pendingTotal) },
+          { label: "open feedback", value: String(openFeedbackTotal) },
           {
             label: "credit + wallet",
             value: creditHeld === null ? "—" : formatCredit(creditHeld),

@@ -208,6 +208,12 @@ export default function AboutPage() {
             <VersionBadge />
           </div>
           <div className="flex flex-wrap items-center gap-4 text-mid">
+            <Link href="/report" className="hover:text-hi">
+              Report a problem
+            </Link>
+            <Link href="/suggestions" className="hover:text-hi">
+              Suggestions
+            </Link>
             <Link href="/terms" className="hover:text-hi">
               Terms
             </Link>

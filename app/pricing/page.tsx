@@ -346,6 +346,12 @@ export default async function PricingPage({
             <Link href="/about" className="hover:text-hi">
               About
             </Link>
+            <Link href="/report" className="hover:text-hi">
+              Report a problem
+            </Link>
+            <Link href="/suggestions" className="hover:text-hi">
+              Suggestions
+            </Link>
             <Link href="/refunds" className="hover:text-hi">
               Refunds
             </Link>

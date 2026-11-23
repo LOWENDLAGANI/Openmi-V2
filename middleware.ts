@@ -36,6 +36,8 @@ export const config = {
     "/agent/:path*",
     "/activity/:path*",
     "/pay/:path*",
+    "/report/:path*",
+    "/suggestions/:path*",
     // A paint-saving redirect only. /admin decides the role on the server and
     // answers 404 to a signed-in visitor without it.
     "/admin/:path*",

@@ -576,6 +576,16 @@ export default async function HomePage({
               <p className="text-[12px] font-semibold text-hi">Support</p>
               <ul className="mt-3 space-y-2 text-[13px] text-mid">
                 <li>
+                  <Link href="/report" className="hover:text-hi">
+                    Report a problem
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/suggestions" className="hover:text-hi">
+                    Suggestions
+                  </Link>
+                </li>
+                <li>
                   <a
                     href={supportMailto("Support")}
                     className="hover:text-hi"

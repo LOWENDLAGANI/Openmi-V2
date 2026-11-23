@@ -76,6 +76,8 @@ export const PRIVATE_PATHS = [
   "/agent",
   "/activity",
   "/pay",
+  "/report",
+  "/suggestions",
   "/admin",
   "/account/",
   "/login",

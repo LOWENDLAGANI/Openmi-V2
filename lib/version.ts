@@ -12,10 +12,22 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.0.1";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.1",
+    date: "2026-11-24",
+    title: "Problem reporting with screenshots, suggestions & admin review",
+    changes: [
+      "Added Report a problem page (/report) allowing users to report bugs, attach PNG/JPEG/WebP screenshots (verified by file signature), and view status updates.",
+      "Added Suggestions page (/suggestions) allowing users to submit feature requests and track team responses.",
+      "Added dedicated Admin Feedback panel (/admin/feedback) to inspect bug reports, preview uploaded screenshots, filter by kind/status, and post responses.",
+      "Added database migration 059_user_feedback.sql with RLS policies, security-definer submission/review RPCs, and private feedback storage bucket.",
+      "Linked Report problem and Suggestions in the workspace sidebar and public footers.",
+    ],
+  },
   {
     version: "2.0.0",
     date: "2026-11-24",

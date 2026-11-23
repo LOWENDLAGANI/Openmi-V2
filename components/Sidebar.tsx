@@ -1,7 +1,9 @@
 import {
   Activity,
+  Bug,
   CreditCard,
   FolderGit2,
+  Lightbulb,
   LogOut,
   SquarePen,
   Trash2,
@@ -99,6 +101,20 @@ export function Sidebar({
         >
           <CreditCard aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
           <span>Plans &amp; billing</span>
+        </Link>
+        <Link
+          href="/report"
+          className="rail-row flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-mid"
+        >
+          <Bug aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
+          <span>Report problem</span>
+        </Link>
+        <Link
+          href="/suggestions"
+          className="rail-row flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-mid"
+        >
+          <Lightbulb aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
+          <span>Suggestions</span>
         </Link>
         <Link
           href={trashView ? "/chat" : "/chat?trash=1"}
