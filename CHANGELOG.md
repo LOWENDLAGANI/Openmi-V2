@@ -2,6 +2,12 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.3] - 2026-11-24 — Seamless stream handover & paginated background run polling
+
+- Lowered chat SSE stream handover window from 240s to 50s (with 24 continuation windows) so runs seamlessly reconnect before 60s serverless/proxy timeouts.
+- Stopped freezing partial output as a "stopped" message when an active stream drops; live text and steps now stay active and hand off smoothly to background polling.
+- Paginated `/api/chat/turn` progress reads across multiple batches of `RUN_PROGRESS_EVENTS` (and included live reasoning) so long runs never freeze after 600 events.
+
 ## [2.0.2] - 2026-11-24 — Inline tool & terminal flow and always-visible running status
 
 - Interleaved tool calls and terminal runs inline alongside assistant text in chronological order instead of stacking all steps at the top of the message.

@@ -73,8 +73,12 @@ export const maxDuration = 300;
  * there. No work is duplicated, because nothing in this route produces work.
  */
 
-/** Stop well before the 300 s ceiling and hand the reader the run's id. */
-const WINDOW_MS = 240_000;
+/**
+ * Stop cleanly before a 60 s serverless ceiling and hand the reader the run's
+ * id + cursor so the client seamlessly opens the next window without dropping
+ * the stream on 60 s hosts (e.g. Vercel Hobby) or mobile proxies.
+ */
+const WINDOW_MS = 50_000;
 const POLL_MS = 250;
 /** How many idle polls between re-reads of the run row: six seconds. */
 const ROW_CHECK_TICKS = 24;

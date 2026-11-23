@@ -23,75 +23,91 @@ export const dynamic = "force-dynamic";
  * replays from `Last-Event-ID`, so what the reload shows is the run, not a
  * description of it.
  */
+const MAX_PROGRESS_PAGES = 10;
+
 async function readRunProgress(
   admin: SupabaseClient,
   runId: string
-): Promise<{ text: string; steps: AgentStep[] }> {
-  const events = await readEventsSince(
-    admin,
-    runId,
-    0,
-    RUN_PROGRESS_EVENTS
-  ).catch(() => []);
-
+): Promise<{ text: string; thinking: string; steps: AgentStep[] }> {
   const steps: AgentStep[] = [];
   // `tool.finished` names the tool, not the sentence its start carried, so the
   // pair is joined by name — exactly as the streaming tab joins them.
   const summaries = new Map<string, string>();
   let text = "";
+  let thinking = "";
+  let afterSeq = 0;
 
-  for (const event of events) {
-    const payload = event.payload;
+  for (let page = 0; page < MAX_PROGRESS_PAGES; page += 1) {
+    const events = await readEventsSince(
+      admin,
+      runId,
+      afterSeq,
+      RUN_PROGRESS_EVENTS
+    ).catch(() => []);
 
-    if (event.kind === "message.delta") {
-      if (typeof payload.text === "string") text += payload.text;
-      continue;
-    }
+    if (events.length === 0) break;
 
-    if (event.kind === "tool.started") {
-      const tool = typeof payload.name === "string" ? payload.name : "tool";
-      const detail =
-        typeof payload.summary === "string" ? payload.summary : tool;
-      const command =
-        typeof payload.command === "string" ? payload.command : undefined;
-      summaries.set(tool, detail);
-      steps.push({
-        tool,
-        detail,
-        state: "start",
-        ...(command ? { command } : {}),
-        offset: text.length,
-      });
-      continue;
-    }
+    for (const event of events) {
+      afterSeq = Math.max(afterSeq, event.seq);
+      const payload = event.payload;
 
-    if (event.kind === "tool.finished") {
-      const tool = typeof payload.name === "string" ? payload.name : "tool";
-      const detail = summaries.get(tool) ?? tool;
-      const finished: AgentStep = {
-        tool,
-        detail,
-        state: payload.isError === true ? "error" : "done",
-        output:
-          typeof payload.resultPreview === "string"
-            ? payload.resultPreview
-            : undefined,
-      };
-
-      let index = -1;
-      for (let i = steps.length - 1; i >= 0; i -= 1) {
-        if (steps[i].state === "start" && steps[i].tool === tool) {
-          index = i;
-          break;
-        }
+      if (event.kind === "message.delta") {
+        if (typeof payload.text === "string") text += payload.text;
+        continue;
       }
 
-      if (index >= 0) steps[index] = { ...steps[index], ...finished };
-      else steps.push({ ...finished, offset: text.length });
+      if (event.kind === "message.reasoning") {
+        if (typeof payload.text === "string") thinking += payload.text;
+        continue;
+      }
+
+      if (event.kind === "tool.started") {
+        const tool = typeof payload.name === "string" ? payload.name : "tool";
+        const detail =
+          typeof payload.summary === "string" ? payload.summary : tool;
+        const command =
+          typeof payload.command === "string" ? payload.command : undefined;
+        summaries.set(tool, detail);
+        steps.push({
+          tool,
+          detail,
+          state: "start",
+          ...(command ? { command } : {}),
+          offset: text.length,
+        });
+        continue;
+      }
+
+      if (event.kind === "tool.finished") {
+        const tool = typeof payload.name === "string" ? payload.name : "tool";
+        const detail = summaries.get(tool) ?? tool;
+        const finished: AgentStep = {
+          tool,
+          detail,
+          state: payload.isError === true ? "error" : "done",
+          output:
+            typeof payload.resultPreview === "string"
+              ? payload.resultPreview
+              : undefined,
+        };
+
+        let index = -1;
+        for (let i = steps.length - 1; i >= 0; i -= 1) {
+          if (steps[i].state === "start" && steps[i].tool === tool) {
+            index = i;
+            break;
+          }
+        }
+
+        if (index >= 0) steps[index] = { ...steps[index], ...finished };
+        else steps.push({ ...finished, offset: text.length });
+      }
     }
+
+    if (events.length < RUN_PROGRESS_EVENTS) break;
   }
 
-  return { text, steps };
+  return { text, thinking, steps };
 }
 
 /**

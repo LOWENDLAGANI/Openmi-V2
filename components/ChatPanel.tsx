@@ -71,6 +71,7 @@ type TurnPoll = {
   error?: string | null;
   steps?: StepLine[];
   text?: string;
+  thinking?: string;
 };
 
 /** One screenshot, exactly as the sandbox returned it. */
@@ -330,11 +331,15 @@ export function ChatPanel({
           if (cancelled || !payload) return;
 
           if (payload.running) {
+            setError(null);
             if (Array.isArray(payload.steps) && payload.steps.length > 0) {
               setSteps(payload.steps);
             }
             if (typeof payload.text === "string" && payload.text.length > 0) {
               setPending(payload.text);
+            }
+            if (typeof payload.thinking === "string" && payload.thinking.length > 0) {
+              setThinking(payload.thinking);
             }
             return;
           }
@@ -936,10 +941,13 @@ export function ChatPanel({
       }
     } catch (caught) {
       const aborted = caught instanceof DOMException && caught.name === "AbortError";
-      if (!aborted) {
+      // When the stream drops after the server already accepted the run, hand
+      // off cleanly to background polling instead of flashing a failure banner
+      // while the worker is still running.
+      if (!aborted && !attached && !continuation) {
         setError(caught instanceof Error ? caught.message : "The connection dropped.");
       }
-      router.refresh();
+      if (!attached && !continuation) router.refresh();
     } finally {
       busyRef.current = false;
       setStreaming(false);
@@ -953,13 +961,26 @@ export function ChatPanel({
 
       // A window that ended with a token is not a stopped turn: the next one
       // takes the answer on from exactly here, so its text stays live instead of
-      // being committed with a "stopped" note around it.
-      resuming = pausedToken !== null && continuedRef.current < 6;
+      // being committed with a "stopped" note around it. Twenty-four 50s windows
+      // cover the full 15-minute run wall clock with headroom.
+      resuming = pausedToken !== null && continuedRef.current < 24;
 
-      // A stopped turn is not a lost answer. If the stream ended without the
-      // server's final "done", the part already on screen becomes a message
-      // instead of vanishing with the composer state.
-      if (!sawDone && !resuming && assembled.trim().length > 0) {
+      // The stream can end without the turn ending (e.g. mobile network drop or
+      // host timeout). A turn the server accepted is still running in the
+      // worker, so hand it straight to the poll without freezing partial text
+      // as "stopped".
+      const handingOffToPoll =
+        (attached || continuation) && !sawDone && !stoppedRef.current && !resuming;
+
+      // A stopped turn is not a lost answer. Only commit a local stopped card
+      // when the reader actually stopped it (or the run was never attached) and
+      // we are not handing off to background polling.
+      if (
+        !sawDone &&
+        !resuming &&
+        !handingOffToPoll &&
+        assembled.trim().length > 0
+      ) {
         stepsCarried = true;
         setMessages((current) => [
           ...current,
@@ -979,27 +1000,14 @@ export function ChatPanel({
       }
 
       // A finished or stopped answer carries its console on the message card, so
-      // the live copy can go. A turn that failed, or stopped before any text,
-      // keeps the console on screen: that output is the only record of what the
-      // sandbox did, and clearing it is what made a failed run impossible to
-      // diagnose.
-      setSteps(resuming || !stepsCarried ? [...stepLog] : []);
-      // Text that arrived before a failure or a handover is the answer so far,
-      // and it is already stored; it stays on screen rather than vanishing.
-      // A committed message already carries the answer, so the live copy only
-      // stays when nothing was written into the transcript.
-      const keepLive = resuming || (failed && !stepsCarried);
+      // the live copy can go. A turn that is resuming, handing off to polling,
+      // or failed before any text keeps the live progress on screen.
+      const keepLive = resuming || handingOffToPoll || (failed && !stepsCarried);
+      setSteps(keepLive || !stepsCarried ? [...stepLog] : []);
       setPending(keepLive ? assembled : "");
       setThinking(keepLive ? thinkingText : "");
 
-      // The stream can end without the turn ending: a dropped connection, or the
-      // continuation budget running out. A turn the server accepted is still in
-      // the queue or the worker, so hand it to the poll — that is the half which
-      // either reports the answer or ends the wait with its reason. A refused
-      // request and a stop the reader asked for have nothing to follow.
-      // A continuation names a run that exists even when this window's request
-      // was refused or dropped, so it is handed to the poll too.
-      if ((attached || continuation) && !sawDone && !stoppedRef.current && !resuming) {
+      if (handingOffToPoll) {
         setBackgroundRunning(true);
       }
     }

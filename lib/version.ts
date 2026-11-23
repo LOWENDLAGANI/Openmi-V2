@@ -12,10 +12,20 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.2";
+export const APP_VERSION = "2.0.3";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.3",
+    date: "2026-11-24",
+    title: "Seamless stream handover & paginated background run polling",
+    changes: [
+      "Lowered chat SSE stream handover window from 240s to 50s (with 24 continuation windows) so runs seamlessly reconnect before 60s serverless/proxy timeouts.",
+      "Stopped freezing partial output as a 'stopped' message when an active stream drops; live text and steps now stay active and hand off smoothly to background polling.",
+      "Paginated /api/chat/turn progress reads across multiple batches of RUN_PROGRESS_EVENTS (and included live reasoning) so long runs never freeze after 600 events.",
+    ],
+  },
   {
     version: "2.0.2",
     date: "2026-11-24",
