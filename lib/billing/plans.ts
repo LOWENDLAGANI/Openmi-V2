@@ -27,7 +27,6 @@ export type Plan = {
   credit: number;
   /** Days of paid allowance the pass covers. */
   days: number;
-  blurb: string;
 };
 
 export const PLANS: readonly Plan[] = [
@@ -37,7 +36,6 @@ export const PLANS: readonly Plan[] = [
     price: 18,
     credit: 30,
     days: 15,
-    blurb: "Fifteen days at 15 Credit a day, plus 30 Credit up front.",
   },
   {
     id: "pass-30",
@@ -45,7 +43,6 @@ export const PLANS: readonly Plan[] = [
     price: 36,
     credit: 70,
     days: 30,
-    blurb: "Thirty days at 15 Credit a day, plus 70 Credit up front.",
   },
 ];
 

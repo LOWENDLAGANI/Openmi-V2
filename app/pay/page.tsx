@@ -240,9 +240,6 @@ export default async function PayPage({
                   Credit
                 </span>
               </p>
-              <p className="mt-1.5 text-[11.5px] leading-relaxed text-low">
-                Used only when daily balance and wallet together cover a turn.
-              </p>
             </div>
 
             <ul className="space-y-2 text-[12.5px] text-mid">
@@ -339,27 +336,16 @@ export default async function PayPage({
                       Credit · {plan.days} days
                     </span>
                   </p>
-                  <p className="mt-3 text-[13px] leading-relaxed text-mid">
-                    {plan.blurb}
-                  </p>
                 </div>
               </div>
             ))}
           </div>
 
-          <p className="mt-3 text-[12px] leading-relaxed text-low">
-            {localPrices
-              ? `≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges Malaysian ringgit. `
-              : ""}
-            Card details are handled exclusively on the hosted payment page.{" "}
-            <Link
-              href="/refunds"
-              className="font-medium text-accent-text underline-offset-2 hover:underline"
-            >
-              All sales are final
-            </Link>
-            —review the refund and cancellation policy before purchasing.
-          </p>
+          {localPrices && (
+            <p className="mt-3 text-[12px] leading-relaxed text-low">
+              {`≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges Malaysian ringgit.`}
+            </p>
+          )}
         </section>
 
         {!TOPUP_PAUSED && (
@@ -373,10 +359,6 @@ export default async function PayPage({
                 Upload a receipt
               </h2>
             </div>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-mid">
-              Submit one receipt per payment. Status updates appear directly in
-              your request history below.
-            </p>
 
             <form action={submitReceipt} className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="block">
