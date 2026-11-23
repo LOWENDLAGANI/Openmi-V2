@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AboutLogoGate } from "@/components/AboutLogoGate";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { VersionBadge } from "@/components/VersionBadge";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
   CREDIT_PER_HOUR,
@@ -14,6 +15,7 @@ import {
   PAID_DAILY_FREE_CREDIT,
   TRIAL_CREDIT,
 } from "@/lib/credits";
+import { APP_VERSION_TAG, CHANGELOG } from "@/lib/version";
 
 export const metadata = {
   title: "About — Openmi",
@@ -56,9 +58,10 @@ export default function AboutPage() {
       <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-10 sm:px-8">
         <section
           aria-label="Openmi"
-          className="flex flex-col items-center justify-center rounded-xl border border-line bg-card py-10 shadow-[var(--card-shadow)]"
+          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-line bg-card py-10 shadow-[var(--card-shadow)]"
         >
           <AboutLogoGate />
+          <VersionBadge />
         </section>
 
         <div className="mt-10 border-b border-line pb-6">
@@ -152,8 +155,58 @@ export default function AboutPage() {
           </p>
         </section>
 
+        <section id="changelog" className="mt-10 border-t border-line pt-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+              Version &amp; changelog
+            </h2>
+            <span className="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-[11px] font-medium tabular-nums text-accent-text">
+              {APP_VERSION_TAG}
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {CHANGELOG.map((entry) => (
+              <div key={entry.version} className="panel p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md border border-line bg-raised px-2 py-0.5 font-mono text-[11.5px] font-semibold tabular-nums text-hi">
+                      v{entry.version}
+                    </span>
+                    <h3 className="text-[14px] font-semibold text-hi">
+                      {entry.title}
+                    </h3>
+                  </div>
+                  <time
+                    dateTime={entry.date}
+                    className="font-mono text-[11.5px] tabular-nums text-low"
+                  >
+                    {entry.date}
+                  </time>
+                </div>
+
+                <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-mid">
+                  {entry.changes.map((change) => (
+                    <li key={change} className="flex items-start gap-2.5">
+                      <Check
+                        aria-hidden="true"
+                        className="mt-1 size-3.5 shrink-0 text-accent-text"
+                        strokeWidth={2}
+                      />
+                      <span>{change}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
-          <p className="font-mono text-low">© 2026 Openmi</p>
+          <div className="flex items-center gap-3">
+            <p className="font-mono text-low">© 2026 Openmi</p>
+            <VersionBadge />
+          </div>
           <div className="flex flex-wrap items-center gap-4 text-mid">
             <Link href="/terms" className="hover:text-hi">
               Terms

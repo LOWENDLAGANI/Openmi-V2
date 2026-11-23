@@ -15,6 +15,7 @@ import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
 import { RunTrace, WorkspaceFrame } from "@/components/LandingPreview";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { VersionBadge } from "@/components/VersionBadge";
 import { PLANS } from "@/lib/billing/plans";
 import {
   CREDIT_PER_HOUR,
@@ -592,7 +593,10 @@ export default async function HomePage({
           </div>
 
           <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
-            <p className="font-mono text-[11.5px] text-low">© 2026 Openmi</p>
+            <div className="flex items-center gap-3">
+              <p className="font-mono text-[11.5px] text-low">© 2026 Openmi</p>
+              <VersionBadge />
+            </div>
             <ThemeSwitcher />
           </div>
         </div>

@@ -15,6 +15,7 @@ import { OpenmiMark } from "@/components/OpenmiMark";
 import { SearchLauncher } from "@/components/SearchLauncher";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { VersionBadge } from "@/components/VersionBadge";
 import type { Chat, Folder } from "@/lib/types";
 
 export function Sidebar({
@@ -57,6 +58,7 @@ export function Sidebar({
             Openmi
           </span>
         </Link>
+        <VersionBadge />
       </div>
 
       <div className="space-y-2 px-3 pt-3">
@@ -150,6 +152,11 @@ export function Sidebar({
               <LogOut aria-hidden="true" className="size-4" strokeWidth={1.75} />
             </SubmitButton>
           </form>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between border-t border-line/70 pt-2">
+          <span className="font-mono text-[10.5px] text-low">Openmi build</span>
+          <VersionBadge />
         </div>
       </div>
     </aside>
