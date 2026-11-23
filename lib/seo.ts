@@ -32,10 +32,10 @@ export function siteUrl(): string {
 
 export const SITE_NAME = "Openmi";
 
-export const SITE_TITLE = "Openmi: a repository agent for GitHub";
+export const SITE_TITLE = "Openmi — Free GitHub coding agent, priced by the hour";
 
 export const SITE_DESCRIPTION =
-  "Connect GitHub, pick a repository, and chat with a model that reads the code, answers with path and line citations, and writes the change to its own branch.";
+  "Ad-supported browser coding agent for GitHub with cloud Linux sandboxes, live previews, verified line citations, and isolated pull requests. Free on Auto, 6 free Credit daily.";
 
 export const SITE_LOCALE = "en_US";
 
@@ -55,6 +55,7 @@ export const INDEXABLE_PAGES: {
   priority: number;
 }[] = [
   { path: "", changeFrequency: "weekly", priority: 1 },
+  { path: "/pricing", changeFrequency: "weekly", priority: 0.9 },
   { path: "/about", changeFrequency: "monthly", priority: 0.8 },
   { path: "/refunds", changeFrequency: "yearly", priority: 0.4 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },

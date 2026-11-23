@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { INVITE_REWARD_CREDIT } from "@/lib/credits";
 import { safeNextPath } from "@/lib/http/next-path";
 import { getSession } from "@/lib/session";
 
@@ -18,6 +19,11 @@ export const metadata = {
 function safeNext(value: string | undefined): string {
   const next = safeNextPath(value, "https://openmi.invalid");
   return next.startsWith("/login") ? "/chat" : next;
+}
+
+function cleanRef(raw: string | undefined): string | null {
+  const value = (raw ?? "").trim();
+  return /^[A-Za-z0-9_-]{3,32}$/.test(value) ? value : null;
 }
 
 const HIGHLIGHTS = [
@@ -41,10 +47,11 @@ const HIGHLIGHTS = [
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; deleted?: string }>;
+  searchParams: Promise<{ next?: string; deleted?: string; ref?: string }>;
 }) {
   const params = await searchParams;
   const next = safeNext(params.next);
+  const ref = cleanRef(params.ref);
   const session = await getSession();
 
   if (session.state === "signed-in") redirect(next);
@@ -53,11 +60,17 @@ export default async function LoginPage({
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" aria-label="Openmi home">
+          <Link href={ref ? `/?ref=${encodeURIComponent(ref)}` : "/"} aria-label="Openmi home">
             <Brand />
           </Link>
           <div className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
+            <Link
+              href={ref ? `/pricing?ref=${encodeURIComponent(ref)}` : "/pricing"}
+              className="btn btn-quiet px-3 py-1.5 text-[12.5px]"
+            >
+              Pricing
+            </Link>
             <Link href="/about" className="btn btn-quiet px-3 py-1.5 text-[12.5px]">
               About
             </Link>
@@ -66,6 +79,20 @@ export default async function LoginPage({
       </header>
 
       <main className="animate-enter mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-5 py-10 sm:px-8">
+        {ref && (
+          <p
+            role="status"
+            className="mb-6 rounded-lg border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12.5px] leading-relaxed text-accent-text"
+          >
+            Invite code{" "}
+            <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11.5px] text-hi">
+              {ref}
+            </code>{" "}
+            applied — create your account below to claim +{INVITE_REWARD_CREDIT}{" "}
+            bonus Credit.
+          </p>
+        )}
+
         {params.deleted === "1" && (
           <p
             role="status"
@@ -108,7 +135,11 @@ export default async function LoginPage({
           </section>
 
           <div className="w-full">
-            <AuthForm next={next} configured={session.state !== "unconfigured"} />
+            <AuthForm
+              next={next}
+              configured={session.state !== "unconfigured"}
+              initialInviteCode={ref ?? undefined}
+            />
           </div>
         </div>
       </main>

@@ -138,9 +138,23 @@ const BOUNDARIES = [
   },
 ];
 
-export default async function HomePage() {
+function cleanRef(raw: string | undefined): string | null {
+  const value = (raw ?? "").trim();
+  return /^[A-Za-z0-9_-]{3,32}$/.test(value) ? value : null;
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string }>;
+}) {
   const session = await getSession();
   if (session.state === "signed-in") redirect("/chat");
+
+  const params = await searchParams;
+  const ref = cleanRef(params.ref);
+  const loginHref = ref ? `/login?ref=${encodeURIComponent(ref)}` : "/login";
+  const pricingHref = ref ? `/pricing?ref=${encodeURIComponent(ref)}` : "/pricing";
 
   const dailyFreeHours = Math.floor(DAILY_FREE_CREDIT / CREDIT_PER_HOUR);
   const paidDailyHours = Math.floor(PAID_DAILY_FREE_CREDIT / CREDIT_PER_HOUR);
@@ -177,13 +191,13 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
             <Link
-              href="/login"
+              href={loginHref}
               className="btn btn-quiet hidden px-3 py-1.5 text-[13px] sm:inline-flex"
             >
               Sign in
             </Link>
             <Link
-              href="/login"
+              href={loginHref}
               className="btn btn-primary px-3.5 py-1.5 text-[13px]"
             >
               Start free
@@ -196,6 +210,28 @@ export default async function HomePage() {
         {/* ── Hero + Interactive Workbench ───────────────────────────────── */}
         <section className="pb-16 pt-24 sm:pb-24 sm:pt-32">
           <div className="lp-wrap">
+            {ref && (
+              <div
+                role="status"
+                className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-[13px] text-accent-text"
+              >
+                <p>
+                  You were invited to Openmi (code{" "}
+                  <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
+                    {ref}
+                  </code>
+                  ) — create an account to claim +{INVITE_REWARD_CREDIT} bonus
+                  Credit.
+                </p>
+                <Link
+                  href={loginHref}
+                  className="btn btn-primary px-3 py-1.5 text-[12px]"
+                >
+                  Claim +{INVITE_REWARD_CREDIT} Credit
+                </Link>
+              </div>
+            )}
+
             <div className="grid items-end gap-8 lg:grid-cols-12">
               <div className="lg:col-span-8">
                 <div className="inline-flex flex-wrap items-center gap-2 rounded-md border border-line bg-card px-2.5 py-1 text-[12px] text-mid shadow-[var(--card-shadow)]">
@@ -224,18 +260,18 @@ export default async function HomePage() {
 
                 <div className="mt-7 flex flex-wrap items-center gap-3">
                   <Link
-                    href="/login"
+                    href={loginHref}
                     className="btn btn-primary lift px-5 py-2.5 text-[13.5px]"
                   >
                     Start free with GitHub
                     <ArrowRight aria-hidden="true" className="size-4" strokeWidth={1.75} />
                   </Link>
-                  <a
-                    href="#pricing"
+                  <Link
+                    href={pricingHref}
                     className="btn px-4 py-2.5 text-[13.5px]"
                   >
-                    Free vs. passes
-                  </a>
+                    Compare passes &amp; currency
+                  </Link>
                 </div>
               </div>
 
@@ -326,7 +362,7 @@ export default async function HomePage() {
                   with PWA install support.
                 </p>
               </div>
-              <Link href="/login" className="btn self-start px-3.5 py-2 text-[12.5px]">
+              <Link href={loginHref} className="btn self-start px-3.5 py-2 text-[12.5px]">
                 Open workspace
               </Link>
             </div>
@@ -462,8 +498,8 @@ export default async function HomePage() {
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link href="/pay" className="btn btn-primary px-4 py-2 text-[13px]">
-                  Compare passes
+                <Link href={pricingHref} className="btn btn-primary px-4 py-2 text-[13px]">
+                  Compare passes &amp; currency
                 </Link>
                 <a
                   href={supportMailto("Credit question")}
@@ -584,7 +620,7 @@ export default async function HomePage() {
               </p>
             </div>
             <Link
-              href="/login"
+              href={loginHref}
               className="btn btn-primary lift shrink-0 px-5 py-2.5 text-[13.5px]"
             >
               Start free with GitHub
@@ -610,12 +646,12 @@ export default async function HomePage() {
               <p className="text-[12px] font-semibold text-hi">Product</p>
               <ul className="mt-3 space-y-2 text-[13px] text-mid">
                 <li>
-                  <Link href="/login" className="hover:text-hi">
+                  <Link href={loginHref} className="hover:text-hi">
                     Sign in
                   </Link>
                 </li>
                 <li>
-                  <Link href="/pay" className="hover:text-hi">
+                  <Link href={pricingHref} className="hover:text-hi">
                     Pricing &amp; passes
                   </Link>
                 </li>

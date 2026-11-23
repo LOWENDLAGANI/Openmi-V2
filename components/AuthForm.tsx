@@ -19,15 +19,17 @@ function setNextCookie(next: string) {
 export function AuthForm({
   next,
   configured,
+  initialInviteCode,
 }: {
   next: string;
   configured: boolean;
+  initialInviteCode?: string;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(initialInviteCode ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(initialInviteCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

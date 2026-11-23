@@ -29,6 +29,7 @@ type Scenario = {
   sha: string;
   branch: string;
   pr: string;
+  sandboxStatus?: string;
   prompt: string;
   answer: string;
   citation: string;
@@ -40,60 +41,61 @@ type Scenario = {
 
 const SCENARIOS: Scenario[] = [
   {
-    id: "refunds",
-    label: "Fix refund bucket",
-    repo: "LOWENDLAGANI/Openmi-V2",
-    sha: "612f414",
-    branch: "openmi/agent/8f2c1d",
-    pr: "PR #412",
-    prompt: "A reaped run refunds the wrong bucket. Fix the lookup.",
+    id: "preview",
+    label: "Build pricing & preview",
+    repo: "acme/saas-starter",
+    sha: "4a8c91e",
+    branch: "openmi/agent/7d4e2a",
+    pr: "PR #128",
+    sandboxStatus: "build exit 0 · preview ready",
+    prompt: "Add a yearly billing toggle to the pricing page and verify the build.",
     answer:
-      "The release call omits whether the run was reaped, so a reaped run returns its hour to the default bucket. Passing the flag preserves the original balance target.",
-    citation: "lib/refunds.ts:212",
+      "Added a client billing-period toggle in app/pricing/page.tsx, updated the plan cards to calculate annual savings, and ran pnpm run build in the sandbox (exit 0) with live preview active.",
+    citation: "app/pricing/page.tsx:44",
     tools: [
-      { tool: "read_file", arg: "lib/refunds.ts" },
-      { tool: "search_code", arg: "reaped_at" },
-      { tool: "read_file", arg: "supabase/migrations/047_queue_recovery.sql" },
+      { tool: "read_file", arg: "app/pricing/page.tsx" },
+      { tool: "propose_edits", arg: "app/pricing/page.tsx (+14 −4)" },
+      { tool: "run_command", arg: "pnpm run build → exit 0" },
     ],
     files: [
-      { path: "lib/refunds.ts", adds: 3, dels: 1, active: true },
-      { path: "lib/runs/reaper.ts", adds: 4, dels: 2 },
-      { path: "tests/refund.test.ts", adds: 5, dels: 1 },
+      { path: "app/pricing/page.tsx", adds: 14, dels: 4, active: true },
+      { path: "components/PlanToggle.tsx", adds: 28, dels: 0 },
     ],
-    hunk: "@@ -206,7 +206,9 @@",
+    hunk: "@@ -40,6 +40,10 @@",
     diff: [
-      { kind: "ctx", n: 206, text: "}" },
-      { kind: "ctx", n: 207, text: "" },
-      { kind: "del", n: 208, text: "  const bucket = await bucketFor(model);" },
-      { kind: "del", n: 209, text: "  await release(run.id, bucket);" },
-      { kind: "add", n: 208, text: "  const bucket = await bucketFor(model);" },
-      { kind: "add", n: 209, text: "  await release(run.id, bucket, {" },
-      { kind: "add", n: 210, text: "    reaped: run.reaped_at !== null," },
-      { kind: "add", n: 211, text: "  });" },
-      { kind: "ctx", n: 212, text: "}" },
+      { kind: "ctx", n: 40, text: "export function PlanPrice({ monthly, yearly }: Props) {" },
+      { kind: "del", n: 41, text: "  return <span className=\"font-mono\">${monthly}/mo</span>;" },
+      { kind: "add", n: 41, text: "  const amount = yearly ? Math.round(monthly * 0.8) : monthly;" },
+      { kind: "add", n: 42, text: "  return (" },
+      { kind: "add", n: 43, text: "    <span className=\"font-mono tabular-nums\">" },
+      { kind: "add", n: 44, text: "      ${amount}/mo {yearly && \"(billed yearly)\"}" },
+      { kind: "add", n: 45, text: "    </span>" },
+      { kind: "add", n: 46, text: "  );" },
+      { kind: "ctx", n: 47, text: "}" },
     ],
   },
   {
     id: "redirect",
-    label: "Guard next path",
-    repo: "LOWENDLAGANI/Openmi-V2",
+    label: "Fix auth redirect",
+    repo: "acme/web-app",
     sha: "9c17d08",
     branch: "openmi/agent/3a90e4",
-    pr: "PR #418",
-    prompt: "Ensure login redirect rejects protocol-relative paths.",
+    pr: "PR #134",
+    sandboxStatus: "typecheck exit 0",
+    prompt: "Ensure login redirect rejects protocol-relative paths like //evil.com.",
     answer:
       "safeNextPath already normalises against an invalid origin, but protocol-relative strings starting with // pass a naive startsWith check. Rejecting leading double slashes closes that path.",
     citation: "lib/http/next-path.ts:19",
     tools: [
       { tool: "read_file", arg: "lib/http/next-path.ts" },
       { tool: "search_code", arg: "safeNextPath" },
-      { tool: "run_command", arg: "pnpm exec tsc --noEmit" },
+      { tool: "run_command", arg: "pnpm exec tsc --noEmit → exit 0" },
     ],
     files: [
-      { path: "lib/http/next-path.ts", adds: 2, dels: 1, active: true },
+      { path: "lib/http/next-path.ts", adds: 3, dels: 1, active: true },
       { path: "tests/redirect.test.ts", adds: 6, dels: 0 },
     ],
-    hunk: "@@ -14,6 +14,7 @@",
+    hunk: "@@ -14,6 +14,8 @@",
     diff: [
       { kind: "ctx", n: 14, text: "export function safeNextPath(raw: string | undefined, base: string) {" },
       { kind: "ctx", n: 15, text: "  if (!raw) return \"/chat\";" },
@@ -105,34 +107,37 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
-    id: "effort",
-    label: "Check effort default",
-    repo: "LOWENDLAGANI/Openmi-V2",
+    id: "webhook",
+    label: "Guard webhook route",
+    repo: "acme/api-server",
     sha: "08e79f9",
     branch: "openmi/agent/5c12b7",
-    pr: "PR #421",
-    prompt: "Verify effort gating only forwards levels to DeepSeek models.",
+    pr: "PR #141",
+    sandboxStatus: "build exit 0",
+    prompt: "Verify webhook signatures with timing-safe comparison before parsing JSON.",
     answer:
-      "modelSupportsEffort restricts reasoning_effort to deepseek-flash, and effortOrDefault coerces unknown strings back to high before the provider payload is built.",
-    citation: "lib/models/effort.ts:42",
+      "The handler parsed req.json() before checking the HMAC header and compared signatures with ===. Reading the raw body first and verifying with timingSafeEqual prevents spoofed payloads.",
+    citation: "app/api/webhooks/route.ts:22",
     tools: [
-      { tool: "read_file", arg: "lib/models/effort.ts" },
-      { tool: "read_file", arg: "lib/providers.ts" },
-      { tool: "search_code", arg: "reasoningRequest" },
+      { tool: "read_file", arg: "app/api/webhooks/route.ts" },
+      { tool: "search_code", arg: "verifySignature" },
+      { tool: "run_command", arg: "pnpm run build → exit 0" },
     ],
     files: [
-      { path: "lib/models/effort.ts", adds: 3, dels: 1, active: true },
-      { path: "lib/providers.ts", adds: 2, dels: 0 },
+      { path: "app/api/webhooks/route.ts", adds: 5, dels: 2, active: true },
+      { path: "lib/webhooks/verify.ts", adds: 8, dels: 3 },
     ],
-    hunk: "@@ -38,6 +38,8 @@",
+    hunk: "@@ -17,6 +17,9 @@",
     diff: [
-      { kind: "ctx", n: 38, text: "export function reasoningRequest(effort: ReasoningEffort) {" },
-      { kind: "del", n: 39, text: "  return { reasoning_effort: effort };" },
-      { kind: "add", n: 39, text: "  if (effort === \"fast\") {" },
-      { kind: "add", n: 40, text: "    return { reasoning_effort: \"none\" as const };" },
-      { kind: "add", n: 41, text: "  }" },
-      { kind: "add", n: 42, text: "  return { reasoning_effort: effort };" },
-      { kind: "ctx", n: 43, text: "}" },
+      { kind: "ctx", n: 17, text: "export async function POST(request: Request) {" },
+      { kind: "del", n: 18, text: "  const payload = await request.json();" },
+      { kind: "del", n: 19, text: "  if (!verifyHeader(request.headers)) return new Response(null, { status: 401 });" },
+      { kind: "add", n: 18, text: "  const rawBody = await request.text();" },
+      { kind: "add", n: 19, text: "  const sig = request.headers.get(\"x-signature\") ?? \"\";" },
+      { kind: "add", n: 20, text: "  if (!verifySignature(rawBody, sig)) {" },
+      { kind: "add", n: 21, text: "    return new Response(\"Invalid signature\", { status: 401 });" },
+      { kind: "add", n: 22, text: "  }" },
+      { kind: "ctx", n: 23, text: "  const payload = JSON.parse(rawBody);" },
     ],
   },
 ];
@@ -197,6 +202,11 @@ export function WorkspaceFrame() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            {scenario.sandboxStatus && (
+              <span className="hidden rounded-md border border-line bg-card px-2 py-0.5 font-mono text-[10.5px] text-mid lg:inline">
+                {scenario.sandboxStatus}
+              </span>
+            )}
             <span className="hidden font-mono text-[11px] text-mid md:inline">
               {scenario.branch}
             </span>
