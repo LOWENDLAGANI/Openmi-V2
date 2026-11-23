@@ -25,7 +25,6 @@ import {
 } from "@/lib/billing/plans";
 import { getMyrRates, withLiveRate } from "@/lib/billing/rates";
 import {
-  DAILY_FREE_CREDIT,
   formatCredit,
   formatPassDate,
   formatPassRemaining,
@@ -217,17 +216,17 @@ export default async function PayPage({
             </div>
           </div>
 
-          <p className="mt-4 max-w-2xl text-[13px] leading-relaxed text-mid">
-            {TOPUP_PAUSED
-              ? "Checkout is paused while the payment path is tested. No payment is accepted and the upload form is closed; a redeem code still adds Credit."
-              : "Payment happens on Sociabuzz, outside this app. Complete payment, keep your receipt, and upload it below. Approval credits your balance and activates or extends your pass."}
-          </p>
+          {TOPUP_PAUSED && (
+            <p className="mt-4 max-w-2xl text-[13px] leading-relaxed text-mid">
+              Checkout is paused while the payment path is tested. No payment is
+              accepted and the upload form is closed; a redeem code still adds
+              Credit.
+            </p>
+          )}
 
-          {profile?.paidUntil && (
+          {profile?.paidUntil && profile.paidActive && (
             <p className="mt-2 text-[12px] leading-relaxed text-low">
-              {profile.paidActive
-                ? `Your pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} (${formatPassRemaining(profile.paidUntil)}).`
-                : `Your last pass ended ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}. The daily allowance is back to ${DAILY_FREE_CREDIT} Credit.`}
+              {`Your pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} (${formatPassRemaining(profile.paidUntil)}).`}
             </p>
           )}
 
@@ -526,13 +525,6 @@ export default async function PayPage({
             </ul>
           )}
         </section>
-
-        <p className="mt-6 max-w-2xl text-[12px] leading-relaxed text-low">
-          Approval is recorded against your receipt and Credit moves through the
-          same append-only ledger as every other balance change. A rejected
-          receipt retains its operator note and can be resubmitted with a
-          corrected reference.
-        </p>
       </main>
     </div>
   );
