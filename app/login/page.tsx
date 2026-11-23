@@ -29,18 +29,18 @@ function cleanRef(raw: string | undefined): string | null {
 const HIGHLIGHTS = [
   {
     icon: GitBranch,
-    title: "Isolated agent branches",
-    detail: "Edits publish to openmi/agent/<id> with a pull request targeting your base.",
+    title: "Isolated branches",
+    detail: "Writes to openmi/agent/<id> with one PR.",
   },
   {
     icon: FileCode2,
-    title: "Verified commit citations",
-    detail: "Every file path and line number is checked against the pinned commit.",
+    title: "Pinned citations",
+    detail: "Real file paths and line numbers.",
   },
   {
     icon: Lock,
-    title: "Sealed repository access",
-    detail: "GitHub grants stay encrypted on the server and are never sent to the browser.",
+    title: "Sealed GitHub tokens",
+    detail: "Encrypted server-side, never sent to the model.",
   },
 ];
 
@@ -108,10 +108,8 @@ export default async function LoginPage({
             <h1 className="text-[clamp(1.9rem,4.4vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
               Sign in to Openmi
             </h1>
-            <p className="mt-4 text-[14.5px] leading-[1.65] text-mid">
-              Your conversations, files, and repository connections remain
-              private to your account. Changes arrive as dedicated branches and
-              pull requests named directly in each thread.
+            <p className="mt-3 text-[14.5px] leading-[1.6] text-mid">
+              Private workspace · cloud sandboxes · isolated GitHub PRs.
             </p>
 
             <ul className="mt-8 space-y-4 border-t border-line pt-6">

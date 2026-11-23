@@ -341,8 +341,8 @@ export default async function PayPage({
           </div>
 
           {localPrices && (
-            <p className="mt-3 text-[12px] leading-relaxed text-low">
-              {`≈ ${currency.name} at ${live ? "today's exchange rate" : "an indicative rate"}. The hosted page charges Malaysian ringgit.`}
+            <p className="mt-3 text-[12px] text-low">
+              {`≈ ${currency.name} (${live ? "live" : "indicative"}). Charged in RM.`}
             </p>
           )}
         </section>

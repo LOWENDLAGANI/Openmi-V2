@@ -2,12 +2,9 @@ import {
   ArrowRight,
   Check,
   Clock,
-  Code2,
   Cpu,
   GitBranch,
-  Globe,
   KeyRound,
-  Layers,
   Rocket,
   ShieldAlert,
   Terminal,
@@ -33,108 +30,84 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Openmi — Free GitHub coding agent, priced by the hour",
-  description: `Ad-supported browser coding agent for GitHub with cloud sandboxes, live previews, and isolated pull requests. ${DAILY_FREE_CREDIT} free Credit every day, ${CREDIT_PER_HOUR} Credit per hour with unlimited follow-up turns.`,
+  description: `Browser GitHub agent with cloud sandboxes, live previews, and isolated PRs. ${DAILY_FREE_CREDIT} free Credit daily, ${CREDIT_PER_HOUR} Credit/hr.`,
   other: { "page-type": "software", "site-kind": "software" },
 };
 
 const NAV = [
-  { href: "#why", label: "Why Openmi" },
   { href: "#features", label: "Features" },
   { href: "#how", label: "Workflow" },
   { href: "#pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ];
 
-const HIGHLIGHTS = [
-  {
-    icon: Clock,
-    title: "Billed by the hour, never per token",
-    body: `${CREDIT_PER_HOUR} Credit unlocks a full hour on a named model with unlimited follow-up turns in that chat. Provider failures before the first token refund automatically.`,
-  },
-  {
-    icon: Globe,
-    title: "Free every day, equal worldwide",
-    body: `Every account refills to ${DAILY_FREE_CREDIT} Credit at local midnight—the same daily allowance in every country, funded by ads.`,
-  },
-  {
-    icon: Layers,
-    title: "Zero subscription lock-in",
-    body: "No monthly auto-renewal and no credit card stored in the app. Pick up a fixed-term pass when you need extra hours; it ends cleanly back on the free tier.",
-  },
-  {
-    icon: Terminal,
-    title: "Zero local setup required",
-    body: "Connect a GitHub repository from any browser, run builds in a persistent Linux sandbox, preview live apps, and merge pull requests from one place.",
-  },
-];
-
 const FEATURES = [
   {
-    icon: KeyRound,
-    title: "GitHub OAuth & sealed tokens",
-    body: "Connect with GitHub OAuth or a fine-grained personal access token. Credentials stay encrypted server-side with AES-256-GCM; the model never sees them.",
+    icon: Clock,
+    title: "Hourly billing",
+    body: `${CREDIT_PER_HOUR} Credit/hr, unlimited follow-ups. Auto-refund on failure.`,
   },
   {
     icon: Terminal,
-    title: "Persistent cloud Linux sandbox",
-    body: "Each chat gets its own isolated sandbox seeded from your pinned commit—kept for 48 hours of inactivity with shell tools, browser inspection, and checkpoints.",
+    title: "Cloud Linux sandbox",
+    body: "Persistent per-chat shell, browser tool, and checkpoints (48h TTL).",
   },
   {
     icon: Rocket,
-    title: "Live previews & Vercel publish",
-    body: "Preview running web apps directly from the chat sandbox, sync workspace edits back to GitHub, and deploy commits straight to Vercel.",
+    title: "Previews & Vercel deploy",
+    body: "Live sandbox previews, GitHub sync, and one-click Vercel publish.",
   },
   {
     icon: Cpu,
-    title: "Frontier models & effort control",
-    body: "Pick DeepSeek V4.1 Flash (with Fast, High, or Max thinking effort), GPT-OSS 120B, or unlock Claude Haiku 4.5 with an active pass.",
+    title: "Top coding models",
+    body: "DeepSeek V4.1 Flash (Fast/High/Max), GPT-OSS 120B, Claude Haiku 4.5.",
   },
   {
     icon: GitBranch,
-    title: "Unified diffs & isolated PRs",
-    body: "Review per-file unified diffs pinned to an exact commit SHA. Approved changes write to openmi/agent/<id> and open a pull request without force-pushing.",
+    title: "Diffs & isolated PRs",
+    body: "Pinned-commit citations, per-file diffs, openmi/agent/ branches.",
   },
   {
-    icon: Code2,
-    title: "Verified line citations & ledger",
-    body: "Every code claim cites real paths and line numbers from the pinned commit, and every Credit charge, refill, or refund appears in an append-only ledger.",
+    icon: KeyRound,
+    title: "Sealed GitHub access",
+    body: "OAuth or fine-grained tokens encrypted server-side (AES-256-GCM).",
   },
 ];
 
 const STEPS = [
   {
     icon: KeyRound,
-    title: "Connect a GitHub repository",
-    body: "Sign in, connect via GitHub OAuth or a fine-grained token, and pick a branch. Every turn runs against the exact commit SHA where the thread started.",
+    title: "Connect a repo",
+    body: "GitHub OAuth or token. Pinned to the exact commit SHA.",
   },
   {
     icon: Terminal,
-    title: "Inspect, edit, and build in the cloud",
-    body: "The agent searches your codebase with ripgrep, edits files in a persistent Linux sandbox, runs installs and builds, and cites real paths and line numbers.",
+    title: "Code & build in cloud",
+    body: "ripgrep search, file edits, installs, and live previews.",
   },
   {
     icon: GitBranch,
-    title: "Preview and ship on an isolated branch",
-    body: "Check live previews or review per-file unified diffs. Openmi writes a dedicated branch, opens one pull request, and lets you deploy to Vercel when ready.",
+    title: "Review & ship PR",
+    body: "Unified diffs on openmi/agent/<id> plus one pull request.",
   },
 ];
 
 const BOUNDARIES = [
   {
-    title: "Never forces or rewrites branches",
-    body: "Changes write to openmi/agent/<id> unless you specify another destination. If the base moves, edits re-apply cleanly or move to a fresh branch.",
+    title: "No force pushes",
+    body: "Never rewrites history or overwrites moved branches.",
   },
   {
-    title: "Never touches your default branch unasked",
-    body: "Your default branch stays protected as the pull request base unless you explicitly choose it as the destination.",
+    title: "Protected default branch",
+    body: "Writes to openmi/agent/<id> unless you name another branch.",
   },
   {
-    title: "Never fabricates test execution",
-    body: "Sandboxes run installs, builds, and commands you request and report the exact exit code observed. If a test suite did not run, the transcript never claims it did.",
+    title: "Real exit codes only",
+    body: "Reports exact sandbox exit codes. Never fakes test runs.",
   },
   {
-    title: "Never stores card details in the app",
-    body: "Credit arrives through the daily allowance, trial grants, invites, or approved fixed-term passes via hosted checkout. Every balance change stays in an append-only ledger.",
+    title: "No cards stored",
+    body: "Fixed passes via hosted checkout. Append-only Credit ledger.",
   },
 ];
 
@@ -213,21 +186,21 @@ export default async function HomePage({
             {ref && (
               <div
                 role="status"
-                className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-[13px] text-accent-text"
+                className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[13px] text-accent-text"
               >
                 <p>
-                  You were invited to Openmi (code{" "}
+                  Invite{" "}
                   <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
                     {ref}
-                  </code>
-                  ) — both accounts earn +{INVITE_REWARD_CREDIT} bonus Credit
-                  when you activate your first paid pass.
+                  </code>{" "}
+                  active — +{INVITE_REWARD_CREDIT} Credit for both on first paid
+                  pass.
                 </p>
                 <Link
                   href={loginHref}
                   className="btn btn-primary px-3 py-1.5 text-[12px]"
                 >
-                  Apply invite code
+                  Apply code
                 </Link>
               </div>
             )}
@@ -241,7 +214,7 @@ export default async function HomePage({
                   <span aria-hidden="true" className="text-line-strong">
                     ·
                   </span>
-                  <span>No credit card</span>
+                  <span>No card</span>
                   <span aria-hidden="true" className="text-line-strong">
                     ·
                   </span>
@@ -251,15 +224,12 @@ export default async function HomePage({
                 <h1 className="mt-4 max-w-[20ch] text-balance text-[clamp(2.35rem,5.2vw,4rem)] font-semibold leading-[1.03] tracking-[-0.035em] text-hi">
                   Free GitHub coding agent, priced by the hour.
                 </h1>
-                <p className="mt-5 max-w-[56ch] text-pretty text-[15.5px] leading-[1.65] text-mid">
-                  Skip the $20/mo subscription and token meters. Connect a
-                  GitHub repository, run builds in a cloud Linux sandbox,
-                  preview live apps, and ship verified pull requests—with{" "}
-                  {DAILY_FREE_CREDIT} free Credit every day and {CREDIT_PER_HOUR}{" "}
-                  Credit per hour.
+                <p className="mt-4 max-w-[48ch] text-pretty text-[15.5px] leading-[1.6] text-mid">
+                  Cloud Linux sandboxes, live previews, and isolated PRs—with{" "}
+                  {DAILY_FREE_CREDIT} free Credit every day.
                 </p>
 
-                <div className="mt-7 flex flex-wrap items-center gap-3">
+                <div className="mt-6 flex flex-wrap items-center gap-3">
                   <Link
                     href={loginHref}
                     className="btn btn-primary lift px-5 py-2.5 text-[13.5px]"
@@ -271,7 +241,7 @@ export default async function HomePage({
                     href={pricingHref}
                     className="btn px-4 py-2.5 text-[13.5px]"
                   >
-                    Compare passes &amp; currency
+                    Pricing
                   </Link>
                 </div>
               </div>
@@ -297,7 +267,7 @@ export default async function HomePage({
                     </p>
                   </div>
                   <div className="px-3.5 py-3">
-                    <dt className="text-[11.5px] text-low">Trial grant</dt>
+                    <dt className="text-[11.5px] text-low">Trial</dt>
                     <dd className="mt-1 font-mono text-[14px] font-semibold tabular-nums text-hi">
                       {TRIAL_CREDIT} Credit
                     </dd>
@@ -313,76 +283,33 @@ export default async function HomePage({
           </div>
         </section>
 
-        {/* ── Why Openmi (Anti-Token-Anxiety & Global Fairness) ──────────── */}
-        <section id="why" className="lp-section border-t border-line bg-raised">
-          <div className="lp-wrap">
-            <div className="max-w-2xl">
-              <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-                Unlimited follow-ups per hour, without the monthly trap
-              </h2>
-              <p className="mt-3 text-pretty text-[14.5px] leading-[1.65] text-mid">
-                Other coding agents meter every prompt and lock cloud sandboxes
-                behind $20–$200 monthly subscriptions. Openmi keeps the free
-                tier genuinely usable every day and charges by the hour when you
-                pick a named model.
-              </p>
-            </div>
-
-            <dl className="mt-10 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
-              {HIGHLIGHTS.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.title} className="bg-card p-6">
-                    <span className="grid size-8 place-items-center rounded-lg border border-line bg-raised text-accent-text">
-                      <Icon className="size-4" strokeWidth={1.75} />
-                    </span>
-                    <dt className="mt-4 text-[14.5px] font-semibold tracking-[-0.015em] text-hi">
-                      {item.title}
-                    </dt>
-                    <dd className="mt-2 text-pretty text-[13px] leading-[1.6] text-mid">
-                      {item.body}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-          </div>
-        </section>
-
-        {/* ── Full Feature Surface ───────────────────────────────────────── */}
-        <section id="features" className="lp-section border-t border-line">
+        {/* ── Features ───────────────────────────────────────────────────── */}
+        <section id="features" className="lp-section border-t border-line bg-raised">
           <div className="lp-wrap">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-              <div>
-                <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-                  Everything needed to go from repo to PR in the browser
-                </h2>
-                <p className="mt-3 max-w-[58ch] text-pretty text-[14.5px] leading-[1.65] text-mid">
-                  Built directly around GitHub commits, persistent Linux
-                  sandboxes, and reviewable diffs—usable on desktop or mobile
-                  with PWA install support.
-                </p>
-              </div>
+              <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+                Repo to PR, in the browser
+              </h2>
               <Link href={loginHref} className="btn self-start px-3.5 py-2 text-[12.5px]">
                 Open workspace
               </Link>
             </div>
 
-            <dl className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <dl className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
                     key={item.title}
-                    className="rounded-xl border border-line bg-card p-6 shadow-[var(--card-shadow)]"
+                    className="rounded-xl border border-line bg-card p-5 shadow-[var(--card-shadow)]"
                   >
-                    <dt className="flex items-center gap-2.5 text-[14.5px] font-semibold tracking-[-0.015em] text-hi">
+                    <dt className="flex items-center gap-2.5 text-[14px] font-semibold tracking-[-0.015em] text-hi">
                       <span className="grid size-7 shrink-0 place-items-center rounded-md border border-line bg-raised text-accent-text">
                         <Icon className="size-3.5" strokeWidth={1.75} />
                       </span>
                       {item.title}
                     </dt>
-                    <dd className="mt-3 text-pretty text-[13px] leading-[1.6] text-mid">
+                    <dd className="mt-2 text-pretty text-[13px] leading-[1.55] text-mid">
                       {item.body}
                     </dd>
                   </div>
@@ -393,19 +320,14 @@ export default async function HomePage({
         </section>
 
         {/* ── Workflow + Execution Trace ─────────────────────────────────── */}
-        <section id="how" className="lp-section border-t border-line bg-raised">
+        <section id="how" className="lp-section border-t border-line">
           <div className="lp-wrap grid items-start gap-12 lg:grid-cols-12">
             <div className="lg:col-span-5">
               <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-                How every turn runs
+                How a turn runs
               </h2>
-              <p className="mt-4 text-[14.5px] leading-[1.65] text-mid">
-                Each turn operates inside a sandbox seeded from your pinned
-                commit. Your GitHub token stays sealed on the server—the model
-                never sees credentials.
-              </p>
 
-              <ol className="mt-8 space-y-5">
+              <ol className="mt-7 space-y-5">
                 {STEPS.map((step, index) => {
                   const Icon = step.icon;
                   return (
@@ -420,7 +342,7 @@ export default async function HomePage({
                           </span>
                           {step.title}
                         </h3>
-                        <p className="mt-1 text-pretty text-[13.5px] leading-[1.6] text-mid">
+                        <p className="mt-1 text-pretty text-[13px] leading-[1.55] text-mid">
                           {step.body}
                         </p>
                       </div>
@@ -432,36 +354,26 @@ export default async function HomePage({
 
             <div className="lg:col-span-7">
               <RunTrace />
-              <p className="mt-3 text-[12px] leading-relaxed text-low">
-                Turn execution limits are enforced server-side across steps,
-                tokens, and wall-clock time.
-              </p>
             </div>
           </div>
         </section>
 
-        {/* ── Operational Boundaries Matrix ──────────────────────────────── */}
-        <section id="limits" className="lp-section border-y border-line">
+        {/* ── Boundaries ─────────────────────────────────────────────────── */}
+        <section id="limits" className="lp-section border-y border-line bg-raised">
           <div className="lp-wrap">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-              <div>
-                <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-                  Explicit operational boundaries
-                </h2>
-                <p className="mt-3 max-w-[54ch] text-pretty text-[14.5px] leading-[1.65] text-mid">
-                  Every transcript states what ran and what stayed untouched,
-                  with clear constraints enforced before a write reaches GitHub.
-                </p>
-              </div>
+              <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+                Hard boundaries
+              </h2>
               <Link href="/about" className="btn self-start px-3.5 py-2 text-[12.5px]">
-                Read full contract
+                Full contract
               </Link>
             </div>
 
-            <dl className="mt-10 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2">
+            <dl className="mt-8 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
               {BOUNDARIES.map((item) => (
-                <div key={item.title} className="bg-card p-6 sm:p-7">
-                  <dt className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.015em] text-hi">
+                <div key={item.title} className="bg-card p-5">
+                  <dt className="flex items-center gap-2 text-[14px] font-semibold tracking-[-0.015em] text-hi">
                     <ShieldAlert
                       aria-hidden="true"
                       className="size-4 shrink-0 text-accent-text"
@@ -469,7 +381,7 @@ export default async function HomePage({
                     />
                     {item.title}
                   </dt>
-                  <dd className="mt-2.5 text-pretty text-[13.5px] leading-[1.6] text-mid">
+                  <dd className="mt-2 text-pretty text-[13px] leading-[1.55] text-mid">
                     {item.body}
                   </dd>
                 </div>
@@ -478,34 +390,27 @@ export default async function HomePage({
           </div>
         </section>
 
-        {/* ── Transparent Hourly Billing & Passes ────────────────────────── */}
-        <section id="pricing" className="lp-section bg-raised">
+        {/* ── Pricing ────────────────────────────────────────────────────── */}
+        <section id="pricing" className="lp-section">
           <div className="lp-wrap grid items-start gap-10 lg:grid-cols-12">
             <div className="lg:col-span-5">
               <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-                Free every day. Upgrade only when you need more hours.
+                {CREDIT_PER_HOUR} Credit/hr. Zero subscriptions.
               </h2>
-              <p className="mt-4 text-[14.5px] leading-[1.65] text-mid">
-                Every model hour costs {CREDIT_PER_HOUR} Credit for a full hour
-                of unlimited follow-up turns in that conversation. Ads fund the
-                daily free tier so you never need a credit card to start.
-              </p>
-              <p className="mt-3 text-[13px] leading-relaxed text-low">
-                Fixed-term passes never auto-renew. When a pass expires, your
-                account simply returns to the {DAILY_FREE_CREDIT} Credit daily
-                allowance. Invite friends to earn +{INVITE_REWARD_CREDIT} Credit
-                for both accounts once they activate their first paid pass.
+              <p className="mt-3 text-[14px] leading-[1.6] text-mid">
+                Unlimited follow-ups inside an active hour. Fixed-term passes
+                never auto-renew.
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link href={pricingHref} className="btn btn-primary px-4 py-2 text-[13px]">
-                  Compare passes &amp; currency
+                  Local currency &amp; details
                 </Link>
                 <a
                   href={supportMailto("Credit question")}
                   className="btn px-4 py-2 text-[13px]"
                 >
-                  Ask about Credit
+                  Contact
                 </a>
               </div>
             </div>
@@ -513,7 +418,7 @@ export default async function HomePage({
             <div className="grid gap-4 sm:grid-cols-2 lg:col-span-7">
               <div className="rounded-xl border border-line bg-card p-6 shadow-[var(--card-shadow)]">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[13px] font-medium text-mid">Free tier</p>
+                  <p className="text-[13px] font-medium text-mid">Free</p>
                   <span className="rounded-md border border-line bg-raised px-2 py-0.5 font-mono text-[10.5px] font-medium text-mid">
                     Ad-supported
                   </span>
@@ -525,27 +430,20 @@ export default async function HomePage({
                   </span>
                 </p>
                 <p className="mt-1.5 text-[12px] text-low">
-                  {dailyFreeHours} hours/day on named models · same worldwide
+                  {dailyFreeHours} hrs/day · worldwide
                 </p>
-                <ul className="mt-5 space-y-2.5 border-t border-line pt-4 text-[13px] text-mid">
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>
-                      {CREDIT_PER_HOUR} Credit per hour (unlimited follow-up
-                      turns)
-                    </span>
+                <ul className="mt-5 space-y-2 border-t border-line pt-4 text-[13px] text-mid">
+                  <li className="flex items-center gap-2">
+                    <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
+                    <span>{TRIAL_CREDIT} Credit trial</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>{TRIAL_CREDIT} Credit one-time trial grant</span>
+                  <li className="flex items-center gap-2">
+                    <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
+                    <span>DeepSeek V4.1 Flash &amp; GPT-OSS 120B</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>DeepSeek V4.1 Flash &amp; GPT-OSS 120B included</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>Cloud sandbox, live previews &amp; GitHub PRs</span>
+                  <li className="flex items-center gap-2">
+                    <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
+                    <span>Sandbox, previews &amp; GitHub PRs</span>
                   </li>
                 </ul>
               </div>
@@ -553,7 +451,7 @@ export default async function HomePage({
               <div className="rounded-xl border border-accent/35 bg-card p-6 shadow-[var(--card-shadow)]">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[13px] font-medium text-accent-text">
-                    Fixed-term passes
+                    Passes
                   </p>
                   <span className="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-[10.5px] font-medium text-accent-text">
                     No auto-renew
@@ -566,7 +464,7 @@ export default async function HomePage({
                   </span>
                 </p>
                 <p className="mt-1.5 text-[12px] text-low">
-                  {paidDailyHours} hours/day · plus upfront wallet Credit
+                  {paidDailyHours} hrs/day + wallet Credit
                 </p>
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -588,18 +486,14 @@ export default async function HomePage({
                   ))}
                 </div>
 
-                <ul className="mt-4 space-y-2.5 border-t border-line pt-4 text-[13px] text-mid">
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>Unlocks paid-only models (Claude Haiku 4.5)</span>
+                <ul className="mt-4 space-y-2 border-t border-line pt-4 text-[13px] text-mid">
+                  <li className="flex items-center gap-2">
+                    <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
+                    <span>Unlocks Claude Haiku 4.5</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>Stackable—extends from your current end date</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                    <span>Ends cleanly with zero recurring billing</span>
+                  <li className="flex items-center gap-2">
+                    <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
+                    <span>Stackable · ends cleanly</span>
                   </li>
                 </ul>
               </div>
@@ -608,17 +502,11 @@ export default async function HomePage({
         </section>
 
         {/* ── Closing CTA ────────────────────────────────────────────────── */}
-        <section className="border-t border-line py-16 sm:py-20">
+        <section className="border-t border-line py-14 sm:py-16">
           <div className="lp-wrap flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-            <div>
-              <h2 className="text-balance text-[clamp(1.6rem,3vw,2.25rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
-                Stop paying per token. Ship on GitHub for free.
-              </h2>
-              <p className="mt-2.5 text-[14px] text-mid">
-                Connect your repository in seconds—start with {TRIAL_CREDIT}{" "}
-                trial Credit and {DAILY_FREE_CREDIT} free Credit every day.
-              </p>
-            </div>
+            <h2 className="text-balance text-[clamp(1.6rem,3vw,2.2rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+              Ship on GitHub for free.
+            </h2>
             <Link
               href={loginHref}
               className="btn btn-primary lift shrink-0 px-5 py-2.5 text-[13.5px]"
@@ -636,9 +524,8 @@ export default async function HomePage({
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-3">
               <Brand compact />
-              <p className="max-w-[28ch] text-[12.5px] leading-relaxed text-low">
-                Free GitHub coding agent priced by the hour. Verified line
-                citations, cloud sandboxes, and isolated pull requests.
+              <p className="max-w-[26ch] text-[12.5px] leading-relaxed text-low">
+                Browser GitHub coding agent, priced by the hour.
               </p>
             </div>
 
@@ -657,7 +544,7 @@ export default async function HomePage({
                 </li>
                 <li>
                   <Link href="/about" className="hover:text-hi">
-                    About &amp; boundaries
+                    About
                   </Link>
                 </li>
               </ul>
@@ -668,17 +555,17 @@ export default async function HomePage({
               <ul className="mt-3 space-y-2 text-[13px] text-mid">
                 <li>
                   <Link href="/terms" className="hover:text-hi">
-                    Terms of service
+                    Terms
                   </Link>
                 </li>
                 <li>
                   <Link href="/privacy" className="hover:text-hi">
-                    Privacy policy
+                    Privacy
                   </Link>
                 </li>
                 <li>
                   <Link href="/refunds" className="hover:text-hi">
-                    Refunds &amp; cancellation
+                    Refunds
                   </Link>
                 </li>
               </ul>

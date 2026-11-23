@@ -20,20 +20,20 @@ export const metadata = {
 };
 
 const DOES = [
-  "Reads repository files at the commit a chat is pinned to.",
-  "Answers with path:line citations verified against the tree at that commit.",
-  "Writes edits as per-file unified diffs against the commit the chat is pinned to.",
-  `When a turn finishes with a change, writes it to ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one pull request, and squash-merges it, recording the merge commit.`,
-  "Runs installs, builds, and requested commands in an isolated Linux sandbox and reports the exact exit code observed.",
-  `Charges ${CREDIT_PER_HOUR} Credit for an hour of chat before the provider is called, recording every change in an append-only ledger.`,
+  "Reads repo files at the pinned commit SHA.",
+  "Cites real path:line locations from that commit.",
+  "Outputs per-file unified diffs.",
+  `Writes changes to ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one PR, and squash-merges it.`,
+  "Runs installs and builds in a Linux sandbox and reports exact exit codes.",
+  `Charges ${CREDIT_PER_HOUR} Credit/hr in an append-only ledger.`,
 ];
 
 const DOES_NOT = [
-  "It does not run your test suite as a verification step. It runs installs and builds in its sandbox, reports the observed exit code, and never claims a test that did not run.",
-  "It does not write to the default branch unless you name it as the destination or an operator enables default-branch writes for unattended runs.",
-  "It does not force-push a branch, merge a pull request it did not open, or delete branches.",
-  "It does not generate a project without an account or repository; there is no guest mode.",
-  "It does not collect card details in this app; payments run on the hosted checkout page, and top-ups arrive via redeem codes or approved receipts.",
+  "Does not run your test suite automatically or fake test passes.",
+  "Does not write to your default branch unless explicitly named.",
+  "Does not force-push, delete branches, or merge outside PRs.",
+  "No guest mode — requires an account and repository.",
+  "Never stores card details; payments run on hosted checkout.",
 ];
 
 export default function AboutPage() {
@@ -61,14 +61,12 @@ export default function AboutPage() {
           <AboutLogoGate />
         </section>
 
-        <div className="mt-10 border-b border-line pb-8">
+        <div className="mt-10 border-b border-line pb-6">
           <h1 className="max-w-2xl text-balance text-[clamp(1.9rem,4.5vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
-            What Openmi does, and what it refuses to do
+            Capabilities &amp; boundaries
           </h1>
-          <p className="mt-4 max-w-2xl text-[14.5px] leading-[1.65] text-mid">
-            Openmi is a workspace bound to a single GitHub repository per thread.
-            It inspects code at a pinned commit, cites real file paths and line
-            numbers, and writes edits to an isolated branch with a pull request.
+          <p className="mt-3 max-w-xl text-[14.5px] leading-[1.6] text-mid">
+            One GitHub repo per thread, pinned commits, isolated PRs.
           </p>
         </div>
 
@@ -124,70 +122,33 @@ export default function AboutPage() {
 
         <section className="mt-10 border-t border-line pt-8">
           <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
-            Branch policy
+            Credit &amp; passes
           </h2>
           <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
-            The head branch is derived from the changeset identifier:{" "}
-            <code className="rounded bg-raised px-1.5 py-0.5 font-mono text-[12px] text-hi">
-              {AGENT_BRANCH_PREFIX}&lt;changeset-id&gt;
-            </code>
-            . The pull request targets the repository&apos;s default branch, and
-            the turn squash-merges it. Naming a custom branch writes there
-            directly without opening a pull request; naming the default branch
-            explicitly requests a direct write. Any branch name is validated
-            against git&apos;s branch naming rules before a request is made.
+            {CREDIT_PER_HOUR} Credit/hr (unlimited follow-ups). Daily allowance:{" "}
+            {DAILY_FREE_CREDIT} Credit free, {PAID_DAILY_FREE_CREDIT} Credit
+            with an active pass. Trial: {TRIAL_CREDIT} Credit (1/IP/24h). Low
+            warning under {LOW_BALANCE_CREDIT} Credit. Invites grant{" "}
+            {INVITE_REWARD_CREDIT} Credit to both sides on the invitee&apos;s
+            first paid pass (max {MAX_INVITES_PER_ACCOUNT}).
           </p>
-        </section>
-
-        <section className="mt-8 border-t border-line pt-8">
-          <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
-            Hourly pricing &amp; Credit
-          </h2>
           <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
-            One hour of chat costs {CREDIT_PER_HOUR} Credit, charged once before
-            the model provider is called. Further turns
-            inside that hour carry no charge. The daily allowance is{" "}
-            {DAILY_FREE_CREDIT} Credit, or {PAID_DAILY_FREE_CREDIT} while a paid
-            plan is active. A {TRIAL_CREDIT} Credit trial credit is granted once
-            per account, capped at one trial per address in any 24-hour window.
-            The balance indicator warns below {LOW_BALANCE_CREDIT} Credit. An
-            invite rewards both accounts {INVITE_REWARD_CREDIT} Credit once the
-            invited account activates its first paid pass, up to{" "}
-            {MAX_INVITES_PER_ACCOUNT} rewarded accounts per inviter.
-          </p>
-          <p className="mt-3 text-[13.5px] leading-relaxed text-mid">
-            Every purchase is final: Credit, plans, and passes are non-refundable
-            and never auto-renew. If the model provider returns no answer at all,
-            the hour is automatically returned to your balance by the meter; a
-            turn stopped after text arrived keeps its hour because the partial
-            answer is preserved. Every change appears as an append-only ledger
-            entry on{" "}
+            Passes never auto-renew and are non-refundable (provider failures
+            before the first token auto-refund). See{" "}
             <Link
               href="/activity"
               className="font-medium text-accent-text underline-offset-2 hover:underline"
             >
-              the activity page
-            </Link>
-            . Read the{" "}
+              activity
+            </Link>{" "}
+            and{" "}
             <Link
               href="/refunds"
               className="font-medium text-accent-text underline-offset-2 hover:underline"
             >
-              refund and cancellation policy
-            </Link>{" "}
-            for full terms.
-          </p>
-        </section>
-
-        <section className="panel mt-8 p-6">
-          <h2 className="text-[15.5px] font-semibold tracking-[-0.02em] text-hi">
-            What every transcript reports
-          </h2>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-mid">
-            Every transcript states directly what the turn accomplished: the
-            branch written, the pull request opened or merged, and the exit code
-            of any sandbox command. Unobserved checks or deployments are never
-            claimed, and a turn that modified no files states that clearly.
+              refund terms
+            </Link>
+            .
           </p>
         </section>
 

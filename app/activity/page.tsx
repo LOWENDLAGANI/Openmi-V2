@@ -227,7 +227,7 @@ export default async function ActivityPage({
               </span>
             </p>
             <p className="mt-2.5 text-[12px] text-mid">
-              {CREDIT_PER_HOUR} Credit / hour · Auto is free
+              {CREDIT_PER_HOUR} Credit / hour · unlimited turns
             </p>
           </div>
 
@@ -282,14 +282,10 @@ export default async function ActivityPage({
             </p>
           </div>
 
-          <p className="mt-2 text-[13px] leading-relaxed text-mid">
+          <p className="mt-2 text-[13px] text-mid">
             {settledToday
-              ? `Settled for ${profile.creditDay}. The next refresh runs at midnight in ${profile.timezone}.`
-              : `Not settled for ${today} yet. Opening a chat or reloading this page settles it.`}
-          </p>
-
-          <p className="mt-1 text-[12px] leading-relaxed text-low">
-            Refills follow {profile.timezone}, not your local device clock.
+              ? `Settled for ${profile.creditDay}.`
+              : `Pending for ${today}.`}
           </p>
 
           <dl className="mt-4 grid gap-4 border-t border-line pt-4 text-[12.5px] sm:grid-cols-3">
@@ -318,11 +314,8 @@ export default async function ActivityPage({
           </dl>
 
           {alreadyAtAllowance && (
-            <p className="mt-3 border-t border-line pt-3 text-[12px] leading-relaxed text-low">
-              A refill tops up to the allowance; it does not stack. At{" "}
-              {formatCredit(profile.balance)} Credit there is nothing to add
-              until the balance drops below {formatCredit(allowance)}, which is
-              why a settled day can leave the ledger unchanged.
+            <p className="mt-3 border-t border-line pt-3 text-[12px] text-low">
+              Daily refills top up to {formatCredit(allowance)} Credit (non-stacking).
             </p>
           )}
         </section>
@@ -333,10 +326,9 @@ export default async function ActivityPage({
             <h2 className="text-[15px] font-semibold tracking-[-0.015em] text-hi">
               Invite code
             </h2>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-mid">
-              Share this code at sign-up. Both sides earn {INVITE_REWARD_CREDIT}{" "}
-              Credit once the invited account activates its first paid pass, up
-              to {MAX_INVITES_PER_ACCOUNT} rewarded accounts.
+            <p className="mt-1.5 text-[12.5px] text-mid">
+              +{INVITE_REWARD_CREDIT} Credit each on invitee&apos;s first paid
+              pass (max {MAX_INVITES_PER_ACCOUNT}).
             </p>
             <p className="mt-3 rounded-lg border border-line bg-raised px-3.5 py-2.5 font-mono text-[15px] font-semibold tracking-[0.14em] text-hi">
               {profile.inviteCode ?? "—"}
