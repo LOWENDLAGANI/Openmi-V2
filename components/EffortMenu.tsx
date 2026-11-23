@@ -136,30 +136,24 @@ export function EffortMenu({
                     type="button"
                     role="option"
                     aria-selected={active}
-                    title={option.blurb}
                     onClick={() => {
                       onChange(option.id);
                       setOpen(false);
                     }}
-                    className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                    className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
                       active
                         ? "bg-elevated text-hi"
                         : "text-body hover:bg-hover hover:text-hi"
                     }`}
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12.5px] font-medium">
-                        {option.label}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] leading-snug text-low">
-                        {option.blurb}
-                      </span>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">
+                      {option.label}
                     </span>
 
                     {active && (
                       <Check
                         aria-hidden="true"
-                        className="mt-0.5 size-3.5 shrink-0 text-accent-text"
+                        className="size-3.5 shrink-0 text-accent-text"
                         strokeWidth={2.25}
                       />
                     )}
