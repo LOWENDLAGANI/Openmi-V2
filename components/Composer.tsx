@@ -40,6 +40,7 @@ export function Composer({
   repo,
   paidActive,
   streaming,
+  backgroundRunning = false,
   stopping,
   providerReady,
   command,
@@ -56,6 +57,7 @@ export function Composer({
   repo?: string | null;
   paidActive: boolean;
   streaming: boolean;
+  backgroundRunning?: boolean;
   stopping: boolean;
   providerReady: boolean;
   command: ComposerCommand;
@@ -79,8 +81,9 @@ export function Composer({
     element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
   }, [text]);
 
+  const isRunning = streaming || backgroundRunning;
   const tooLong = text.length > MAX_MESSAGE_CHARS;
-  const canSend = !streaming && !tooLong && text.trim().length > 0;
+  const canSend = !isRunning && !tooLong && text.trim().length > 0;
   const hourCost = modelHourCredit(model, models);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -154,7 +157,7 @@ export function Composer({
               />
             )}
 
-            {streaming && (
+            {isRunning && (
               <button
                 type="button"
                 onClick={onStop}

@@ -2,6 +2,13 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.2] - 2026-11-24 — Inline tool & terminal flow and always-visible running status
+
+- Interleaved tool calls and terminal runs inline alongside assistant text in chronological order instead of stacking all steps at the top of the message.
+- Kept the live thinking/running indicator visible at the bottom of the active turn even after partial assistant text has arrived or while continuing in the background.
+- Replaced the static ellipsis on in-progress steps with a live spinner and forwarded shell commands on tool start events.
+- Enabled the Composer Stop button and disabled new sends while a run is active in the background as well as during live streaming.
+
 ## [2.0.1] - 2026-11-24 — Problem reporting with screenshots, suggestions & admin review
 
 - Added Report a problem page (`/report`) allowing users to report bugs, attach PNG/JPEG/WebP screenshots (verified by file signature), and view status updates.

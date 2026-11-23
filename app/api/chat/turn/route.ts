@@ -52,8 +52,16 @@ async function readRunProgress(
       const tool = typeof payload.name === "string" ? payload.name : "tool";
       const detail =
         typeof payload.summary === "string" ? payload.summary : tool;
+      const command =
+        typeof payload.command === "string" ? payload.command : undefined;
       summaries.set(tool, detail);
-      steps.push({ tool, detail, state: "start" });
+      steps.push({
+        tool,
+        detail,
+        state: "start",
+        ...(command ? { command } : {}),
+        offset: text.length,
+      });
       continue;
     }
 
@@ -79,7 +87,7 @@ async function readRunProgress(
       }
 
       if (index >= 0) steps[index] = { ...steps[index], ...finished };
-      else steps.push(finished);
+      else steps.push({ ...finished, offset: text.length });
     }
   }
 

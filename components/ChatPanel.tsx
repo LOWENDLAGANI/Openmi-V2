@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Copy,
   GitBranch,
+  Loader2,
   Pencil,
   Terminal,
   XCircle,
@@ -595,8 +596,16 @@ export function ChatPanel({
             break;
           }
         }
-        if (index >= 0) stepLog[index] = next;
-        else stepLog.push(next);
+        if (index >= 0) {
+          stepLog[index] = {
+            ...stepLog[index],
+            ...next,
+            command: next.command ?? stepLog[index].command,
+            offset: stepLog[index].offset,
+          };
+        } else {
+          stepLog.push(next);
+        }
       }
       setSteps([...stepLog]);
     };
@@ -751,6 +760,7 @@ export function ChatPanel({
             state,
             command: typeof payload.command === "string" ? payload.command : undefined,
             output: typeof payload.output === "string" ? payload.output : undefined,
+            offset: assembled.length,
           });
 
           // A screenshot rides on the step that produced it. It is shown now and
@@ -828,15 +838,16 @@ export function ChatPanel({
           // The row is the answer as stored, the stream is the same answer as it
           // arrived. A row shorter than what reached this tab was cut at the
           // storage cap, so the longer copy is the one the model actually wrote.
-          const storedContent =
-            rowContent.length >= assembled.length ? rowContent : assembled;
+          const useRow = rowContent.length >= assembled.length;
+          const storedContent = useRow ? rowContent : assembled;
           const storedThinking =
             typeof payload.thinking === "string" && payload.thinking.length > 0
               ? payload.thinking
               : thinkingText;
-          const storedSteps = Array.isArray(payload.steps)
-            ? (payload.steps as StepLine[])
-            : [...stepLog];
+          const storedSteps =
+            useRow && Array.isArray(payload.steps)
+              ? (payload.steps as StepLine[])
+              : [...stepLog];
           // The worker stores the same note with a stopped answer, so the card
           // and the row say the same thing and neither writes it twice.
           const content =
@@ -1020,8 +1031,9 @@ export function ChatPanel({
   }
 
   function stop() {
-    if (!streaming || stopping) return;
+    if ((!streaming && !backgroundRunning) || stopping) return;
 
+    const wasStreaming = streaming;
     stoppedRef.current = true;
     setStopping(true);
     setBackgroundRunning(false);
@@ -1045,16 +1057,25 @@ export function ChatPanel({
         .catch(() => {
           // No server to stop, so end this view rather than hang on it.
           abortRef.current?.abort();
+        })
+        .finally(() => {
+          if (!wasStreaming) {
+            setStopping(false);
+            router.refresh();
+          }
         });
     } else {
       abortRef.current?.abort();
+      if (!wasStreaming) setStopping(false);
     }
 
     // Backstop: if no final event arrives, close the stream and keep the text.
-    stopTimerRef.current = window.setTimeout(() => {
-      stopTimerRef.current = null;
-      abortRef.current?.abort();
-    }, 8_000);
+    if (wasStreaming) {
+      stopTimerRef.current = window.setTimeout(() => {
+        stopTimerRef.current = null;
+        abortRef.current?.abort();
+      }, 8_000);
+    }
   }
 
   function retry() {
@@ -1189,18 +1210,16 @@ export function ChatPanel({
                   </div>
                   <div className="msg-ai-card">
                     {message.thinking && <ThinkingBlock text={message.thinking} />}
-                    {message.steps && message.steps.length > 0 && (
-                      <StepList steps={message.steps} />
-                    )}
-                    {message.shots && message.shots.length > 0 && (
-                      <ShotStrip shots={message.shots} />
-                    )}
-                    <MessageBody
+                    <MessageTimeline
                       content={message.content}
+                      steps={message.steps ?? []}
                       repo={repo}
                       validPaths={validPaths}
                       chatId={activeChatId ?? ""}
                     />
+                    {message.shots && message.shots.length > 0 && (
+                      <ShotStrip shots={message.shots} />
+                    )}
                   </div>
                 </EnteringArticle>
               )
@@ -1210,42 +1229,52 @@ export function ChatPanel({
               pending.length > 0 ||
               thinking.length > 0 ||
               shots.length > 0 ||
+              streaming ||
               backgroundRunning) && (
               <article
                 className="min-w-0 max-w-[94%]"
                 aria-live="polite"
-                aria-busy={streaming}
+                aria-busy={streaming || backgroundRunning}
               >
                 {thinking.length > 0 && <ThinkingBlock text={thinking} live />}
 
-                {steps.length > 0 && <StepList steps={steps} live={streaming} />}
+                {(pending.length > 0 || steps.length > 0) && (
+                  <MessageTimeline
+                    content={pending}
+                    steps={steps}
+                    repo={repo}
+                    validPaths={validPaths}
+                    chatId={activeChatId ?? ""}
+                    live={streaming || backgroundRunning}
+                  />
+                )}
 
                 {shots.length > 0 && <ShotStrip shots={shots} />}
 
-                {pending.length === 0 ? (
-                  (streaming || backgroundRunning) && (
+                {streaming && pending.length > 0 && (
+                  <span aria-hidden="true" className="stream-caret" />
+                )}
+
+                {(streaming || backgroundRunning) && (
+                  <div
+                    className={
+                      pending.length > 0 || steps.length > 0 || thinking.length > 0
+                        ? "mt-2.5"
+                        : undefined
+                    }
+                  >
                     <AiThinking
                       steps={steps}
                       streaming={streaming}
                       backgroundRunning={backgroundRunning}
                     />
-                  )
-                ) : (
-                  <MessageBody
-                    content={pending}
-                    repo={repo}
-                    validPaths={validPaths}
-                    chatId={activeChatId ?? ""}
-                  />
+                  </div>
                 )}
-                {streaming && stalled && pending.length === 0 && (
+
+                {streaming && stalled && (
                   <p className="mt-1.5 text-[11.5px] leading-relaxed text-low">
-                    Still working. No answer text yet — the steps above are what
-                    the turn has done.
+                    Still working — waiting for the next output.
                   </p>
-                )}
-                {streaming && pending.length > 0 && (
-                  <span aria-hidden="true" className="stream-caret" />
                 )}
               </article>
             )}
@@ -1259,7 +1288,7 @@ export function ChatPanel({
               onClick={jumpToLatest}
               className="pointer-events-auto rounded-lg border border-line-strong bg-card px-3 py-1.5 text-[11.5px] font-medium text-mid shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:text-hi"
             >
-              {streaming ? "new output ↓" : "jump to end ↓"}
+              {streaming || backgroundRunning ? "new output ↓" : "jump to end ↓"}
             </button>
           </div>
         )}
@@ -1382,6 +1411,7 @@ export function ChatPanel({
             activeChatId={activeChatId}
             repo={repo ? repo.fullName : null}
             streaming={streaming}
+            backgroundRunning={backgroundRunning}
             stopping={stopping}
             providerReady={providerReady}
             command={composer}
@@ -1434,7 +1464,7 @@ function StepRow({ step }: { step: StepLine }) {
         <summary>
           <span aria-hidden="true" className="agent-step-icon inline-flex items-center">
             {step.state === "start" ? (
-              "…"
+              <Loader2 className="size-3.5 animate-spin text-accent-text" strokeWidth={2} />
             ) : step.state === "error" ? (
               <XCircle className="size-3.5 text-danger" strokeWidth={2} />
             ) : hasConsole ? (
@@ -1466,6 +1496,100 @@ function StepList({ steps, live = false }: { steps: StepLine[]; live?: boolean }
         <StepRow key={`${step.detail}-${index}`} step={step} />
       ))}
     </ol>
+  );
+}
+
+type TimelineSegment =
+  | { kind: "text"; text: string }
+  | { kind: "steps"; steps: StepLine[] };
+
+/**
+ * Splits an assistant message and its tool steps into chronological segments
+ * using each step's recorded character `offset`, so terminal runs and tool
+ * calls appear inline alongside the chat flow instead of stacked at the top.
+ * Older messages without `offset` fall back to steps-first rendering.
+ */
+function buildTimeline(content: string, steps: StepLine[]): TimelineSegment[] {
+  if (steps.length === 0) {
+    return content.trim().length > 0 ? [{ kind: "text", text: content }] : [];
+  }
+
+  const segments: TimelineSegment[] = [];
+  let cursor = 0;
+  let pendingSteps: StepLine[] = [];
+
+  const flushSteps = () => {
+    if (pendingSteps.length > 0) {
+      segments.push({ kind: "steps", steps: pendingSteps });
+      pendingSteps = [];
+    }
+  };
+
+  for (const step of steps) {
+    const rawOffset =
+      typeof step.offset === "number" && Number.isFinite(step.offset)
+        ? step.offset
+        : 0;
+    const pos = Math.max(cursor, Math.min(rawOffset, content.length));
+
+    if (pos > cursor) {
+      const chunk = content.slice(cursor, pos);
+      if (chunk.trim().length > 0) {
+        flushSteps();
+        segments.push({ kind: "text", text: chunk.trim() });
+      }
+      cursor = pos;
+    }
+
+    pendingSteps.push(step);
+  }
+
+  flushSteps();
+
+  if (cursor < content.length) {
+    const tail = content.slice(cursor);
+    if (tail.trim().length > 0) {
+      segments.push({ kind: "text", text: tail.trim() });
+    }
+  }
+
+  return segments;
+}
+
+function MessageTimeline({
+  content,
+  steps,
+  repo,
+  validPaths,
+  chatId,
+  live = false,
+}: {
+  content: string;
+  steps: StepLine[];
+  repo: RepoRef;
+  validPaths: string[];
+  chatId: string;
+  live?: boolean;
+}) {
+  const segments = buildTimeline(content, steps);
+  if (segments.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {segments.map((segment, index) =>
+        segment.kind === "steps" ? (
+          <StepList key={`steps-${index}`} steps={segment.steps} live={live} />
+        ) : (
+          <MessageBody
+            key={`text-${index}`}
+            content={segment.text}
+            repo={repo}
+            validPaths={validPaths}
+            chatId={chatId}
+          />
+        )
+      )}
+    </div>
   );
 }
 

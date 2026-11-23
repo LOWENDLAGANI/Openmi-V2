@@ -718,9 +718,16 @@ function streamRun(input: StreamInput): NextResponse {
             const name = typeof payload.name === "string" ? payload.name : "tool";
             const summary =
               typeof payload.summary === "string" ? payload.summary : name;
+            const command =
+              typeof payload.command === "string" ? payload.command : undefined;
 
             summaries.set(name, summary);
-            send("step", { tool: name, detail: summary, state: "start" });
+            send("step", {
+              tool: name,
+              detail: summary,
+              state: "start",
+              ...(command ? { command } : {}),
+            });
             continue;
           }
 

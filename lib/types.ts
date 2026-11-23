@@ -31,6 +31,8 @@ export type AgentStep = {
   state: "start" | "done" | "error";
   command?: string;
   output?: string;
+  /** Character offset in the assistant text where this step started, for interleaved rendering. */
+  offset?: number;
 };
 
 export type Message = {

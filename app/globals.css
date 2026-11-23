@@ -553,7 +553,7 @@ html.ink {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
-    margin: 0 0 0.75rem;
+    margin: 0;
   }
 
   .agent-step > details > summary {

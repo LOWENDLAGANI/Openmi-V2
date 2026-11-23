@@ -12,10 +12,21 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.1";
+export const APP_VERSION = "2.0.2";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.2",
+    date: "2026-11-24",
+    title: "Inline tool & terminal flow and always-visible running status",
+    changes: [
+      "Interleaved tool calls and terminal runs inline alongside assistant text in chronological order instead of stacking all steps at the top of the message.",
+      "Kept the live thinking/running indicator visible at the bottom of the active turn even after partial assistant text has arrived or while continuing in the background.",
+      "Replaced the static ellipsis on in-progress steps with a live spinner and forwarded shell commands on tool start events.",
+      "Enabled the Composer Stop button and disabled new sends while a run is active in the background as well as during live streaming.",
+    ],
+  },
   {
     version: "2.0.1",
     date: "2026-11-24",

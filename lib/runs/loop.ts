@@ -518,16 +518,22 @@ export async function executeRun(
         const args = parseArgs(call.args);
         toolNames.push(call.name);
 
+        const command =
+          typeof args?.command === "string" ? args.command : undefined;
+        const stepOffset = collectedText.length;
+
         await appendEvent(admin, runId, "tool.started", {
           name: call.name,
           summary: toolSummary(call.name, args),
+          ...(command ? { command } : {}),
         });
 
         chatSteps.push({
           tool: call.name,
           detail: toolSummary(call.name, args),
           state: "start",
-          command: typeof args?.command === "string" ? args.command : undefined,
+          command,
+          offset: stepOffset,
         });
 
         const toolStartedAt = Date.now();
@@ -622,6 +628,7 @@ export async function executeRun(
             command:
               typeof args?.command === "string" ? args.command : undefined,
             output: previewText(result.text, 400),
+            offset: index >= 0 ? chatSteps[index].offset : stepOffset,
           };
 
           if (index >= 0) chatSteps[index] = finished;
@@ -701,13 +708,22 @@ export async function executeRun(
             ? `${partial}\n\n_(${stoppedNote(status, stopReason)})_`
             : partial;
 
+      // For a completed turn, `deliveredText` is the final answer written after
+      // all tool calls finished, so every stored step precedes it (offset 0).
+      // For a partial/stopped turn, `deliveredText` is `collectedText`, so each
+      // step keeps its exact character offset for interleaved rendering.
+      const deliveredSteps =
+        status === "done"
+          ? chatSteps.map(({ offset: _offset, ...rest }) => rest)
+          : chatSteps;
+
       const delivered = await deliverChatTurn({
         admin,
         run,
         sandbox,
         text: deliveredText,
         thinking: collectedReasoning,
-        steps: chatSteps,
+        steps: deliveredSteps,
         files: changedFiles,
         token: chatToken,
         sealKey: serverEnv().githubTokenKey,
