@@ -48,7 +48,9 @@ import { soft } from "@/lib/soft";
 import { filesEnabled } from "@/lib/files/plan";
 import { previewEnabled } from "@/lib/execution/preview/plan";
 import { RUN_HEARTBEAT_STALE_MS, RUN_QUEUE_WAIT_MS } from "@/lib/runs/limits";
+import { settleStalledRuns } from "@/lib/runs/store";
 import { getSession } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Chat, Folder } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -356,6 +358,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
   const [
     messages,
     runningTurn,
+    latestRunResult,
     profileResult,
     validPaths,
     // An operator-only model is shown to an operator and to nobody else. The
@@ -387,6 +390,16 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // The latest run for this chat, so a reloaded tab whose turn was reaped or
+    // failed without writing an assistant message still shows why it stopped
+    // instead of an unanswered user prompt in silence.
+    session.supabase
+      .from("runs")
+      .select("id, status, error")
+      .eq("chat_id", chat.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     session.supabase
       .from("profiles")
       .select("credit_balance, wallet_credit, paid_until")
@@ -395,6 +408,36 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
     citationPaths,
     soft(readAdminAccess(session), { state: "forbidden", email: null } as AdminAccess),
   ]);
+
+  const latestRun = latestRunResult.data as {
+    id?: string;
+    status?: string;
+    error?: string | null;
+  } | null;
+
+  // If the latest run is stuck in queued/running past the active window, settle
+  // it right away on page load so the lockout clears and the refund lands.
+  if (
+    !runningTurn.data &&
+    (latestRun?.status === "queued" || latestRun?.status === "running")
+  ) {
+    const admin = supabaseAdmin();
+    if (admin) await settleStalledRuns(admin, session.user.id);
+  }
+
+  // Only surface a failed/stalled run error when the chat has no active run and
+  // the last stored message is still an unanswered user turn.
+  const lastMessage = messages[messages.length - 1];
+  const initialError =
+    !runningTurn.data && lastMessage?.role === "user" && latestRun
+      ? latestRun.status === "failed"
+        ? (latestRun.error ?? "The turn did not finish. Start it again.")
+        : latestRun.status === "queued"
+          ? "No worker picked this run up. Start it again."
+          : latestRun.status === "running"
+            ? "The worker stopped reporting before this run finished. Start it again."
+            : null
+      : null;
 
   const models = modelsForReader(modelCatalogue(), access.state === "admin").filter(
     (model) => model.id !== "auto"
@@ -462,6 +505,7 @@ async function ChatView({ session, chat }: { session: SignedIn; chat: Chat }) {
             pinnedPath={null}
             providerReady={providersConfigured()}
             initialRunning={Boolean(runningTurn.data)}
+            initialError={initialError}
             paidActive={paidActive}
             credit={credit}
           />

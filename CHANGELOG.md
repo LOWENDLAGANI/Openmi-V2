@@ -2,6 +2,13 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.4] - 2026-11-24 — Worker keepalive, graceful shutdown & failed-turn recovery on reload
+
+- Added a 4-minute self-keepalive ping to `/healthz` while runs are active in the worker so free web-service hosts (Render) do not spin down and `SIGKILL` in-flight runs after 15 minutes without inbound HTTP traffic.
+- Wired worker `SIGTERM`/`SIGINT` `stopSignal` into `executeRun` so a restarting worker aborts cleanly and persists partial text and steps before shutdown.
+- Kept nudging `wakeWorker()` from the chat SSE stream and `/api/chat/turn` while a run is still queued, recovering from cold-start wake misses.
+- Surfaced the latest failed or stalled run's error (and Retry action) in `app/chat/page.tsx` and preserved live progress on poll errors in `ChatPanel` so reaped turns no longer vanish silently on reload.
+
 ## [2.0.3] - 2026-11-24 — Seamless stream handover & paginated background run polling
 
 - Lowered chat SSE stream handover window from 240s to 50s (with 24 continuation windows) so runs seamlessly reconnect before 60s serverless/proxy timeouts.

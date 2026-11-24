@@ -11,6 +11,7 @@ import {
 import { runSandboxExpired, workerConcurrency } from "./limits";
 import { executeRun } from "./loop";
 import { claimNextRun, reapStaleRuns } from "./store";
+import { wakeWorker } from "./wake";
 
 /**
  * The worker process.
@@ -38,6 +39,13 @@ import { claimNextRun, reapStaleRuns } from "./store";
  */
 
 const IDLE_SLEEP_MS = 1_000;
+/**
+ * Free web-service hosts (like Render) spin down instances after 15 minutes
+ * without inbound HTTP traffic — even while a background run is executing.
+ * Pinging our own `/healthz` every 4 minutes while runs are active resets that
+ * idle timer without keeping the instance awake when the queue is empty.
+ */
+const WORKER_KEEPALIVE_MS = 4 * 60_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -226,63 +234,75 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
     );
   }
 
-  while (!options.stopSignal?.aborted) {
-    if (active.size < concurrency) {
-      let claimed = null;
+  const keepalive = setInterval(() => {
+    if (active.size > 0) wakeWorker();
+  }, WORKER_KEEPALIVE_MS);
+  keepalive.unref?.();
 
-      try {
-        claimed = await claimNextRun(admin, id);
-      } catch (caught) {
-        log(
-          `[runs] claim failed: ${
-            caught instanceof Error ? caught.message : "unknown error"
-          }`
-        );
-        await sleep(2_000);
-        continue;
+  try {
+    while (!options.stopSignal?.aborted) {
+      if (active.size < concurrency) {
+        let claimed = null;
+
+        try {
+          claimed = await claimNextRun(admin, id);
+        } catch (caught) {
+          log(
+            `[runs] claim failed: ${
+              caught instanceof Error ? caught.message : "unknown error"
+            }`
+          );
+          await sleep(2_000);
+          continue;
+        }
+
+        if (claimed) {
+          const runId = claimed.id;
+          log(`[runs] claimed ${runId}`);
+
+          status.claimed += 1;
+          status.lastClaimAt = new Date().toISOString();
+
+          const task: Promise<void> = executeRun(claimed, {
+            admin,
+            stopSignal: options.stopSignal,
+          })
+            .then((result) => {
+              log(`[runs] finished ${runId}: ${result}`);
+              status.finished += 1;
+            })
+            .catch((caught: unknown) => {
+              log(
+                `[runs] ${runId} threw: ${
+                  caught instanceof Error ? caught.message : "unknown error"
+                }`
+              );
+              status.failed += 1;
+            })
+            .finally(() => {
+              active.delete(task);
+              status.active = active.size;
+            });
+
+          active.add(task);
+          status.active = active.size;
+          continue;
+        }
       }
 
-      if (claimed) {
-        const runId = claimed.id;
-        log(`[runs] claimed ${runId}`);
-
-        status.claimed += 1;
-        status.lastClaimAt = new Date().toISOString();
-
-        const task: Promise<void> = executeRun(claimed, { admin })
-          .then((result) => {
-            log(`[runs] finished ${runId}: ${result}`);
-            status.finished += 1;
-          })
-          .catch((caught: unknown) => {
-            log(
-              `[runs] ${runId} threw: ${
-                caught instanceof Error ? caught.message : "unknown error"
-              }`
-            );
-            status.failed += 1;
-          })
-          .finally(() => {
-            active.delete(task);
-            status.active = active.size;
-          });
-
-        active.add(task);
-        status.active = active.size;
-        continue;
+      if (active.size > 0) {
+        await Promise.race([...active, sleep(IDLE_SLEEP_MS)]);
+      } else {
+        await sleep(IDLE_SLEEP_MS);
       }
     }
 
-    if (active.size > 0) {
-      await Promise.race([...active, sleep(IDLE_SLEEP_MS)]);
-    } else {
-      await sleep(IDLE_SLEEP_MS);
-    }
+    log(`[runs] worker ${id} stopping, waiting for ${active.size} run(s)`);
+    await Promise.allSettled([...active]);
+    log(`[runs] worker ${id} stopped`);
+  } finally {
+    clearInterval(keepalive);
   }
-
-  log(`[runs] worker ${id} stopping, waiting for ${active.size} run(s)`);
-  await Promise.allSettled([...active]);
-  log(`[runs] worker ${id} stopped`);
 }
 
 /** The stale-run sweep, callable from the cron route without a worker. */

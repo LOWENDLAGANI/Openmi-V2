@@ -12,10 +12,21 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.3";
+export const APP_VERSION = "2.0.4";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.4",
+    date: "2026-11-24",
+    title: "Worker keepalive, graceful shutdown & failed-turn recovery on reload",
+    changes: [
+      "Added a 4-minute self-keepalive ping to /healthz while runs are active in the worker so free web-service hosts (Render) do not spin down and SIGKILL in-flight runs after 15 minutes without inbound HTTP traffic.",
+      "Wired worker SIGTERM/SIGINT stopSignal into executeRun so a restarting worker aborts cleanly and persists partial text and steps before shutdown.",
+      "Kept nudging wakeWorker() from the chat SSE stream and /api/chat/turn while a run is still queued, recovering from cold-start wake misses.",
+      "Surfaced the latest failed or stalled run's error (and Retry action) in app/chat/page.tsx and preserved live progress on poll errors in ChatPanel so reaped turns no longer vanish silently on reload.",
+    ],
+  },
   {
     version: "2.0.3",
     date: "2026-11-24",

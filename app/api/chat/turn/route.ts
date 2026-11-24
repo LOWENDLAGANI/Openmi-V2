@@ -7,6 +7,7 @@ import {
   RUN_QUEUE_WAIT_MS,
 } from "@/lib/runs/limits";
 import { readEventsSince, settleStalledRuns } from "@/lib/runs/store";
+import { wakeWorker } from "@/lib/runs/wake";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentStep } from "@/lib/types";
@@ -170,6 +171,9 @@ export async function GET(request: Request) {
   const row = data as { id?: string; status?: string } | null;
 
   if (row?.id) {
+    // Keep nudging a sleeping worker while the run is still waiting in the queue.
+    if (row.status === "queued") wakeWorker();
+
     // The work so far, so a reload shows the steps and the answer in progress
     // instead of a spinner that says nothing about what the run is doing.
     const progress = admin

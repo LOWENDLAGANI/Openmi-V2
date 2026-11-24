@@ -81,7 +81,11 @@ import { toolSummary } from "./events";
  *   - usage is recorded once, on the way out, from what the loop actually saw.
  */
 
-export type ExecuteDeps = { admin: SupabaseClient };
+export type ExecuteDeps = {
+  admin: SupabaseClient;
+  /** Fires on worker SIGTERM/SIGINT so the run saves partial progress before force-kill. */
+  stopSignal?: AbortSignal;
+};
 
 type ToolCall = { id: string; name: string; args: string };
 
@@ -128,6 +132,8 @@ function stoppedNote(status: RunStatus, stopReason: string): string {
       return `this answer stopped before it finished: the run reached its ${RUN_MAX_STEPS}-step limit.`;
     case "token-budget":
       return `this answer stopped before it finished: the run reached its ${RUN_MAX_TOKENS.toLocaleString()}-token estimate.`;
+    case "worker-shutdown":
+      return "this answer stopped before it finished: the worker restarted.";
     default:
       return "this answer stopped before it finished";
   }
@@ -326,6 +332,13 @@ export async function executeRun(
     let cancelled = false;
 
     loop: while (true) {
+      if (deps.stopSignal?.aborted) {
+        failure = "The worker restarted before this run finished. Start it again.";
+        status = "failed";
+        stopReason = "worker-shutdown";
+        break;
+      }
+
       if (await cancelRequested(admin, runId)) {
         cancelled = true;
         break;
@@ -387,13 +400,20 @@ export async function executeRun(
 
       for (const provider of chain) {
         try {
+          const timeoutSignal = AbortSignal.timeout(
+            Math.max(1_000, deadline - Date.now())
+          );
+          const streamSignal = deps.stopSignal
+            ? AbortSignal.any([timeoutSignal, deps.stopSignal])
+            : timeoutSignal;
+
           for await (const event of streamChat({
             provider,
             apiKeys: providerKeys(provider),
             messages,
             tools: RUN_TOOL_SPECS,
             effort,
-            signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
+            signal: streamSignal,
           })) {
             if (event.type === "text") {
               stepText += event.text;
@@ -454,6 +474,13 @@ export async function executeRun(
           duration_ms: Date.now() - stepStartedAt,
         });
 
+        if (deps.stopSignal?.aborted) {
+          failure = "The worker restarted before this run finished. Start it again.";
+          status = "failed";
+          stopReason = "worker-shutdown";
+          break;
+        }
+
         if (await cancelRequested(admin, runId)) {
           cancelled = true;
           break;
@@ -510,6 +537,13 @@ export async function executeRun(
       const toolNames: string[] = [];
 
       for (const [index, call] of calls.entries()) {
+        if (deps.stopSignal?.aborted) {
+          failure = "The worker restarted before this run finished. Start it again.";
+          status = "failed";
+          stopReason = "worker-shutdown";
+          break;
+        }
+
         if (await cancelRequested(admin, runId)) {
           cancelled = true;
           break;
@@ -659,7 +693,7 @@ export async function executeRun(
 
       await emitUsage();
 
-      if (cancelled) break loop;
+      if (cancelled || deps.stopSignal?.aborted) break loop;
     }
 
     if (cancelled) {

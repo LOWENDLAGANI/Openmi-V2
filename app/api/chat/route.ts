@@ -807,6 +807,12 @@ function streamRun(input: StreamInput): NextResponse {
               fresh = await readRun(admin, run.id).catch(() => null);
             }
 
+            if (fresh?.status === "queued") {
+              // Keep nudging a sleeping worker while the run is still queued,
+              // in case the first 1.5s wake ping landed during a cold boot.
+              wakeWorker();
+            }
+
             // Silence after twenty seconds is not "thinking": no worker has
             // claimed the run. Saying so beats a spinner that will not move,
             // and the composer's Stop settles a queued run on the spot.

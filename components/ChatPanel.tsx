@@ -199,6 +199,7 @@ export function ChatPanel({
   pinnedPath,
   providerReady,
   initialRunning,
+  initialError = null,
   paidActive,
   credit,
 }: {
@@ -211,6 +212,8 @@ export function ChatPanel({
   pinnedPath: string | null;
   providerReady: boolean;
   initialRunning: boolean;
+  /** Reason the latest unanswered turn failed, so a reload does not go silent. */
+  initialError?: string | null;
   /** A live paid pass is what unlocks the paid-only models. */
   paidActive: boolean;
   /** The two balances a charge can draw on. */
@@ -234,12 +237,16 @@ export function ChatPanel({
   const [notices, setNotices] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [stopping, setStopping] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   // The sentence a paid-only model shows when the account has no live pass,
   // with the way to fix it. Nothing is sent while it is up.
   const [paidGate, setPaidGate] = useState<string | null>(null);
   const [meter, setMeter] = useState<ContextMeter | null>(null);
-  const [lastSent, setLastSent] = useState("");
+  const [lastSent, setLastSent] = useState(() => {
+    if (!initialError) return "";
+    const last = initialMessages[initialMessages.length - 1];
+    return last?.role === "user" ? last.content : "";
+  });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   /** True when a streaming turn has gone quiet for longer than a reader waits. */
   const [stalled, setStalled] = useState(false);
@@ -251,6 +258,12 @@ export function ChatPanel({
   useEffect(() => {
     if (initialRunning) setBackgroundRunning(true);
   }, [initialRunning]);
+
+  useEffect(() => {
+    if (initialError && !streaming && !backgroundRunning) {
+      setError((current) => current ?? initialError);
+    }
+  }, [initialError, streaming, backgroundRunning]);
 
   // The transcript the server just rendered is the authority. This panel is not
   // remounted by `router.refresh()`, so without this the answer written while
@@ -345,17 +358,23 @@ export function ChatPanel({
           }
 
           setBackgroundRunning(false);
-          // Settled: the refreshed transcript carries the steps and the answer
-          // both, so the live copy goes rather than sitting under the answer —
-          // including the reasoning, which would otherwise leave a lone folded
-          // block behind for a turn that is over.
-          setSteps([]);
-          setPending("");
-          setThinking("");
           // The poll is also where a run nothing finished is settled, so it is
           // where the reason arrives. Without it the wait ended in silence.
-          if (typeof payload.error === "string" && payload.error.length > 0) {
-            setError(payload.error);
+          const pollError =
+            typeof payload.error === "string" && payload.error.length > 0
+              ? payload.error
+              : null;
+          if (pollError) {
+            setError(pollError);
+          } else {
+            // Settled cleanly: the refreshed transcript carries the steps and
+            // the answer both, so the live copy goes rather than sitting under
+            // the answer — including the reasoning, which would otherwise leave
+            // a lone folded block behind for a turn that is over. On a failure,
+            // keep any live progress visible alongside the error banner.
+            setSteps([]);
+            setPending("");
+            setThinking("");
           }
           router.refresh();
         })
