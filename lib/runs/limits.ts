@@ -8,7 +8,7 @@
  */
 
 /** One run stops at this many model steps, tool calls included. */
-export const RUN_MAX_STEPS = 40;
+export const RUN_MAX_STEPS = 70;
 
 /** Estimated tokens one run may spend. `ceil(chars / 4)` is the estimate. */
 export const RUN_MAX_TOKENS = 2_000_000;
@@ -85,7 +85,7 @@ export const RUN_MAX_CONCURRENT = 1;
 export const RUN_DAILY_RUNS = 20;
 
 /** Tokens one account may spend per UTC day, across runs. */
-export const RUN_DAILY_TOKENS = 2_000_000;
+export const RUN_DAILY_TOKENS = 3_000_000;
 
 /**
  * A price per token, only so a run's cost can be charted. It is an estimate for
