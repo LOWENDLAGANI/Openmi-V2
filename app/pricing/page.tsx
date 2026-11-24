@@ -1,8 +1,16 @@
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Layers,
+  ShieldCheck,
+  Terminal,
+  Zap,
+} from "lucide-react";
 import { cookies, headers } from "next/headers";
 import Link from "next/link";
 
 import { Brand } from "@/components/Brand";
+import { OpenmiMark } from "@/components/OpenmiMark";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   COUNTRY_COOKIE,
@@ -56,6 +64,11 @@ const PRICING_FAQS = [
   },
 ] as const;
 
+type PlanFeature = {
+  title: string;
+  description: string;
+};
+
 function cleanRef(raw: string | undefined): string | null {
   const value = (raw ?? "").trim();
   return /^[A-Za-z0-9_-]{3,32}$/.test(value) ? value : null;
@@ -93,6 +106,9 @@ export default async function PricingPage({
   const signedIn = session.state === "signed-in";
   const dailyFreeHours = Math.floor(DAILY_FREE_CREDIT / CREDIT_PER_HOUR);
   const paidDailyHours = Math.floor(PAID_DAILY_FREE_CREDIT / CREDIT_PER_HOUR);
+  const dailyMultiplier = Number(
+    (PAID_DAILY_FREE_CREDIT / DAILY_FREE_CREDIT).toFixed(1)
+  );
 
   const publicModels = MODELS.filter(
     (model) => !model.adminOnly && model.id !== "auto"
@@ -108,8 +124,25 @@ export default async function PricingPage({
       ? `/login?next=%2Fpay&ref=${encodeURIComponent(ref)}`
       : "/login?next=%2Fpay";
 
+  const freeFeatures: PlanFeature[] = [
+    {
+      title: `${DAILY_FREE_CREDIT} Credit daily allowance`,
+      description: `Get ${dailyFreeHours} full hours of named model chat every day, worldwide`,
+    },
+    {
+      title: `${TRIAL_CREDIT} Credit welcome trial`,
+      description:
+        "Extra upfront Credit on your first request to try models right away",
+    },
+    {
+      title: "DeepSeek V4.1 Flash & GPT-OSS 120B",
+      description:
+        "Plus 0 Credit/hr Auto routing across available free models",
+    },
+  ];
+
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh bg-canvas">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -123,10 +156,17 @@ export default async function PricingPage({
           ]),
         }}
       />
-      <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-5 sm:px-8">
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3">
-            <Link href={ref ? `/?ref=${encodeURIComponent(ref)}` : "/"} aria-label="Openmi home">
+
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-5 sm:px-8">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex min-w-0 items-center gap-3"
+          >
+            <Link
+              href={ref ? `/?ref=${encodeURIComponent(ref)}` : "/"}
+              aria-label="Openmi home"
+            >
               <Brand compact />
             </Link>
             <span aria-hidden="true" className="text-line-strong">
@@ -143,10 +183,20 @@ export default async function PricingPage({
           <div className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
             <Link
-              href={signedIn ? "/chat" : ref ? `/?ref=${encodeURIComponent(ref)}` : "/"}
+              href={
+                signedIn
+                  ? "/chat"
+                  : ref
+                    ? `/?ref=${encodeURIComponent(ref)}`
+                    : "/"
+              }
               className="btn gap-1.5 px-3 py-1.5 text-[12px]"
             >
-              <ArrowLeft aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+              <ArrowLeft
+                aria-hidden="true"
+                className="size-3.5"
+                strokeWidth={1.75}
+              />
               <span>{signedIn ? "Workspace" : "Home"}</span>
             </Link>
             <Link
@@ -159,11 +209,11 @@ export default async function PricingPage({
         </div>
       </header>
 
-      <main className="animate-enter mx-auto w-full max-w-5xl px-5 py-10 sm:px-8">
+      <main className="animate-enter mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12">
         {ref && !signedIn && (
           <div
             role="status"
-            className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[13px] text-accent-text"
+            className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-5 py-3 text-[13px] text-accent-text"
           >
             <p>
               Invite{" "}
@@ -175,21 +225,23 @@ export default async function PricingPage({
             </p>
             <Link
               href={startHref}
-              className="btn btn-primary px-3 py-1.5 text-[12px]"
+              className="inline-flex items-center justify-center rounded-full bg-accent px-4 py-1.5 text-[12px] font-medium text-on-accent transition-opacity hover:opacity-90"
             >
               Sign up
             </Link>
           </div>
         )}
 
-        <div className="flex flex-col justify-between gap-6 border-b border-line pb-7 md:flex-row md:items-end">
-          <div>
-            <h1 className="text-balance text-[clamp(1.9rem,4.2vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
-              Openmi pricing: {CREDIT_PER_HOUR} Credit/hr, zero subscriptions.
+        {/* ── Hero + Currency Controls ───────────────────────────────────── */}
+        <div className="flex flex-col justify-between gap-6 pb-8 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <h1 className="text-balance text-[clamp(2rem,4.4vw,2.85rem)] font-semibold leading-[1.08] tracking-[-0.035em] text-hi">
+              Choose your Openmi plan
             </h1>
-            <p className="mt-2.5 text-[14px] text-mid">
-              Unlimited follow-ups per active hour · auto-refund on failure · no
-              auto-renewal.
+            <p className="mt-3 text-[15px] leading-[1.55] text-mid">
+              {CREDIT_PER_HOUR} Credit/hr per named model with unlimited
+              follow-ups inside each 60-minute window. Auto-refund on provider
+              failure and zero auto-renewal.
             </p>
           </div>
 
@@ -206,7 +258,7 @@ export default async function PricingPage({
               id="pricing-country"
               name="country"
               defaultValue={selectedCountry ?? ""}
-              className="field w-auto py-1.5 text-[12.5px]"
+              className="field w-auto rounded-full px-3.5 py-2 text-[12.5px]"
             >
               <option value="">Currency (MYR)</option>
               {COUNTRY_OPTIONS.map((option) => (
@@ -215,162 +267,340 @@ export default async function PricingPage({
                 </option>
               ))}
             </select>
-            <button type="submit" className="btn px-3 py-1.5 text-[12.5px]">
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center justify-center rounded-full border border-line-strong bg-card px-4 text-[12.5px] font-medium text-hi transition-colors hover:bg-hover"
+            >
               Update
             </button>
           </form>
         </div>
 
-        {/* ── Plans ──────────────────────────────────────────────────────── */}
-        <section aria-label="Plans" className="mt-8 grid gap-5 lg:grid-cols-3">
-          <div className="flex flex-col justify-between rounded-xl border border-line bg-card p-6 shadow-[var(--card-shadow)]">
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[14px] font-semibold text-hi">Free</p>
-                <span className="rounded-md border border-line bg-raised px-2 py-0.5 font-mono text-[10.5px] font-medium text-mid">
-                  Ad-supported
+        {/* ── Plan Cards ─────────────────────────────────────────────────── */}
+        <section
+          aria-label="Plans"
+          className="grid items-stretch gap-6 lg:grid-cols-3"
+        >
+          {/* Free Tier Card */}
+          <article className="flex flex-col rounded-[24px] border border-line-strong bg-card p-6 shadow-[var(--card-shadow)] sm:p-7">
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-low uppercase">
+              Free tier
+            </p>
+
+            <h2 className="mt-2 text-[26px] font-semibold leading-tight tracking-[-0.03em] text-hi">
+              Openmi <span className="font-medium text-mid">Free</span>
+            </h2>
+
+            <div className="mt-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-raised px-3 py-1 text-[12.5px] font-medium text-hi">
+                <Zap
+                  aria-hidden="true"
+                  className="size-3.5 text-mid"
+                  strokeWidth={2}
+                />
+                <span>
+                  {DAILY_FREE_CREDIT} Credit/day · {dailyFreeHours} hrs
+                </span>
+              </span>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-[13px] text-mid">Always free</p>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-[36px] font-semibold leading-none tracking-[-0.035em] tabular-nums text-hi sm:text-[38px]">
+                  {formatMoney(0, currency)}
+                </span>
+                <span className="text-[15px] font-normal text-mid">
+                  /forever
                 </span>
               </div>
-
-              <p className="mt-4 font-mono text-[32px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-hi">
-                {formatMoney(0, currency)}
+              <p className="mt-2 text-[12px] text-low">
+                Ad-supported · no card required
               </p>
-              <p className="mt-2 text-[12.5px] text-low">
-                {DAILY_FREE_CREDIT} Credit/day ({dailyFreeHours} hrs) ·
-                worldwide
-              </p>
-
-              <ul className="mt-5 space-y-2 border-t border-line pt-4 text-[13px] text-mid">
-                <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                  <span>{TRIAL_CREDIT} Credit trial</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                  <span>DeepSeek V4.1 Flash &amp; GPT-OSS 120B</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                  <span>Sandbox, previews &amp; GitHub PRs</span>
-                </li>
-              </ul>
             </div>
 
             <Link
               href={startHref}
-              className="btn mt-6 w-full justify-center py-2 text-[13px]"
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-full border border-line-strong bg-raised px-5 text-[14px] font-medium text-hi transition-colors hover:bg-hover"
             >
-              {signedIn ? "Open workspace" : "Start free"}
+              {signedIn ? "Open workspace" : "Get Openmi Free"}
             </Link>
-          </div>
 
+            <div className="mt-7 flex-1">
+              <div className="flex items-center gap-2.5">
+                <OpenmiMark size={20} />
+                <span className="text-[15px] font-semibold tracking-[-0.015em] text-hi">
+                  Openmi AI
+                </span>
+              </div>
+
+              <ul className="mt-4 space-y-4">
+                {freeFeatures.map((feature) => (
+                  <li key={feature.title} className="flex items-start gap-3">
+                    <Check
+                      aria-hidden="true"
+                      className="mt-0.5 size-4 shrink-0 text-hi"
+                      strokeWidth={2.2}
+                    />
+                    <div>
+                      <p className="text-[13.5px] font-semibold leading-snug text-hi">
+                        {feature.title}
+                      </p>
+                      <p className="mt-0.5 text-[13px] leading-[1.45] text-mid">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <hr className="my-6 border-line" />
+
+            <div>
+              <p className="text-[13.5px] font-semibold leading-snug text-hi">
+                Includes full coding workspace &amp; failure protection
+              </p>
+
+              <ul className="mt-4 space-y-3.5">
+                <li className="flex items-start gap-3">
+                  <Terminal
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-mid"
+                    strokeWidth={1.9}
+                  />
+                  <div>
+                    <p className="text-[13px] font-semibold leading-snug text-hi">
+                      Sandbox, live previews &amp; GitHub PRs
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] leading-[1.45] text-mid">
+                      Edit files, run builds, and open pull requests from chat
+                    </p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <ShieldCheck
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-mid"
+                    strokeWidth={1.9}
+                  />
+                  <div>
+                    <p className="text-[13px] font-semibold leading-snug text-hi">
+                      Automatic failure refunds
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] leading-[1.45] text-mid">
+                      Hour charge releases automatically if a provider drops
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </article>
+
+          {/* Paid Pass Cards */}
           {PLANS.map((plan, index) => {
-            const featured = index === 1;
+            const recommended = index === 1;
+            const tierLabel = plan.days === 30 ? "30-day" : "15-day";
+            const planFeatures: PlanFeature[] = [
+              {
+                title: `${dailyMultiplier}x higher daily limits than Free`,
+                description: `Get ${PAID_DAILY_FREE_CREDIT} Credit/day (${paidDailyHours} full hours) instead of ${DAILY_FREE_CREDIT} Credit/day`,
+              },
+              {
+                title: "Access to Claude Haiku 4.5",
+                description:
+                  "Unlock Anthropic's fast coding model alongside DeepSeek V4.1 & GPT-OSS 120B",
+              },
+              {
+                title: `+${plan.credit} upfront wallet Credit`,
+                description: recommended
+                  ? `Banked immediately in your ledger — over 2x the upfront Credit of the 15-day pass`
+                  : "Banked immediately in your ledger on top of your daily allowance",
+              },
+            ];
+
             return (
-              <div
+              <article
                 key={plan.id}
-                className={`flex flex-col justify-between rounded-xl border bg-card p-6 shadow-[var(--card-shadow)] ${
-                  featured ? "border-accent/45" : "border-line"
+                className={`flex flex-col rounded-[24px] bg-card p-6 shadow-[var(--card-shadow)] sm:p-7 ${
+                  recommended
+                    ? "border-2 border-accent"
+                    : "border border-line-strong"
                 }`}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p
-                      className={`text-[14px] font-semibold ${
-                        featured ? "text-accent-text" : "text-hi"
-                      }`}
-                    >
-                      {plan.name}
-                    </p>
-                    <span className="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-[10.5px] font-medium text-accent-text">
-                      No auto-renew
+                <p
+                  className={`text-[11px] font-semibold tracking-[0.08em] uppercase ${
+                    recommended ? "text-accent-text" : "text-low"
+                  }`}
+                >
+                  {recommended ? "Recommended" : "Fixed-term pass"}
+                </p>
+
+                <h2 className="mt-2 text-[26px] font-semibold leading-tight tracking-[-0.03em] text-hi">
+                  Openmi{" "}
+                  <span className="text-accent-text">{tierLabel}</span>
+                </h2>
+
+                <div className="mt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-raised px-3 py-1 text-[12.5px] font-medium text-hi">
+                    <Zap
+                      aria-hidden="true"
+                      className="size-3.5 text-accent-text"
+                      strokeWidth={2}
+                    />
+                    <span>
+                      {PAID_DAILY_FREE_CREDIT} Credit/day + {plan.credit} Credit
+                    </span>
+                  </span>
+                </div>
+
+                <div className="mt-6">
+                  <p className="text-[13px] text-mid">One-time pass</p>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-[36px] font-semibold leading-none tracking-[-0.035em] tabular-nums text-hi sm:text-[38px]">
+                      {converted
+                        ? `~${formatMoney(plan.price, currency)}`
+                        : `MYR ${plan.price}`}
+                    </span>
+                    <span className="text-[15px] font-normal text-mid">
+                      /{plan.days} days
                     </span>
                   </div>
-
-                  <p className="mt-4 font-mono text-[32px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-hi">
-                    {converted ? `~${formatMoney(plan.price, currency)}` : `RM ${plan.price}`}
+                  <p className="mt-2 text-[12px] text-low">
+                    {converted ? `Settled as RM ${plan.price} · ` : ""}No
+                    auto-renewal · no stored card
                   </p>
-                  <p className="mt-2 text-[12.5px] text-low">
-                    {converted ? `RM ${plan.price} · ` : ""}+{plan.credit}{" "}
-                    wallet Credit · {plan.days} days
-                  </p>
-
-                  <ul className="mt-5 space-y-2 border-t border-line pt-4 text-[13px] text-mid">
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                      <span>
-                        {PAID_DAILY_FREE_CREDIT} Credit/day ({paidDailyHours}{" "}
-                        hrs)
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                      <span>+{plan.credit} upfront wallet Credit</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                      <span>Unlocks Claude Haiku 4.5</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-accent-text" strokeWidth={2} />
-                      <span>Stackable · ends cleanly</span>
-                    </li>
-                  </ul>
                 </div>
 
                 <Link
                   href={passCtaHref}
-                  className={`btn mt-6 w-full justify-center py-2 text-[13px] ${
-                    featured ? "btn-primary" : ""
+                  className={`mt-6 flex h-12 w-full items-center justify-center rounded-full px-5 text-[14px] font-medium transition-colors ${
+                    recommended
+                      ? "bg-accent text-on-accent hover:opacity-90"
+                      : "border border-accent/40 bg-accent-soft text-accent-text hover:bg-accent hover:text-on-accent"
                   }`}
                 >
-                  {signedIn ? `Get ${plan.name}` : `Sign in for ${plan.name}`}
-                  <ArrowRight aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
+                  Get Openmi {tierLabel}
                 </Link>
-              </div>
+
+                <div className="mt-7 flex-1">
+                  <div className="flex items-center gap-2.5">
+                    <OpenmiMark size={20} />
+                    <span className="text-[15px] font-semibold tracking-[-0.015em] text-hi">
+                      Openmi AI
+                    </span>
+                  </div>
+
+                  <ul className="mt-4 space-y-4">
+                    {planFeatures.map((feature) => (
+                      <li key={feature.title} className="flex items-start gap-3">
+                        <Check
+                          aria-hidden="true"
+                          className="mt-0.5 size-4 shrink-0 text-hi"
+                          strokeWidth={2.2}
+                        />
+                        <div>
+                          <p className="text-[13.5px] font-semibold leading-snug text-hi">
+                            {feature.title}
+                          </p>
+                          <p className="mt-0.5 text-[13px] leading-[1.45] text-mid">
+                            {feature.description}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <hr className="my-6 border-line" />
+
+                <div>
+                  <p className="text-[13.5px] font-semibold leading-snug text-hi">
+                    Includes full coding workspace &amp; stackable passes
+                  </p>
+
+                  <ul className="mt-4 space-y-3.5">
+                    <li className="flex items-start gap-3">
+                      <Terminal
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-mid"
+                        strokeWidth={1.9}
+                      />
+                      <div>
+                        <p className="text-[13px] font-semibold leading-snug text-hi">
+                          Sandbox, live previews &amp; GitHub PRs
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] leading-[1.45] text-mid">
+                          Everything in Free with ad-free workspace access
+                        </p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Layers
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-mid"
+                        strokeWidth={1.9}
+                      />
+                      <div>
+                        <p className="text-[13px] font-semibold leading-snug text-hi">
+                          Stackable {plan.days}-day window
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] leading-[1.45] text-mid">
+                          Extends from your current end date and ends cleanly
+                        </p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </article>
             );
           })}
         </section>
 
         {converted && (
-          <p className="mt-4 text-[12px] text-low">
+          <p className="mt-4 text-[12.5px] text-low">
             {currency.name} estimate ({live ? "live" : "indicative"}). Checkout
-            settles in RM.
+            settles in Malaysian ringgit (RM).
           </p>
         )}
 
         {/* ── Models ─────────────────────────────────────────────────────── */}
-        <section className="mt-10">
-          <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
-            Models and hourly Credit rates
-          </h2>
-          <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-card shadow-[var(--card-shadow)]">
-            <table className="w-full text-left text-[13px]">
+        <section className="mt-14">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-hi">
+              Models and hourly Credit rates
+            </h2>
+            <p className="text-[13px] text-mid">
+              Auto routing is 0 Credit/hr on all plans.
+            </p>
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-card shadow-[var(--card-shadow)]">
+            <table className="w-full text-left text-[13.5px]">
               <thead className="border-b border-line bg-raised text-[12px] text-low">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Model</th>
-                  <th className="px-4 py-2.5 font-medium">Rate</th>
-                  <th className="px-4 py-2.5 font-medium">Tier</th>
+                  <th className="px-5 py-3 font-medium">Model</th>
+                  <th className="px-5 py-3 font-medium">Hourly rate</th>
+                  <th className="px-5 py-3 font-medium">Access</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {publicModels.map((model) => (
                   <tr key={model.id}>
-                    <td className="px-4 py-3 font-medium text-hi">
+                    <td className="px-5 py-3.5 font-medium text-hi">
                       {model.name}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[12.5px] tabular-nums text-hi">
+                    <td className="px-5 py-3.5 font-mono text-[12.5px] tabular-nums text-hi">
                       {model.creditPerHour} Credit / hr
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-3.5">
                       <span
-                        className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-medium ${
+                        className={`inline-flex rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium ${
                           model.paidOnly
                             ? "bg-accent-soft text-accent-text"
                             : "border border-line bg-raised text-mid"
                         }`}
                       >
-                        {model.paidOnly ? "Pass" : "Free & pass"}
+                        {model.paidOnly ? "Pass only" : "Free & pass"}
                       </span>
                     </td>
                   </tr>
@@ -381,12 +611,12 @@ export default async function PricingPage({
         </section>
 
         {/* ── Pricing FAQ ────────────────────────────────────────────────── */}
-        <section className="mt-10 border-t border-line pt-8">
+        <section className="mt-14 border-t border-line pt-10">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+            <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-hi">
               Common questions about Openmi pricing
             </h2>
-            <p className="text-[12.5px] text-mid">
+            <p className="text-[13px] text-mid">
               See{" "}
               <Link
                 href="/about"
@@ -405,16 +635,16 @@ export default async function PricingPage({
             </p>
           </div>
 
-          <dl className="mt-4 grid gap-4 md:grid-cols-3">
+          <dl className="mt-5 grid gap-5 md:grid-cols-3">
             {PRICING_FAQS.map((item) => (
               <div
                 key={item.question}
-                className="rounded-xl border border-line bg-card p-5 shadow-[var(--card-shadow)]"
+                className="rounded-2xl border border-line bg-card p-6 shadow-[var(--card-shadow)]"
               >
-                <dt className="text-[13.5px] font-semibold tracking-[-0.015em] text-hi">
+                <dt className="text-[14px] font-semibold tracking-[-0.015em] text-hi">
                   {item.question}
                 </dt>
-                <dd className="mt-2 text-pretty text-[12.5px] leading-[1.6] text-mid">
+                <dd className="mt-2.5 text-pretty text-[13px] leading-[1.6] text-mid">
                   {item.answer}
                 </dd>
               </div>
@@ -422,7 +652,7 @@ export default async function PricingPage({
           </dl>
         </section>
 
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
+        <footer className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
           <p className="font-mono text-low">© 2026 Openmi</p>
           <div className="flex flex-wrap items-center gap-4 text-mid">
             <Link href="/about" className="hover:text-hi">
@@ -440,7 +670,10 @@ export default async function PricingPage({
             <Link href="/terms" className="hover:text-hi">
               Terms
             </Link>
-            <a href={supportMailto("Pricing question")} className="hover:text-hi">
+            <a
+              href={supportMailto("Pricing question")}
+              className="hover:text-hi"
+            >
               Support
             </a>
           </div>
