@@ -19,6 +19,10 @@ const CALLBACK = readFileSync(
   new URL("../app/auth/github/callback/route.ts", import.meta.url),
   "utf8"
 );
+const AUTHORIZE = readFileSync(
+  new URL("../app/auth/github/route.ts", import.meta.url),
+  "utf8"
+);
 const PANEL = readFileSync(new URL("../app/chat/page.tsx", import.meta.url), "utf8");
 const ACTIONS = readFileSync(
   new URL("../app/github/actions.ts", import.meta.url),
@@ -109,6 +113,22 @@ test("the code exchange is form-encoded, because GitHub rejects a JSON body", ()
 test("nothing is stored until saveConnection has verified the token", () => {
   expect(CALLBACK).toContain("saveConnection(");
   expect(CALLBACK).not.toContain('.from("github_connections")');
+});
+
+test("both halves use the browser's origin, not the address the app is bound to", () => {
+  // Behind a proxy `request.url` carries `http://localhost:3000` or
+  // `http://0.0.0.0:3000`. A redirect_uri built from that is the
+  // "redirect_uri MUST match the registered callback URL" failure, and a
+  // redirect to it is the 404 the reader sees afterwards.
+  expect(AUTHORIZE).toContain("requestOrigin(request)");
+  expect(CALLBACK).toContain("requestOrigin(request)");
+  expect(AUTHORIZE).not.toContain("oauthRedirectUri(url.origin)");
+  expect(CALLBACK).not.toContain("oauthRedirectUri(url.origin)");
+});
+
+test("a redirect_uri mismatch names the URL to register", () => {
+  expect(CALLBACK).toContain("register exactly that");
+  expect(CALLBACK).toContain("NEXT_PUBLIC_SITE_URL");
 });
 
 test("the callback refuses a code that does not match the state cookie", () => {

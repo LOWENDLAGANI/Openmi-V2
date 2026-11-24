@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import { requestOrigin } from "@/lib/http/origin";
 import {
   STATE_COOKIE,
   authorizeUrl,
@@ -21,13 +22,15 @@ export const dynamic = "force-dynamic";
  * authorization code that comes back to the account that started it.
  */
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  // The browser's origin, not the address this process is bound to: the
+  // redirect_uri below has to be the URL the reader is actually on, because
+  // it is compared byte for byte with the OAuth App's registered callback.
+  const origin = requestOrigin(request);
+  const secure = origin.startsWith("https:");
   const session = await getSession();
 
   if (session.state !== "signed-in") {
-    return NextResponse.redirect(
-      new URL("/login?next=%2Fchat", url.origin)
-    );
+    return NextResponse.redirect(new URL("/login?next=%2Fchat", origin));
   }
 
   // Each connect mints a state and sends a request to GitHub.
@@ -38,7 +41,7 @@ export async function GET(request: Request) {
         `/chat?error=${encodeURIComponent(
           `Too many GitHub connect attempts. Try again in ${limited.retryAfterSeconds} seconds.`
         )}`,
-        url.origin
+        origin
       )
     );
   }
@@ -49,20 +52,20 @@ export async function GET(request: Request) {
         `/chat?error=${encodeURIComponent(
           "GitHub sign-in is unavailable right now. Connect with a personal access token instead."
         )}`,
-        url.origin
+        origin
       )
     );
   }
 
   const state = randomBytes(24).toString("hex");
   const response = NextResponse.redirect(
-    authorizeUrl(state, oauthRedirectUri(url.origin))
+    authorizeUrl(state, oauthRedirectUri(origin))
   );
 
   response.cookies.set(STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",
-    secure: url.protocol === "https:",
+    secure,
     path: "/auth/github",
     maxAge: 600,
   });

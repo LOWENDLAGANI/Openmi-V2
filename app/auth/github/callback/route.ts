@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { secretsMatch } from "@/lib/crypto";
 import { describeGithubError } from "@/lib/github/read";
 import { saveConnection } from "@/lib/github/token";
+import { requestOrigin } from "@/lib/http/origin";
 import {
   STATE_COOKIE,
   exchangeCode,
@@ -14,12 +15,15 @@ import { getSession } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 function back(request: NextRequest, query: string) {
-  const url = new URL(request.url);
-  const response = NextResponse.redirect(new URL(`/chat?${query}`, url.origin));
+  // Back to the host in the address bar. `request.url` here carries whatever
+  // address the process is bound to, so redirecting to it would land the reader
+  // on `http://localhost:3000` (or `0.0.0.0`) instead of their own domain.
+  const origin = requestOrigin(request);
+  const response = NextResponse.redirect(new URL(`/chat?${query}`, origin));
   response.cookies.set(STATE_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: url.protocol === "https:",
+    secure: origin.startsWith("https:"),
     path: "/auth/github",
     maxAge: 0,
   });
@@ -40,10 +44,11 @@ function failure(request: NextRequest, message: string) {
  */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
+  const origin = requestOrigin(request);
   const session = await getSession();
 
   if (session.state !== "signed-in") {
-    return NextResponse.redirect(new URL("/login?next=%2Fchat", url.origin));
+    return NextResponse.redirect(new URL("/login?next=%2Fchat", origin));
   }
 
   if (!oauthConfigured()) {
@@ -51,11 +56,23 @@ export async function GET(request: NextRequest) {
   }
 
   if (url.searchParams.get("error")) {
-    return failure(
-      request,
+    const description =
       url.searchParams.get("error_description") ??
-        "GitHub authorisation was cancelled."
-    );
+      "GitHub authorisation was cancelled.";
+
+    // A mismatched callback is the one failure an operator fixes by copying a
+    // string into GitHub, so the message carries the exact string this
+    // deployment asked GitHub for.
+    if (/redirect_uri/i.test(description)) {
+      return failure(
+        request,
+        `${description} This deployment sent ${oauthRedirectUri(
+          origin
+        )} as its callback URL; register exactly that on the OAuth App, and check NEXT_PUBLIC_SITE_URL matches the domain you are on.`
+      );
+    }
+
+    return failure(request, description);
   }
 
   const code = url.searchParams.get("code");
@@ -72,7 +89,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const token = await exchangeCode(code, oauthRedirectUri(url.origin));
+    const token = await exchangeCode(code, oauthRedirectUri(origin));
     const connection = await saveConnection(
       session.supabase,
       session.user.id,

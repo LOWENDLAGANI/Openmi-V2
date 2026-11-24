@@ -51,11 +51,6 @@ export function authorizeUrlFor(
   return url.toString();
 }
 
-/**
- * GitHub's token endpoint reads form-encoded parameters, not JSON — a JSON body
- * is answered with 400 even when it is shaped correctly. `Accept:
- * application/json` only decides the response format.
- */
 /** The endpoint that deletes this app's authorisation on one account. */
 export function grantRevokeUrl(clientId: string): string {
   return `${GITHUB_APPLICATIONS_URL}/${encodeURIComponent(clientId)}/grant`;
@@ -73,6 +68,11 @@ export function basicAuthHeader(
   return `Basic ${Buffer.from(pair, "utf8").toString("base64")}`;
 }
 
+/**
+ * GitHub's token endpoint reads form-encoded parameters, not JSON — a JSON body
+ * is answered with 400 even when it is shaped correctly. `Accept:
+ * application/json` only decides the response format.
+ */
 export function tokenRequestBody(input: {
   clientId: string;
   clientSecret: string;

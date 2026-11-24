@@ -33,6 +33,9 @@ function normaliseSiteUrl(siteUrl: string | null | undefined): string | null {
   }
 }
 
+/** A host that is only ever served over http while developing. */
+const LOOPBACK_HOST = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])(?::\d+)?$/i;
+
 function firstHeaderValue(value: string | null): string | null {
   const first = value?.split(",")[0]?.trim();
   return first && first.length > 0 ? first : null;
@@ -50,6 +53,43 @@ function requestHost(request: Request): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The origin a browser is actually on, for somewhere a URL has to be built.
+ *
+ * `new URL(request.url).origin` is not it: behind a proxy, or under `next dev
+ * --hostname 0.0.0.0`, the request URL carries the address the app is bound to
+ * (`http://0.0.0.0:3000`, `http://localhost:3000`) rather than the host in the
+ * address bar. Redirecting there sends the browser to a host that is not this
+ * deployment — which is how an OAuth callback ends up as "redirect URI not
+ * allowed" and then a 404.
+ *
+ * The forwarded headers are what a proxy sets; `host` is the fallback; the
+ * request URL only answers when neither is present. The scheme defaults to
+ * https for anything that is not a loopback address, because a TLS-terminating
+ * proxy can hand the app an `http` URL and every public deployment of this app
+ * is https.
+ */
+export function requestOrigin(request: Request): string {
+  const host = requestHost(request);
+
+  if (!host) {
+    try {
+      return new URL(request.url).origin;
+    } catch {
+      return "http://localhost";
+    }
+  }
+
+  const forwarded = firstHeaderValue(request.headers.get("x-forwarded-proto"));
+  const scheme = forwarded
+    ? forwarded.toLowerCase()
+    : LOOPBACK_HOST.test(host)
+      ? "http"
+      : "https";
+
+  return `${scheme}://${host}`;
 }
 
 export function isSameOrigin(

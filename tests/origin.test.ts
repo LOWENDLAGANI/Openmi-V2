@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { isSameOrigin } from "../lib/http/origin";
+import { isSameOrigin, requestOrigin } from "../lib/http/origin";
 
 /**
  * The mission routes spend Credit and start sandboxes, so this check is the only
@@ -67,6 +67,33 @@ test("a bare domain in the environment file is read as https, not ignored", () =
 
   expect(isSameOrigin(request, "openmi.app")).toBe(false);
   expect(isSameOrigin(post({ origin: "https://openmi.app" }), "openmi.app")).toBe(true);
+});
+
+test("a redirect is built from the browser's host, not the bind address", () => {
+  // `next dev --hostname 0.0.0.0`, or a proxy in front of the app, hands the
+  // route a request URL on the internal address. A redirect_uri built from that
+  // is a string GitHub has never heard of, which is the whole bug.
+  const internal = new Request("http://0.0.0.0:3000/auth/github", {
+    headers: { host: "openmi.app", "x-forwarded-proto": "https" },
+  });
+
+  expect(requestOrigin(internal)).toBe("https://openmi.app");
+});
+
+test("a loopback request stays http so local sign-in keeps working", () => {
+  const local = new Request("http://127.0.0.1:3000/auth/github", {
+    headers: { host: "localhost:3000" },
+  });
+
+  expect(requestOrigin(local)).toBe("http://localhost:3000");
+});
+
+test("a public host is https even when the proxy sent no proto header", () => {
+  const request = new Request("http://openmi.app/auth/github", {
+    headers: { host: "openmi.app" },
+  });
+
+  expect(requestOrigin(request)).toBe("https://openmi.app");
 });
 
 test("with nothing configured there is no policy to enforce", () => {

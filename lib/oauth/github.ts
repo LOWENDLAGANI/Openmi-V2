@@ -4,6 +4,7 @@ import { GithubError } from "@/lib/github/read";
 import { serverEnv } from "@/lib/env";
 import {
   GITHUB_OAUTH_SCOPES,
+  GITHUB_TOKEN_URL,
   OAUTH_CALLBACK_PATH,
   authorizeUrlFor,
   basicAuthHeader,
@@ -75,7 +76,7 @@ export async function exchangeCode(
     );
   }
 
-  const response = await fetch("https://github.com/login/oauth/access_token", {
+  const response = await fetch(GITHUB_TOKEN_URL, {
     method: "POST",
     headers: {
       accept: "application/json",
