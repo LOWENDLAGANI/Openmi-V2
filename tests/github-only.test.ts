@@ -30,13 +30,10 @@ test("a chat turn gets the sandbox unless the operator turns it off", () => {
   }
 });
 
-test("the route refuses before it queues when there is no execution provider", () => {
-  // A chat turn is a run, and a run always owns a sandbox. The refusal names
-  // the missing configuration instead of queueing work that can only fail.
-  expect(ROUTE).toContain("executionConfigured()");
-  expect(ROUTE.indexOf("executionConfigured()")).toBeLessThan(
-    ROUTE.indexOf("createRun(")
-  );
+test("the chat route queues runs even without an execution provider configured", () => {
+  // Runs degrade gracefully to sandboxless mode when E2B_API_KEY is absent or
+  // fails to start, so the chat route does not refuse on executionConfigured().
+  expect(ROUTE).not.toContain("executionConfigured()");
 
   // The in-request shell is gone: the worker opens the workspace, not the route.
   expect(ROUTE).not.toContain("createShellTurn");

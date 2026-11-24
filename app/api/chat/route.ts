@@ -13,7 +13,7 @@ import {
   startCreditSession,
   type CreditGate,
 } from "@/lib/credits/store";
-import { executionConfigured, serverEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env";
 import { pullChatBranch } from "@/lib/execution/sync/session";
 import { isRepoFullName, getRepo, resolveBranchSha } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
@@ -209,20 +209,6 @@ export async function POST(request: Request) {
       {
         error: "Openmi can't answer right now. Try again in a moment.",
         code: "no-provider",
-      },
-      409
-    );
-  }
-
-  // A chat turn runs in a sandbox, because the agent is the thing behind it.
-  // Saying so before a row exists is better than queueing a run that can only
-  // fail: the message names the missing configuration, not a generic error.
-  if (!executionConfigured()) {
-    return json(
-      {
-        error:
-          "The agent needs its execution provider configured (E2B_API_KEY) before it can answer.",
-        code: "no-execution",
       },
       409
     );

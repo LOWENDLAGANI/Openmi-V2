@@ -89,6 +89,13 @@ export const RUN_TOOL_NAMES: readonly RunToolName[] = [
   "github_action",
 ];
 
+/** Tools that do not require an E2B sandbox workspace to run. */
+export const SANDBOX_FREE_TOOL_NAMES: readonly RunToolName[] = [
+  "todo",
+  "github_read",
+  "github_action",
+];
+
 export const RUN_TOOL_SPECS: AgentToolDefinition[] = [
   {
     name: "read_file",
@@ -306,6 +313,18 @@ export const RUN_TOOL_SPECS: AgentToolDefinition[] = [
     },
   },
 ];
+
+export const SANDBOX_FREE_TOOL_SPECS: AgentToolDefinition[] =
+  RUN_TOOL_SPECS.filter((tool) =>
+    (SANDBOX_FREE_TOOL_NAMES as readonly string[]).includes(tool.name)
+  );
+
+export function toolSpecsForRun(hasSandbox: boolean): AgentToolDefinition[] {
+  return hasSandbox ? RUN_TOOL_SPECS : SANDBOX_FREE_TOOL_SPECS;
+}
+
+const NO_SANDBOX_TOOL_ERROR =
+  "No sandbox workspace is loaded for this turn, so file and shell tools are unavailable. Explain this to the user if they asked to edit files or run commands.";
 
 export function isRunTool(name: string): name is RunToolName {
   return (RUN_TOOL_NAMES as readonly string[]).includes(name);
@@ -811,7 +830,7 @@ function formatChecks(checks: CheckSummary): string {
 export async function executeRunTool(input: {
   name: string;
   args: Record<string, unknown> | null;
-  sandbox: SandboxHandle;
+  sandbox: SandboxHandle | null;
   /** The reader's GitHub connection, when this run has one. Never given to the sandbox. */
   github?: RunGithubContext | null;
   /** Aborts in-flight sandbox commands when the run is cancelled or the worker shuts down. */
@@ -822,6 +841,11 @@ export async function executeRunTool(input: {
   if (signal?.aborted) return failure("Cancelled.");
   if (!isRunTool(name)) return failure(`unknown tool: ${name}`);
   if (args === null) return failure("bad-input: arguments were not a JSON object");
+
+  const requiresSandbox = !SANDBOX_FREE_TOOL_NAMES.includes(name);
+  if (requiresSandbox && !sandbox) {
+    return failure(NO_SANDBOX_TOOL_ERROR);
+  }
 
   if (name === "todo") {
     if (!onlyKeys(args, ["items"])) return failure("bad-input: unexpected argument");
@@ -872,6 +896,7 @@ export async function executeRunTool(input: {
   }
 
   if (name === "list_files") {
+    if (!sandbox) return failure(NO_SANDBOX_TOOL_ERROR);
     if (!onlyKeys(args, ["prefix"])) return failure("bad-input: unexpected argument");
 
     const prefix = args.prefix === undefined ? "" : safeRunPath(args.prefix);
@@ -911,6 +936,7 @@ export async function executeRunTool(input: {
   }
 
   if (name === "read_file") {
+    if (!sandbox) return failure(NO_SANDBOX_TOOL_ERROR);
     if (!onlyKeys(args, ["path", "offset", "limit"])) {
       return failure("bad-input: unexpected argument");
     }
@@ -946,6 +972,7 @@ export async function executeRunTool(input: {
   }
 
   if (name === "write_file") {
+    if (!sandbox) return failure(NO_SANDBOX_TOOL_ERROR);
     if (!onlyKeys(args, ["path", "content"])) return failure("bad-input: unexpected argument");
 
     const path = safeRunPath(args.path);
@@ -986,6 +1013,7 @@ export async function executeRunTool(input: {
   }
 
   if (name === "edit_file") {
+    if (!sandbox) return failure(NO_SANDBOX_TOOL_ERROR);
     if (!onlyKeys(args, ["path", "find", "replace"])) {
       return failure("bad-input: unexpected argument");
     }
@@ -1035,6 +1063,7 @@ export async function executeRunTool(input: {
   }
 
   if (name === "search_code") {
+    if (!sandbox) return failure(NO_SANDBOX_TOOL_ERROR);
     if (!onlyKeys(args, ["query", "path"])) return failure("bad-input: unexpected argument");
 
     const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -1289,6 +1318,7 @@ export async function executeRunTool(input: {
   }
 
   // run_command
+  if (!sandbox) return failure(NO_SANDBOX_TOOL_ERROR);
   if (!onlyKeys(args, ["command", "purpose", "cwd", "timeout_ms"])) {
     return failure("bad-input: unexpected argument");
   }

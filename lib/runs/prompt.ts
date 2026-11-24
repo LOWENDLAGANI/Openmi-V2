@@ -145,6 +145,17 @@ export function formatTree(paths: readonly string[]): string {
   return text.trimEnd();
 }
 
+export const RUN_NO_SANDBOX_IDENTITY =
+  "You are Openmi's web agent. No Linux sandbox workspace is loaded for this turn, so answer the reader's request directly using your knowledge and any non-sandbox tools available.";
+
+export const RUN_NO_SANDBOX_TOOLS_CLAUSE = [
+  "Your tools for this turn (file and shell tools are unavailable without a sandbox):",
+  "- github_read: pull requests, issues, their comments, check runs and branches. Read-only.",
+  "- github_action: comment on an issue or pull request, open, close, reopen or label an issue, or merge a pull request. Only when the reader asked for that exact action in this conversation.",
+  "- todo: record the plan the reader sees.",
+  "If the reader asks a general, conceptual, debugging, or code-guidance question, answer normally without mentioning the sandbox. Only mention that the sandbox workspace is unavailable if the reader asks you to read or edit workspace files, run shell commands, or push code changes. Never fabricate file reads, command outputs, or diffs.",
+].join("\n");
+
 export function buildRunSystemPrompt(input: {
   repo: string | null;
   sha: string | null;
@@ -154,7 +165,34 @@ export function buildRunSystemPrompt(input: {
   today?: string;
   /** True when this run is using the chat's own workspace, which outlives it. */
   persistent?: boolean;
+  /** False when the run fell back to sandboxless mode (E2B unconfigured or failed to start). */
+  sandboxAvailable?: boolean;
+  /** Internal reason the sandbox could not load, for the model to reference only if asked. */
+  sandboxUnavailableReason?: string | null;
 }): string {
+  if (input.sandboxAvailable === false) {
+    const head = [
+      RUN_NO_SANDBOX_IDENTITY,
+      runTimeClause(input.today ?? utcToday()),
+      RUN_OPERATING_RULES,
+      RUN_NO_SANDBOX_TOOLS_CLAUSE,
+      RUN_UNTRUSTED_DATA_CLAUSE,
+    ];
+
+    const repoContext =
+      input.repo && input.sha
+        ? `This chat is linked to ${input.repo} (commit ${input.sha}), but the sandbox workspace is not loaded right now, so repository files cannot be inspected or edited directly. You can still use github_read and github_action when a GitHub connection is present.`
+        : "This turn has no sandbox workspace loaded.";
+
+    head.push(
+      input.sandboxUnavailableReason
+        ? `${repoContext} (Workspace status: ${input.sandboxUnavailableReason})`
+        : repoContext
+    );
+
+    return head.join("\n\n");
+  }
+
   const head = [
     RUN_IDENTITY,
     runTimeClause(input.today ?? utcToday()),

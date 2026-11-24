@@ -56,9 +56,9 @@ import {
   type RunStatus,
 } from "./store";
 import {
-  RUN_TOOL_SPECS,
   executeRunTool,
   listWorkspaceFiles,
+  toolSpecsForRun,
   type RunToolResult,
 } from "./tools";
 import { toolSummary } from "./events";
@@ -148,6 +148,7 @@ export async function executeRun(
   const runId = run.id;
 
   let sandbox: SandboxHandle | null = null;
+  let sandboxUnavailableReason: string | null = null;
   /** How this run gives its workspace back; set once the box is open. */
   let releaseWorkspace: (() => Promise<void>) | null = null;
   /** How this run keeps its claim on a chat's workspace; null until it has one. */
@@ -278,7 +279,12 @@ export async function executeRun(
           status = "failed";
           stopReason = "worker-shutdown";
         } else {
-          throw new Error(opened.message);
+          // Survive without a sandbox: continue the run with non-sandbox tools
+          // instead of failing the entire turn.
+          sandboxUnavailableReason = opened.message;
+          console.warn(
+            `[runs] ${runId}: continuing without sandbox (${opened.message})`
+          );
         }
       } else {
         sandbox = opened.sandbox;
@@ -299,7 +305,7 @@ export async function executeRun(
       cancelled = true;
     }
 
-    if (!cancelled && !deps.stopSignal?.aborted && sandbox) {
+    if (!cancelled && !deps.stopSignal?.aborted) {
       // A chat turn arrives with the conversation behind it, already written to
       // run_messages by the route. A run started without history is seeded with
       // its prompt, so one loop serves both.
@@ -309,8 +315,12 @@ export async function executeRun(
         await appendRunMessage(admin, runId, "user", { text: run.prompt }, []);
       }
 
-      const tree = await listWorkspaceFiles(sandbox, undefined, runSignal);
-      const instructions = await readProjectInstructions(sandbox);
+      const tree = sandbox
+        ? await listWorkspaceFiles(sandbox, undefined, runSignal)
+        : [];
+      const instructions = sandbox
+        ? await readProjectInstructions(sandbox)
+        : null;
 
       if (await isCancelledNow()) {
         cancelled = true;
@@ -326,7 +336,10 @@ export async function executeRun(
           instructions,
           // The prompt says the workspace outlives this turn only when it does.
           persistent: releaseWorkspace !== null && renewWorkspace !== null,
+          sandboxAvailable: sandbox !== null,
+          sandboxUnavailableReason,
         });
+        const runTools = toolSpecsForRun(sandbox !== null);
 
         const history: WireMessage[] =
           seeded.length > 0
@@ -477,7 +490,7 @@ export async function executeRun(
                 provider,
                 apiKeys: providerKeys(provider),
                 messages,
-                tools: RUN_TOOL_SPECS,
+                tools: runTools,
                 effort,
                 signal: streamSignal,
               })) {
@@ -652,32 +665,21 @@ export async function executeRun(
             });
 
             const toolStartedAt = Date.now();
-            let result: RunToolResult;
-
-            if (!sandbox) {
-              result = {
-                ok: false,
-                isError: true,
-                text: "The workspace is no longer available.",
-                preview: "workspace missing",
-              };
-            } else {
-              result = await executeRunTool({
-                name: call.name,
-                args,
-                sandbox,
-                github:
-                  github && run.repo_full_name
-                    ? { token: github.token, repo: run.repo_full_name }
-                    : null,
-                signal: runSignal,
-              }).catch((caught: unknown) => ({
-                ok: false,
-                isError: true,
-                text: caught instanceof Error ? caught.message : "The tool failed.",
-                preview: "tool failed",
-              }));
-            }
+            const result: RunToolResult = await executeRunTool({
+              name: call.name,
+              args,
+              sandbox,
+              github:
+                github && run.repo_full_name
+                  ? { token: github.token, repo: run.repo_full_name }
+                  : null,
+              signal: runSignal,
+            }).catch((caught: unknown) => ({
+              ok: false,
+              isError: true,
+              text: caught instanceof Error ? caught.message : "The tool failed.",
+              preview: "tool failed",
+            }));
 
             const durationMs = Date.now() - toolStartedAt;
 

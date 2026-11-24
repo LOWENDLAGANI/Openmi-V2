@@ -1,3 +1,4 @@
+import { executionConfigured } from "@/lib/env";
 import { fetchRepoArchive } from "@/lib/execution/archive";
 import { chatSandboxesEnabled } from "@/lib/execution/chat-env/lifecycle";
 import {
@@ -80,6 +81,13 @@ export type OpenWorkspaceInput = {
 export async function openRunWorkspace(
   input: OpenWorkspaceInput
 ): Promise<OpenWorkspaceResult> {
+  if (!executionConfigured()) {
+    return {
+      ok: false,
+      message: "Sandbox execution is not configured (E2B_API_KEY).",
+    };
+  }
+
   const chat = await openChatWorkspace(input);
   if (chat) return chat;
 

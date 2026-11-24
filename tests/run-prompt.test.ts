@@ -12,7 +12,13 @@ import {
   RUN_SEARCH_MAX_HITS,
 } from "../lib/runs/limits";
 import { buildRunSystemPrompt } from "../lib/runs/prompt";
-import { RUN_TOOL_NAMES, RUN_TOOL_SPECS } from "../lib/runs/tools";
+import {
+  RUN_TOOL_NAMES,
+  RUN_TOOL_SPECS,
+  SANDBOX_FREE_TOOL_NAMES,
+  SANDBOX_FREE_TOOL_SPECS,
+  toolSpecsForRun,
+} from "../lib/runs/tools";
 
 /**
  * The prompt and the tool list are one contract.
@@ -158,4 +164,30 @@ test("the mission prompt also knows the date and its process tools", () => {
     const named = prompt.includes(tool.name) || tool.description.length > 20;
     expect(named).toBe(true);
   }
+});
+
+test("sandboxless runs only advertise and prompt non-sandbox tools", () => {
+  const prompt = buildRunSystemPrompt({ ...BASE, sandboxAvailable: false });
+
+  for (const name of SANDBOX_FREE_TOOL_NAMES) {
+    expect(prompt).toContain(`- ${name}:`);
+  }
+
+  for (const sandboxTool of [
+    "read_file",
+    "write_file",
+    "edit_file",
+    "search_code",
+    "run_command",
+    "list_files",
+    "publish",
+  ]) {
+    expect(prompt).not.toContain(`- ${sandboxTool}:`);
+  }
+
+  expect(toolSpecsForRun(false)).toEqual(SANDBOX_FREE_TOOL_SPECS);
+  expect(toolSpecsForRun(true)).toEqual(RUN_TOOL_SPECS);
+  expect(SANDBOX_FREE_TOOL_SPECS.map((tool) => tool.name).sort()).toEqual(
+    [...SANDBOX_FREE_TOOL_NAMES].sort()
+  );
 });
