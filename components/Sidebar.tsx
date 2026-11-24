@@ -5,6 +5,7 @@ import {
   FolderGit2,
   Lightbulb,
   LogOut,
+  Settings,
   SquarePen,
   Trash2,
 } from "lucide-react";
@@ -101,6 +102,13 @@ export function Sidebar({
         >
           <CreditCard aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
           <span>Plans &amp; billing</span>
+        </Link>
+        <Link
+          href="/settings"
+          className="rail-row flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-mid"
+        >
+          <Settings aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
+          <span>Settings</span>
         </Link>
         <Link
           href="/report"

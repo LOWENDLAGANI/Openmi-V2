@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { secretsMatch } from "@/lib/crypto";
 import { describeGithubError } from "@/lib/github/read";
 import { saveConnection } from "@/lib/github/token";
+import { safeNextPath } from "@/lib/http/next-path";
 import { requestOrigin } from "@/lib/http/origin";
 import {
+  RETURN_COOKIE,
   STATE_COOKIE,
   exchangeCode,
   oauthConfigured,
@@ -14,24 +16,33 @@ import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-function back(request: NextRequest, query: string) {
+function back(request: NextRequest, key: string, value: string) {
   // Back to the host in the address bar. `request.url` here carries whatever
   // address the process is bound to, so redirecting to it would land the reader
   // on `http://localhost:3000` (or `0.0.0.0`) instead of their own domain.
   const origin = requestOrigin(request);
-  const response = NextResponse.redirect(new URL(`/chat?${query}`, origin));
-  response.cookies.set(STATE_COOKIE, "", {
+  const returnTo = safeNextPath(
+    request.cookies.get(RETURN_COOKIE)?.value ?? null,
+    origin
+  );
+  const destination = new URL(returnTo, origin);
+  destination.searchParams.set(key, value);
+
+  const response = NextResponse.redirect(destination);
+  const clearOpts = {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "lax" as const,
     secure: origin.startsWith("https:"),
     path: "/auth/github",
     maxAge: 0,
-  });
+  };
+  response.cookies.set(STATE_COOKIE, "", clearOpts);
+  response.cookies.set(RETURN_COOKIE, "", clearOpts);
   return response;
 }
 
 function failure(request: NextRequest, message: string) {
-  return back(request, `error=${encodeURIComponent(message)}`);
+  return back(request, "error", message);
 }
 
 /**
@@ -97,7 +108,7 @@ export async function GET(request: NextRequest) {
       "oauth"
     );
 
-    return back(request, `connected=${encodeURIComponent(connection.login)}`);
+    return back(request, "connected", connection.login);
   } catch (error) {
     return failure(request, describeGithubError(error));
   }

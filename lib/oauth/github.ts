@@ -28,6 +28,7 @@ import {
 export { GITHUB_OAUTH_SCOPES, OAUTH_CALLBACK_PATH };
 
 export const STATE_COOKIE = "openmi-gh-state";
+export const RETURN_COOKIE = "openmi-gh-next";
 
 export function oauthConfigured(): boolean {
   const env = serverEnv();

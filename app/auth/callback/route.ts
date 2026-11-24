@@ -27,26 +27,42 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (code) {
+  const oauthError =
+    url.searchParams.get("error_description") ?? url.searchParams.get("error");
+  let callbackError: string | null = oauthError;
+
+  if (code && !callbackError) {
     const supabase = await supabaseServer();
     if (supabase) {
-      await supabase.auth.exchangeCodeForSession(code);
+      const { error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code);
 
-      const cookieRef = request.cookies.get("openmi_ref")?.value;
-      if (cookieRef) {
-        try {
-          const decoded = decodeURIComponent(cookieRef).trim();
-          if (/^[A-Za-z0-9_-]{3,32}$/.test(decoded)) {
-            await supabase.rpc("claim_invite_code", { p_code: decoded });
+      if (exchangeError) {
+        callbackError = exchangeError.message;
+      } else {
+        const cookieRef = request.cookies.get("openmi_ref")?.value;
+        if (cookieRef) {
+          try {
+            const decoded = decodeURIComponent(cookieRef).trim();
+            if (/^[A-Za-z0-9_-]{3,32}$/.test(decoded)) {
+              await supabase.rpc("claim_invite_code", { p_code: decoded });
+            }
+          } catch {
+            // Best-effort attribution; never block sign-in.
           }
-        } catch {
-          // Best-effort attribution; never block sign-in.
         }
       }
     }
   }
 
-  const response = NextResponse.redirect(new URL(next, url.origin));
+  const destination = new URL(next, url.origin);
+  if (callbackError) {
+    destination.searchParams.delete("saved");
+    destination.searchParams.delete("connected");
+    destination.searchParams.set("error", callbackError);
+  }
+
+  const response = NextResponse.redirect(destination);
   response.cookies.set("openmi_next", "", {
     httpOnly: false,
     sameSite: "lax",

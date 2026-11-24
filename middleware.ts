@@ -35,6 +35,7 @@ export const config = {
     "/chat/:path*",
     "/agent/:path*",
     "/activity/:path*",
+    "/settings/:path*",
     "/pay/:path*",
     "/report/:path*",
     "/suggestions/:path*",

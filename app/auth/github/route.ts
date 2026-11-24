@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import { safeNextPath } from "@/lib/http/next-path";
 import { requestOrigin } from "@/lib/http/origin";
 import {
+  RETURN_COOKIE,
   STATE_COOKIE,
   authorizeUrl,
   oauthConfigured,
@@ -27,34 +29,34 @@ export async function GET(request: Request) {
   // it is compared byte for byte with the OAuth App's registered callback.
   const origin = requestOrigin(request);
   const secure = origin.startsWith("https:");
+  const url = new URL(request.url);
+  const returnTo = safeNextPath(url.searchParams.get("next"), origin);
   const session = await getSession();
 
   if (session.state !== "signed-in") {
-    return NextResponse.redirect(new URL("/login?next=%2Fchat", origin));
+    return NextResponse.redirect(
+      new URL(`/login?next=${encodeURIComponent(returnTo)}`, origin)
+    );
   }
 
   // Each connect mints a state and sends a request to GitHub.
   const limited = await checkRateLimit(supabaseAdmin(), "oauth", session.user.id);
   if (!limited.allowed) {
-    return NextResponse.redirect(
-      new URL(
-        `/chat?error=${encodeURIComponent(
-          `Too many GitHub connect attempts. Try again in ${limited.retryAfterSeconds} seconds.`
-        )}`,
-        origin
-      )
+    const dest = new URL(returnTo, origin);
+    dest.searchParams.set(
+      "error",
+      `Too many GitHub connect attempts. Try again in ${limited.retryAfterSeconds} seconds.`
     );
+    return NextResponse.redirect(dest);
   }
 
   if (!oauthConfigured()) {
-    return NextResponse.redirect(
-      new URL(
-        `/chat?error=${encodeURIComponent(
-          "GitHub sign-in is unavailable right now. Connect with a personal access token instead."
-        )}`,
-        origin
-      )
+    const dest = new URL(returnTo, origin);
+    dest.searchParams.set(
+      "error",
+      "GitHub sign-in is unavailable right now. Connect with a personal access token instead."
     );
+    return NextResponse.redirect(dest);
   }
 
   const state = randomBytes(24).toString("hex");
@@ -63,6 +65,14 @@ export async function GET(request: Request) {
   );
 
   response.cookies.set(STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure,
+    path: "/auth/github",
+    maxAge: 600,
+  });
+
+  response.cookies.set(RETURN_COOKIE, returnTo, {
     httpOnly: true,
     sameSite: "lax",
     secure,
