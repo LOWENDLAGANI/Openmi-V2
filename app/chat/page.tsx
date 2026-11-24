@@ -763,7 +763,7 @@ export default async function ChatPage({
       return {
         fullName: recent.repo_full_name,
         branch: recent.repo_branch ?? "",
-        sha: recent.repo_base_sha,
+        sha: "",
       };
     })();
 

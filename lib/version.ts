@@ -12,10 +12,20 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.4";
+export const APP_VERSION = "2.0.5";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.5",
+    date: "2026-11-24",
+    title: "Fresh branch HEAD resolution & automatic clean workspace sync",
+    changes: [
+      "Always resolve the remote branch's live HEAD on GitHub when creating a new chat in POST /api/chat instead of trusting a stale client-supplied SHA inherited from an older conversation.",
+      "Stopped copying the previous chat's repo_base_sha into draft chats in app/chat/page.tsx so new conversations start unpinned until resolved on send.",
+      "Auto-pull existing chats via pullChatBranch before queuing a run in POST /api/chat and POST /api/runs when the remote branch has moved ahead and the sandbox has no uncommitted changes, triggering a fresh workspace reseed while preserving dirty workspaces.",
+    ],
+  },
   {
     version: "2.0.4",
     date: "2026-11-24",

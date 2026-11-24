@@ -2,6 +2,12 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.5] - 2026-11-24 — Fresh branch HEAD resolution & automatic clean workspace sync
+
+- Always resolve the remote branch's live `HEAD` on GitHub when creating a new chat in `POST /api/chat` instead of trusting a stale client-supplied SHA inherited from an older conversation.
+- Stopped copying the previous chat's `repo_base_sha` into draft chats in `app/chat/page.tsx` so new conversations start unpinned until resolved on send.
+- Auto-pull existing chats via `pullChatBranch` before queuing a run in `POST /api/chat` and `POST /api/runs` when the remote branch has moved ahead and the sandbox has no uncommitted changes, triggering a fresh workspace reseed while preserving dirty workspaces.
+
 ## [2.0.4] - 2026-11-24 — Worker keepalive, graceful shutdown & failed-turn recovery on reload
 
 - Added a 4-minute self-keepalive ping to `/healthz` while runs are active in the worker so free web-service hosts (Render) do not spin down and `SIGKILL` in-flight runs after 15 minutes without inbound HTTP traffic.

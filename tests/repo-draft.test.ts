@@ -42,4 +42,13 @@ test("the chat row is created with a server-resolved pin", () => {
   expect(ROUTE).toContain("resolveBranchSha");
   // Still created on the first message, not when the button is pressed.
   expect(ROUTE).toContain("title: titleFromMessage(content)");
+  // New chats always resolve live HEAD rather than trusting a stale client sha.
+  expect(ROUTE).not.toContain("if (requestedRepo && (!requestedBranch || !requestedSha))");
+});
+
+test("existing chats auto-pull when clean before queuing a run", () => {
+  const RUNS_ROUTE = read("/app/api/runs/route.ts");
+
+  expect(ROUTE).toContain("pullChatBranch");
+  expect(RUNS_ROUTE).toContain("pullChatBranch");
 });

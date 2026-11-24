@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { readAdminAccess } from "@/lib/admin/access";
 import { MAX_MESSAGE_CHARS } from "@/lib/chat-limits";
 import { readCreditProfile } from "@/lib/credits/store";
+import { pullChatBranch } from "@/lib/execution/sync/session";
+import { readToken } from "@/lib/github/token";
 import { isSameOrigin } from "@/lib/http/origin";
 import {
   adminOnlyRefusal,
@@ -119,15 +121,38 @@ export async function POST(request: Request) {
     // theirs, and a chat id from the request body is never trusted.
     const { data: chat } = await session.supabase
       .from("chats")
-      .select("id, repo_full_name, repo_base_sha")
+      .select("id, repo_full_name, repo_branch, repo_base_sha")
       .eq("id", chatId)
       .maybeSingle();
 
     if (!chat) return json({ error: "That chat does not exist." }, 404);
 
-    const row = chat as { repo_full_name?: string | null; repo_base_sha?: string | null };
+    const row = chat as {
+      repo_full_name?: string | null;
+      repo_branch?: string | null;
+      repo_base_sha?: string | null;
+    };
     repo = row.repo_full_name ?? null;
     baseSha = row.repo_base_sha ?? null;
+
+    if (repo && row.repo_branch) {
+      try {
+        const github = await readToken(session.supabase, session.user.id);
+        if (github) {
+          const pulled = await pullChatBranch({
+            admin,
+            supabase: session.supabase,
+            chatId,
+            token: github.token,
+          });
+          if (pulled.ok && pulled.verdict === "pull") {
+            baseSha = pulled.head;
+          }
+        }
+      } catch {
+        // Best-effort sync; proceed with the existing pinned sha.
+      }
+    }
   }
 
   const catalogue = modelCatalogue();

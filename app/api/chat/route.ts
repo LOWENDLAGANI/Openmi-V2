@@ -14,6 +14,7 @@ import {
   type CreditGate,
 } from "@/lib/credits/store";
 import { executionConfigured, serverEnv } from "@/lib/env";
+import { pullChatBranch } from "@/lib/execution/sync/session";
 import { isRepoFullName, getRepo, resolveBranchSha } from "@/lib/github/read";
 import { readToken } from "@/lib/github/token";
 import { hashIp, requestIp } from "@/lib/http/ip";
@@ -328,25 +329,25 @@ export async function POST(request: Request) {
         ? body.sha.trim()
         : "";
 
-    // The pin is resolved on the server when the draft did not carry one, so the
-    // sha in the database is one GitHub reported, not one a form supplied.
-    if (requestedRepo && (!requestedBranch || !requestedSha)) {
+    // Always resolve the branch's live HEAD on GitHub when creating a chat so a
+    // draft inheriting an older chat's repo_base_sha never starts behind the
+    // remote branch. Fall back to the supplied sha only if GitHub cannot be read.
+    if (requestedRepo) {
       try {
         const github = await readToken(session.supabase, session.user.id);
         if (github) {
           if (!requestedBranch) {
             requestedBranch = (await getRepo(github.token, requestedRepo)).defaultBranch;
           }
-          if (!requestedSha) {
-            requestedSha = await resolveBranchSha(
-              github.token,
-              requestedRepo,
-              requestedBranch
-            );
-          }
+          const latestSha = await resolveBranchSha(
+            github.token,
+            requestedRepo,
+            requestedBranch
+          );
+          if (latestSha) requestedSha = latestSha;
         }
       } catch {
-        // A repository that cannot be read is not attached.
+        // Keep any validated fallback sha, or leave unattached if none.
       }
     }
 
@@ -391,7 +392,7 @@ export async function POST(request: Request) {
   const [{ data: chat, error }] = await Promise.all([
     session.supabase
       .from("chats")
-      .select("id, repo_full_name, repo_base_sha")
+      .select("id, repo_full_name, repo_branch, repo_base_sha")
       .eq("id", chatId)
       .maybeSingle(),
     trialGrant,
@@ -404,7 +405,34 @@ export async function POST(request: Request) {
     typeof chat.repo_full_name === "string" && isRepoFullName(chat.repo_full_name)
       ? chat.repo_full_name
       : null;
-  const sha = typeof chat.repo_base_sha === "string" ? chat.repo_base_sha : null;
+  const repoBranch =
+    typeof chat.repo_branch === "string" && chat.repo_branch.trim().length > 0
+      ? chat.repo_branch.trim()
+      : null;
+  let sha = typeof chat.repo_base_sha === "string" ? chat.repo_base_sha : null;
+
+  // Keep existing chats up to date with their remote branch before queuing a
+  // turn: if the branch moved ahead and the workspace has no uncommitted files,
+  // advance the pin so openChatSandbox reseeds fresh. Uncommitted work or
+  // transient GitHub errors leave the current pin intact.
+  if (!createdChat && repoFullName && repoBranch) {
+    try {
+      const github = await readToken(session.supabase, session.user.id);
+      if (github) {
+        const pulled = await pullChatBranch({
+          admin,
+          supabase: session.supabase,
+          chatId,
+          token: github.token,
+        });
+        if (pulled.ok && pulled.verdict === "pull") {
+          sha = pulled.head;
+        }
+      }
+    } catch {
+      // Best-effort sync; proceed with the existing pinned sha.
+    }
+  }
 
   // Trial Credit is granted above, not at signup: this is the first point in
   // the flow where the request has an address, and the grant is capped per
