@@ -213,7 +213,7 @@ export default async function ActivityPage({
         )}
 
         {/* ── Top KPI Strip ──────────────────────────────────────────────── */}
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="panel p-5">
             <p className="text-[12px] font-medium text-low">Available balance</p>
             <p
@@ -268,6 +268,16 @@ export default async function ActivityPage({
                 Turns inside an active hour carry no extra charge.
               </p>
             )}
+          </div>
+
+          <div className="panel p-5">
+            <p className="text-[12px] font-medium text-low">Tokens used</p>
+            <p className="mt-2 font-mono text-[28px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-hi">
+              {profile.tokensUsed.toLocaleString()}
+            </p>
+            <p className="mt-2.5 text-[12px] text-mid">
+              All chats, since this account was created
+            </p>
           </div>
         </section>
 

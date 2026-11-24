@@ -140,6 +140,7 @@ const REQUIRED_COLUMNS = [
   ["changesets", "reverted_commit_sha"],
   ["changesets", "reviewed_at"],
   ["profiles", "credit_balance"],
+  ["profiles", "tokens_used"],
   ["payment_requests", "status"],
   ["payment_requests", "receipt_path"],
   ["payment_requests", "credit_granted"],

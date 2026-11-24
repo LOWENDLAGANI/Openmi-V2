@@ -60,6 +60,8 @@ export type CreditProfile = {
   hasPaid: boolean;
   inviteCode: string | null;
   invitedBy: string | null;
+  /** Tokens this account has spent since it was created, across every chat. */
+  tokensUsed: number;
 };
 
 function errorText(error: { message?: string } | null): string {
@@ -315,7 +317,7 @@ export async function readCreditProfile(
   const { data } = await supabase
     .from("profiles")
     .select(
-      "credit_balance, wallet_credit, credit_day, timezone, has_paid, paid_until, invite_code, invited_by"
+      "credit_balance, wallet_credit, credit_day, timezone, has_paid, paid_until, invite_code, invited_by, tokens_used"
     )
     .eq("id", owner)
     .maybeSingle();
@@ -331,6 +333,7 @@ export async function readCreditProfile(
     paid_until: string | null;
     invite_code: string | null;
     invited_by: string | null;
+    tokens_used?: number | string | null;
   };
 
   const paidUntil = row.paid_until ?? null;
@@ -345,6 +348,7 @@ export async function readCreditProfile(
     hasPaid: Boolean(row.has_paid),
     inviteCode: row.invite_code,
     invitedBy: row.invited_by,
+    tokensUsed: Number(row.tokens_used ?? 0),
   };
 }
 
