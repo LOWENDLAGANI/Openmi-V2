@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { LegalPage, type LegalSection } from "@/components/LegalPage";
+import { pageMetadata } from "@/lib/seo";
 
 /**
  * The refund and cancellation policy, in one place.
@@ -13,11 +16,12 @@ import { LegalPage, type LegalSection } from "@/components/LegalPage";
  * of leaving a contradiction between the ledger and the policy.
  */
 
-export const metadata = {
-  title: "Refunds and cancellation — Openmi",
+export const metadata = pageMetadata({
+  path: "/refunds",
+  title: "Refunds and Cancellation Policy | Openmi",
   description:
     "Openmi's refund and cancellation policy: all sales are final, passes do not renew, unused Credit is not refundable, and how to raise a payment problem or delete your account.",
-};
+});
 
 const LAST_UPDATED = "November 15, 2026";
 
@@ -164,10 +168,23 @@ const SECTIONS: LegalSection[] = [
 export default function RefundsPage() {
   return (
     <LegalPage
+      path="/refunds"
       eyebrow="legal"
       title="Refunds and cancellation"
       updated={LAST_UPDATED}
       intro="Every purchase is final: Openmi does not offer refunds, credits or cancellations for Credit, plans or passes. This page states that plainly, explains the one automatic correction the meter makes, and tells you how to raise a payment problem or close your account."
+      pricingNote={
+        <>
+          Before buying a fixed-term pass, review the{" "}
+          <Link
+            href="/pricing"
+            className="font-medium text-accent-text underline-offset-2 hover:underline"
+          >
+            full Openmi pass comparison and daily Credit allowances
+          </Link>
+          .
+        </>
+      }
       sections={SECTIONS}
       contact={{
         title: "10. Contact",

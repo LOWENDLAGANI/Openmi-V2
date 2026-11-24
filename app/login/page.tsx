@@ -11,7 +11,11 @@ import { getSession } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Sign in — Openmi",
+  title: "Sign in | Openmi",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 /** Only ever redirect to a path on this origin, never back to sign-in. */
@@ -65,7 +69,7 @@ export default async function LoginPage({
             <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11px] text-hi">
               {ref}
             </code>{" "}
-            applied — +{INVITE_REWARD_CREDIT} bonus Credit on your first paid
+            applied: +{INVITE_REWARD_CREDIT} bonus Credit on your first paid
             pass.
           </p>
         )}

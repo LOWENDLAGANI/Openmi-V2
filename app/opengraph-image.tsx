@@ -4,7 +4,7 @@ import { CREDIT_PER_HOUR, DAILY_FREE_CREDIT, TRIAL_CREDIT } from "@/lib/credits"
 
 export const runtime = "edge";
 
-export const alt = "Openmi — Free GitHub coding agent, priced by the hour";
+export const alt = "Free GitHub Coding Agent Priced by the Hour | Openmi";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -91,7 +91,7 @@ export default function OpenGraphImage() {
             }}
           >
             Cloud Linux sandboxes, live previews, verified line citations, and
-            isolated pull requests—straight from your browser.
+            isolated pull requests straight from your browser.
           </div>
         </div>
 

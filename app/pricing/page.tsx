@@ -22,15 +22,39 @@ import {
   TRIAL_CREDIT,
 } from "@/lib/credits";
 import { MODELS } from "@/lib/models";
+import {
+  breadcrumbJsonLd,
+  faqJsonLd,
+  pageMetadata,
+  pricingOffersJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo";
 import { getSession } from "@/lib/session";
 import { supportMailto } from "@/lib/support";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Pricing & passes — Openmi",
-  description: `${DAILY_FREE_CREDIT} free Credit daily, ${CREDIT_PER_HOUR} Credit/hr, or fixed-term passes with ${PAID_DAILY_FREE_CREDIT} Credit/day.`,
-};
+export const metadata = pageMetadata({
+  path: "/pricing",
+  title: "Openmi Pricing: Free Tier & Fixed-Term Passes",
+  description: `Compare Openmi pricing: ${DAILY_FREE_CREDIT} free Credit daily at ${CREDIT_PER_HOUR} Credit/hr, or fixed-term 15-day (RM ${PLANS[0].price}) and 30-day (RM ${PLANS[1].price}) passes with ${PAID_DAILY_FREE_CREDIT} Credit/day and zero auto-renewal.`,
+});
+
+const PRICING_FAQS = [
+  {
+    question: "How does Openmi hourly Credit billing work?",
+    answer: `Each named model charges ${CREDIT_PER_HOUR} Credit when you start an hour, and all follow-up turns inside that 60-minute window are included at no extra cost. Auto routing is 0 Credit/hr.`,
+  },
+  {
+    question: "Do Openmi paid passes auto-renew?",
+    answer: `No. Both the ${PLANS[0].name} (RM ${PLANS[0].price}) and ${PLANS[1].name} (RM ${PLANS[1].price}) are one-time fixed-term passes. They stack if you buy another early and end cleanly without recurring charges or stored cards.`,
+  },
+  {
+    question: "What happens if a model provider fails to answer?",
+    answer:
+      "If the upstream model provider returns no answer before the first token arrives, Openmi automatically releases the hour charge back to your Credit balance in the append-only ledger.",
+  },
+] as const;
 
 function cleanRef(raw: string | undefined): string | null {
   const value = (raw ?? "").trim();
@@ -86,19 +110,35 @@ export default async function PricingPage({
 
   return (
     <div className="min-h-dvh">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd([
+            pricingOffersJsonLd(),
+            breadcrumbJsonLd([
+              { name: "Home", path: "/" },
+              { name: "Pricing", path: "/pricing" },
+            ]),
+            faqJsonLd(PRICING_FAQS),
+          ]),
+        }}
+      />
       <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-5 sm:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3">
             <Link href={ref ? `/?ref=${encodeURIComponent(ref)}` : "/"} aria-label="Openmi home">
               <Brand compact />
             </Link>
             <span aria-hidden="true" className="text-line-strong">
               /
             </span>
-            <h1 className="truncate text-[14px] font-semibold tracking-[-0.02em] text-hi">
+            <span
+              aria-current="page"
+              className="truncate text-[14px] font-semibold tracking-[-0.02em] text-hi"
+            >
               Pricing
-            </h1>
-          </div>
+            </span>
+          </nav>
 
           <div className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
@@ -130,7 +170,7 @@ export default async function PricingPage({
               <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
                 {ref}
               </code>{" "}
-              active — +{INVITE_REWARD_CREDIT} Credit for both on first paid
+              active: +{INVITE_REWARD_CREDIT} Credit for both on first paid
               pass.
             </p>
             <Link
@@ -144,9 +184,9 @@ export default async function PricingPage({
 
         <div className="flex flex-col justify-between gap-6 border-b border-line pb-7 md:flex-row md:items-end">
           <div>
-            <h2 className="text-balance text-[clamp(1.9rem,4.2vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
-              {CREDIT_PER_HOUR} Credit/hr. Zero subscriptions.
-            </h2>
+            <h1 className="text-balance text-[clamp(1.9rem,4.2vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
+              Openmi pricing: {CREDIT_PER_HOUR} Credit/hr, zero subscriptions.
+            </h1>
             <p className="mt-2.5 text-[14px] text-mid">
               Unlimited follow-ups per active hour · auto-refund on failure · no
               auto-renewal.
@@ -301,9 +341,9 @@ export default async function PricingPage({
 
         {/* ── Models ─────────────────────────────────────────────────────── */}
         <section className="mt-10">
-          <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
-            Models
-          </h3>
+          <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+            Models and hourly Credit rates
+          </h2>
           <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-card shadow-[var(--card-shadow)]">
             <table className="w-full text-left text-[13px]">
               <thead className="border-b border-line bg-raised text-[12px] text-low">
@@ -338,6 +378,48 @@ export default async function PricingPage({
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* ── Pricing FAQ ────────────────────────────────────────────────── */}
+        <section className="mt-10 border-t border-line pt-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+              Common questions about Openmi pricing
+            </h2>
+            <p className="text-[12.5px] text-mid">
+              See{" "}
+              <Link
+                href="/about"
+                className="font-medium text-accent-text underline-offset-2 hover:underline"
+              >
+                sandbox limits &amp; PR workflow
+              </Link>{" "}
+              or{" "}
+              <Link
+                href="/refunds"
+                className="font-medium text-accent-text underline-offset-2 hover:underline"
+              >
+                refund &amp; cancellation terms
+              </Link>
+              .
+            </p>
+          </div>
+
+          <dl className="mt-4 grid gap-4 md:grid-cols-3">
+            {PRICING_FAQS.map((item) => (
+              <div
+                key={item.question}
+                className="rounded-xl border border-line bg-card p-5 shadow-[var(--card-shadow)]"
+              >
+                <dt className="text-[13.5px] font-semibold tracking-[-0.015em] text-hi">
+                  {item.question}
+                </dt>
+                <dd className="mt-2 text-pretty text-[12.5px] leading-[1.6] text-mid">
+                  {item.answer}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">

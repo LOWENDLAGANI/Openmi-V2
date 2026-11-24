@@ -24,21 +24,30 @@ import {
   PAID_DAILY_FREE_CREDIT,
   TRIAL_CREDIT,
 } from "@/lib/credits";
+import {
+  faqJsonLd,
+  organizationJsonLd,
+  pageMetadata,
+  pricingOffersJsonLd,
+  SITE_TITLE,
+  serializeJsonLd,
+} from "@/lib/seo";
 import { getSession } from "@/lib/session";
 import { supportMailto } from "@/lib/support";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Openmi — Free GitHub coding agent, priced by the hour",
+export const metadata = pageMetadata({
+  path: "/",
+  title: SITE_TITLE,
   description: `Browser GitHub agent with cloud sandboxes, live previews, and isolated PRs. ${DAILY_FREE_CREDIT} free Credit daily, ${CREDIT_PER_HOUR} Credit/hr.`,
   other: { "page-type": "software", "site-kind": "software" },
-};
+});
 
 const NAV = [
   { href: "#features", label: "Features" },
   { href: "#how", label: "Workflow" },
-  { href: "#pricing", label: "Pricing" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ];
 
@@ -112,6 +121,27 @@ const BOUNDARIES = [
   },
 ];
 
+const HOME_FAQS = [
+  {
+    question: "How much does Openmi cost per hour?",
+    answer: `Every named model costs ${CREDIT_PER_HOUR} Credit per hour with unlimited follow-up turns inside that active hour, and Auto is 0 Credit/hr. Free accounts receive ${DAILY_FREE_CREDIT} free Credit every day (${Math.floor(DAILY_FREE_CREDIT / CREDIT_PER_HOUR)} hrs/day) plus a ${TRIAL_CREDIT} Credit trial grant on the first turn.`,
+  },
+  {
+    question: "Do Openmi paid passes auto-renew?",
+    answer: `No. Fixed-term passes (${PLANS.map((p) => `${p.name} at RM ${p.price}`).join(" and ")}) raise your daily allowance to ${PAID_DAILY_FREE_CREDIT} Credit/day, add upfront wallet Credit, unlock Claude Haiku 4.5, and end cleanly without recurring charges.`,
+  },
+  {
+    question: "Does Openmi write directly to my default GitHub branch?",
+    answer:
+      "No. Openmi reads files at the pinned commit SHA, writes unified diffs to an isolated openmi/agent/<id> branch, opens one pull request, and never force-pushes unless you explicitly name another branch.",
+  },
+  {
+    question: "What happens if a model provider fails to respond?",
+    answer:
+      "If the model provider returns no answer before the first token, Openmi automatically releases the hour charge back to your Credit balance in the append-only ledger.",
+  },
+] as const;
+
 function cleanRef(raw: string | undefined): string | null {
   const value = (raw ?? "").trim();
   return /^[A-Za-z0-9_-]{3,32}$/.test(value) ? value : null;
@@ -135,6 +165,16 @@ export default async function HomePage({
 
   return (
     <div className="lp min-h-dvh">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd([
+            organizationJsonLd(),
+            pricingOffersJsonLd(),
+            faqJsonLd(HOME_FAQS),
+          ]),
+        }}
+      />
       <a
         href="#main"
         className="sr-only rounded-lg focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:border focus:border-line-strong focus:bg-card focus:px-4 focus:py-2 focus:text-[13px] focus:text-hi"
@@ -194,7 +234,7 @@ export default async function HomePage({
                   <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
                     {ref}
                   </code>{" "}
-                  active — +{INVITE_REWARD_CREDIT} Credit for both on first paid
+                  active: +{INVITE_REWARD_CREDIT} Credit for both on first paid
                   pass.
                 </p>
                 <Link
@@ -226,7 +266,7 @@ export default async function HomePage({
                   Free GitHub coding agent, priced by the hour.
                 </h1>
                 <p className="mt-4 max-w-[48ch] text-pretty text-[15.5px] leading-[1.6] text-mid">
-                  Cloud Linux sandboxes, live previews, and isolated PRs—with{" "}
+                  Cloud Linux sandboxes, live previews, and isolated PRs, with{" "}
                   {DAILY_FREE_CREDIT} free Credit every day.
                 </p>
 
@@ -499,6 +539,50 @@ export default async function HomePage({
                 </ul>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ── FAQ ────────────────────────────────────────────────────────── */}
+        <section id="faq" className="lp-section border-t border-line bg-raised">
+          <div className="lp-wrap">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+              <h2 className="text-balance text-[clamp(1.75rem,3vw,2.35rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-hi">
+                How does Openmi work?
+              </h2>
+              <div className="flex flex-wrap items-center gap-3 text-[13px] text-mid">
+                <Link
+                  href="/pricing"
+                  className="font-medium text-accent-text underline-offset-2 hover:underline"
+                >
+                  Compare Openmi pass pricing
+                </Link>
+                <span aria-hidden="true" className="text-line-strong">
+                  ·
+                </span>
+                <Link
+                  href="/about"
+                  className="font-medium text-accent-text underline-offset-2 hover:underline"
+                >
+                  Read the full execution contract
+                </Link>
+              </div>
+            </div>
+
+            <dl className="mt-8 grid gap-4 md:grid-cols-2">
+              {HOME_FAQS.map((item) => (
+                <div
+                  key={item.question}
+                  className="rounded-xl border border-line bg-card p-5 shadow-[var(--card-shadow)]"
+                >
+                  <dt className="text-[14.5px] font-semibold tracking-[-0.015em] text-hi">
+                    {item.question}
+                  </dt>
+                  <dd className="mt-2 text-pretty text-[13px] leading-[1.6] text-mid">
+                    {item.answer}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         </section>
 

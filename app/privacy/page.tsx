@@ -1,10 +1,12 @@
 import { LegalPage, type LegalSection } from "@/components/LegalPage";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Privacy Policy — Openmi",
+export const metadata = pageMetadata({
+  path: "/privacy",
+  title: "Privacy Policy | Openmi",
   description:
     "What Openmi collects, why, who processes it, which cookies are used, how long data is kept, and how to exercise your rights.",
-};
+});
 
 const LAST_UPDATED = "November 13, 2026";
 
@@ -198,6 +200,7 @@ const SECTIONS: LegalSection[] = [
 export default function PrivacyPage() {
   return (
     <LegalPage
+      path="/privacy"
       eyebrow="legal"
       title="Privacy Policy"
       updated={LAST_UPDATED}

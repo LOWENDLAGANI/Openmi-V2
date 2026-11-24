@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Brand } from "@/components/Brand";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { breadcrumbJsonLd, serializeJsonLd } from "@/lib/seo";
 import { SUPPORT_EMAIL, supportMailto } from "@/lib/support";
 
 export type LegalBlock =
@@ -15,6 +17,7 @@ export type LegalSection = {
 };
 
 export function LegalPage({
+  path,
   eyebrow,
   title,
   updated,
@@ -22,7 +25,9 @@ export function LegalPage({
   sections,
   contact,
   other,
+  pricingNote,
 }: {
+  path: string;
   eyebrow: string;
   title: string;
   updated: string;
@@ -30,14 +35,37 @@ export function LegalPage({
   sections: LegalSection[];
   contact: { title: string; lead: string; subject: string };
   other: { href: string; label: string };
+  pricingNote?: ReactNode;
 }) {
   return (
     <div className="min-h-dvh">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            breadcrumbJsonLd([
+              { name: "Home", path: "/" },
+              { name: title, path },
+            ])
+          ),
+        }}
+      />
       <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-2 px-5 sm:px-8">
-          <Link href="/" aria-label="Openmi home">
-            <Brand />
-          </Link>
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2.5">
+            <Link href="/" aria-label="Openmi home">
+              <Brand />
+            </Link>
+            <span aria-hidden="true" className="text-line-strong">
+              /
+            </span>
+            <span
+              aria-current="page"
+              className="truncate text-[13.5px] font-semibold tracking-[-0.02em] text-hi"
+            >
+              {title}
+            </span>
+          </nav>
           <nav className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
             <Link href={other.href} className="btn px-3.5 py-1.5 text-[12.5px]">
@@ -60,6 +88,11 @@ export function LegalPage({
         <p className="mt-5 text-pretty text-[14.5px] leading-[1.65] text-mid">
           {intro}
         </p>
+        {pricingNote && (
+          <p className="mt-3 text-[13.5px] leading-[1.65] text-mid">
+            {pricingNote}
+          </p>
+        )}
 
         {sections.map((section) => (
           <section
@@ -117,6 +150,9 @@ export function LegalPage({
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
           <p className="font-mono text-low">© 2026 Openmi</p>
           <div className="flex flex-wrap items-center gap-4 text-mid">
+            <Link href="/pricing" className="hover:text-hi">
+              Pricing
+            </Link>
             <Link href="/terms" className="hover:text-hi">
               Terms
             </Link>

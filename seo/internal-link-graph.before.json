@@ -1,0 +1,196 @@
+{
+  "generatedAt": "2026-11-24T09:04:43.835Z",
+  "orphanMoneyPages": [
+    "/pricing"
+  ],
+  "pages": [
+    {
+      "route": "/banned",
+      "file": "app/banned/page.tsx",
+      "contextualInbound": 0,
+      "linkedFrom": [],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/pay",
+      "file": "app/pay/page.tsx",
+      "contextualInbound": 0,
+      "linkedFrom": [],
+      "inNavOrFooter": true,
+      "money": false
+    },
+    {
+      "route": "/pricing",
+      "file": "app/pricing/page.tsx",
+      "contextualInbound": 0,
+      "linkedFrom": [],
+      "inNavOrFooter": false,
+      "money": true
+    },
+    {
+      "route": "/setup",
+      "file": "app/setup/page.tsx",
+      "contextualInbound": 0,
+      "linkedFrom": [],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/account/delete",
+      "file": "app/account/delete/page.tsx",
+      "contextualInbound": 1,
+      "linkedFrom": [
+        "/"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/activity",
+      "file": "app/activity/page.tsx",
+      "contextualInbound": 1,
+      "linkedFrom": [
+        "/about"
+      ],
+      "inNavOrFooter": true,
+      "money": false
+    },
+    {
+      "route": "/admin/feedback",
+      "file": "app/admin/feedback/page.tsx",
+      "contextualInbound": 1,
+      "linkedFrom": [
+        "/admin"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/login",
+      "file": "app/login/page.tsx",
+      "contextualInbound": 1,
+      "linkedFrom": [
+        "/account/delete"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/about",
+      "file": "app/about/page.tsx",
+      "contextualInbound": 2,
+      "linkedFrom": [
+        "/",
+        "/pricing"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/admin",
+      "file": "app/admin/page.tsx",
+      "contextualInbound": 2,
+      "linkedFrom": [
+        "/admin/feedback",
+        "/setup"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/",
+      "file": "app/page.tsx",
+      "contextualInbound": 3,
+      "linkedFrom": [
+        "/about",
+        "/account/delete",
+        "/setup"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/terms",
+      "file": "app/terms/page.tsx",
+      "contextualInbound": 3,
+      "linkedFrom": [
+        "/about",
+        "/",
+        "/pricing"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/privacy",
+      "file": "app/privacy/page.tsx",
+      "contextualInbound": 4,
+      "linkedFrom": [
+        "/about",
+        "/account/delete",
+        "/banned",
+        "/"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/report",
+      "file": "app/report/page.tsx",
+      "contextualInbound": 4,
+      "linkedFrom": [
+        "/about",
+        "/",
+        "/pricing",
+        "/suggestions"
+      ],
+      "inNavOrFooter": true,
+      "money": false
+    },
+    {
+      "route": "/suggestions",
+      "file": "app/suggestions/page.tsx",
+      "contextualInbound": 4,
+      "linkedFrom": [
+        "/about",
+        "/",
+        "/pricing",
+        "/report"
+      ],
+      "inNavOrFooter": true,
+      "money": false
+    },
+    {
+      "route": "/refunds",
+      "file": "app/refunds/page.tsx",
+      "contextualInbound": 5,
+      "linkedFrom": [
+        "/about",
+        "/account/delete",
+        "/activity",
+        "/",
+        "/pricing"
+      ],
+      "inNavOrFooter": false,
+      "money": false
+    },
+    {
+      "route": "/chat",
+      "file": "app/chat/page.tsx",
+      "contextualInbound": 8,
+      "linkedFrom": [
+        "/about",
+        "/activity",
+        "/admin/feedback",
+        "/admin",
+        "/pay",
+        "/report",
+        "/setup",
+        "/suggestions"
+      ],
+      "inNavOrFooter": true,
+      "money": false
+    }
+  ]
+}

@@ -39,6 +39,9 @@ export default function NotFound() {
           <Link href="/chat" className="btn px-4 py-2 text-[13px]">
             Open workspace
           </Link>
+          <Link href="/pricing" className="btn btn-quiet px-4 py-2 text-[13px]">
+            View pricing
+          </Link>
           <Link href="/about" className="btn btn-quiet px-4 py-2 text-[13px]">
             Read the contract
           </Link>

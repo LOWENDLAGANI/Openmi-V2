@@ -15,11 +15,14 @@ import {
   PAID_DAILY_FREE_CREDIT,
   TRIAL_CREDIT,
 } from "@/lib/credits";
+import { breadcrumbJsonLd, pageMetadata, serializeJsonLd } from "@/lib/seo";
 import { APP_VERSION_TAG, CHANGELOG } from "@/lib/version";
 
-export const metadata = {
-  title: "About — Openmi",
-};
+export const metadata = pageMetadata({
+  path: "/about",
+  title: "How Openmi Works: Sandbox Limits & PR Workflow | Openmi",
+  description: `How Openmi reads pinned GitHub commits, writes isolated pull requests on ${AGENT_BRANCH_PREFIX}<id>, runs Linux sandboxes, and bills ${CREDIT_PER_HOUR} Credit/hr.`,
+});
 
 const DOES = [
   "Reads repo files at the pinned commit SHA.",
@@ -34,20 +37,45 @@ const DOES_NOT = [
   "Does not run your test suite automatically or fake test passes.",
   "Does not write to your default branch unless explicitly named.",
   "Does not force-push, delete branches, or merge outside PRs.",
-  "No guest mode — requires an account and repository.",
+  "No guest mode: requires an account and repository.",
   "Never stores card details; payments run on hosted checkout.",
 ];
 
 export default function AboutPage() {
   return (
     <div className="min-h-dvh">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            breadcrumbJsonLd([
+              { name: "Home", path: "/" },
+              { name: "About", path: "/about" },
+            ])
+          ),
+        }}
+      />
       <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between gap-2 px-5 sm:px-8">
-          <Link href="/" aria-label="Openmi home">
-            <Brand />
-          </Link>
-          <nav className="flex items-center gap-2">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2.5">
+            <Link href="/" aria-label="Openmi home">
+              <Brand />
+            </Link>
+            <span aria-hidden="true" className="text-line-strong">
+              /
+            </span>
+            <span
+              aria-current="page"
+              className="truncate text-[13.5px] font-semibold tracking-[-0.02em] text-hi"
+            >
+              About
+            </span>
+          </nav>
+          <nav aria-label="Primary" className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
+            <Link href="/pricing" className="btn btn-quiet px-3 py-1.5 text-[12.5px]">
+              Pricing
+            </Link>
             <Link href="/chat" className="btn px-3.5 py-1.5 text-[12.5px]">
               Open workspace
             </Link>
@@ -137,14 +165,21 @@ export default function AboutPage() {
           </p>
           <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
             Passes never auto-renew and are non-refundable (provider failures
-            before the first token auto-refund). See{" "}
+            before the first token auto-refund). Compare{" "}
+            <Link
+              href="/pricing"
+              className="font-medium text-accent-text underline-offset-2 hover:underline"
+            >
+              free tier and paid pass pricing
+            </Link>
+            , inspect your{" "}
             <Link
               href="/activity"
               className="font-medium text-accent-text underline-offset-2 hover:underline"
             >
               activity
-            </Link>{" "}
-            and{" "}
+            </Link>
+            , or read the{" "}
             <Link
               href="/refunds"
               className="font-medium text-accent-text underline-offset-2 hover:underline"
@@ -208,6 +243,9 @@ export default function AboutPage() {
             <VersionBadge />
           </div>
           <div className="flex flex-wrap items-center gap-4 text-mid">
+            <Link href="/pricing" className="hover:text-hi">
+              Pricing
+            </Link>
             <Link href="/report" className="hover:text-hi">
               Report a problem
             </Link>

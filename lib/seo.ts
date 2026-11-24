@@ -1,4 +1,12 @@
-import type { MetadataRoute } from "next";
+import type { Metadata, MetadataRoute } from "next";
+
+import { PLANS } from "@/lib/billing/plans";
+import {
+  CREDIT_PER_HOUR,
+  DAILY_FREE_CREDIT,
+  PAID_DAILY_FREE_CREDIT,
+  TRIAL_CREDIT,
+} from "@/lib/credits";
 
 /**
  * What a search engine is told about the site, in one place.
@@ -32,12 +40,135 @@ export function siteUrl(): string {
 
 export const SITE_NAME = "Openmi";
 
-export const SITE_TITLE = "Openmi — Free GitHub coding agent, priced by the hour";
+export const SITE_TITLE =
+  "Free GitHub Coding Agent Priced by the Hour | Openmi";
 
-export const SITE_DESCRIPTION =
-  "Ad-supported browser coding agent for GitHub with cloud Linux sandboxes, live previews, verified line citations, and isolated pull requests. 6 free Credit daily, 3 Credit per hour.";
+export const SITE_DESCRIPTION = `Ad-supported browser coding agent for GitHub with cloud Linux sandboxes, live previews, verified line citations, and isolated pull requests. ${DAILY_FREE_CREDIT} free Credit daily, ${CREDIT_PER_HOUR} Credit per hour.`;
 
 export const SITE_LOCALE = "en_US";
+
+export function pageMetadata(input: {
+  path: string;
+  title: string;
+  description: string;
+  noIndex?: boolean;
+  other?: Record<string, string>;
+}): Metadata {
+  const canonical = input.path === "" ? "/" : input.path;
+
+  return {
+    title: input.title,
+    description: input.description,
+    alternates: { canonical },
+    ...(input.noIndex
+      ? {
+          robots: {
+            index: false,
+            follow: false,
+          },
+        }
+      : {}),
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: SITE_LOCALE,
+      url: canonical,
+      title: input.title,
+      description: input.description,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: input.title,
+      description: input.description,
+    },
+    ...(input.other ? { other: input.other } : {}),
+  };
+}
+
+/**
+ * Serializes a JSON-LD object safely for inline `<script type="application/ld+json">`.
+ * Escaping `<` prevents closing the script tag if a string ever contains `</script>`.
+ */
+export function serializeJsonLd(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+export function breadcrumbJsonLd(
+  items: Array<{ name: string; path: string }>
+): Record<string, unknown> {
+  const origin = siteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: `${origin}${item.path === "/" ? "" : item.path}`,
+    })),
+  };
+}
+
+export function faqJsonLd(
+  items: ReadonlyArray<{ question: string; answer: string }>
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  };
+}
+
+export function pricingOffersJsonLd(): Record<string, unknown> {
+  const origin = siteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: SITE_NAME,
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Web",
+    url: origin,
+    description: SITE_DESCRIPTION,
+    offers: [
+      {
+        "@type": "Offer",
+        name: "Free tier (ad-supported)",
+        price: "0",
+        priceCurrency: "MYR",
+        url: `${origin}/pricing`,
+        availability: "https://schema.org/InStock",
+        description: `${DAILY_FREE_CREDIT} free Credit daily (${Math.floor(DAILY_FREE_CREDIT / CREDIT_PER_HOUR)} hrs/day) plus ${TRIAL_CREDIT} Credit trial grant.`,
+      },
+      ...PLANS.map((plan) => ({
+        "@type": "Offer",
+        name: plan.name,
+        price: String(plan.price),
+        priceCurrency: "MYR",
+        url: `${origin}/pricing`,
+        availability: "https://schema.org/InStock",
+        description: `${plan.days}-day fixed-term pass with ${PAID_DAILY_FREE_CREDIT} Credit daily, +${plan.credit} upfront wallet Credit, and Claude Haiku 4.5 access. No auto-renewal.`,
+      })),
+    ],
+  };
+}
+
+export function organizationJsonLd(): Record<string, unknown> {
+  const origin = siteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    url: origin,
+    logo: `${origin}/icon-512.png`,
+  };
+}
 
 type ChangeFrequency = NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
 

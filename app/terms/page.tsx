@@ -1,11 +1,15 @@
+import Link from "next/link";
+
 import { LegalPage, type LegalSection } from "@/components/LegalPage";
 import { CREDIT_PER_HOUR, DAILY_FREE_CREDIT, PAID_DAILY_FREE_CREDIT, TRIAL_CREDIT } from "@/lib/credits";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Terms of Service — Openmi",
+export const metadata = pageMetadata({
+  path: "/terms",
+  title: "Terms of Service | Openmi",
   description:
     "The terms that govern your use of Openmi: accounts, GitHub access, billing in Credit, automatic changes, acceptable use, and liability.",
-};
+});
 
 const LAST_UPDATED = "November 13, 2026";
 
@@ -280,10 +284,23 @@ const SECTIONS: LegalSection[] = [
 export default function TermsPage() {
   return (
     <LegalPage
+      path="/terms"
       eyebrow="legal"
       title="Terms of Service"
       updated={LAST_UPDATED}
       intro="These terms govern your use of Openmi, an assistant that reads a repository you connect and writes changes to it. By creating an account or using the service you agree to them. If you do not agree, do not use the service."
+      pricingNote={
+        <>
+          For current hourly Credit rates and fixed-term pass prices, see{" "}
+          <Link
+            href="/pricing"
+            className="font-medium text-accent-text underline-offset-2 hover:underline"
+          >
+            Openmi pricing and pass details
+          </Link>
+          .
+        </>
+      }
       sections={SECTIONS}
       contact={{
         title: "20. Contact",
