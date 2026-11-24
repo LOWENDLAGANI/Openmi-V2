@@ -1,9 +1,7 @@
-import { Check, XCircle } from "lucide-react";
 import Link from "next/link";
 
 import { AboutLogoGate } from "@/components/AboutLogoGate";
-import { Brand } from "@/components/Brand";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SiteHeader } from "@/components/SiteHeader";
 import { VersionBadge } from "@/components/VersionBadge";
 import { AGENT_BRANCH_PREFIX } from "@/lib/branch";
 import {
@@ -25,7 +23,7 @@ export const metadata = pageMetadata({
 });
 
 const DOES = [
-  "Reads repo files at the pinned commit SHA.",
+  "Reads repository files at the pinned commit SHA.",
   "Cites real path:line locations from that commit.",
   "Outputs per-file unified diffs.",
   `Writes changes to ${AGENT_BRANCH_PREFIX}<changeset-id>, opens one PR, and squash-merges it.`,
@@ -43,7 +41,7 @@ const DOES_NOT = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh bg-canvas">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -55,107 +53,72 @@ export default function AboutPage() {
           ),
         }}
       />
-      <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between gap-2 px-5 sm:px-8">
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2.5">
-            <Link href="/" aria-label="Openmi home">
-              <Brand />
-            </Link>
-            <span aria-hidden="true" className="text-line-strong">
-              /
-            </span>
-            <span
-              aria-current="page"
-              className="truncate text-[13.5px] font-semibold tracking-[-0.02em] text-hi"
-            >
-              About
-            </span>
-          </nav>
-          <nav aria-label="Primary" className="flex items-center gap-2">
-            <ThemeSwitcher variant="icon" />
-            <Link href="/pricing" className="btn btn-quiet px-3 py-1.5 text-[12.5px]">
-              Pricing
-            </Link>
-            <Link href="/chat" className="btn px-3.5 py-1.5 text-[12.5px]">
-              Open workspace
-            </Link>
-          </nav>
-        </div>
-      </header>
 
-      <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-10 sm:px-8">
-        <section
-          aria-label="Openmi"
-          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-line bg-card py-10 shadow-[var(--card-shadow)]"
-        >
-          <AboutLogoGate />
-          <VersionBadge />
-        </section>
+      <SiteHeader currentPath="/about" />
 
-        <div className="mt-10 border-b border-line pb-6">
-          <h1 className="max-w-2xl text-balance text-[clamp(1.9rem,4.5vw,2.75rem)] font-semibold leading-[1.06] tracking-[-0.03em] text-hi">
-            Capabilities &amp; boundaries
-          </h1>
-          <p className="mt-3 max-w-xl text-[14.5px] leading-[1.6] text-mid">
-            One GitHub repo per thread, pinned commits, isolated PRs.
-          </p>
+      <main id="main" className="lp-wrap max-w-[960px] pb-20 pt-28 sm:pt-32">
+        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-line pb-8">
+          <div>
+            <h1 className="max-w-[20ch] text-balance text-[clamp(2.1rem,4.2vw,3.15rem)] font-medium leading-[1.06] tracking-[-0.032em] text-hi">
+              Capabilities &amp; boundaries
+            </h1>
+            <p className="mt-3 max-w-[52ch] text-[16px] leading-[1.6] text-mid">
+              One GitHub repository per thread, pinned commits, isolated pull requests.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <AboutLogoGate />
+            <VersionBadge />
+          </div>
         </div>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <section className="panel p-6">
+        <div className="mt-12 grid gap-10 md:grid-cols-2">
+          <section>
             <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3">
-              <h2 className="text-[15.5px] font-semibold tracking-[-0.02em] text-hi">
+              <h2 className="text-[19px] font-medium tracking-[-0.02em] text-hi">
                 Capabilities
               </h2>
-              <span className="font-mono text-[11px] text-low">
+              <span className="font-mono text-[12px] text-low">
                 {String(DOES.length).padStart(2, "0")} guarantees
               </span>
             </div>
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-4 divide-y divide-line">
               {DOES.map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <Check
-                    aria-hidden="true"
-                    className="mt-1 size-3.5 shrink-0 text-accent-text"
-                    strokeWidth={2}
-                  />
-                  <span className="text-[13px] leading-relaxed text-mid">
-                    {item}
-                  </span>
+                <li
+                  key={item}
+                  className="py-3 text-[15.5px] leading-[1.55] text-body"
+                >
+                  {item}
                 </li>
               ))}
             </ul>
           </section>
 
-          <section className="panel p-6">
+          <section>
             <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3">
-              <h2 className="text-[15.5px] font-semibold tracking-[-0.02em] text-hi">
+              <h2 className="text-[19px] font-medium tracking-[-0.02em] text-hi">
                 Explicit boundaries
               </h2>
-              <span className="font-mono text-[11px] text-low">Refusals</span>
+              <span className="font-mono text-[12px] text-low">Refusals</span>
             </div>
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-4 divide-y divide-line">
               {DOES_NOT.map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <XCircle
-                    aria-hidden="true"
-                    className="mt-1 size-3.5 shrink-0 text-danger"
-                    strokeWidth={1.75}
-                  />
-                  <span className="text-[13px] leading-relaxed text-mid">
-                    {item}
-                  </span>
+                <li
+                  key={item}
+                  className="py-3 text-[15.5px] leading-[1.55] text-mid"
+                >
+                  {item}
                 </li>
               ))}
             </ul>
           </section>
         </div>
 
-        <section className="mt-10 border-t border-line pt-8">
-          <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+        <section className="mt-14 border-t border-line pt-10">
+          <h2 className="text-[20px] font-medium tracking-[-0.02em] text-hi">
             Credit &amp; passes
           </h2>
-          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
+          <p className="mt-3 max-w-[65ch] text-[16px] leading-[1.65] text-body">
             {CREDIT_PER_HOUR} Credit/hr (unlimited follow-ups). Daily allowance:{" "}
             {DAILY_FREE_CREDIT} Credit free, {PAID_DAILY_FREE_CREDIT} Credit
             with an active pass. Trial: {TRIAL_CREDIT} Credit (1/IP/24h). Low
@@ -163,73 +126,57 @@ export default function AboutPage() {
             {INVITE_REWARD_CREDIT} Credit to both sides on the invitee&apos;s
             first paid pass (max {MAX_INVITES_PER_ACCOUNT}).
           </p>
-          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mid">
+          <p className="mt-3 max-w-[65ch] text-[16px] leading-[1.65] text-mid">
             Passes never auto-renew and are non-refundable (provider failures
             before the first token auto-refund). Compare{" "}
-            <Link
-              href="/pricing"
-              className="font-medium text-accent-text underline-offset-2 hover:underline"
-            >
+            <Link href="/pricing" className="t-link font-medium text-accent-text">
               free tier and paid pass pricing
             </Link>
             , inspect your{" "}
-            <Link
-              href="/activity"
-              className="font-medium text-accent-text underline-offset-2 hover:underline"
-            >
+            <Link href="/activity" className="t-link font-medium text-accent-text">
               activity
             </Link>
             , or read the{" "}
-            <Link
-              href="/refunds"
-              className="font-medium text-accent-text underline-offset-2 hover:underline"
-            >
+            <Link href="/refunds" className="t-link font-medium text-accent-text">
               refund terms
             </Link>
             .
           </p>
         </section>
 
-        <section id="changelog" className="mt-10 border-t border-line pt-8">
+        <section id="changelog" className="mt-14 border-t border-line pt-10">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-hi">
+            <h2 className="text-[20px] font-medium tracking-[-0.02em] text-hi">
               Version &amp; changelog
             </h2>
-            <span className="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-[11px] font-medium tabular-nums text-accent-text">
+            <span className="rounded-[var(--r-sm)] bg-accent-soft px-2.5 py-0.5 font-mono text-[12px] font-medium tabular-nums text-accent-text">
               {APP_VERSION_TAG}
             </span>
           </div>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-6 space-y-4">
             {CHANGELOG.map((entry) => (
               <div key={entry.version} className="panel p-5">
                 <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md border border-line bg-raised px-2 py-0.5 font-mono text-[11.5px] font-semibold tabular-nums text-hi">
+                  <div className="flex items-center gap-2.5">
+                    <span className="rounded-[var(--r-sm)] border border-line bg-raised px-2 py-0.5 font-mono text-[12px] font-medium tabular-nums text-hi">
                       v{entry.version}
                     </span>
-                    <h3 className="text-[14px] font-semibold text-hi">
+                    <h3 className="text-[16px] font-medium text-hi">
                       {entry.title}
                     </h3>
                   </div>
                   <time
                     dateTime={entry.date}
-                    className="font-mono text-[11.5px] tabular-nums text-low"
+                    className="font-mono text-[12px] tabular-nums text-low"
                   >
                     {entry.date}
                   </time>
                 </div>
 
-                <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-mid">
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-[14.5px] leading-[1.6] text-mid marker:text-line-strong">
                   {entry.changes.map((change) => (
-                    <li key={change} className="flex items-start gap-2.5">
-                      <Check
-                        aria-hidden="true"
-                        className="mt-1 size-3.5 shrink-0 text-accent-text"
-                        strokeWidth={2}
-                      />
-                      <span>{change}</span>
-                    </li>
+                    <li key={change}>{change}</li>
                   ))}
                 </ul>
               </div>
@@ -237,31 +184,31 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
+        <footer className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-line py-8 text-[14px]">
           <div className="flex items-center gap-3">
-            <p className="font-mono text-low">© 2026 Openmi</p>
+            <p className="font-mono text-[13px] text-low">© 2026 Openmi</p>
             <VersionBadge />
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-mid">
-            <Link href="/pricing" className="hover:text-hi">
+          <div className="flex flex-wrap items-center gap-5 text-mid">
+            <Link href="/pricing" className="t-link text-mid hover:text-hi">
               Pricing
             </Link>
-            <Link href="/report" className="hover:text-hi">
+            <Link href="/report" className="t-link text-mid hover:text-hi">
               Report a problem
             </Link>
-            <Link href="/suggestions" className="hover:text-hi">
+            <Link href="/suggestions" className="t-link text-mid hover:text-hi">
               Suggestions
             </Link>
-            <Link href="/terms" className="hover:text-hi">
+            <Link href="/terms" className="t-link text-mid hover:text-hi">
               Terms
             </Link>
-            <Link href="/privacy" className="hover:text-hi">
+            <Link href="/privacy" className="t-link text-mid hover:text-hi">
               Privacy
             </Link>
-            <Link href="/refunds" className="hover:text-hi">
+            <Link href="/refunds" className="t-link text-mid hover:text-hi">
               Refunds
             </Link>
-            <Link href="/" className="hover:text-hi">
+            <Link href="/" className="t-link text-mid hover:text-hi">
               Home
             </Link>
           </div>

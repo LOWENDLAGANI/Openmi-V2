@@ -100,7 +100,7 @@ export default async function SettingsPage({
 
   return (
     <div className="min-h-dvh bg-canvas">
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-3 px-5 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <Link href="/chat" aria-label="Back to chats">

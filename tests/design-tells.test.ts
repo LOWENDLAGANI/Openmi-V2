@@ -56,10 +56,10 @@ test("precision typography and zero AI-slop visual tropes", () => {
   const preview = read("components/LandingPreview.tsx");
   const about = read("app/about/page.tsx");
 
-  // No editorial-serif + Instrument Sans cliché
+  // Typography dealt via design-taste-frontend (Instrument Sans + DM Mono)
   expect(layout).not.toContain("Fraunces");
-  expect(layout).not.toContain("Instrument_Sans");
-  expect(layout).toContain("Geist");
+  expect(layout).toContain("Instrument_Sans");
+  expect(layout).toContain("DM_Mono");
 
   // No purple/lavender ink theme or radial dark-mode glow
   expect(css).not.toContain("#a09ad8");

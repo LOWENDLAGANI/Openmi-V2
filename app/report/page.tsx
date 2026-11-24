@@ -96,7 +96,7 @@ export default async function ReportPage({
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
+      <header className="border-b border-line bg-canvas">
         <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between gap-3 px-5 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <Link href="/chat" aria-label="Back to chats">

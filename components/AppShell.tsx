@@ -54,7 +54,7 @@ export function AppShell({
       )}
 
       <main className="consent-aware-viewport flex min-w-0 flex-col md:h-full md:min-h-0">
-        <header className="sticky top-0 z-30 flex h-13 shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md md:px-6">
+        <header className="sticky top-0 z-30 flex h-13 shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"

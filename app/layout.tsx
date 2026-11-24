@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Mono, Instrument_Sans } from "next/font/google";
 
-const geistSans = Geist({
+const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  weight: ["400", "500", "600"],
+  variable: "--font-instrument-sans",
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const dmMono = DM_Mono({
   subsets: ["latin"],
-  variable: "--font-geist-mono",
+  weight: ["400", "500"],
+  variable: "--font-dm-mono",
   display: "swap",
 });
 
@@ -97,7 +99,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#fafafa",
+  themeColor: "#eef0f3",
 };
 
 /**
@@ -115,12 +117,20 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-type="software"
+      data-radius="sharp"
+      data-ground="sage"
+      data-buttons="arrow"
+      data-motion=""
+      suppressHydrationWarning
+    >
       <head>
         <script src="/theme-boot.js" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-canvas text-body antialiased`}
+        className={`${instrumentSans.variable} ${dmMono.variable} min-h-dvh bg-canvas text-body antialiased`}
       >
         <Suspense fallback={null}>
           <NavProgress />

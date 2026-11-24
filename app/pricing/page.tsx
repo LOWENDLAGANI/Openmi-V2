@@ -1,10 +1,8 @@
-import { X } from "lucide-react";
 import { cookies, headers } from "next/headers";
 import Link from "next/link";
 
-import { Brand } from "@/components/Brand";
 import { GoogleOnePlanCards } from "@/components/GoogleOnePlanCards";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SiteHeader } from "@/components/SiteHeader";
 import {
   COUNTRY_COOKIE,
   COUNTRY_OPTIONS,
@@ -41,17 +39,17 @@ export const metadata = pageMetadata({
 
 const PRICING_FAQS = [
   {
-    question: "How does Openmi hourly Credit billing work?",
-    answer: `Each named model charges ${CREDIT_PER_HOUR} Credit when you start an hour, and all follow-up turns inside that 60-minute window are included at no extra cost. Auto routing is 0 Credit/hr.`,
+    question: "How does hourly Credit billing work?",
+    answer: `Each named model charges ${CREDIT_PER_HOUR} Credit when you start an hour, and all follow-up turns inside that 60-minute window are included. Auto routing is 0 Credit/hr.`,
   },
   {
-    question: "Do Openmi paid passes auto-renew?",
-    answer: `No. Both the ${PLANS[0].name} (RM ${PLANS[0].price}) and ${PLANS[1].name} (RM ${PLANS[1].price}) are one-time fixed-term passes. They stack if you buy another early and end cleanly without recurring charges or stored cards.`,
+    question: "Do paid passes auto-renew?",
+    answer: `No. Both the ${PLANS[0].name} (RM ${PLANS[0].price}) and ${PLANS[1].name} (RM ${PLANS[1].price}) are one-time fixed-term passes. They stack if you buy another early and end cleanly without stored cards.`,
   },
   {
     question: "What happens if a model provider fails to answer?",
     answer:
-      "If the upstream model provider returns no answer before the first token arrives, Openmi automatically releases the hour charge back to your Credit balance in the append-only ledger.",
+      "If the upstream model provider returns no answer before the first token arrives, Openmi automatically releases the hour charge back to your Credit balance.",
   },
 ] as const;
 
@@ -93,11 +91,6 @@ export default async function PricingPage({
   const publicModels = MODELS.filter(
     (model) => !model.adminOnly && model.id !== "auto"
   );
-  const closeHref = signedIn
-    ? "/chat"
-    : ref
-      ? `/?ref=${encodeURIComponent(ref)}`
-      : "/";
   const startHref = signedIn
     ? "/chat"
     : ref
@@ -125,71 +118,24 @@ export default async function PricingPage({
         }}
       />
 
-      {/* ── Minimal Google One-style Top Bar ───────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-canvas/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-8">
-          <Link href={closeHref} aria-label="Openmi home">
-            <Brand />
-          </Link>
+      <SiteHeader
+        currentPath="/pricing"
+        loginHref={startHref}
+        signedIn={signedIn}
+      />
 
-          <div className="flex items-center gap-2">
-            <ThemeSwitcher variant="icon" />
-            <Link
-              href={closeHref}
-              aria-label="Close pricing"
-              className="grid size-10 place-items-center rounded-full text-hi transition-colors hover:bg-hover"
-            >
-              <X aria-hidden="true" className="size-6" strokeWidth={1.75} />
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="animate-enter mx-auto w-full max-w-6xl px-3 pb-14 pt-2 sm:px-8">
-        <h1 className="sr-only">
-          Openmi pricing: {CREDIT_PER_HOUR} Credit/hr, zero subscriptions
-        </h1>
-
-        {ref && !signedIn && (
-          <div
-            role="status"
-            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3 text-[13px] text-accent-text"
-          >
-            <p>
-              Invite{" "}
-              <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
-                {ref}
-              </code>{" "}
-              active: +{INVITE_REWARD_CREDIT} Credit for both on first paid
-              pass.
+      <main id="main" className="lp-wrap pb-20 pt-28 sm:pt-32">
+        <div className="flex flex-col justify-between gap-6 pb-10 md:flex-row md:items-end">
+          <div>
+            <h1 className="max-w-[20ch] text-balance text-[clamp(2.1rem,4vw,3.25rem)] font-medium leading-[1.06] tracking-[-0.032em] text-hi">
+              {CREDIT_PER_HOUR} Credit per hour, zero subscriptions.
+            </h1>
+            <p className="mt-3 max-w-[54ch] text-[16px] leading-[1.6] text-mid">
+              {converted
+                ? `${currency.name} estimate (${live ? "live" : "indicative"}). Checkout settles in MYR.`
+                : "Unlimited follow-ups inside every active hour. Fixed-term passes never auto-renew."}
             </p>
-            <Link
-              href={startHref}
-              className="inline-flex items-center justify-center rounded-full bg-accent px-4 py-1.5 text-[12px] font-medium text-on-accent transition-opacity hover:opacity-90"
-            >
-              Sign up
-            </Link>
           </div>
-        )}
-
-        {/* ── 1:1 Google One Plan Cards ──────────────────────────────────── */}
-        <section aria-label="Plans">
-          <GoogleOnePlanCards
-            currency={currency}
-            mode="pricing"
-            signedIn={signedIn}
-            startHref={startHref}
-            passCtaHref={passCtaHref}
-          />
-        </section>
-
-        {/* ── Currency Selector ──────────────────────────────────────────── */}
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 px-1">
-          <p className="text-[12.5px] text-low">
-            {converted
-              ? `${currency.name} estimate (${live ? "live" : "indicative"}). Checkout settles in MYR.`
-              : `${CREDIT_PER_HOUR} Credit/hr per named model · unlimited follow-ups per active hour · auto-refund on failure.`}
-          </p>
 
           <form
             method="GET"
@@ -204,7 +150,7 @@ export default async function PricingPage({
               id="pricing-country"
               name="country"
               defaultValue={selectedCountry ?? ""}
-              className="field w-auto rounded-full px-3.5 py-1.5 text-[12.5px]"
+              className="field h-10 w-auto px-3.5 py-0 text-[13.5px]"
             >
               <option value="">Currency (MYR)</option>
               {COUNTRY_OPTIONS.map((option) => (
@@ -213,28 +159,56 @@ export default async function PricingPage({
                 </option>
               ))}
             </select>
-            <button
-              type="submit"
-              className="inline-flex h-8 items-center justify-center rounded-full border border-line-strong bg-card px-3.5 text-[12px] font-medium text-hi transition-colors hover:bg-hover"
-            >
-              Update
+            <button type="submit" className="btn h-10 px-4 text-[13.5px]">
+              Update currency
             </button>
           </form>
         </div>
 
+        {ref && !signedIn && (
+          <div
+            role="status"
+            className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-md)] border border-accent/30 bg-accent-soft px-4 py-3 text-[14px] text-accent-text"
+          >
+            <p>
+              Invite{" "}
+              <code className="rounded-[var(--r-sm)] bg-card px-1.5 py-0.5 font-mono text-[13px] text-hi">
+                {ref}
+              </code>{" "}
+              active: +{INVITE_REWARD_CREDIT} Credit for both accounts on first paid pass.
+            </p>
+            <Link
+              href={startHref}
+              className="btn btn-primary h-9 px-3.5 text-[13px]"
+            >
+              Create account
+            </Link>
+          </div>
+        )}
+
+        <section aria-label="Plans">
+          <GoogleOnePlanCards
+            currency={currency}
+            mode="pricing"
+            signedIn={signedIn}
+            startHref={startHref}
+            passCtaHref={passCtaHref}
+          />
+        </section>
+
         {/* ── Models ─────────────────────────────────────────────────────── */}
-        <section className="mt-12">
+        <section className="mt-16">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-hi">
+            <h2 className="text-[22px] font-medium tracking-[-0.025em] text-hi">
               Models and hourly Credit rates
             </h2>
-            <p className="text-[12.5px] text-mid">
+            <p className="text-[14px] text-mid">
               Auto routing is 0 Credit/hr on all plans.
             </p>
           </div>
-          <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-card">
-            <table className="w-full text-left text-[13.5px]">
-              <thead className="border-b border-line bg-raised text-[12px] text-low">
+          <div className="mt-4 overflow-x-auto rounded-[var(--r-lg)] border border-line bg-card">
+            <table className="w-full text-left text-[15px]">
+              <thead className="border-b border-line bg-raised text-[13px] text-low">
                 <tr>
                   <th className="px-5 py-3 font-medium">Model</th>
                   <th className="px-5 py-3 font-medium">Hourly rate</th>
@@ -247,16 +221,14 @@ export default async function PricingPage({
                     <td className="px-5 py-3.5 font-medium text-hi">
                       {model.name}
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-[12.5px] tabular-nums text-hi">
+                    <td className="px-5 py-3.5 font-mono text-[14px] tabular-nums text-hi">
                       {model.creditPerHour} Credit / hr
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-3.5 font-mono text-[13px]">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium ${
-                          model.paidOnly
-                            ? "bg-accent-soft text-accent-text"
-                            : "border border-line bg-raised text-mid"
-                        }`}
+                        className={
+                          model.paidOnly ? "text-accent-text" : "text-mid"
+                        }
                       >
                         {model.paidOnly ? "Pass only" : "Free & pass"}
                       </span>
@@ -269,40 +241,31 @@ export default async function PricingPage({
         </section>
 
         {/* ── Pricing FAQ ────────────────────────────────────────────────── */}
-        <section className="mt-12 border-t border-line pt-8">
+        <section className="mt-16 border-t border-line pt-12">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-hi">
-              Common questions about Openmi pricing
+            <h2 className="text-[22px] font-medium tracking-[-0.025em] text-hi">
+              Common questions
             </h2>
-            <p className="text-[12.5px] text-mid">
+            <p className="text-[14px] text-mid">
               See{" "}
-              <Link
-                href="/about"
-                className="font-medium text-accent-text underline-offset-2 hover:underline"
-              >
+              <Link href="/about" className="t-link font-medium text-accent-text">
                 sandbox limits &amp; PR workflow
               </Link>{" "}
               or{" "}
-              <Link
-                href="/refunds"
-                className="font-medium text-accent-text underline-offset-2 hover:underline"
-              >
-                refund &amp; cancellation terms
+              <Link href="/refunds" className="t-link font-medium text-accent-text">
+                refund terms
               </Link>
               .
             </p>
           </div>
 
-          <dl className="mt-4 grid gap-4 md:grid-cols-3">
+          <dl className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-3">
             {PRICING_FAQS.map((item) => (
-              <div
-                key={item.question}
-                className="rounded-2xl border border-line bg-card p-5"
-              >
-                <dt className="text-[14px] font-semibold tracking-[-0.015em] text-hi">
+              <div key={item.question} className="border-t border-line pt-5">
+                <dt className="text-[16px] font-medium tracking-[-0.015em] text-hi">
                   {item.question}
                 </dt>
-                <dd className="mt-2 text-pretty text-[13px] leading-[1.6] text-mid">
+                <dd className="mt-2 text-[15px] leading-[1.6] text-mid">
                   {item.answer}
                 </dd>
               </div>
@@ -310,27 +273,27 @@ export default async function PricingPage({
           </dl>
         </section>
 
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[12.5px]">
-          <p className="font-mono text-low">© 2026 Openmi</p>
-          <div className="flex flex-wrap items-center gap-4 text-mid">
-            <Link href="/about" className="hover:text-hi">
+        <footer className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-line py-8 text-[14px]">
+          <p className="font-mono text-[13px] text-low">© 2026 Openmi</p>
+          <div className="flex flex-wrap items-center gap-5 text-mid">
+            <Link href="/about" className="t-link text-mid hover:text-hi">
               About
             </Link>
-            <Link href="/report" className="hover:text-hi">
+            <Link href="/report" className="t-link text-mid hover:text-hi">
               Report a problem
             </Link>
-            <Link href="/suggestions" className="hover:text-hi">
+            <Link href="/suggestions" className="t-link text-mid hover:text-hi">
               Suggestions
             </Link>
-            <Link href="/refunds" className="hover:text-hi">
+            <Link href="/refunds" className="t-link text-mid hover:text-hi">
               Refunds
             </Link>
-            <Link href="/terms" className="hover:text-hi">
+            <Link href="/terms" className="t-link text-mid hover:text-hi">
               Terms
             </Link>
             <a
               href={supportMailto("Pricing question")}
-              className="hover:text-hi"
+              className="t-link text-mid hover:text-hi"
             >
               Support
             </a>

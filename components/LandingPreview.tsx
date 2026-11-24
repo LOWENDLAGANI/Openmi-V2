@@ -1,20 +1,6 @@
 "use client";
 
-import {
-  Check,
-  FileCode2,
-  GitBranch,
-  GitPullRequest,
-  Search,
-  Terminal,
-} from "lucide-react";
 import { useState } from "react";
-
-import {
-  RUN_MAX_STEPS,
-  RUN_MAX_TOKENS,
-  RUN_WALL_CLOCK_MS,
-} from "@/lib/runs/limits";
 
 type DiffLine = {
   kind: "ctx" | "add" | "del";
@@ -29,7 +15,7 @@ type Scenario = {
   sha: string;
   branch: string;
   pr: string;
-  sandboxStatus?: string;
+  sandboxStatus: string;
   prompt: string;
   answer: string;
   citation: string;
@@ -42,15 +28,15 @@ type Scenario = {
 const SCENARIOS: Scenario[] = [
   {
     id: "preview",
-    label: "Build pricing & preview",
+    label: "Pricing toggle & preview",
     repo: "acme/saas-starter",
     sha: "4a8c91e",
     branch: "openmi/agent/7d4e2a",
     pr: "PR #128",
-    sandboxStatus: "build exit 0 · preview ready",
+    sandboxStatus: "build exit 0",
     prompt: "Add a yearly billing toggle to the pricing page and verify the build.",
     answer:
-      "Added a client billing-period toggle in app/pricing/page.tsx, updated the plan cards to calculate annual savings, and ran pnpm run build in the sandbox (exit 0) with live preview active.",
+      "Added a client billing-period toggle in app/pricing/page.tsx, updated the plan cards for annual totals, and verified pnpm run build in the sandbox (exit 0).",
     citation: "app/pricing/page.tsx:44",
     tools: [
       { tool: "read_file", arg: "app/pricing/page.tsx" },
@@ -81,10 +67,10 @@ const SCENARIOS: Scenario[] = [
     sha: "9c17d08",
     branch: "openmi/agent/3a90e4",
     pr: "PR #134",
-    sandboxStatus: "typecheck exit 0",
-    prompt: "Ensure login redirect rejects protocol-relative paths like //evil.com.",
+    sandboxStatus: "tsc exit 0",
+    prompt: "Reject protocol-relative redirect paths like //evil.com on login.",
     answer:
-      "safeNextPath already normalises against an invalid origin, but protocol-relative strings starting with // pass a naive startsWith check. Rejecting leading double slashes closes that path.",
+      "safeNextPath normalized against a dummy origin, but leading double slashes passed the prefix check. Rejecting // closes open redirects.",
     citation: "lib/http/next-path.ts:19",
     tools: [
       { tool: "read_file", arg: "lib/http/next-path.ts" },
@@ -108,15 +94,15 @@ const SCENARIOS: Scenario[] = [
   },
   {
     id: "webhook",
-    label: "Guard webhook route",
+    label: "Verify webhook HMAC",
     repo: "acme/api-server",
     sha: "08e79f9",
     branch: "openmi/agent/5c12b7",
     pr: "PR #141",
     sandboxStatus: "build exit 0",
-    prompt: "Verify webhook signatures with timing-safe comparison before parsing JSON.",
+    prompt: "Verify webhook signatures with timingSafeEqual before parsing JSON.",
     answer:
-      "The handler parsed req.json() before checking the HMAC header and compared signatures with ===. Reading the raw body first and verifying with timingSafeEqual prevents spoofed payloads.",
+      "The handler parsed req.json() before checking the signature header. Reading raw text first and verifying with timingSafeEqual prevents spoofed payloads.",
     citation: "app/api/webhooks/route.ts:22",
     tools: [
       { tool: "read_file", arg: "app/api/webhooks/route.ts" },
@@ -161,7 +147,7 @@ export function WorkspaceFrame() {
       <div
         role="tablist"
         aria-label="Workspace scenarios"
-        className="flex flex-wrap items-center gap-1.5"
+        className="flex flex-wrap items-center justify-center gap-1.5"
       >
         {SCENARIOS.map((item) => {
           const active = item.id === scenario.id;
@@ -172,10 +158,10 @@ export function WorkspaceFrame() {
               role="tab"
               aria-selected={active}
               onClick={() => setSelectedId(item.id)}
-              className={`rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              className={`rounded-[var(--r-btn)] border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                 active
-                  ? "border-line-strong bg-card text-hi shadow-[var(--card-shadow)]"
-                  : "border-transparent bg-transparent text-mid hover:bg-hover hover:text-hi"
+                  ? "border-line-strong bg-card text-hi"
+                  : "border-transparent bg-transparent text-[var(--ground-sage-ink)] hover:bg-card/70"
               }`}
             >
               {item.label}
@@ -186,32 +172,27 @@ export function WorkspaceFrame() {
 
       <div
         role="img"
-        aria-label={`The Openmi workspace showing ${scenario.label}. Question, answer citing ${scenario.citation}, tool trace, and unified diff written to ${scenario.branch}.`}
-        className="preview-frame"
+        aria-label={`Openmi workspace showing ${scenario.label}. Prompt, answer citing ${scenario.citation}, tool trace, and unified diff written to ${scenario.branch}.`}
+        className="preview-frame text-left"
       >
-        {/* Authentic workspace bar — repository, pinned commit, target branch, PR status */}
         <div aria-hidden="true" className="preview-bar justify-between">
           <div className="flex min-w-0 items-center gap-2.5">
-            <GitBranch className="size-3.5 shrink-0 text-mid" strokeWidth={1.75} />
-            <span className="truncate font-mono text-[11.5px] font-medium text-hi">
+            <span className="truncate font-mono text-[12px] font-medium text-hi">
               {scenario.repo}
             </span>
-            <span className="hidden rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[10.5px] text-low sm:inline">
+            <span className="hidden rounded-[var(--r-sm)] border border-line bg-card px-1.5 py-0.5 font-mono text-[11px] text-low sm:inline">
               {scenario.sha}
             </span>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {scenario.sandboxStatus && (
-              <span className="hidden rounded-md border border-line bg-card px-2 py-0.5 font-mono text-[10.5px] text-mid lg:inline">
-                {scenario.sandboxStatus}
-              </span>
-            )}
-            <span className="hidden font-mono text-[11px] text-mid md:inline">
+            <span className="hidden rounded-[var(--r-sm)] border border-line bg-card px-2 py-0.5 font-mono text-[11px] text-mid lg:inline">
+              {scenario.sandboxStatus}
+            </span>
+            <span className="hidden font-mono text-[11.5px] text-mid md:inline">
               {scenario.branch}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-accent-soft px-2 py-0.5 font-mono text-[10.5px] font-medium text-accent-text">
-              <GitPullRequest className="size-3" strokeWidth={1.75} />
+            <span className="rounded-[var(--r-sm)] border border-accent/25 bg-accent-soft px-2 py-0.5 font-mono text-[11px] font-medium text-accent-text">
               {scenario.pr}
             </span>
           </div>
@@ -219,25 +200,24 @@ export function WorkspaceFrame() {
 
         <div
           aria-hidden="true"
-          className="grid lg:grid-cols-[200px_1fr_1.15fr]"
+          className="grid lg:grid-cols-[196px_1fr_1.2fr]"
         >
-          {/* Left file pane */}
-          <div className="hidden border-r border-line bg-raised/60 p-3 lg:block">
-            <p className="px-2 pb-2 font-mono text-[10.5px] font-medium text-low">
-              Changed files ({scenario.files.length})
+          <div className="hidden border-r border-line bg-raised/70 p-3 lg:block">
+            <p className="px-2 pb-2 font-mono text-[11px] font-medium text-low">
+              Files ({scenario.files.length})
             </p>
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {scenario.files.map((file) => (
                 <li
                   key={file.path}
-                  className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 font-mono text-[11px] ${
+                  className={`flex items-center justify-between gap-2 rounded-[var(--r-sm)] px-2 py-1.5 font-mono text-[11.5px] ${
                     file.active
-                      ? "bg-card font-medium text-hi shadow-[var(--card-shadow)]"
+                      ? "bg-card font-medium text-hi"
                       : "text-mid"
                   }`}
                 >
                   <span className="truncate">{file.path.split("/").pop()}</span>
-                  <span className="shrink-0 tabular-nums text-[10px]">
+                  <span className="shrink-0 tabular-nums text-[11px]">
                     <span className="text-[color:var(--diff-add)]">+{file.adds}</span>{" "}
                     <span className="text-danger">−{file.dels}</span>
                   </span>
@@ -246,19 +226,17 @@ export function WorkspaceFrame() {
             </ul>
           </div>
 
-          {/* Center transcript + citation + tool trace */}
           <div className="flex min-w-0 flex-col justify-between gap-4 border-b border-line p-4 lg:border-b-0 lg:border-r">
             <div className="space-y-3">
-              <div className="ml-auto max-w-[28ch] rounded-xl rounded-br-sm bg-bubble px-3 py-2 text-[12px] leading-[1.55] text-bubble-text">
+              <div className="ml-auto max-w-[30ch] rounded-[var(--r-md)] bg-bubble px-3 py-2 text-[13px] leading-[1.5] text-bubble-text">
                 {scenario.prompt}
               </div>
 
               <div className="space-y-2">
-                <p className="text-[12.5px] leading-[1.6] text-body">
+                <p className="text-[13.5px] leading-[1.55] text-body">
                   {scenario.answer}
                 </p>
-                <span className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-accent-soft px-2 py-0.5 font-mono text-[11px] text-accent-text">
-                  <FileCode2 className="size-3" strokeWidth={1.75} />
+                <span className="inline-block rounded-[var(--r-sm)] border border-accent/25 bg-accent-soft px-2 py-0.5 font-mono text-[11.5px] text-accent-text">
                   {scenario.citation}
                 </span>
               </div>
@@ -268,9 +246,8 @@ export function WorkspaceFrame() {
               {scenario.tools.map((entry, idx) => (
                 <li
                   key={`${entry.tool}-${idx}`}
-                  className="flex items-center gap-2 font-mono text-[11px] text-low"
+                  className="flex items-center gap-2 font-mono text-[11.5px] text-low"
                 >
-                  <Check className="size-3 shrink-0 text-accent-text" strokeWidth={2} />
                   <span className="shrink-0 text-body">{entry.tool}</span>
                   <span className="truncate">{entry.arg}</span>
                 </li>
@@ -278,14 +255,13 @@ export function WorkspaceFrame() {
             </ol>
           </div>
 
-          {/* Right unified diff viewer */}
-          <div className="min-w-0 bg-canvas/40 p-3 sm:p-4">
-            <div className="overflow-hidden rounded-lg border border-line bg-card">
+          <div className="min-w-0 bg-canvas/50 p-3 sm:p-4">
+            <div className="overflow-hidden rounded-[var(--r-md)] border border-line bg-card">
               <div className="flex items-center justify-between gap-2 border-b border-line bg-raised px-3 py-1.5">
-                <span className="truncate font-mono text-[11px] font-medium text-hi">
+                <span className="truncate font-mono text-[11.5px] font-medium text-hi">
                   {scenario.files[0]?.path}
                 </span>
-                <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-low">
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-low">
                   {scenario.hunk}
                 </span>
               </div>
@@ -320,100 +296,12 @@ export function WorkspaceFrame() {
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-line bg-raised px-2.5 py-1 text-[11px] font-medium text-hi">
-                <Check className="size-3 text-[color:var(--diff-add)]" strokeWidth={2} />
-                Written to {scenario.branch}
-              </span>
-              <span className="font-mono text-[11px] text-low">
-                {scenario.pr} opened
-              </span>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[11.5px]">
+              <span className="text-hi">Written to {scenario.branch}</span>
+              <span className="text-low">{scenario.pr} opened</span>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Execution timeline with real caps pulled directly from `lib/runs/limits`.
- */
-export function RunTrace() {
-  const minutes = Math.round(RUN_WALL_CLOCK_MS / 60_000);
-  const tokens = `${Math.round(RUN_MAX_TOKENS / 1_000_000)}M`;
-
-  const steps = [
-    {
-      icon: FileCode2,
-      tool: "read_file",
-      arg: "≤ 400 lines",
-      note: "Pinned-commit file slice, text only",
-    },
-    {
-      icon: Search,
-      tool: "search_code",
-      arg: "≤ 40 hits",
-      note: "Ripgrep across the checked-out workspace",
-    },
-    {
-      icon: Terminal,
-      tool: "run_command",
-      arg: "≤ 120 s",
-      note: "Sandbox command with observed exit code",
-    },
-    {
-      icon: GitPullRequest,
-      tool: "publish",
-      arg: "1 branch",
-      note: "Unified diff committed to agent branch & PR",
-    },
-  ];
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-line-strong bg-card shadow-[var(--card-shadow)]">
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-raised px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Terminal className="size-3.5 text-mid" strokeWidth={1.75} />
-          <span className="font-mono text-[12px] font-medium text-hi">
-            Turn execution trace
-          </span>
-        </div>
-        <span className="font-mono text-[11px] tabular-nums text-low">
-          4 tools · 9.4k tokens
-        </span>
-      </div>
-
-      <ol className="divide-y divide-line">
-        {steps.map((step) => {
-          const Icon = step.icon;
-          return (
-            <li
-              key={step.tool}
-              className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3"
-            >
-              <span className="grid size-7 place-items-center rounded-md border border-line bg-raised text-mid">
-                <Icon className="size-3.5" strokeWidth={1.75} />
-              </span>
-              <div className="min-w-0">
-                <p className="font-mono text-[12.5px] font-medium text-hi">
-                  {step.tool}
-                </p>
-                <p className="truncate text-[12px] text-mid">{step.note}</p>
-              </div>
-              <span className="rounded-md border border-line bg-raised px-2 py-0.5 font-mono text-[11px] tabular-nums text-low">
-                {step.arg}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-raised/60 px-4 py-2.5 font-mono text-[11px] text-low">
-        <span>Hard execution ceilings</span>
-        <span className="tabular-nums text-mid">
-          {RUN_MAX_STEPS} steps · {tokens} tokens · {minutes} min
-        </span>
       </div>
     </div>
   );

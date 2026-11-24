@@ -2,6 +2,12 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.1.0] - 2026-11-24 — Full site redesign with design-taste-frontend system
+
+- Adopted cool-grey-cobalt palette (`#eef0f3` ground, `#e2e5ea` surface, `#0b0c0e` ink, `#1f2de6` cobalt), Instrument Sans + DM Mono typography, and sharp `4px`/`6px`/`8px` radii across all public and workspace pages.
+- Rebuilt the landing page around a centred hero over the live workspace workbench on a sage lit ground, 2x2 open feature cards with real diff/sandbox/ledger/model fragments, a pinned-chapters workflow section, an inverse dark boundaries band, and a combined closing footer.
+- Unified `/pricing`, `/pay`, `/about`, `/login`, legal pages, and workspace headers with opaque 1px hairline navs, removing blurred glass headers, decorative auth gradient beams, `rounded-full` pill buttons, and staggered fade-ins.
+
 ## [2.0.9] - 2026-11-24 — Redesigned Sign in / Register page with per-theme architectural patterns
 
 - Redesigned `/login` and `AuthForm` into a centered, minimal auth flow with a framed Openmi mark, inline mode switcher, password visibility toggle, and Terms/Privacy footer.

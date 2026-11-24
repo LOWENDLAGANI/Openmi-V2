@@ -10,9 +10,9 @@ import { useEffect, useState } from "react";
  * keep working seamlessly; `ink` now renders our Midnight Slate palette.
  */
 const THEMES = [
-  { id: "paper", label: "Light", swatch: "#fafafa", className: "" },
-  { id: "dark", label: "Dark", swatch: "#09090b", className: "dark" },
-  { id: "ink", label: "Slate", swatch: "#192230", className: "ink" },
+  { id: "paper", label: "Light", swatch: "#eef0f3", className: "" },
+  { id: "dark", label: "Dark", swatch: "#0b0c0e", className: "dark" },
+  { id: "ink", label: "Slate", swatch: "#121923", className: "ink" },
 ] as const;
 
 type ThemeId = (typeof THEMES)[number]["id"];

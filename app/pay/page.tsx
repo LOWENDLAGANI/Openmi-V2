@@ -136,11 +136,10 @@ export default async function PayPage({
 
   return (
     <div className="min-h-dvh bg-canvas">
-      {/* ── Minimal Google One-style Top Bar ───────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-canvas/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-8">
           <Link href="/chat" aria-label="Openmi workspace">
-            <Brand />
+            <Brand compact />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -148,15 +147,15 @@ export default async function PayPage({
             <Link
               href="/chat"
               aria-label="Close plans"
-              className="grid size-10 place-items-center rounded-full text-hi transition-colors hover:bg-hover"
+              className="btn grid size-9 p-0"
             >
-              <X aria-hidden="true" className="size-6" strokeWidth={1.75} />
+              <X aria-hidden="true" className="size-4" strokeWidth={1.75} />
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="animate-enter mx-auto w-full max-w-6xl px-3 pb-14 pt-2 sm:px-8">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-8">
         {params.error && (
           <p
             role="alert"
@@ -233,7 +232,7 @@ export default async function PayPage({
             <select
               name="country"
               defaultValue={country ?? ""}
-              className="field w-auto rounded-full px-3.5 py-1.5 text-[12.5px]"
+              className="field h-9 w-auto px-3 py-0 text-[13px]"
               aria-label="Choose your country for the price estimate"
             >
               <option value="">Currency (MYR)</option>
@@ -243,10 +242,7 @@ export default async function PayPage({
                 </option>
               ))}
             </select>
-            <button
-              type="submit"
-              className="inline-flex h-8 items-center justify-center rounded-full border border-line-strong bg-raised px-3.5 text-[12px] font-medium text-hi transition-colors hover:bg-hover"
-            >
+            <button type="submit" className="btn h-9 px-3.5 text-[13px]">
               Update
             </button>
           </form>
@@ -384,7 +380,7 @@ export default async function PayPage({
 
               <ReceiptWave>
                 <SubmitButton
-                  className="flex h-11 w-full items-center justify-center rounded-full bg-accent text-[14px] font-medium text-on-accent transition-opacity hover:opacity-90 sm:col-span-2"
+                  className="btn btn-primary h-11 w-full text-[14.5px] sm:col-span-2"
                   optimisticText="Sent for review"
                   pendingText="Uploading the receipt…"
                 >

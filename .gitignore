@@ -38,3 +38,4 @@ agent/
 
 # browser/tooling artefacts left in the repo root by an agent
 .freebuff-browser-*
+.taste-skill/

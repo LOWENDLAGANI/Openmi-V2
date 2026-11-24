@@ -305,24 +305,24 @@ export function AuthForm({
   return (
     <div className="w-full">
       <div className="flex flex-col items-center text-center">
-        <span className="grid size-12 place-items-center rounded-2xl border border-line-strong bg-card/90 shadow-[var(--card-shadow)] backdrop-blur-md">
-          <OpenmiMark size={24} />
+        <span className="grid size-11 place-items-center rounded-[var(--r-lg)] border border-line-strong bg-card">
+          <OpenmiMark size={22} />
         </span>
 
-        <h1 className="mt-5 text-[26px] font-semibold leading-[1.15] tracking-[-0.03em] text-hi sm:text-[28px]">
+        <h1 className="mt-5 text-[28px] font-medium leading-[1.12] tracking-[-0.03em] text-hi">
           {mode === "signin" ? "Sign in to Openmi" : "Create an Openmi account"}
         </h1>
 
-        <p className="mt-2 text-[13.5px] text-mid">
+        <p className="mt-2 text-[14.5px] text-mid">
           {mode === "signin" ? (
             <>
-              Don&apos;t have an account?{" "}
+              No account yet?{" "}
               <button
                 type="button"
                 onClick={() => switchMode("signup")}
-                className="font-semibold text-hi underline-offset-4 hover:underline"
+                className="t-link font-medium text-hi"
               >
-                Create account.
+                Create account
               </button>
             </>
           ) : (
@@ -331,9 +331,9 @@ export function AuthForm({
               <button
                 type="button"
                 onClick={() => switchMode("signin")}
-                className="font-semibold text-hi underline-offset-4 hover:underline"
+                className="t-link font-medium text-hi"
               >
-                Sign in.
+                Sign in
               </button>
             </>
           )}
@@ -343,7 +343,7 @@ export function AuthForm({
       <div
         role="tablist"
         aria-label="Sign in or create an account"
-        className="mt-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-raised/85 p-1 backdrop-blur-sm"
+        className="mt-6 grid grid-cols-2 gap-1 rounded-[var(--r-md)] border border-line bg-raised p-1"
       >
         {(["signin", "signup"] as const).map((value) => (
           <button
@@ -352,9 +352,9 @@ export function AuthForm({
             type="button"
             aria-selected={mode === value}
             onClick={() => switchMode(value)}
-            className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+            className={`rounded-[var(--r-sm)] px-3 py-2 text-[13.5px] font-medium transition-colors ${
               mode === value
-                ? "bg-card text-hi shadow-[var(--card-shadow)]"
+                ? "bg-card text-hi"
                 : "text-mid hover:text-hi"
             }`}
           >
@@ -368,7 +368,7 @@ export function AuthForm({
           type="button"
           onClick={() => oauth("github")}
           disabled={busy}
-          className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line-strong bg-card/85 px-4 py-3 text-[13.5px] font-medium text-hi shadow-[var(--card-shadow)] backdrop-blur-sm transition-colors hover:bg-hover disabled:opacity-60"
+          className="btn h-11 w-full text-[14.5px]"
         >
           <GithubMark />
           <span>Continue with GitHub</span>
@@ -378,7 +378,7 @@ export function AuthForm({
           type="button"
           onClick={() => oauth("google")}
           disabled={busy}
-          className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line-strong bg-card/85 px-4 py-3 text-[13.5px] font-medium text-hi shadow-[var(--card-shadow)] backdrop-blur-sm transition-colors hover:bg-hover disabled:opacity-60"
+          className="btn h-11 w-full text-[14.5px]"
         >
           <GoogleMark />
           <span>Continue with Google</span>
@@ -387,7 +387,7 @@ export function AuthForm({
 
       <div className="my-5 flex items-center gap-3.5" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
-        <span className="text-[12px] text-low">or use email</span>
+        <span className="text-[13px] text-low">or use email</span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
@@ -395,7 +395,7 @@ export function AuthForm({
         <div>
           <label
             htmlFor="email"
-            className="mb-1.5 block text-[12.5px] font-medium text-mid"
+            className="mb-1.5 block text-[13.5px] font-medium text-body"
           >
             Email
           </label>
@@ -412,7 +412,7 @@ export function AuthForm({
               setEmail(event.target.value);
               clearField("email");
             }}
-            className={`field rounded-xl bg-card/85 px-3.5 py-2.5 text-[14px] backdrop-blur-sm ${
+            className={`field h-11 px-3.5 text-[15px] ${
               emailInvalid ? "border-danger" : ""
             }`}
             placeholder="you@example.com"
@@ -430,7 +430,7 @@ export function AuthForm({
         <div>
           <label
             htmlFor="password"
-            className="mb-1.5 block text-[12.5px] font-medium text-mid"
+            className="mb-1.5 block text-[13.5px] font-medium text-body"
           >
             Password
           </label>
@@ -451,7 +451,7 @@ export function AuthForm({
                 setPassword(event.target.value);
                 clearField("password");
               }}
-              className={`field rounded-xl bg-card/85 py-2.5 pl-3.5 pr-10 text-[14px] backdrop-blur-sm ${
+              className={`field h-11 pl-3.5 pr-10 text-[15px] ${
                 passwordInvalid ? "border-danger" : ""
               }`}
               placeholder="At least 8 characters"
@@ -460,7 +460,7 @@ export function AuthForm({
               type="button"
               onClick={() => setShowPassword((current) => !current)}
               aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute inset-y-0 right-1.5 my-auto grid size-8 place-items-center rounded-lg text-low transition-colors hover:text-hi"
+              className="absolute inset-y-0 right-1.5 my-auto grid size-8 place-items-center rounded-[var(--r-sm)] text-low transition-colors hover:text-hi"
             >
               {showPassword ? (
                 <EyeOff className="size-4" strokeWidth={1.75} aria-hidden="true" />
@@ -483,7 +483,7 @@ export function AuthForm({
           <div>
             <label
               htmlFor="invite-code"
-              className="mb-1.5 block text-[12.5px] font-medium text-mid"
+              className="mb-1.5 block text-[13.5px] font-medium text-body"
             >
               Invite code <span className="font-normal text-low">(optional)</span>
             </label>
@@ -495,7 +495,7 @@ export function AuthForm({
               maxLength={64}
               autoComplete="off"
               spellCheck={false}
-              className="field rounded-xl bg-card/85 px-3.5 py-2.5 font-mono text-[13px] backdrop-blur-sm"
+              className="field h-11 px-3.5 font-mono text-[14px]"
               placeholder="From the account that invited you"
             />
           </div>
@@ -504,7 +504,7 @@ export function AuthForm({
         {error && (
           <p
             role="alert"
-            className="rounded-xl border border-danger/30 bg-danger/8 px-3.5 py-2.5 text-[12.5px] text-danger"
+            className="rounded-[var(--r-md)] border border-danger/30 bg-danger/8 px-3.5 py-2.5 text-[13px] text-danger"
           >
             {error}
           </p>
@@ -512,7 +512,7 @@ export function AuthForm({
         {notice && (
           <p
             role="status"
-            className="rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[12.5px] text-accent-text"
+            className="rounded-[var(--r-md)] border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-accent-text"
           >
             {notice}
           </p>
@@ -522,7 +522,7 @@ export function AuthForm({
           type="submit"
           disabled={busy}
           aria-busy={busy}
-          className="btn btn-primary mt-1 w-full rounded-xl py-3 text-[13.5px] font-medium"
+          className="btn btn-primary mt-1 h-11 w-full text-[15px]"
         >
           {busy
             ? mode === "signin"
@@ -534,7 +534,7 @@ export function AuthForm({
         </button>
       </form>
 
-      <p className="mt-6 text-center text-[11.5px] leading-relaxed text-low">
+      <p className="mt-6 text-center text-[13px] leading-relaxed text-low">
         By continuing, you agree to our{" "}
         <Link href="/terms" className="text-mid underline underline-offset-2 hover:text-hi">
           Terms

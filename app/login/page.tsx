@@ -45,28 +45,28 @@ export default async function LoginPage({
 
   return (
     <div className="auth-stage flex min-h-dvh flex-col">
-      <div aria-hidden="true" className="auth-pattern" />
+      <header className="border-b border-line bg-canvas">
+        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-5 sm:px-8">
+          <Link
+            href={homeHref}
+            className="t-link inline-flex items-center gap-1 text-[14px] font-medium text-mid hover:text-hi"
+          >
+            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden="true" />
+            <span>Home</span>
+          </Link>
 
-      <header className="relative z-10 mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-5 sm:px-8">
-        <Link
-          href={homeHref}
-          className="inline-flex items-center gap-1 text-[13px] font-medium text-mid transition-colors hover:text-hi"
-        >
-          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden="true" />
-          <span>Home</span>
-        </Link>
-
-        <ThemeSwitcher variant="icon" />
+          <ThemeSwitcher variant="icon" />
+        </div>
       </header>
 
-      <main className="animate-enter relative z-10 mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center px-5 pb-12 pt-2 sm:px-6">
+      <main className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center px-5 py-12 sm:px-6">
         {ref && (
           <p
             role="status"
-            className="mb-5 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-center text-[12px] leading-relaxed text-accent-text backdrop-blur-sm"
+            className="mb-5 rounded-[var(--r-md)] border border-accent/30 bg-accent-soft px-4 py-2.5 text-center text-[13px] leading-relaxed text-accent-text"
           >
             Invite code{" "}
-            <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11px] text-hi">
+            <code className="rounded-[var(--r-sm)] bg-card px-1.5 py-0.5 font-mono text-[12px] text-hi">
               {ref}
             </code>{" "}
             applied: +{INVITE_REWARD_CREDIT} bonus Credit on your first paid
@@ -77,7 +77,7 @@ export default async function LoginPage({
         {params.deleted === "1" && (
           <p
             role="status"
-            className="mb-5 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-center text-[12px] leading-relaxed text-accent-text backdrop-blur-sm"
+            className="mb-5 rounded-[var(--r-md)] border border-accent/30 bg-accent-soft px-4 py-2.5 text-center text-[13px] leading-relaxed text-accent-text"
           >
             Your account and data have been deleted. You can create a new
             account at any time.

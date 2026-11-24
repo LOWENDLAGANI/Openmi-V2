@@ -50,42 +50,42 @@ export function LegalPage({
           ),
         }}
       />
-      <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-2 px-5 sm:px-8">
+      <header className="border-b border-line bg-canvas">
+        <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-between gap-2 px-5 sm:px-8">
           <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2.5">
             <Link href="/" aria-label="Openmi home">
-              <Brand />
+              <Brand compact />
             </Link>
             <span aria-hidden="true" className="text-line-strong">
               /
             </span>
             <span
               aria-current="page"
-              className="truncate text-[13.5px] font-semibold tracking-[-0.02em] text-hi"
+              className="truncate text-[14px] font-medium tracking-[-0.02em] text-hi"
             >
               {title}
             </span>
           </nav>
           <nav className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
-            <Link href={other.href} className="btn px-3.5 py-1.5 text-[12.5px]">
+            <Link href={other.href} className="btn px-3.5 py-1.5 text-[13px]">
               {other.label}
             </Link>
           </nav>
         </div>
       </header>
 
-      <main className="animate-enter mx-auto w-full max-w-3xl px-5 py-10 sm:px-8">
-        <p className="text-[12px] font-medium capitalize text-accent-text">
+      <main className="mx-auto w-full max-w-3xl px-5 py-12 sm:px-8">
+        <p className="font-mono text-[12px] font-medium text-accent-text">
           {eyebrow}
         </p>
-        <h1 className="mt-2 text-balance text-[clamp(1.9rem,4.5vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-hi">
+        <h1 className="mt-2 text-balance text-[clamp(2rem,4.5vw,2.85rem)] font-medium leading-[1.08] tracking-[-0.03em] text-hi">
           {title}
         </h1>
-        <p className="mt-2.5 font-mono text-[12px] text-low">
+        <p className="mt-2.5 font-mono text-[13px] text-low">
           Last updated {updated}
         </p>
-        <p className="mt-5 text-pretty text-[14.5px] leading-[1.65] text-mid">
+        <p className="mt-5 text-pretty text-[16px] leading-[1.65] text-body">
           {intro}
         </p>
         {pricingNote && (

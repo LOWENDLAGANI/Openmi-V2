@@ -12,10 +12,20 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.9";
+export const APP_VERSION = "2.1.0";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.1.0",
+    date: "2026-11-24",
+    title: "Full site redesign with design-taste-frontend system",
+    changes: [
+      "Adopted cool-grey-cobalt palette (#eef0f3 ground, #e2e5ea surface, #0b0c0e ink, #1f2de6 cobalt), Instrument Sans + DM Mono typography, and sharp 4px/6px/8px radii across all public and workspace pages.",
+      "Rebuilt the landing page around a centred hero over the live workspace workbench on a sage lit ground, 2x2 open feature cards with real diff/sandbox/ledger/model fragments, a pinned-chapters workflow section, an inverse dark boundaries band, and a combined closing footer.",
+      "Unified /pricing, /pay, /about, /login, legal pages, and workspace headers with opaque 1px hairline navs, removing blurred glass headers, decorative auth gradient beams, rounded-full pill buttons, and staggered fade-ins.",
+    ],
+  },
   {
     version: "2.0.9",
     date: "2026-11-24",
