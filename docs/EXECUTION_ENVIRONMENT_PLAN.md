@@ -111,14 +111,20 @@ storage  (8 − 5 free) × $0.000108 = $0.000324/h
                                     $0.165924/h  =  $0.00277/min
 ```
 
-At the pass floor of **RM 0.60 per Credit** (15-day pass: RM18 / 30 Credit, plus the
-daily allowance while it runs):
+At the pass floor of **RM 9.00 per Credit** (15-day pass: RM18 / 2 Credit; the
+30-day pass is RM36 / 3 Credit, RM 12.00 per Credit), plus the daily allowance
+while the pass runs:
 
 | | Cost to Openmi | Charged | Margin |
 |---|---|---|---|
-| 1 minute | RM 0.0126 | 0.05 Credit = RM 0.030 | ~2× |
-| 10-minute run | RM 0.126 | 0.5 Credit = RM 0.300 | ~2× |
-| 1 hour | RM 0.754 | 2 Credit = RM 1.20 | ~1.6× |
+| 1 minute | RM 0.0126 | 0.05 Credit = RM 0.45 | ~36× |
+| 10-minute run | RM 0.126 | 0.5 Credit = RM 4.50 | ~36× |
+| 1 hour | RM 0.754 | 2 Credit = RM 18.00 | ~24× |
+
+The wide margin is a consequence of the pass grants: 2 and 3 Credit per pass
+leave the plan's value in the 15 Credit daily allowance rather than in the
+wallet, so sandbox Credit is bought at the pass rate above. If the passes ever
+carry a larger wallet grant again, this floor and the table move with it.
 
 The symmetry is deliberate and easy to say out loud: **an execution hour costs
 the same as a chat hour.** Model tokens for the run are already covered by the
