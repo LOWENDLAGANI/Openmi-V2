@@ -1,8 +1,11 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { OpenmiMark } from "@/components/OpenmiMark";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
@@ -37,10 +40,17 @@ export function AuthForm({
   const [mode, setMode] = useState<Mode>(initialInviteCode ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [inviteCode, setInviteCode] = useState(initialInviteCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  function switchMode(target: Mode) {
+    setMode(target);
+    setError(null);
+    setNotice(null);
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -139,7 +149,7 @@ export function AuthForm({
 
   if (!configured) {
     return (
-      <div className="panel p-6">
+      <div className="panel p-6 text-center">
         <p className="text-[14px] font-semibold text-hi">
           Sign-in is unavailable
         </p>
@@ -151,11 +161,47 @@ export function AuthForm({
   }
 
   return (
-    <div className="panel p-5 sm:p-6">
+    <div className="w-full">
+      <div className="flex flex-col items-center text-center">
+        <span className="grid size-12 place-items-center rounded-2xl border border-line-strong bg-card/90 shadow-[var(--card-shadow)] backdrop-blur-md">
+          <OpenmiMark size={24} />
+        </span>
+
+        <h1 className="mt-5 text-[26px] font-semibold leading-[1.15] tracking-[-0.03em] text-hi sm:text-[28px]">
+          {mode === "signin" ? "Sign in to Openmi" : "Create an Openmi account"}
+        </h1>
+
+        <p className="mt-2 text-[13.5px] text-mid">
+          {mode === "signin" ? (
+            <>
+              Don&apos;t have an account?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signup")}
+                className="font-semibold text-hi underline-offset-4 hover:underline"
+              >
+                Create account.
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="font-semibold text-hi underline-offset-4 hover:underline"
+              >
+                Sign in.
+              </button>
+            </>
+          )}
+        </p>
+      </div>
+
       <div
         role="tablist"
         aria-label="Sign in or create an account"
-        className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-raised p-1"
+        className="mt-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-raised/85 p-1 backdrop-blur-sm"
       >
         {(["signin", "signup"] as const).map((value) => (
           <button
@@ -163,12 +209,8 @@ export function AuthForm({
             role="tab"
             type="button"
             aria-selected={mode === value}
-            onClick={() => {
-              setMode(value);
-              setError(null);
-              setNotice(null);
-            }}
-            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+            onClick={() => switchMode(value)}
+            className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
               mode === value
                 ? "bg-card text-hi shadow-[var(--card-shadow)]"
                 : "text-mid hover:text-hi"
@@ -184,15 +226,15 @@ export function AuthForm({
         onClick={google}
         disabled={busy}
         aria-busy={busy}
-        className="btn mt-4 w-full gap-2 py-2.5 text-[13px]"
+        className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl border border-line-strong bg-card/85 px-4 py-3 text-[13.5px] font-medium text-hi shadow-[var(--card-shadow)] backdrop-blur-sm transition-colors hover:bg-hover disabled:opacity-60"
       >
         <GoogleMark />
-        {busy ? "Opening Google…" : "Continue with Google"}
+        <span>{busy ? "Opening Google…" : "Continue with Google"}</span>
       </button>
 
-      <div className="my-4 flex items-center gap-3" aria-hidden="true">
+      <div className="my-5 flex items-center gap-3.5" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
-        <span className="text-[11.5px] text-low">or with email</span>
+        <span className="text-[12px] text-low">or</span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
@@ -200,7 +242,7 @@ export function AuthForm({
         <div>
           <label
             htmlFor="email"
-            className="mb-1.5 block text-[12.5px] font-medium text-body"
+            className="mb-1.5 block text-[12.5px] font-medium text-mid"
           >
             Email
           </label>
@@ -212,7 +254,7 @@ export function AuthForm({
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="field py-2"
+            className="field rounded-xl bg-card/85 px-3.5 py-2.5 text-[14px] backdrop-blur-sm"
             placeholder="you@example.com"
           />
         </div>
@@ -220,29 +262,43 @@ export function AuthForm({
         <div>
           <label
             htmlFor="password"
-            className="mb-1.5 block text-[12.5px] font-medium text-body"
+            className="mb-1.5 block text-[12.5px] font-medium text-mid"
           >
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="field py-2"
-            placeholder="At least 8 characters"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={8}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="field rounded-xl bg-card/85 py-2.5 pl-3.5 pr-10 text-[14px] backdrop-blur-sm"
+              placeholder="At least 8 characters"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute inset-y-0 right-1.5 my-auto grid size-8 place-items-center rounded-lg text-low transition-colors hover:text-hi"
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              ) : (
+                <Eye className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
 
         {mode === "signup" && (
           <div>
             <label
               htmlFor="invite-code"
-              className="mb-1.5 block text-[12.5px] font-medium text-body"
+              className="mb-1.5 block text-[12.5px] font-medium text-mid"
             >
               Invite code <span className="font-normal text-low">(optional)</span>
             </label>
@@ -254,7 +310,7 @@ export function AuthForm({
               maxLength={64}
               autoComplete="off"
               spellCheck={false}
-              className="field py-2 font-mono text-[12.5px]"
+              className="field rounded-xl bg-card/85 px-3.5 py-2.5 font-mono text-[13px] backdrop-blur-sm"
               placeholder="From the account that invited you"
             />
           </div>
@@ -263,7 +319,7 @@ export function AuthForm({
         {error && (
           <p
             role="alert"
-            className="rounded-lg border border-danger/30 bg-danger/8 px-3.5 py-2.5 text-[12.5px] text-danger"
+            className="rounded-xl border border-danger/30 bg-danger/8 px-3.5 py-2.5 text-[12.5px] text-danger"
           >
             {error}
           </p>
@@ -271,7 +327,7 @@ export function AuthForm({
         {notice && (
           <p
             role="status"
-            className="rounded-lg border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[12.5px] text-accent-text"
+            className="rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[12.5px] text-accent-text"
           >
             {notice}
           </p>
@@ -281,7 +337,7 @@ export function AuthForm({
           type="submit"
           disabled={busy}
           aria-busy={busy}
-          className="btn btn-primary w-full py-2.5 text-[13px]"
+          className="btn btn-primary mt-1 w-full rounded-xl py-3 text-[13.5px] font-medium"
         >
           {busy
             ? mode === "signin"
@@ -292,6 +348,18 @@ export function AuthForm({
               : "Create account"}
         </button>
       </form>
+
+      <p className="mt-6 text-center text-[11.5px] leading-relaxed text-low">
+        By continuing, you agree to our{" "}
+        <Link href="/terms" className="text-mid underline underline-offset-2 hover:text-hi">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="text-mid underline underline-offset-2 hover:text-hi">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </div>
   );
 }
@@ -302,7 +370,7 @@ function GoogleMark() {
       aria-hidden="true"
       focusable="false"
       viewBox="0 0 24 24"
-      className="size-[15px] shrink-0"
+      className="size-[16px] shrink-0"
     >
       <path
         fill="#4285F4"

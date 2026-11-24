@@ -2,6 +2,11 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.9] - 2026-11-24 — Redesigned Sign in / Register page with per-theme architectural patterns
+
+- Redesigned `/login` and `AuthForm` into a centered, minimal auth flow with a framed Openmi mark, inline mode switcher, password visibility toggle, and Terms/Privacy footer.
+- Added distinct theme-specific background patterns in `app/globals.css`: drafting grid + soft diagonal light for Light (Paper), angled obsidian glass beams for Dark, and technical diagonal hatch + cobalt ribbons for Slate (Ink).
+
 ## [2.0.8] - 2026-11-24 — Real-time active users & last visitor monitor in Admin panel
 
 - Added migration `060_user_presence.sql` with service-role-only RLS table `public.user_presence` to track live member and guest heartbeats.

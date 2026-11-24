@@ -12,10 +12,19 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.8";
+export const APP_VERSION = "2.0.9";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.9",
+    date: "2026-11-24",
+    title: "Redesigned Sign in / Register page with per-theme architectural patterns",
+    changes: [
+      "Redesigned /login and AuthForm into a centered, minimal auth flow with a framed Openmi mark, inline mode switcher, password visibility toggle, and Terms/Privacy footer.",
+      "Added distinct theme-specific background patterns in app/globals.css: drafting grid + soft diagonal light for Light (Paper), angled obsidian glass beams for Dark, and technical diagonal hatch + cobalt ribbons for Slate (Ink).",
+    ],
+  },
   {
     version: "2.0.8",
     date: "2026-11-24",
