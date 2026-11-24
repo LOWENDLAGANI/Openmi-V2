@@ -13,13 +13,13 @@ export const RUN_MAX_STEPS = 40;
 /** Estimated tokens one run may spend. `ceil(chars / 4)` is the estimate. */
 export const RUN_MAX_TOKENS = 2_000_000;
 
-/** Wall clock, from claim to teardown. The sandbox is killed at the same edge. */
-export const RUN_WALL_CLOCK_MS = 15 * 60_000;
+/** Wall clock, from claim to teardown. The sandbox is paused at the same edge. */
+export const RUN_WALL_CLOCK_MS = 30 * 60_000;
 
 /**
  * The workspace outlives the run.
  *
- * A run executes for at most fifteen minutes. At that point its sandbox is
+ * A run executes for at most thirty minutes by default. At that point its sandbox is
  * **paused** — compute released, disk kept — not killed. It is destroyed
  * forty-eight hours after the run settled, by the sweep, which is the same
  * contract a chat workspace already has.
@@ -28,7 +28,7 @@ export const RUN_WALL_CLOCK_MS = 15 * 60_000;
  * read by `sweepRunSandboxes`. Both numbers are exported so the docs, the
  * sweep and the sandbox factory read one source.
  */
-export const RUN_SANDBOX_IDLE_MINUTES = 15;
+export const RUN_SANDBOX_IDLE_MINUTES = 30;
 export const RUN_SANDBOX_TTL_HOURS = 48;
 export const RUN_SANDBOX_MIN_TTL_HOURS = 1;
 export const RUN_SANDBOX_MAX_TTL_HOURS = 168;
@@ -178,13 +178,13 @@ export const RUN_QUEUE_NOTICE_MS = 20_000;
  */
 export const RUN_WAKE_TIMEOUT_MS = 1_500;
 
-/** `RUN_MAX_MINUTES` is an operator knob, clamped so a typo cannot buy an hour. */
+/** `RUN_MAX_MINUTES` is an operator knob, clamped to 1..60 minutes. */
 export function runMaxMinutes(
   env: Record<string, string | undefined> = process.env
 ): number {
   const raw = Number(env.RUN_MAX_MINUTES ?? "");
-  if (!Number.isFinite(raw) || raw <= 0) return 15;
-  return Math.min(30, Math.max(1, Math.trunc(raw)));
+  if (!Number.isFinite(raw) || raw <= 0) return 30;
+  return Math.min(60, Math.max(1, Math.trunc(raw)));
 }
 
 export function runWallClockMs(

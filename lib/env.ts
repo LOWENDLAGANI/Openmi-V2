@@ -378,7 +378,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "How long one web-agent run may execute",
-    hint: "Defaults to 15, clamped to 1..30; the loop and the sandbox share the ceiling",
+    hint: "Defaults to 30, clamped to 1..60; the loop and the sandbox share the ceiling",
   },
   {
     key: "RUN_WORKER_CONCURRENCY",
@@ -415,7 +415,7 @@ export const ENV_SPEC: EnvSpec[] = [
     scope: "server",
     required: false,
     unlocks: "When a run's sandbox pauses (compute released, disk kept)",
-    hint: "Defaults to 15, clamped to 1..60; the run's own wall clock is the same 15 minutes",
+    hint: "Defaults to 30, clamped to 1..60; the run's own wall clock is the same 30 minutes",
   },
   {
     key: "RUN_SANDBOX_TTL_HOURS",

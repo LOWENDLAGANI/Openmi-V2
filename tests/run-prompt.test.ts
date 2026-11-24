@@ -85,6 +85,11 @@ test("the rules the retired prompt carried are in the live one", () => {
 
   // The sandbox holds no credential and nothing in it can push.
   expect(prompt).toContain("no GitHub token");
+
+  // Stuck tests stop after 3 attempts and hand code back to the user.
+  expect(prompt).toContain("3 times");
+  expect(prompt).toContain("hand the current code back to the user");
+  expect(prompt).toContain("ask for their next instructions");
 });
 
 test("the workspace is described as persistent only when it is", () => {

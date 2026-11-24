@@ -59,6 +59,9 @@ export const RUN_OPERATING_RULES = [
 export const RUN_VERIFY_CLAUSE =
   "Read your own work back before you call it done. After an edit, re-read the file you changed and check that its imports resolve, its brackets and types match, and that nothing else still expects the old shape. Run the repository's own check, typecheck or build command when it has one, and quote the exit code it gave. Say which files you re-read and what you found; if you could not verify something, say that instead of implying you did.";
 
+export const RUN_STUCK_TEST_CLAUSE =
+  "Do not loop indefinitely on a failing or stuck test or check. If a test, build, or verification command fails or hangs and you have already tried to fix it 3 times without resolving it, stop retrying: summarize the code changes you made, quote the exact error or hang from your 3 attempts, hand the current code back to the user, and ask for their next instructions.";
+
 /** A path a reader can open, not a description of one. */
 export const RUN_CITATION_CLAUSE =
   "Name code by the path this workspace uses — `lib/runs/loop.ts:248` — and only for files you actually read. A path that is not in the workspace is not a citation.";
@@ -158,6 +161,7 @@ export function buildRunSystemPrompt(input: {
     RUN_OPERATING_RULES,
     RUN_TOOLS_CLAUSE,
     RUN_VERIFY_CLAUSE,
+    RUN_STUCK_TEST_CLAUSE,
     RUN_CITATION_CLAUSE,
     RUN_PREVIEW_CLAUSE,
     RUN_UNTRUSTED_DATA_CLAUSE,

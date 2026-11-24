@@ -2,6 +2,11 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.7] - 2026-11-24 — 30-minute run limit & 3-attempt stuck-test handoff
+
+- Increased the default run wall-clock limit and run sandbox idle timeout from 15 minutes to 30 minutes (with `RUN_MAX_MINUTES` configurable up to 60 minutes) and raised the `ChatPanel` SSE stream continuation window cap from 24 to 75 to cover full long runs.
+- Added `RUN_STUCK_TEST_CLAUSE` to the agent system prompt so if a test, build, or verification command stays stuck or failing after 3 fix attempts, the agent stops looping, hands the current code back to the user with the error details, and asks for next instructions.
+
 ## [2.0.6] - 2026-11-24 — True task kill on Stop & stuck-run recovery
 
 - Added live cancellation polling (`RUN_CANCEL_POLL_MS`) and a per-run `AbortController` in `executeRun` so clicking Stop immediately aborts in-flight LLM streams without falling back across providers and preserves streamed partial text.

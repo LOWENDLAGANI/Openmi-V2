@@ -12,10 +12,19 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.6";
+export const APP_VERSION = "2.0.7";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.7",
+    date: "2026-11-24",
+    title: "30-minute run limit & 3-attempt stuck-test handoff",
+    changes: [
+      "Increased the default run wall-clock limit and run sandbox idle timeout from 15 minutes to 30 minutes (with RUN_MAX_MINUTES configurable up to 60 minutes) and raised the ChatPanel SSE stream continuation window cap from 24 to 75 to cover full long runs.",
+      "Added RUN_STUCK_TEST_CLAUSE to the agent system prompt so if a test, build, or verification command stays stuck or failing after 3 fix attempts, the agent stops looping, hands the current code back to the user with the error details, and asks for next instructions.",
+    ],
+  },
   {
     version: "2.0.6",
     date: "2026-11-24",

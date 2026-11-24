@@ -1026,9 +1026,9 @@ export function ChatPanel({
 
       // A window that ended with a token is not a stopped turn: the next one
       // takes the answer on from exactly here, so its text stays live instead of
-      // being committed with a "stopped" note around it. Twenty-four 50s windows
-      // cover the full 15-minute run wall clock with headroom.
-      resuming = pausedToken !== null && continuedRef.current < 24;
+      // being committed with a "stopped" note around it. Seventy-five 50s windows
+      // cover up to a 60-minute run wall clock with headroom.
+      resuming = pausedToken !== null && continuedRef.current < 75;
 
       // The stream can end without the turn ending (e.g. mobile network drop or
       // host timeout). A turn the server accepted is still running in the

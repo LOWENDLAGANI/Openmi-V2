@@ -74,11 +74,11 @@ describe("run limits", () => {
     expect(RUN_PROGRESS_EVENTS).toBe(600);
   });
 
-  test("a mis-set minute value cannot buy an hour", () => {
-    expect(runMaxMinutes({})).toBe(15);
-    expect(runMaxMinutes({ RUN_MAX_MINUTES: "99" })).toBe(30);
-    expect(runMaxMinutes({ RUN_MAX_MINUTES: "0" })).toBe(15);
-    expect(runMaxMinutes({ RUN_MAX_MINUTES: "nonsense" })).toBe(15);
+  test("a mis-set minute value is clamped to the 1..60 ceiling", () => {
+    expect(runMaxMinutes({})).toBe(30);
+    expect(runMaxMinutes({ RUN_MAX_MINUTES: "99" })).toBe(60);
+    expect(runMaxMinutes({ RUN_MAX_MINUTES: "0" })).toBe(30);
+    expect(runMaxMinutes({ RUN_MAX_MINUTES: "nonsense" })).toBe(30);
     expect(runMaxMinutes({ RUN_MAX_MINUTES: "10" })).toBe(10);
   });
 
@@ -136,11 +136,11 @@ describe("run limits", () => {
 });
 
 describe("workspace lifetime", () => {
-  test("a run's sandbox pauses at fifteen minutes and lives for forty-eight hours", () => {
-    expect(runSandboxIdleMinutes({})).toBe(15);
+  test("a run's sandbox pauses at thirty minutes and lives for forty-eight hours", () => {
+    expect(runSandboxIdleMinutes({})).toBe(30);
     expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "99" })).toBe(60);
-    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "0" })).toBe(15);
-    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "nonsense" })).toBe(15);
+    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "0" })).toBe(30);
+    expect(runSandboxIdleMinutes({ RUN_SANDBOX_IDLE_MINUTES: "nonsense" })).toBe(30);
 
     expect(runSandboxTtlHours({})).toBe(48);
     expect(runSandboxTtlHours({ RUN_SANDBOX_TTL_HOURS: "999" })).toBe(168);
