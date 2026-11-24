@@ -216,10 +216,42 @@ export function runCostUsd(inputTokens: number, outputTokens: number): number {
   return Math.round(cost * 1_000_000) / 1_000_000;
 }
 
+/**
+ * The next midnight UTC: when the daily run and token budgets start over.
+ *
+ * The limits are counted per UTC day, so the reset is a fixed instant rather
+ * than "a day after the first run". The refusal quotes this instead of making
+ * the reader work out the remaining hours themselves.
+ */
+export function dailyBudgetResetAt(now: number = Date.now()): number {
+  const at = new Date(now);
+  return Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1);
+}
+
+/** "4h 12m", "37m" or "less than a minute": a duration, not a timestamp. */
+export function formatResetIn(ms: number): string {
+  const minutes = Math.max(0, Math.ceil(ms / 60_000));
+  if (minutes <= 1) return "less than a minute";
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+
+  if (hours === 0) return `${rest}m`;
+  if (rest === 0) return `${hours}h`;
+  return `${hours}h ${rest}m`;
+}
+
+/** The tail of a daily-budget refusal: when the budget is available again. */
+export function dailyResetNote(now: number = Date.now()): string {
+  return `It resets in ${formatResetIn(dailyBudgetResetAt(now) - now)} (at midnight UTC).`;
+}
+
 export type RunQuotaInput = {
   active: number;
   runsToday: number;
   tokensToday: number;
+  /** Test seam: the clock the reset countdown is measured from. */
+  now?: number;
 };
 
 export type RunQuotaDecision =
@@ -246,11 +278,15 @@ export function checkRunQuota(input: RunQuotaInput): RunQuotaDecision {
     };
   }
 
+  // One reading of the clock for both refusals, so a message cannot quote a
+  // countdown measured twice.
+  const reset = dailyResetNote(input.now);
+
   if (input.runsToday >= RUN_DAILY_RUNS) {
     return {
       allowed: false,
       code: "daily-runs",
-      message: `This account has used all ${RUN_DAILY_RUNS} runs for today. The budget resets at midnight UTC.`,
+      message: `This account has used all ${RUN_DAILY_RUNS} runs for today. ${reset}`,
     };
   }
 
@@ -258,7 +294,7 @@ export function checkRunQuota(input: RunQuotaInput): RunQuotaDecision {
     return {
       allowed: false,
       code: "daily-tokens",
-      message: `This account has used its ${RUN_DAILY_TOKENS.toLocaleString()}-token budget for today. The budget resets at midnight UTC.`,
+      message: `This account has used its ${RUN_DAILY_TOKENS.toLocaleString()}-token budget for today. ${reset}`,
     };
   }
 

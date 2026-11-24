@@ -17,6 +17,9 @@ import {
   RUN_WAKE_TIMEOUT_MS,
   checkRunQuota,
   compactMessages,
+  dailyBudgetResetAt,
+  dailyResetNote,
+  formatResetIn,
   estimateTokens,
   runCostUsd,
   runMaxMinutes,
@@ -226,6 +229,37 @@ describe("run quota", () => {
   test("inside every limit a run is allowed", () => {
     expect(checkRunQuota({ active: 0, runsToday: 5, tokensToday: 1_000 }).allowed).toBe(
       true
+    );
+  });
+
+  test("the daily token refusal says when the budget comes back", () => {
+    // 18:30 UTC: five and a half hours of the UTC day are left.
+    const now = Date.UTC(2026, 0, 1, 18, 30);
+    const decision = checkRunQuota({
+      active: 0,
+      runsToday: 1,
+      tokensToday: RUN_DAILY_TOKENS,
+      now,
+    });
+
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) {
+      expect(decision.message).toContain("resets in 5h 30m");
+      expect(decision.message).toContain("midnight UTC");
+    }
+  });
+
+  test("the reset is the next midnight UTC, counted in readable units", () => {
+    expect(dailyBudgetResetAt(Date.UTC(2026, 0, 1, 18, 30))).toBe(
+      Date.UTC(2026, 0, 2, 0, 0)
+    );
+
+    expect(formatResetIn(5.5 * 3_600_000)).toBe("5h 30m");
+    expect(formatResetIn(2 * 3_600_000)).toBe("2h");
+    expect(formatResetIn(37 * 60_000)).toBe("37m");
+    expect(formatResetIn(30_000)).toBe("less than a minute");
+    expect(dailyResetNote(Date.UTC(2026, 0, 1, 23, 59))).toBe(
+      "It resets in less than a minute (at midnight UTC)."
     );
   });
 });
