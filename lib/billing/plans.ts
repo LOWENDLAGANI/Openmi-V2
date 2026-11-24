@@ -34,14 +34,14 @@ export const PLANS: readonly Plan[] = [
     id: "pass-15",
     name: "15-day pass",
     price: 18,
-    credit: 30,
+    credit: 2,
     days: 15,
   },
   {
     id: "pass-30",
     name: "30-day pass",
     price: 36,
-    credit: 70,
+    credit: 3,
     days: 30,
   },
 ];
