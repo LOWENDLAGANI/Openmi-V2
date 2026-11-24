@@ -413,9 +413,10 @@ async function exec(
   sandbox: SandboxHandle,
   command: string,
   cwd: string,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ) {
-  return sandbox.exec(command, cwd, timeoutMs);
+  return sandbox.exec(command, cwd, timeoutMs, signal);
 }
 
 const PUBLISH_KINDS: readonly PublishDestination["kind"][] = [
@@ -813,9 +814,12 @@ export async function executeRunTool(input: {
   sandbox: SandboxHandle;
   /** The reader's GitHub connection, when this run has one. Never given to the sandbox. */
   github?: RunGithubContext | null;
+  /** Aborts in-flight sandbox commands when the run is cancelled or the worker shuts down. */
+  signal?: AbortSignal;
 }): Promise<RunToolResult> {
-  const { name, args, sandbox, github } = input;
+  const { name, args, sandbox, github, signal } = input;
 
+  if (signal?.aborted) return failure("Cancelled.");
   if (!isRunTool(name)) return failure(`unknown tool: ${name}`);
   if (args === null) return failure("bad-input: arguments were not a JSON object");
 
@@ -880,7 +884,8 @@ export async function executeRunTool(input: {
       sandbox,
       `git ls-files${target} | head -n ${RUN_LIST_MAX + 1}`,
       RUN_WORKDIR,
-      30_000
+      30_000,
+      signal
     );
 
     if (listed.exitCode !== 0) {
@@ -959,7 +964,8 @@ export async function executeRunTool(input: {
         sandbox,
         `mkdir -p ${shellQuote(directory)}`,
         RUN_WORKDIR,
-        30_000
+        30_000,
+        signal
       );
 
       if (made.exitCode !== 0) {
@@ -1043,7 +1049,8 @@ export async function executeRunTool(input: {
       sandbox,
       `rg -n --no-heading --max-count ${RUN_SEARCH_MAX_HITS} -F ${shellQuote(query)}${target}`,
       RUN_WORKDIR,
-      60_000
+      60_000,
+      signal
     );
 
     // rg exits 1 for "nothing matched", which is an answer, and 127 for "not
@@ -1312,7 +1319,7 @@ export async function executeRunTool(input: {
   const cwd = directory.length > 0 ? `${RUN_WORKDIR}/${directory}` : RUN_WORKDIR;
 
   const startedAt = Date.now();
-  const result = await exec(sandbox, command, cwd, timeoutMs);
+  const result = await exec(sandbox, command, cwd, timeoutMs, signal);
   const output = tailBytes(result.output, RUN_TOOL_OUTPUT_BYTES);
 
   const status = `exit ${result.exitCode}${result.timedOut ? " (timed out)" : ""} in ${
@@ -1336,14 +1343,20 @@ export async function executeRunTool(input: {
 /** The list a prompt may show the reader: workspace paths, capped. */
 export async function listWorkspaceFiles(
   sandbox: SandboxHandle,
-  maxPaths = RUN_LIST_MAX
+  maxPaths = RUN_LIST_MAX,
+  signal?: AbortSignal
 ): Promise<string[]> {
+  if (signal?.aborted) return [];
+
   const listed = await exec(
     sandbox,
     `git ls-files | head -n ${maxPaths}`,
     RUN_WORKDIR,
-    30_000
+    30_000,
+    signal
   );
+
+  if (signal?.aborted) return [];
 
   if (listed.exitCode === 0 && listed.output.trim().length > 0) {
     return listed.output.trim().split("\n").slice(0, maxPaths);
@@ -1353,7 +1366,8 @@ export async function listWorkspaceFiles(
     sandbox,
     `find . -type f -not -path './.git/*' -not -path './node_modules/*' | sed 's|^\\./||' | head -n ${maxPaths}`,
     RUN_WORKDIR,
-    30_000
+    30_000,
+    signal
   );
 
   return fallback.exitCode === 0

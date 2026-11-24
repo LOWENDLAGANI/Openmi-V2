@@ -256,7 +256,12 @@ export function ChatPanel({
   // is live — on a reload, or on the refresh after a dropped stream — polling
   // has to resume, or the answer would arrive with nobody watching for it.
   useEffect(() => {
-    if (initialRunning) setBackgroundRunning(true);
+    if (initialRunning) {
+      if (!stoppedRef.current) setBackgroundRunning(true);
+    } else {
+      setBackgroundRunning(false);
+      stoppedRef.current = false;
+    }
   }, [initialRunning]);
 
   useEffect(() => {
@@ -284,6 +289,10 @@ export function ChatPanel({
     content: string;
     chatId: string | null;
     /** What the server said, so a model lock and a chat lock read apart. */
+    message: string;
+  } | null>(null);
+  const [activeRunConflict, setActiveRunConflict] = useState<{
+    content: string;
     message: string;
   } | null>(null);
 
@@ -530,6 +539,32 @@ export function ChatPanel({
     await send(pendingChoose.content);
   }
 
+  async function stopActiveRunAndRetry(content?: string) {
+    try {
+      await fetch("/api/chat/stop", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chatId: activeChatId ?? undefined,
+          all: true,
+        }),
+      });
+    } catch {
+      // The retry below is the source of truth if the stop request failed.
+    }
+
+    setActiveRunConflict(null);
+    setBackgroundRunning(false);
+    setStopping(false);
+    setError(null);
+
+    if (content) {
+      await send(content);
+    } else {
+      router.refresh();
+    }
+  }
+
   /**
    * Sends a message, or continues the window of a turn already running.
    *
@@ -573,6 +608,7 @@ export function ChatPanel({
       stopTimerRef.current = null;
     }
     setError(null);
+    setActiveRunConflict(null);
     setPending(resume?.text ?? "");
     setThinking(resume?.thinking ?? "");
     setSteps(resume?.steps ? [...resume.steps] : []);
@@ -671,21 +707,31 @@ export function ChatPanel({
         signal: controller.signal,
       });
 
-      if (!response.ok || !response.body) {        const payload = (await response.json().catch(() => null)) as
+      if (!response.ok || !response.body) {
+        const payload = (await response.json().catch(() => null)) as
           | { error?: string; code?: string; activeChatId?: string | null }
           | null;
-
-        setError(payload?.error ?? `The request failed (${response.status}).`);
 
         // A running hour is not a failure to retry blindly; the server names the
         // chat that holds it, and the reader decides between continuing there
         // and ending it.
         if (payload?.code === "hour-active") {
+          setError(payload?.error ?? `The request failed (${response.status}).`);
           setConflict({
             content,
             chatId: payload.activeChatId ?? null,
             message: payload?.error ?? "An hour of chat is already running.",
           });
+        } else if (payload?.code === "concurrency") {
+          setError(null);
+          setActiveRunConflict({
+            content,
+            message:
+              payload?.error ??
+              "You already have a run in progress. Wait for it to finish, or stop it first.",
+          });
+        } else {
+          setError(payload?.error ?? `The request failed (${response.status}).`);
         }
 
         if (optimisticId) {
@@ -1063,46 +1109,67 @@ export function ChatPanel({
     const wasStreaming = streaming;
     stoppedRef.current = true;
     setStopping(true);
-    setBackgroundRunning(false);
 
-    // Ask the server to stop first, and keep the stream open.
-    //
-    // Aborting this fetch only ends this view; the turn is deliberately not tied
-    // to it. Aborting immediately is what used to discard the part of the
-    // answer already on screen: the runner writes its final "done" after it
-    // sees the stop flag, and that event never reached a closed stream. The
-    // runner polls once every two seconds, so the wait is short.
-    if (activeChatId) {
-      void fetch("/api/chat/stop", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chatId: activeChatId }),
-      })
-        .then((response) => {
-          if (!response.ok) abortRef.current?.abort();
-        })
-        .catch(() => {
-          // No server to stop, so end this view rather than hang on it.
-          abortRef.current?.abort();
-        })
-        .finally(() => {
-          if (!wasStreaming) {
-            setStopping(false);
-            router.refresh();
-          }
-        });
-    } else {
-      abortRef.current?.abort();
-      if (!wasStreaming) setStopping(false);
-    }
+    const chatToStop = activeChatId ?? createdChatRef.current ?? undefined;
 
-    // Backstop: if no final event arrives, close the stream and keep the text.
     if (wasStreaming) {
       stopTimerRef.current = window.setTimeout(() => {
         stopTimerRef.current = null;
         abortRef.current?.abort();
-      }, 8_000);
+      }, 4_500);
     }
+
+    void fetch("/api/chat/stop", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chatId: chatToStop,
+        all: !chatToStop,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          if (wasStreaming) {
+            abortRef.current?.abort();
+          } else {
+            const payload = (await response.json().catch(() => null)) as
+              | { error?: string }
+              | null;
+            setError(payload?.error ?? "Could not stop the running task.");
+            setBackgroundRunning(false);
+            setStopping(false);
+          }
+          return;
+        }
+
+        if (wasStreaming) {
+          // Give the open SSE stream a brief window to deliver the worker's
+          // final `done` event before closing the view.
+          if (stopTimerRef.current) window.clearTimeout(stopTimerRef.current);
+          stopTimerRef.current = window.setTimeout(() => {
+            stopTimerRef.current = null;
+            abortRef.current?.abort();
+          }, 350);
+          return;
+        }
+
+        setBackgroundRunning(false);
+        setStopping(false);
+        setError(null);
+        setSteps([]);
+        setPending("");
+        setThinking("");
+        router.refresh();
+      })
+      .catch(() => {
+        if (wasStreaming) {
+          abortRef.current?.abort();
+        } else {
+          setError("Could not reach the server to stop the task.");
+          setBackgroundRunning(false);
+          setStopping(false);
+        }
+      });
   }
 
   function retry() {
@@ -1360,6 +1427,40 @@ export function ChatPanel({
             <button
               type="button"
               onClick={() => setConflict(null)}
+              className="text-[11.5px] underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeRunConflict && (
+        <div
+          role="alert"
+          className="mb-2 space-y-2 rounded-xl border border-warn/30 bg-warn/8 px-4 py-3 text-[12px] text-warn"
+        >
+          <p className="break-words leading-relaxed">{activeRunConflict.message}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <PendingButton
+              onAction={() => stopActiveRunAndRetry(activeRunConflict.content)}
+              disabled={streaming}
+              pendingText="Stopping…"
+              className="rounded-lg border border-warn/40 px-2.5 py-1 text-[11.5px] font-medium hover:opacity-90"
+            >
+              Stop running task &amp; retry
+            </PendingButton>
+            <PendingButton
+              onAction={() => stopActiveRunAndRetry()}
+              disabled={streaming}
+              pendingText="Stopping…"
+              className="rounded-lg border border-warn/40 px-2.5 py-1 text-[11.5px] font-medium hover:opacity-90"
+            >
+              Stop task only
+            </PendingButton>
+            <button
+              type="button"
+              onClick={() => setActiveRunConflict(null)}
               className="text-[11.5px] underline-offset-2 hover:underline"
             >
               Dismiss

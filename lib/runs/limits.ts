@@ -97,6 +97,8 @@ export const RUN_COST_PER_OUTPUT_TOKEN_USD = 0.6 / 1_000_000;
 /** SSE behaviour: a heartbeat keeps proxies from closing an idle stream. */
 export const RUN_STREAM_HEARTBEAT_MS = 15_000;
 export const RUN_STREAM_POLL_MS = 400;
+/** How often the worker checks whether a running run was cancelled. */
+export const RUN_CANCEL_POLL_MS = 1_000;
 /** A stream closes here and the client reconnects with Last-Event-ID. */
 export const RUN_STREAM_MAX_MS = 10 * 60_000;
 

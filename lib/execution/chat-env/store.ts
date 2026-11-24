@@ -189,9 +189,14 @@ export async function claimChatSandbox(
 /** Ends a turn's hold without destroying the disk. */
 export async function releaseChatSandboxRow(
   admin: Admin,
-  input: { id: string; lastActiveAt: string; deleteAfter: string }
+  input: {
+    id: string;
+    lastActiveAt: string;
+    deleteAfter: string;
+    expectedLeaseUntil?: string | null;
+  }
 ): Promise<void> {
-  await updateChatSandbox(admin, input.id, {
+  const patch: ChatSandboxPatch = {
     state: "running",
     last_active_at: input.lastActiveAt,
     delete_after: input.deleteAfter,
@@ -199,7 +204,18 @@ export async function releaseChatSandboxRow(
     stopped_at: null,
     failure_code: null,
     failure_detail: null,
-  });
+  };
+
+  if (input.expectedLeaseUntil) {
+    await admin
+      .from("chat_sandboxes")
+      .update(patch)
+      .eq("id", input.id)
+      .eq("lease_until", input.expectedLeaseUntil);
+    return;
+  }
+
+  await updateChatSandbox(admin, input.id, patch);
 }
 
 export async function markChatSandboxFailed(

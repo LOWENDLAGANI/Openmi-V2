@@ -248,7 +248,12 @@ function normalizeState(value: unknown): SandboxState {
 
 export type SandboxHandle = {
   id: string;
-  exec: (command: string, cwd?: string, timeoutMs?: number) => Promise<ExecResult>;
+  exec: (
+    command: string,
+    cwd?: string,
+    timeoutMs?: number,
+    signal?: AbortSignal
+  ) => Promise<ExecResult>;
   upload: (bytes: Buffer, remotePath: string) => Promise<void>;
   /** Reads a workspace file for a repair pass or a mission's diff. */
   readText: (remotePath: string, maxBytes?: number) => Promise<string>;
@@ -382,9 +387,20 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
     get trafficToken() {
       return current.trafficAccessToken ?? null;
     },
-    async exec(command, cwd, timeoutMs) {
+    async exec(command, cwd, timeoutMs, signal) {
       const startedAt = Date.now();
       const limitMs = Math.max(5_000, timeoutMs ?? EXEC_STEP_TIMEOUT_MS);
+
+      const cancelled = (): ExecResult => ({
+        command,
+        exitCode: 137,
+        output: "Command cancelled.",
+        truncated: false,
+        durationMs: Date.now() - startedAt,
+        timedOut: false,
+      });
+
+      if (signal?.aborted) return cancelled();
 
       const result = (exitCode: number, stdout: string, stderr: string): ExecResult => {
         const tail = tailOf(combined(stdout, stderr));
@@ -403,13 +419,59 @@ function handleFor(initial: Sandbox, id: string): SandboxHandle {
       // send `a && b` chains. No `bash -c` wrapper: the image is ours to pick
       // and the shell is the platform's.
       try {
-        const response = await current.commands.run(command, {
+        if (!signal) {
+          const response = await current.commands.run(command, {
+            cwd: absolutePath(cwd ?? EXEC_WORKDIR),
+            timeoutMs: limitMs,
+          });
+
+          return result(response.exitCode, response.stdout ?? "", response.stderr ?? "");
+        }
+
+        const handle = await current.commands.run(command, {
           cwd: absolutePath(cwd ?? EXEC_WORKDIR),
           timeoutMs: limitMs,
+          background: true,
+          signal,
         });
 
-        return result(response.exitCode, response.stdout ?? "", response.stderr ?? "");
+        let onAbort: (() => void) | null = null;
+        const abortPromise = new Promise<"aborted">((resolve) => {
+          const trigger = () => {
+            void Promise.race([
+              handle.kill().catch(() => false),
+              new Promise<void>((done) => setTimeout(done, 1_500)),
+            ]).finally(() => {
+              void handle.disconnect().catch(() => {});
+              resolve("aborted");
+            });
+          };
+
+          if (signal.aborted) {
+            trigger();
+            return;
+          }
+
+          onAbort = trigger;
+          signal.addEventListener("abort", trigger, { once: true });
+        });
+
+        const waitPromise = handle.wait();
+        waitPromise.catch(() => {});
+
+        let outcome: Awaited<ReturnType<typeof handle.wait>> | "aborted";
+        try {
+          outcome = await Promise.race([waitPromise, abortPromise]);
+        } finally {
+          if (onAbort) signal.removeEventListener("abort", onAbort);
+        }
+
+        if (outcome === "aborted" || signal.aborted) return cancelled();
+
+        return result(outcome.exitCode, outcome.stdout ?? "", outcome.stderr ?? "");
       } catch (caught) {
+        if (signal?.aborted) return cancelled();
+
         // A non-zero exit is information, not a provider failure: the card and
         // the model both need the code and the output, not an exception.
         if (caught instanceof CommandExitError) {

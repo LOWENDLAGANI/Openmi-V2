@@ -2,6 +2,14 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.6] - 2026-11-24 — True task kill on Stop & stuck-run recovery
+
+- Added live cancellation polling (`RUN_CANCEL_POLL_MS`) and a per-run `AbortController` in `executeRun` so clicking Stop immediately aborts in-flight LLM streams without falling back across providers and preserves streamed partial text.
+- Made `SandboxHandle.exec` abortable using background execution and `handle.kill()` (`SIGKILL`) so active sandbox commands terminate right away on Stop while keeping the chat workspace disk intact.
+- Added `forceCancelRun` and `killRun` in `lib/runs/store.ts` and wired them into `POST /api/chat/stop` and `POST /api/runs/[id]/cancel` so hung or unresponsive runs are force-settled to `cancelled`, clear `chat_sandboxes` leases, emit `run.finished`, and refund empty turns.
+- Guarded `chat_sandboxes` lease renewal/release and worker finalization against zombie-worker races after force-cancellation.
+- Fixed the Composer Stop button in `ChatPanel` to keep its stopping state until termination confirms, support stopping draft/any active runs, and offer a one-click "Stop running task & retry" recovery action on concurrency conflicts.
+
 ## [2.0.5] - 2026-11-24 — Fresh branch HEAD resolution & automatic clean workspace sync
 
 - Always resolve the remote branch's live `HEAD` on GitHub when creating a new chat in `POST /api/chat` instead of trusting a stale client-supplied SHA inherited from an older conversation.

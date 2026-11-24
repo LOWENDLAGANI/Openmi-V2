@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isSameOrigin } from "@/lib/http/origin";
-import { readRunForReader, requestRunCancel } from "@/lib/runs/store";
+import { killRun, readRunForReader } from "@/lib/runs/store";
 import { getSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -9,11 +9,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Cancellation is a flag, not a kill.
+ * Cancels and terminates a live run.
  *
- * The worker reads it at each step boundary and lets the tool in flight finish,
- * so an edit is never half-applied. The row is read through the reader's own
- * client first — a run that is not theirs is a 404, not a 403 with a hint.
+ * Sets `cancel_requested = true` so the worker aborts its in-flight LLM stream
+ * and kills any running sandbox command immediately, and force-settles the row
+ * if the worker does not respond within the grace window.
  */
 export async function POST(
   request: Request,
@@ -61,16 +61,15 @@ export async function POST(
     );
   }
 
-  const cancelled = await requestRunCancel(admin, id, session.user.id);
+  const result = await killRun(admin, id, session.user.id);
 
   return NextResponse.json(
     {
-      cancelled,
-      status: cancelled ? "cancelled" : run.status,
-      // The row keeps saying `running` until the worker reaches its next
-      // boundary; the UI shows "cancelling" rather than pretending it stopped.
-      message: cancelled
-        ? "Cancellation requested. The current tool call is allowed to finish."
+      cancelled: result.cancelled,
+      forced: result.forced,
+      status: result.status ?? run.status,
+      message: result.cancelled
+        ? "Run stopped."
         : "The run is no longer running.",
     },
     { headers: { "cache-control": "no-store" } }

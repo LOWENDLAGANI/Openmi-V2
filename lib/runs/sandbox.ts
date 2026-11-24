@@ -201,6 +201,8 @@ async function openChatWorkspace(
   // they are not this turn's change.
   await markTurnBase(opened.handle, input.runId).catch(() => {});
 
+  let activeLease: string | null = opened.row.leaseUntil;
+
   return {
     ok: true,
     sandbox: opened.handle,
@@ -212,10 +214,18 @@ async function openChatWorkspace(
         admin,
         rowId: opened.row.id,
         handle: opened.handle,
+        expectedLeaseUntil: activeLease,
       });
     },
     renew: async () => {
-      await renewChatSandboxLease({ admin, rowId: opened.row.id });
+      await renewChatSandboxLease({
+        admin,
+        rowId: opened.row.id,
+        expectedLeaseUntil: activeLease,
+        onLease: (next) => {
+          activeLease = next;
+        },
+      });
     },
   };
 }

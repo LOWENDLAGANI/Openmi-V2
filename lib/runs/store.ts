@@ -236,14 +236,15 @@ export async function updateRun(
     onlyWhileQueued?: boolean;
     workerId?: string;
   } = {}
-): Promise<void> {
+): Promise<boolean> {
   let query = admin.from("runs").update(patch).eq("id", runId);
 
   if (options.onlyWhileRunning) query = query.eq("status", "running");
   if (options.onlyWhileQueued) query = query.eq("status", "queued");
   if (options.workerId) query = query.eq("worker_id", options.workerId);
 
-  await query;
+  const { data, error } = await query.select("id");
+  return !error && Array.isArray(data) && data.length > 0;
 }
 
 /** Refreshes the lease. False means this worker no longer owns the run. */
@@ -477,6 +478,207 @@ export async function requestRunCancel(
   });
 
   return !error && data === true;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Finds the owner's latest active (`queued` or `running`) run. */
+export async function findActiveRunForOwner(
+  admin: Client,
+  owner: string,
+  options: { chatId?: string | null; fallbackToAny?: boolean } = {}
+): Promise<RunRow | null> {
+  const chatId = typeof options.chatId === "string" ? options.chatId : "";
+
+  if (chatId.length > 0) {
+    const { data, error } = await admin
+      .from("runs")
+      .select(RUN_COLUMNS)
+      .eq("owner", owner)
+      .eq("chat_id", chatId)
+      .in("status", ["queued", "running"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      return normalizeRun(data as Record<string, unknown>);
+    }
+
+    if (!options.fallbackToAny) return null;
+  }
+
+  const { data, error } = await admin
+    .from("runs")
+    .select(RUN_COLUMNS)
+    .eq("owner", owner)
+    .in("status", ["queued", "running"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return normalizeRun(data as Record<string, unknown>);
+}
+
+/** Force-settles a queued or running run as cancelled so the owner lock releases immediately. */
+export async function forceCancelRun(
+  admin: Client,
+  runId: string,
+  owner: string
+): Promise<RunRow | null> {
+  const { data, error } = await admin
+    .from("runs")
+    .update({
+      cancel_requested: true,
+      status: "cancelled",
+      stop_reason: "user",
+      ended_at: new Date().toISOString(),
+    })
+    .eq("id", runId)
+    .eq("owner", owner)
+    .in("status", ["queued", "running"])
+    .select(RUN_COLUMNS)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return normalizeRun(data as Record<string, unknown>);
+}
+
+async function clearRunSandboxLease(
+  admin: Client,
+  owner: string,
+  chatId: string | null
+): Promise<void> {
+  if (!chatId) return;
+  try {
+    await admin
+      .from("chat_sandboxes")
+      .update({ lease_until: null })
+      .eq("chat_id", chatId)
+      .eq("owner", owner);
+  } catch {
+    // Best effort: the short workspace lease also expires on its own.
+  }
+}
+
+async function refundCancelledRunIfEmpty(
+  admin: Client,
+  owner: string,
+  run: RunRow
+): Promise<void> {
+  if (!run.chat_id || !run.credit_session_id) return;
+
+  try {
+    const { data } = await admin
+      .from("run_events")
+      .select("seq")
+      .eq("run_id", run.id)
+      .eq("kind", "message.delta")
+      .limit(1);
+
+    if (Array.isArray(data) && data.length > 0) return;
+
+    await admin.rpc("try_refund_hour_session", {
+      p_owner: owner,
+      p_session_id: run.credit_session_id,
+      p_reason: "the turn was stopped before it answered",
+    });
+  } catch {
+    // Best effort: an expired or already-refunded hour reports false.
+  }
+}
+
+/**
+ * Requests cancellation and guarantees the run leaves `queued`/`running`.
+ *
+ * Waits briefly for the worker to abort cleanly and write partial output; if
+ * the worker is hung or unresponsive after the grace window, force-settles the
+ * row to `cancelled`, clears any sandbox lease, emits `run.finished`, and
+ * refunds an unused hour so the account is never locked out.
+ */
+export async function killRun(
+  admin: Client,
+  runId: string,
+  owner: string,
+  options: { graceMs?: number; pollMs?: number } = {}
+): Promise<{
+  cancelled: boolean;
+  forced: boolean;
+  status: RunStatus | null;
+  run: RunRow | null;
+}> {
+  const graceMs = Math.max(0, options.graceMs ?? 2_500);
+  const pollMs = Math.max(25, options.pollMs ?? 200);
+
+  await requestRunCancel(admin, runId, owner).catch(() => false);
+
+  let fresh = await readRun(admin, runId).catch(() => null);
+  if (!fresh || fresh.owner !== owner) {
+    return { cancelled: false, forced: false, status: null, run: null };
+  }
+
+  if (isTerminalStatus(fresh.status)) {
+    if (fresh.status === "cancelled" && fresh.last_event_seq === 0) {
+      await appendEvent(admin, runId, "run.finished", {
+        stopReason: fresh.stop_reason ?? "user",
+        status: "cancelled",
+      }).catch(() => null);
+      await refundCancelledRunIfEmpty(admin, owner, fresh);
+    }
+
+    return {
+      cancelled: fresh.status === "cancelled",
+      forced: false,
+      status: fresh.status,
+      run: fresh,
+    };
+  }
+
+  const deadline = Date.now() + graceMs;
+  while (Date.now() < deadline) {
+    await sleep(Math.min(pollMs, Math.max(1, deadline - Date.now())));
+    fresh = await readRun(admin, runId).catch(() => null);
+    if (!fresh) {
+      return { cancelled: false, forced: false, status: null, run: null };
+    }
+    if (isTerminalStatus(fresh.status)) {
+      return {
+        cancelled: fresh.status === "cancelled",
+        forced: false,
+        status: fresh.status,
+        run: fresh,
+      };
+    }
+  }
+
+  const forced = await forceCancelRun(admin, runId, owner);
+  if (forced) {
+    await clearRunSandboxLease(admin, owner, forced.chat_id);
+    await appendEvent(admin, runId, "run.finished", {
+      stopReason: "user",
+      status: "cancelled",
+      forced: true,
+    }).catch(() => null);
+    await refundCancelledRunIfEmpty(admin, owner, forced);
+
+    return {
+      cancelled: true,
+      forced: true,
+      status: "cancelled",
+      run: forced,
+    };
+  }
+
+  const latest = await readRun(admin, runId).catch(() => null);
+  return {
+    cancelled: latest?.status === "cancelled",
+    forced: false,
+    status: latest?.status ?? null,
+    run: latest,
+  };
 }
 
 export async function readQuota(

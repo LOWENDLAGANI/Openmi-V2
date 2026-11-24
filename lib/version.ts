@@ -12,10 +12,22 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.5";
+export const APP_VERSION = "2.0.6";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.6",
+    date: "2026-11-24",
+    title: "True task kill on Stop & stuck-run recovery",
+    changes: [
+      "Added live cancellation polling (RUN_CANCEL_POLL_MS) and a per-run AbortController in executeRun so clicking Stop immediately aborts in-flight LLM streams without falling back across providers and preserves streamed partial text.",
+      "Made SandboxHandle.exec abortable using background execution and handle.kill() (SIGKILL) so active sandbox commands terminate right away on Stop while keeping the chat workspace disk intact.",
+      "Added forceCancelRun and killRun in lib/runs/store.ts and wired them into POST /api/chat/stop and POST /api/runs/[id]/cancel so hung or unresponsive runs are force-settled to cancelled, clear chat_sandboxes leases, emit run.finished, and refund empty turns.",
+      "Guarded chat_sandboxes lease renewal/release and worker finalization against zombie-worker races after force-cancellation.",
+      "Fixed the Composer Stop button in ChatPanel to keep its stopping state until termination confirms, support stopping draft/any active runs, and offer a one-click 'Stop running task & retry' recovery action on concurrency conflicts.",
+    ],
+  },
   {
     version: "2.0.5",
     date: "2026-11-24",

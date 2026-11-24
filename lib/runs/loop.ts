@@ -25,6 +25,7 @@ import { serverEnv } from "@/lib/env";
 import { collectRunArtifacts } from "./artifacts";
 import { deliverChatTurn } from "./chat";
 import {
+  RUN_CANCEL_POLL_MS,
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
   RUN_STREAM_HEARTBEAT_MS,
@@ -178,6 +179,10 @@ export async function executeRun(
 
   const startedAt = Date.now();
   const deadline = startedAt + runWallClockMs();
+  const cancelController = new AbortController();
+  const runSignal = deps.stopSignal
+    ? AbortSignal.any([cancelController.signal, deps.stopSignal])
+    : cancelController.signal;
 
   // A lease is refreshed while the loop runs so the reaper can tell a slow run
   // from a dead worker. A failed refresh means this worker lost the run, and
@@ -187,9 +192,28 @@ export async function executeRun(
   // records: a worker that stops reporting must lose the disk as well as the
   // row, or the next message waits on a lease nobody is going to renew.
   const lease = setInterval(() => {
+    if (runSignal.aborted) return;
     void heartbeat(admin, runId, run.worker_id ?? "");
     void renewWorkspace?.().catch(() => {});
   }, RUN_STREAM_HEARTBEAT_MS);
+
+  let cancelPollInFlight = false;
+  const cancelWatcher = setInterval(() => {
+    if (cancelController.signal.aborted || cancelPollInFlight) return;
+    cancelPollInFlight = true;
+    void cancelRequested(admin, runId)
+      .then((requested) => {
+        if (!requested) return;
+        cancelController.abort();
+        clearInterval(lease);
+        clearInterval(cancelWatcher);
+      })
+      .catch(() => {})
+      .finally(() => {
+        cancelPollInFlight = false;
+      });
+  }, RUN_CANCEL_POLL_MS);
+  cancelWatcher.unref?.();
 
   try {
     // The effort this turn asked for, for the one model that takes one. A row
@@ -206,505 +230,577 @@ export async function executeRun(
       ...(effort ? { effort } : {}),
     });
 
+    const isCancelledNow = async (): Promise<boolean> => {
+      if (cancelController.signal.aborted) return true;
+      if (await cancelRequested(admin, runId)) {
+        cancelController.abort();
+        clearInterval(lease);
+        clearInterval(cancelWatcher);
+        return true;
+      }
+      return false;
+    };
+
+    let cancelled = await isCancelledNow();
+
+    if (!cancelled && deps.stopSignal?.aborted) {
+      failure = "The worker restarted before this run finished. Start it again.";
+      status = "failed";
+      stopReason = "worker-shutdown";
+    }
+
     // The token is read in the worker, used once to fetch a tarball, and never
     // placed in the sandbox's environment or on a command line.
     const github =
-      run.repo_full_name && run.base_sha
+      !cancelled && !deps.stopSignal?.aborted && run.repo_full_name && run.base_sha
         ? await readToken(
             admin as unknown as Parameters<typeof readToken>[0],
             run.owner
           ).catch(() => null)
         : null;
 
-    const opened = await openRunWorkspace({
-      runId,
-      admin,
-      owner: run.owner,
-      chatId: run.chat_id,
-      repo: run.repo_full_name,
-      sha: run.base_sha,
-      token: github?.token ?? null,
-    });
-
-    if (!opened.ok) throw new Error(opened.message);
-
-    sandbox = opened.sandbox;
-    releaseWorkspace = opened.release;
-    renewWorkspace = opened.renew ?? null;
-
-    // A chat's workspace belongs to its `chat_sandboxes` row, not to this run.
-    // The run sweep lists only `kind: "run"` boxes and the chat sweep reads the
-    // row, so recording the id here would claim a disk the next message is
-    // supposed to find.
-    if (!opened.shared) {
-      await updateRun(admin, runId, { sandbox_id: sandbox.id });
-    }
-
-    // A chat turn arrives with the conversation behind it, already written to
-    // run_messages by the route. A run started without history is seeded with
-    // its prompt, so one loop serves both.
-    const seeded = await listRunMessages(admin, runId);
-
-    if (seeded.length === 0) {
-      await appendRunMessage(admin, runId, "user", { text: run.prompt }, []);
-    }
-
-    const tree = await listWorkspaceFiles(sandbox);
-    const instructions = await readProjectInstructions(sandbox);
-    const system = buildRunSystemPrompt({
-      repo: run.repo_full_name,
-      sha: run.base_sha,
-      tree,
-      instructions,
-      // The prompt says the workspace outlives this turn only when it does.
-      persistent: opened.shared,
-    });
-
-    const history: WireMessage[] =
-      seeded.length > 0
-        ? seeded.map((message) => ({ role: message.role, content: message.text }))
-        : [{ role: "user", content: run.prompt }];
-
-    const messages: WireMessage[] = [{ role: "system", content: system }, ...history];
-
-    chatToken = github?.token ?? null;
-
-    const chain =
-      run.model === AUTO_MODEL
-        ? autoChain(run.prompt)
-        : providersFor(run.model as ModelId);
-
-    if (chain.length === 0) {
-      throw new Error(
-        `No provider is configured for ${run.model}. The run cannot start.`
-      );
-    }
-
-    let deltaBuffer = "";
-    let lastFlush = 0;
-    let reasoningBuffer = "";
-    let lastReasoningFlush = 0;
-
-    const flushDeltas = async (force = false) => {
-      if (deltaBuffer.length === 0) return;
-      if (!force && deltaBuffer.length < MAX_DELTA_BUFFER && Date.now() - lastFlush < DELTA_FLUSH_MS) {
-        return;
-      }
-
-      const text = deltaBuffer;
-      deltaBuffer = "";
-      lastFlush = Date.now();
-      await appendEvent(admin, runId, "message.delta", { text });
-    };
-
-    /**
-     * Reasoning, on its own channel.
-     *
-     * It used to be kept only for the provider that echoes it back, so a
-     * thinking model looked idle until the first token of its answer. The chat
-     * folds it away and opens it on request; the answer is still a separate
-     * channel, so nothing here can be mistaken for one.
-     */
-    const flushReasoning = async (force = false) => {
-      if (reasoningBuffer.length === 0) return;
-      if (
-        !force &&
-        reasoningBuffer.length < MAX_DELTA_BUFFER &&
-        Date.now() - lastReasoningFlush < DELTA_FLUSH_MS
-      ) {
-        return;
-      }
-
-      const text = reasoningBuffer;
-      reasoningBuffer = "";
-      lastReasoningFlush = Date.now();
-      await appendEvent(admin, runId, "message.reasoning", { text });
-    };
-
-    const emitUsage = async () => {
-      await appendEvent(admin, runId, "usage", {
-        inputTokens,
-        outputTokens,
-        costUsd: runCostUsd(inputTokens, outputTokens),
+    if (!cancelled && !deps.stopSignal?.aborted) {
+      const opened = await openRunWorkspace({
+        runId,
+        admin,
+        owner: run.owner,
+        chatId: run.chat_id,
+        repo: run.repo_full_name,
+        sha: run.base_sha,
+        token: github?.token ?? null,
       });
-    };
 
-    let cancelled = false;
+      if (!opened.ok) {
+        if (await isCancelledNow()) {
+          cancelled = true;
+        } else if (deps.stopSignal?.aborted) {
+          failure = "The worker restarted before this run finished. Start it again.";
+          status = "failed";
+          stopReason = "worker-shutdown";
+        } else {
+          throw new Error(opened.message);
+        }
+      } else {
+        sandbox = opened.sandbox;
+        releaseWorkspace = opened.release;
+        renewWorkspace = opened.renew ?? null;
 
-    loop: while (true) {
-      if (deps.stopSignal?.aborted) {
+        // A chat's workspace belongs to its `chat_sandboxes` row, not to this run.
+        // The run sweep lists only `kind: "run"` boxes and the chat sweep reads the
+        // row, so recording the id here would claim a disk the next message is
+        // supposed to find.
+        if (!opened.shared) {
+          await updateRun(admin, runId, { sandbox_id: sandbox.id });
+        }
+      }
+    }
+
+    if (!cancelled && !deps.stopSignal?.aborted && (await isCancelledNow())) {
+      cancelled = true;
+    }
+
+    if (!cancelled && !deps.stopSignal?.aborted && sandbox) {
+      // A chat turn arrives with the conversation behind it, already written to
+      // run_messages by the route. A run started without history is seeded with
+      // its prompt, so one loop serves both.
+      const seeded = await listRunMessages(admin, runId);
+
+      if (seeded.length === 0) {
+        await appendRunMessage(admin, runId, "user", { text: run.prompt }, []);
+      }
+
+      const tree = await listWorkspaceFiles(sandbox, undefined, runSignal);
+      const instructions = await readProjectInstructions(sandbox);
+
+      if (await isCancelledNow()) {
+        cancelled = true;
+      } else if (deps.stopSignal?.aborted) {
         failure = "The worker restarted before this run finished. Start it again.";
         status = "failed";
         stopReason = "worker-shutdown";
-        break;
-      }
-
-      if (await cancelRequested(admin, runId)) {
-        cancelled = true;
-        break;
-      }
-
-      if (steps >= RUN_MAX_STEPS) {
-        status = "blocked";
-        stopReason = "max-steps";
-        await appendEvent(admin, runId, "warning", {
-          code: "max-steps",
-          message: `The run reached its ${RUN_MAX_STEPS}-step limit.`,
+      } else {
+        const system = buildRunSystemPrompt({
+          repo: run.repo_full_name,
+          sha: run.base_sha,
+          tree,
+          instructions,
+          // The prompt says the workspace outlives this turn only when it does.
+          persistent: releaseWorkspace !== null && renewWorkspace !== null,
         });
-        break;
-      }
 
-      if (inputTokens + outputTokens >= RUN_MAX_TOKENS) {
-        status = "blocked";
-        stopReason = "token-budget";
-        await appendEvent(admin, runId, "warning", {
-          code: "token-budget",
-          message: `The run reached its ${RUN_MAX_TOKENS.toLocaleString()}-token estimate.`,
-        });
-        break;
-      }
+        const history: WireMessage[] =
+          seeded.length > 0
+            ? seeded.map((message) => ({ role: message.role, content: message.text }))
+            : [{ role: "user", content: run.prompt }];
 
-      if (Date.now() > deadline) {
-        status = "blocked";
-        stopReason = "wall-clock";
-        await appendEvent(admin, runId, "warning", {
-          code: "wall-clock",
-          message: "The run reached its wall-clock limit.",
-        });
-        break;
-      }
+        const messages: WireMessage[] = [{ role: "system", content: system }, ...history];
 
-      const stepInput = estimateTokens(
-        messages.map((message) => message.content).join("\n")
-      );
-      inputTokens += stepInput;
+        chatToken = github?.token ?? null;
 
-      const idx = await beginStep(admin, runId, {
-        system: hashText(system),
-        messages: hashText(messages.map((message) => `${message.role}:${message.content}`).join("\n")),
-      });
+        const chain =
+          run.model === AUTO_MODEL
+            ? autoChain(run.prompt)
+            : providersFor(run.model as ModelId);
 
-      if (idx === null) {
-        cancelled = true;
-        break;
-      }
-
-      steps = idx;
-      const stepStartedAt = Date.now();
-
-      let stepText = "";
-      let stepReasoning = "";
-      const fragments = new Map<number, ToolCall>();
-      let completed = false;
-      let stepFailure: Error | null = null;
-
-      for (const provider of chain) {
-        try {
-          const timeoutSignal = AbortSignal.timeout(
-            Math.max(1_000, deadline - Date.now())
+        if (chain.length === 0) {
+          throw new Error(
+            `No provider is configured for ${run.model}. The run cannot start.`
           );
-          const streamSignal = deps.stopSignal
-            ? AbortSignal.any([timeoutSignal, deps.stopSignal])
-            : timeoutSignal;
+        }
 
-          for await (const event of streamChat({
-            provider,
-            apiKeys: providerKeys(provider),
-            messages,
-            tools: RUN_TOOL_SPECS,
-            effort,
-            signal: streamSignal,
-          })) {
-            if (event.type === "text") {
-              stepText += event.text;
-              deltaBuffer += event.text;
-              outputTokens += estimateTokens(event.text);
-              await flushDeltas();
-            } else if (event.type === "reasoning") {
-              // Kept for the provider that requires it echoed back, and sent to
-              // the chat on its own channel so the reader can watch it think.
-              stepReasoning += event.text;
-              collectedReasoning += event.text;
-              reasoningBuffer += event.text;
-              await flushReasoning();
-            } else {
-              const existing = fragments.get(event.index) ?? {
-                id: "",
-                name: "",
-                args: "",
-              };
+        let deltaBuffer = "";
+        let lastFlush = 0;
+        let reasoningBuffer = "";
+        let lastReasoningFlush = 0;
 
-              fragments.set(event.index, {
-                id: event.id ?? existing.id,
-                name: event.name ?? existing.name,
-                args: existing.args + (event.argumentsDelta ?? ""),
-              });
+        const flushDeltas = async (force = false) => {
+          if (deltaBuffer.length === 0) return;
+          if (!force && deltaBuffer.length < MAX_DELTA_BUFFER && Date.now() - lastFlush < DELTA_FLUSH_MS) {
+            return;
+          }
+
+          const text = deltaBuffer;
+          deltaBuffer = "";
+          lastFlush = Date.now();
+          await appendEvent(admin, runId, "message.delta", { text });
+        };
+
+        /**
+         * Reasoning, on its own channel.
+         *
+         * It used to be kept only for the provider that echoes it back, so a
+         * thinking model looked idle until the first token of its answer. The chat
+         * folds it away and opens it on request; the answer is still a separate
+         * channel, so nothing here can be mistaken for one.
+         */
+        const flushReasoning = async (force = false) => {
+          if (reasoningBuffer.length === 0) return;
+          if (
+            !force &&
+            reasoningBuffer.length < MAX_DELTA_BUFFER &&
+            Date.now() - lastReasoningFlush < DELTA_FLUSH_MS
+          ) {
+            return;
+          }
+
+          const text = reasoningBuffer;
+          reasoningBuffer = "";
+          lastReasoningFlush = Date.now();
+          await appendEvent(admin, runId, "message.reasoning", { text });
+        };
+
+        const emitUsage = async () => {
+          await appendEvent(admin, runId, "usage", {
+            inputTokens,
+            outputTokens,
+            costUsd: runCostUsd(inputTokens, outputTokens),
+          });
+        };
+
+        loop: while (true) {
+          if (await isCancelledNow()) {
+            cancelled = true;
+            break;
+          }
+
+          if (deps.stopSignal?.aborted) {
+            failure = "The worker restarted before this run finished. Start it again.";
+            status = "failed";
+            stopReason = "worker-shutdown";
+            break;
+          }
+
+          if (steps >= RUN_MAX_STEPS) {
+            status = "blocked";
+            stopReason = "max-steps";
+            await appendEvent(admin, runId, "warning", {
+              code: "max-steps",
+              message: `The run reached its ${RUN_MAX_STEPS}-step limit.`,
+            });
+            break;
+          }
+
+          if (inputTokens + outputTokens >= RUN_MAX_TOKENS) {
+            status = "blocked";
+            stopReason = "token-budget";
+            await appendEvent(admin, runId, "warning", {
+              code: "token-budget",
+              message: `The run reached its ${RUN_MAX_TOKENS.toLocaleString()}-token estimate.`,
+            });
+            break;
+          }
+
+          if (Date.now() > deadline) {
+            status = "blocked";
+            stopReason = "wall-clock";
+            await appendEvent(admin, runId, "warning", {
+              code: "wall-clock",
+              message: "The run reached its wall-clock limit.",
+            });
+            break;
+          }
+
+          const stepInput = estimateTokens(
+            messages.map((message) => message.content).join("\n")
+          );
+          inputTokens += stepInput;
+
+          const idx = await beginStep(admin, runId, {
+            system: hashText(system),
+            messages: hashText(messages.map((message) => `${message.role}:${message.content}`).join("\n")),
+          });
+
+          if (idx === null) {
+            cancelled = true;
+            break;
+          }
+
+          steps = idx;
+          const stepStartedAt = Date.now();
+
+          let stepText = "";
+          let stepReasoning = "";
+          const fragments = new Map<number, ToolCall>();
+          let completed = false;
+          let stepFailure: Error | null = null;
+
+          for (const provider of chain) {
+            if (runSignal.aborted) break;
+
+            try {
+              const timeoutSignal = AbortSignal.timeout(
+                Math.max(1_000, deadline - Date.now())
+              );
+              const streamSignal = AbortSignal.any([timeoutSignal, runSignal]);
+
+              for await (const event of streamChat({
+                provider,
+                apiKeys: providerKeys(provider),
+                messages,
+                tools: RUN_TOOL_SPECS,
+                effort,
+                signal: streamSignal,
+              })) {
+                if (cancelController.signal.aborted) break;
+
+                if (event.type === "text") {
+                  stepText += event.text;
+                  deltaBuffer += event.text;
+                  outputTokens += estimateTokens(event.text);
+                  await flushDeltas();
+                } else if (event.type === "reasoning") {
+                  // Kept for the provider that requires it echoed back, and sent to
+                  // the chat on its own channel so the reader can watch it think.
+                  stepReasoning += event.text;
+                  collectedReasoning += event.text;
+                  reasoningBuffer += event.text;
+                  await flushReasoning();
+                } else {
+                  const existing = fragments.get(event.index) ?? {
+                    id: "",
+                    name: "",
+                    args: "",
+                  };
+
+                  fragments.set(event.index, {
+                    id: event.id ?? existing.id,
+                    name: event.name ?? existing.name,
+                    args: existing.args + (event.argumentsDelta ?? ""),
+                  });
+                }
+              }
+
+              if (runSignal.aborted) {
+                completed = false;
+                break;
+              }
+
+              completed = true;
+              stepFailure = null;
+              break;
+            } catch (caught) {
+              stepFailure = caught instanceof Error ? caught : new Error("The provider failed.");
+
+              if (runSignal.aborted) break;
+
+              // Text or a half tool call means this step has already committed to
+              // one answer; a handover would splice two of them together.
+              if (stepText.length > 0 || fragments.size > 0) break;
             }
           }
 
-          completed = true;
-          stepFailure = null;
-          break;
-        } catch (caught) {
-          stepFailure = caught instanceof Error ? caught : new Error("The provider failed.");
+          await flushDeltas(true);
+          await flushReasoning(true);
 
-          // Text or a half tool call means this step has already committed to
-          // one answer; a handover would splice two of them together.
-          if (stepText.length > 0 || fragments.size > 0) break;
-        }
-      }
+          const calls = [...fragments.values()]
+            .filter((call) => call.name.length > 0)
+            .map((call, index) => ({
+              id: call.id || `call_${index}`,
+              name: call.name,
+              args: call.args,
+            }));
 
-      await flushDeltas(true);
-      await flushReasoning(true);
+          if (!completed) {
+            if (stepText.length > 0) {
+              collectedText += `${collectedText.length > 0 ? "\n\n" : ""}${stepText}`;
+            }
 
-      const calls = [...fragments.values()]
-        .filter((call) => call.name.length > 0)
-        .map((call, index) => ({
-          id: call.id || `call_${index}`,
-          name: call.name,
-          args: call.args,
-        }));
+            const wasCancelled = await isCancelledNow();
 
-      if (!completed) {
-        await finishStep(admin, runId, idx, {
-          input_tokens: stepInput,
-          output_tokens: estimateTokens(stepText),
-          finish_reason: "error",
-          tool_names: [],
-          duration_ms: Date.now() - stepStartedAt,
-        });
+            await finishStep(admin, runId, idx, {
+              input_tokens: stepInput,
+              output_tokens: estimateTokens(stepText),
+              finish_reason: wasCancelled ? "cancelled" : "error",
+              tool_names: [],
+              duration_ms: Date.now() - stepStartedAt,
+            });
 
-        if (deps.stopSignal?.aborted) {
-          failure = "The worker restarted before this run finished. Start it again.";
-          status = "failed";
-          stopReason = "worker-shutdown";
-          break;
-        }
+            if (wasCancelled) {
+              cancelled = true;
+              break;
+            }
 
-        if (await cancelRequested(admin, runId)) {
-          cancelled = true;
-          break;
-        }
+            if (deps.stopSignal?.aborted) {
+              failure = "The worker restarted before this run finished. Start it again.";
+              status = "failed";
+              stopReason = "worker-shutdown";
+              break;
+            }
 
-        failure = stepFailure?.message ?? "The provider failed.";
-        status = "failed";
-        stopReason = "error";
-        break;
-      }
+            failure = stepFailure?.message ?? "The provider failed.";
+            status = "failed";
+            stopReason = "error";
+            break;
+          }
 
-      if (stepText.length > 0) {
-        collectedText += `${collectedText.length > 0 ? "\n\n" : ""}${stepText}`;
+          if (stepText.length > 0) {
+            collectedText += `${collectedText.length > 0 ? "\n\n" : ""}${stepText}`;
 
-        await appendRunMessage(
-          admin,
-          runId,
-          "assistant",
-          { text: stepText },
-          calls.length > 0 ? ["step"] : ["answer"]
-        );
-      }
-
-      if (calls.length === 0) {
-        await finishStep(admin, runId, idx, {
-          input_tokens: stepInput,
-          output_tokens: estimateTokens(stepText),
-          finish_reason: "stop",
-          tool_names: [],
-          duration_ms: Date.now() - stepStartedAt,
-        });
-
-        await appendEvent(admin, runId, "message.done", { step: idx });
-        await emitUsage();
-
-        answerText = stepText;
-        summary = summaryOf(stepText);
-        status = "done";
-        stopReason = "answer";
-        break;
-      }
-
-      messages.push({
-        role: "assistant",
-        content: stepText,
-        tool_calls: calls.map((call) => ({
-          id: call.id,
-          type: "function" as const,
-          function: { name: call.name, arguments: call.args || "{}" },
-        })),
-        ...(stepReasoning.length > 0 ? { reasoning_content: stepReasoning } : {}),
-      });
-
-      const toolNames: string[] = [];
-
-      for (const [index, call] of calls.entries()) {
-        if (deps.stopSignal?.aborted) {
-          failure = "The worker restarted before this run finished. Start it again.";
-          status = "failed";
-          stopReason = "worker-shutdown";
-          break;
-        }
-
-        if (await cancelRequested(admin, runId)) {
-          cancelled = true;
-          break;
-        }
-
-        const args = parseArgs(call.args);
-        toolNames.push(call.name);
-
-        const command =
-          typeof args?.command === "string" ? args.command : undefined;
-        const stepOffset = collectedText.length;
-
-        await appendEvent(admin, runId, "tool.started", {
-          name: call.name,
-          summary: toolSummary(call.name, args),
-          ...(command ? { command } : {}),
-        });
-
-        chatSteps.push({
-          tool: call.name,
-          detail: toolSummary(call.name, args),
-          state: "start",
-          command,
-          offset: stepOffset,
-        });
-
-        const toolStartedAt = Date.now();
-        let result: RunToolResult;
-
-        if (!sandbox) {
-          result = {
-            ok: false,
-            isError: true,
-            text: "The workspace is no longer available.",
-            preview: "workspace missing",
-          };
-        } else {
-          result = await executeRunTool({
-            name: call.name,
-            args,
-            sandbox,
-            github:
-              github && run.repo_full_name
-                ? { token: github.token, repo: run.repo_full_name }
-                : null,
-          }).catch((caught: unknown) => ({
-            ok: false,
-            isError: true,
-            text: caught instanceof Error ? caught.message : "The tool failed.",
-            preview: "tool failed",
-          }));
-        }
-
-        const durationMs = Date.now() - toolStartedAt;
-
-        if (result.publish) publishDestination = result.publish;
-
-        // An attempt to reach loopback, a private range or the metadata service
-        // is the one tool failure that is about intent rather than a bad
-        // command. One signal per run: the operator needs to know it happened,
-        // not how many times the model retried.
-        if (
-          result.text.startsWith("refused:") &&
-          firstSignalIn(`egress:${runId}`, 6 * 3_600_000)
-        ) {
-          void recordRiskSignal({
-            userId: run.owner,
-            kind: "sandbox-egress",
-            severity: "high",
-            summary:
-              "A sandbox command named an internal address and was refused",
-            detail: {
+            await appendRunMessage(
+              admin,
               runId,
-              tool: call.name,
-              command:
-                typeof args?.command === "string"
-                  ? args.command.slice(0, 200)
-                  : null,
-            },
-            route: "worker:run_command",
+              "assistant",
+              { text: stepText },
+              calls.length > 0 ? ["step"] : ["answer"]
+            );
+          }
+
+          if (calls.length === 0) {
+            await finishStep(admin, runId, idx, {
+              input_tokens: stepInput,
+              output_tokens: estimateTokens(stepText),
+              finish_reason: "stop",
+              tool_names: [],
+              duration_ms: Date.now() - stepStartedAt,
+            });
+
+            await appendEvent(admin, runId, "message.done", { step: idx });
+            await emitUsage();
+
+            answerText = stepText;
+            summary = summaryOf(stepText);
+            status = "done";
+            stopReason = "answer";
+            break;
+          }
+
+          messages.push({
+            role: "assistant",
+            content: stepText,
+            tool_calls: calls.map((call) => ({
+              id: call.id,
+              type: "function" as const,
+              function: { name: call.name, arguments: call.args || "{}" },
+            })),
+            ...(stepReasoning.length > 0 ? { reasoning_content: stepReasoning } : {}),
           });
-        }
 
-        await appendToolCall(admin, {
-          runId,
-          stepIdx: idx,
-          idx: index + 1,
-          name: call.name,
-          args,
-          result: capPayload(
-            { ok: result.ok, isError: result.isError, text: result.text.slice(0, 32_000) },
-            64_000
-          ),
-          isError: result.isError,
-          durationMs,
-        });
+          const toolNames: string[] = [];
 
-        // Keep the stored step in step with the one the reader watched: a
-        // finished tool replaces its start entry rather than adding a second.
-        {
-          let index = -1;
-          for (let i = chatSteps.length - 1; i >= 0; i -= 1) {
+          for (const [index, call] of calls.entries()) {
+            if (await isCancelledNow()) {
+              cancelled = true;
+              break;
+            }
+
+            if (deps.stopSignal?.aborted) {
+              failure = "The worker restarted before this run finished. Start it again.";
+              status = "failed";
+              stopReason = "worker-shutdown";
+              break;
+            }
+
+            const args = parseArgs(call.args);
+            toolNames.push(call.name);
+
+            const command =
+              typeof args?.command === "string" ? args.command : undefined;
+            const stepOffset = collectedText.length;
+
+            await appendEvent(admin, runId, "tool.started", {
+              name: call.name,
+              summary: toolSummary(call.name, args),
+              ...(command ? { command } : {}),
+            });
+
+            chatSteps.push({
+              tool: call.name,
+              detail: toolSummary(call.name, args),
+              state: "start",
+              command,
+              offset: stepOffset,
+            });
+
+            const toolStartedAt = Date.now();
+            let result: RunToolResult;
+
+            if (!sandbox) {
+              result = {
+                ok: false,
+                isError: true,
+                text: "The workspace is no longer available.",
+                preview: "workspace missing",
+              };
+            } else {
+              result = await executeRunTool({
+                name: call.name,
+                args,
+                sandbox,
+                github:
+                  github && run.repo_full_name
+                    ? { token: github.token, repo: run.repo_full_name }
+                    : null,
+                signal: runSignal,
+              }).catch((caught: unknown) => ({
+                ok: false,
+                isError: true,
+                text: caught instanceof Error ? caught.message : "The tool failed.",
+                preview: "tool failed",
+              }));
+            }
+
+            const durationMs = Date.now() - toolStartedAt;
+
+            if (result.publish) publishDestination = result.publish;
+
+            // An attempt to reach loopback, a private range or the metadata service
+            // is the one tool failure that is about intent rather than a bad
+            // command. One signal per run: the operator needs to know it happened,
+            // not how many times the model retried.
             if (
-              chatSteps[i].state === "start" &&
-              chatSteps[i].tool === call.name
+              result.text.startsWith("refused:") &&
+              firstSignalIn(`egress:${runId}`, 6 * 3_600_000)
             ) {
-              index = i;
+              void recordRiskSignal({
+                userId: run.owner,
+                kind: "sandbox-egress",
+                severity: "high",
+                summary:
+                  "A sandbox command named an internal address and was refused",
+                detail: {
+                  runId,
+                  tool: call.name,
+                  command:
+                    typeof args?.command === "string"
+                      ? args.command.slice(0, 200)
+                      : null,
+                },
+                route: "worker:run_command",
+              });
+            }
+
+            await appendToolCall(admin, {
+              runId,
+              stepIdx: idx,
+              idx: index + 1,
+              name: call.name,
+              args,
+              result: capPayload(
+                { ok: result.ok, isError: result.isError, text: result.text.slice(0, 32_000) },
+                64_000
+              ),
+              isError: result.isError,
+              durationMs,
+            });
+
+            // Keep the stored step in step with the one the reader watched: a
+            // finished tool replaces its start entry rather than adding a second.
+            {
+              let stepIndex = -1;
+              for (let i = chatSteps.length - 1; i >= 0; i -= 1) {
+                if (
+                  chatSteps[i].state === "start" &&
+                  chatSteps[i].tool === call.name
+                ) {
+                  stepIndex = i;
+                  break;
+                }
+              }
+
+              const finished: AgentStep = {
+                tool: call.name,
+                detail: toolSummary(call.name, args),
+                state: result.isError ? "error" : "done",
+                command:
+                  typeof args?.command === "string" ? args.command : undefined,
+                output: previewText(result.text, 400),
+                offset: stepIndex >= 0 ? chatSteps[stepIndex].offset : stepOffset,
+              };
+
+              if (stepIndex >= 0) chatSteps[stepIndex] = finished;
+              else chatSteps.push(finished);
+            }
+
+            await appendEvent(admin, runId, "tool.finished", {
+              name: call.name,
+              isError: result.isError,
+              durationMs,
+              resultPreview: previewText(result.text, 400),
+            });
+
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content: result.text,
+            });
+
+            if (await isCancelledNow()) {
+              cancelled = true;
+              break;
+            }
+
+            if (deps.stopSignal?.aborted) {
+              failure = "The worker restarted before this run finished. Start it again.";
+              status = "failed";
+              stopReason = "worker-shutdown";
               break;
             }
           }
 
-          const finished: AgentStep = {
-            tool: call.name,
-            detail: toolSummary(call.name, args),
-            state: result.isError ? "error" : "done",
-            command:
-              typeof args?.command === "string" ? args.command : undefined,
-            output: previewText(result.text, 400),
-            offset: index >= 0 ? chatSteps[index].offset : stepOffset,
-          };
+          await finishStep(admin, runId, idx, {
+            input_tokens: stepInput,
+            output_tokens: estimateTokens(stepText),
+            finish_reason: cancelled ? "cancelled" : "tool_calls",
+            tool_names: toolNames,
+            duration_ms: Date.now() - stepStartedAt,
+          });
 
-          if (index >= 0) chatSteps[index] = finished;
-          else chatSteps.push(finished);
+          await emitUsage();
+
+          if (cancelled || deps.stopSignal?.aborted) break loop;
         }
-
-        await appendEvent(admin, runId, "tool.finished", {
-          name: call.name,
-          isError: result.isError,
-          durationMs,
-          resultPreview: previewText(result.text, 400),
-        });
-
-        messages.push({
-          role: "tool",
-          tool_call_id: call.id,
-          content: result.text,
-        });
       }
-
-      await finishStep(admin, runId, idx, {
-        input_tokens: stepInput,
-        output_tokens: estimateTokens(stepText),
-        finish_reason: cancelled ? "cancelled" : "tool_calls",
-        tool_names: toolNames,
-        duration_ms: Date.now() - stepStartedAt,
-      });
-
-      await emitUsage();
-
-      if (cancelled || deps.stopSignal?.aborted) break loop;
     }
 
     if (cancelled) {
       status = "cancelled";
-      stopReason = "cancelled";
+      stopReason = "user";
     }
 
     // Artifacts are collected before the box is paused: the disk is still
     // there afterwards, but a run should not depend on a later process finding
     // it. A store that is not configured is not a failure.
-    if (sandbox) {
+    if (sandbox && !cancelled && !deps.stopSignal?.aborted) {
       const collected = await collectRunArtifacts(sandbox, runId).catch(() => null);
 
       if (collected && collected.files.length > 0) {
@@ -726,11 +822,16 @@ export async function executeRun(
     stopReason = "error";
   } finally {
     clearInterval(lease);
+    clearInterval(cancelWatcher);
+
+    const currentRow = await readRun(admin, runId).catch(() => null);
+    const externallySettled =
+      currentRow !== null && currentRow.status !== "running";
 
     // The chat is the product: the answer and its proposed diff are written
     // before the workspace is paused and before the run is marked settled, so a
     // reader who sees `run.finished` can already reload the transcript.
-    if (run.chat_id) {
+    if (run.chat_id && !externallySettled) {
       // A complete answer is stored as it was written. One that stopped early is
       // stored with the reason attached, so the transcript says what the tab
       // would have said while it watched.
@@ -840,6 +941,7 @@ export async function executeRun(
     // for the same reason a stopped chat turn did: the reader got what they
     // asked for, then chose to end it.
     if (
+      !externallySettled &&
       run.chat_id &&
       run.credit_session_id &&
       (status === "failed" || status === "cancelled")
@@ -870,7 +972,7 @@ export async function executeRun(
 
     const cost = runCostUsd(inputTokens, outputTokens);
 
-    await updateRun(
+    const settled = await updateRun(
       admin,
       runId,
       {
@@ -883,24 +985,26 @@ export async function executeRun(
         ended_at: new Date().toISOString(),
       },
       { onlyWhileRunning: true }
-    ).catch(() => {});
+    ).catch(() => false);
 
-    await recordRunUsage(admin, run.owner, inputTokens, outputTokens, cost).catch(
-      () => {}
-    );
+    if (settled) {
+      await recordRunUsage(admin, run.owner, inputTokens, outputTokens, cost).catch(
+        () => {}
+      );
 
-    if (status === "failed") {
-      await appendEvent(admin, runId, "run.error", {
-        code: "run-failed",
-        message: failure ?? "The run failed.",
-        retryable: true,
-      });
-    } else {
-      await appendEvent(admin, runId, "run.finished", {
-        stopReason,
-        summary: summary || undefined,
-        status,
-      });
+      if (status === "failed") {
+        await appendEvent(admin, runId, "run.error", {
+          code: "run-failed",
+          message: failure ?? "The run failed.",
+          retryable: true,
+        });
+      } else {
+        await appendEvent(admin, runId, "run.finished", {
+          stopReason,
+          summary: summary || undefined,
+          status,
+        });
+      }
     }
   }
 

@@ -397,6 +397,7 @@ export async function releaseChatSandbox(input: {
   rowId: string;
   handle?: SandboxHandle | null;
   now?: number;
+  expectedLeaseUntil?: string | null;
 }): Promise<void> {
   const now = input.now ?? Date.now();
 
@@ -404,6 +405,7 @@ export async function releaseChatSandbox(input: {
     id: input.rowId,
     lastActiveAt: new Date(now).toISOString(),
     deleteAfter: deleteAfter(now, chatSandboxTtlHours()),
+    expectedLeaseUntil: input.expectedLeaseUntil,
   });
 
   if (input.handle) await refreshTtl(input.handle);
@@ -422,19 +424,28 @@ export async function renewChatSandboxLease(input: {
   rowId: string;
   now?: number;
   leaseMs?: number;
+  expectedLeaseUntil?: string | null;
+  onLease?: (nextLease: string) => void;
 }): Promise<boolean> {
   const now = input.now ?? Date.now();
+  const next = leaseUntil(now, input.leaseMs);
 
-  const { data } = await input.admin
+  let query = input.admin
     .from("chat_sandboxes")
     .update({
-      lease_until: leaseUntil(now, input.leaseMs),
+      lease_until: next,
       last_active_at: new Date(now).toISOString(),
     })
-    .eq("id", input.rowId)
-    .select("id");
+    .eq("id", input.rowId);
 
-  return Array.isArray(data) && data.length > 0;
+  if (input.expectedLeaseUntil) {
+    query = query.eq("lease_until", input.expectedLeaseUntil);
+  }
+
+  const { data } = await query.select("id");
+  const renewed = Array.isArray(data) && data.length > 0;
+  if (renewed) input.onLease?.(next);
+  return renewed;
 }
 
 export type { ChatSandboxRow };
