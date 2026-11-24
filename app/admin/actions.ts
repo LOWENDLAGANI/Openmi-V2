@@ -255,3 +255,30 @@ export async function setPass(formData: FormData) {
   revalidatePath("/activity");
   redirect(`/admin?done=${revoke ? "pass-off" : "pass"}`);
 }
+
+/**
+ * Unlimited daily runs and tokens for one account, granted or revoked by hand.
+ *
+ * Admins already skip the daily run and token budgets; this gives the same
+ * exemption to a member. `admin_set_unlimited` re-checks the role in Postgres.
+ */
+export async function setUnlimited(formData: FormData) {
+  const supabase = await actingClient();
+
+  const userId = field(formData, "userId");
+  const enabled = field(formData, "enabled") === "1";
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    fail("That account does not exist.");
+  }
+
+  const { error } = await supabase.rpc("admin_set_unlimited", {
+    p_user: userId,
+    p_enabled: enabled,
+  });
+
+  if (error) fail(error.message.replace(/^(admin|unlimited):\s*/, ""));
+
+  revalidatePath("/admin");
+  redirect(`/admin?done=${enabled ? "unlimited" : "unlimited-off"}#members`);
+}

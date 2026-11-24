@@ -250,6 +250,11 @@ export type RunQuotaInput = {
   active: number;
   runsToday: number;
   tokensToday: number;
+  /**
+   * Admins, and accounts an admin granted unlimited, skip the daily run and
+   * token budgets. Concurrency still applies: it protects the worker.
+   */
+  unlimited?: boolean;
   /** Test seam: the clock the reset countdown is measured from. */
   now?: number;
 };
@@ -277,6 +282,8 @@ export function checkRunQuota(input: RunQuotaInput): RunQuotaDecision {
         "You already have a run in progress. Wait for it to finish, or cancel it first.",
     };
   }
+
+  if (input.unlimited === true) return { allowed: true };
 
   // One reading of the clock for both refusals, so a message cannot quote a
   // countdown measured twice.

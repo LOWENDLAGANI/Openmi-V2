@@ -28,6 +28,7 @@ import {
   createRun,
   listRuns,
   readQuota,
+  readUnlimitedRuns,
   settleStalledRuns,
 } from "@/lib/runs/store";
 import { wakeWorker } from "@/lib/runs/wake";
@@ -186,7 +187,13 @@ export async function POST(request: Request) {
   // leaves nothing behind. The unique index on live runs is the second guard:
   // two requests racing here cannot both win.
   const quota = await readQuota(admin, session.user.id);
-  const decision = checkRunQuota(quota);
+
+  // Admins skip the daily budgets, and so does an account an admin granted
+  // unlimited from the panel. Concurrency is still checked for both.
+  const unlimited =
+    (await readUnlimitedRuns(admin, session.user.id)) ||
+    (await readAdminAccess(session)).state === "admin";
+  const decision = checkRunQuota({ ...quota, unlimited });
 
   if (!decision.allowed) {
     return json(
@@ -227,6 +234,7 @@ export async function POST(request: Request) {
           concurrent: RUN_MAX_CONCURRENT,
           dailyRuns: RUN_DAILY_RUNS,
           dailyTokens: RUN_DAILY_TOKENS,
+          unlimited,
         },
       },
       202
@@ -269,6 +277,7 @@ export async function POST(request: Request) {
             concurrent: RUN_MAX_CONCURRENT,
             dailyRuns: RUN_DAILY_RUNS,
             dailyTokens: RUN_DAILY_TOKENS,
+            unlimited,
           },
         },
         202
@@ -289,6 +298,9 @@ export async function GET() {
   const quota = admin
     ? await readQuota(admin, session.user.id)
     : { active: 0, runsToday: 0, tokensToday: 0 };
+  const unlimited =
+    (admin ? await readUnlimitedRuns(admin, session.user.id) : false) ||
+    (await readAdminAccess(session)).state === "admin";
 
   return json(
     {
@@ -310,6 +322,7 @@ export async function GET() {
         concurrent: RUN_MAX_CONCURRENT,
         dailyRuns: RUN_DAILY_RUNS,
         dailyTokens: RUN_DAILY_TOKENS,
+        unlimited,
       },
     },
     200

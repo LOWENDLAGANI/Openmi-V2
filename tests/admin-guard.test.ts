@@ -64,6 +64,7 @@ test("admin mutations re-check access instead of trusting the form", () => {
   expect(ADMIN_ACTIONS).toContain('rpc("admin_grant_credit"');
   expect(ADMIN_ACTIONS).toContain('rpc("admin_set_admin"');
   expect(ADMIN_ACTIONS).toContain('rpc("admin_set_pass"');
+  expect(ADMIN_ACTIONS).toContain('rpc("admin_set_unlimited"');
   expect(ADMIN_ACTIONS).not.toContain("isAdmin:");
 });
 

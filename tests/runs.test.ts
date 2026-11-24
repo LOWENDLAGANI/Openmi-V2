@@ -226,6 +226,26 @@ describe("run quota", () => {
     if (!decision.allowed) expect(decision.code).toBe("daily-tokens");
   });
 
+  test("an unlimited account skips the daily budgets, not concurrency", () => {
+    expect(
+      checkRunQuota({
+        active: 0,
+        runsToday: RUN_DAILY_RUNS,
+        tokensToday: RUN_DAILY_TOKENS * 5,
+        unlimited: true,
+      }).allowed
+    ).toBe(true);
+
+    const busy = checkRunQuota({
+      active: 1,
+      runsToday: 0,
+      tokensToday: 0,
+      unlimited: true,
+    });
+    expect(busy.allowed).toBe(false);
+    if (!busy.allowed) expect(busy.code).toBe("concurrency");
+  });
+
   test("inside every limit a run is allowed", () => {
     expect(checkRunQuota({ active: 0, runsToday: 5, tokensToday: 1_000 }).allowed).toBe(
       true

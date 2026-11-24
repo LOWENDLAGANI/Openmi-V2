@@ -700,6 +700,22 @@ export async function readQuota(
   };
 }
 
+/**
+ * Whether an operator granted this account unlimited daily runs and tokens.
+ * Read with the service role; a failed read is "no", so an outage cannot lift
+ * the budget.
+ */
+export async function readUnlimitedRuns(admin: Client, owner: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("unlimited_runs")
+    .eq("id", owner)
+    .maybeSingle();
+
+  if (error || !data) return false;
+  return (data as { unlimited_runs?: unknown }).unlimited_runs === true;
+}
+
 export async function recordRunUsage(
   admin: Client,
   owner: string,

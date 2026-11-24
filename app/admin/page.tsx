@@ -24,6 +24,7 @@ import {
   reviewReceipt,
   setAdmin,
   setPass,
+  setUnlimited,
   unbanUser,
 } from "./actions";
 
@@ -95,6 +96,7 @@ type AccountRow = ProfileRow & {
   banned_at: string | null;
   ban_expires_at: string | null;
   ban_reason: string | null;
+  unlimited_runs: boolean | null;
 };
 
 /** How many accounts the panel renders before "See more". */
@@ -305,7 +307,7 @@ export default async function AdminPage({
   let accountQuery = admin
     .from("profiles")
     .select(
-      "id, email, handle, credit_balance, paid_until, created_at, banned_at, ban_expires_at, ban_reason",
+      "id, email, handle, credit_balance, paid_until, created_at, banned_at, ban_expires_at, ban_reason, unlimited_runs",
       { count: "exact" }
     );
 
@@ -432,7 +434,11 @@ export default async function AdminPage({
                     ? "Paid pass granted. The allowance rises at the next refill."
                     : params.done === "pass-off"
                       ? "Paid pass revoked. The free allowance applies at the next refill."
-                      : "Admin access revoked."}
+                      : params.done === "unlimited"
+                        ? "Unlimited daily runs and tokens granted."
+                        : params.done === "unlimited-off"
+                          ? "Unlimited revoked. The daily run and token budget applies again."
+                          : "Admin access revoked."}
         </p>
       )}
 
@@ -524,6 +530,7 @@ export default async function AdminPage({
             {accountRows.map((member) => {
               const active = paidActive(member.paid_until);
               const pass = passLabel(member.paid_until);
+              const unlimited = member.unlimited_runs === true;
               const stopped =
                 member.banned_at !== null &&
                 (member.ban_expires_at === null ||
@@ -554,6 +561,9 @@ export default async function AdminPage({
                     <StatusPill tone={active ? "ok" : "optional"}>
                       {active ? "paid" : "free"}
                     </StatusPill>
+                    {unlimited && (
+                      <StatusPill tone="ok">unlimited</StatusPill>
+                    )}
                     {stopped && (
                       <span className="rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-[10px] text-danger">
                         stopped
@@ -595,6 +605,24 @@ export default async function AdminPage({
                       )}
                     </form>
                   )}
+
+                  {/* Lifts the daily run and token budget, the same
+                      exemption an admin account has. */}
+                  <form action={setUnlimited}>
+                    <input type="hidden" name="userId" value={member.id} />
+                    <input
+                      type="hidden"
+                      name="enabled"
+                      value={unlimited ? "0" : "1"}
+                    />
+                    <button
+                      type="submit"
+                      title="Daily runs and token budget"
+                      className="btn btn-quiet px-2.5 py-1 text-[10.5px]"
+                    >
+                      {unlimited ? "revoke unlimited" : "grant unlimited"}
+                    </button>
+                  </form>
 
                   {/* A ban is a moderation decision, so it is one control away
                       from the account it is about — not only from a signal. */}
