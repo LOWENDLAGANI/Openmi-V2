@@ -2,6 +2,12 @@
 
 All notable and small changes to Openmi are documented in this file and mirrored in `lib/version.ts` (and `package.json`).
 
+## [2.0.8] - 2026-11-24 — Real-time active users & last visitor monitor in Admin panel
+
+- Added migration `060_user_presence.sql` with service-role-only RLS table `public.user_presence` to track live member and guest heartbeats.
+- Added `POST /api/presence` and a global `PresenceBeacon` in `app/layout.tsx` sending lightweight same-origin heartbeats every 30s while a tab is visible.
+- Added `GET /api/admin/presence`, `lib/admin/presence.ts` (with graceful fallback to recent chat/run activity before migration push), and `PresencePanel` in `/admin` polling every 10s to show currently online members/guests, the last user on the website, and recent visitors.
+
 ## [2.0.7] - 2026-11-24 — 30-minute run limit & 3-attempt stuck-test handoff
 
 - Increased the default run wall-clock limit and run sandbox idle timeout from 15 minutes to 30 minutes (with `RUN_MAX_MINUTES` configurable up to 60 minutes) and raised the `ChatPanel` SSE stream continuation window cap from 24 to 75 to cover full long runs.

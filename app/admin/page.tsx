@@ -7,9 +7,11 @@ import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { BanControl } from "./BanControl";
+import { PresencePanel } from "./PresencePanel";
 import { RuntimePanel } from "./RuntimePanel";
 
 import { readAdminAccess } from "@/lib/admin/access";
+import { readPresenceSnapshot } from "@/lib/admin/presence";
 import { readRuntimeSnapshot } from "@/lib/admin/runtime";
 import { planById } from "@/lib/billing/plans";
 import { formatCredit } from "@/lib/credits";
@@ -359,7 +361,10 @@ export default async function AdminPage({
 
   // The runtime card reads counters and the last stored probes; it contacts no
   // provider on a page load, so opening /admin cannot start a sandbox.
-  const runtime = await readRuntimeSnapshot(admin);
+  const [runtime, presence] = await Promise.all([
+    readRuntimeSnapshot(admin),
+    readPresenceSnapshot(admin),
+  ]);
 
   return (
     <main className="animate-enter mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
@@ -461,6 +466,8 @@ export default async function AdminPage({
           </div>
         ))}
       </section>
+
+      <PresencePanel initial={presence} currentAdminId={access.userId} />
 
       <RuntimePanel initial={runtime} />
 

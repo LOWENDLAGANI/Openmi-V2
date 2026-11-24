@@ -12,10 +12,20 @@ export type ChangelogEntry = {
   changes: string[];
 };
 
-export const APP_VERSION = "2.0.7";
+export const APP_VERSION = "2.0.8";
 export const APP_VERSION_TAG = `v${APP_VERSION}`;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    version: "2.0.8",
+    date: "2026-11-24",
+    title: "Real-time active users & last visitor monitor in Admin panel",
+    changes: [
+      "Added migration 060_user_presence.sql with service-role-only RLS table public.user_presence to track live member and guest heartbeats.",
+      "Added POST /api/presence and a global PresenceBeacon in app/layout.tsx sending lightweight same-origin heartbeats every 30s while a tab is visible.",
+      "Added GET /api/admin/presence, lib/admin/presence.ts (with graceful fallback to recent chat/run activity before migration push), and PresencePanel in /admin polling every 10s to show currently online members/guests, the last user on the website, and recent visitors.",
+    ],
+  },
   {
     version: "2.0.7",
     date: "2026-11-24",

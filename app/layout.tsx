@@ -19,6 +19,7 @@ import { AdBlockGate } from "@/components/AdBlockGate";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NavProgress } from "@/components/NavProgress";
+import { PresenceBeacon } from "@/components/PresenceBeacon";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import {
   SITE_DESCRIPTION,
@@ -123,6 +124,7 @@ export default function RootLayout({
       >
         <Suspense fallback={null}>
           <NavProgress />
+          <PresenceBeacon />
         </Suspense>
         <CommandPalette />
         <AdBlockGate />
