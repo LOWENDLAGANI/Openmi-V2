@@ -1,10 +1,11 @@
-import { ArrowLeft, ArrowUpRight, Check, Receipt } from "lucide-react";
+import { ArrowUpRight, Receipt, X } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AdBanner } from "@/components/AdBanner";
 import { Brand } from "@/components/Brand";
+import { GoogleOnePlanCards } from "@/components/GoogleOnePlanCards";
 import { ReceiptWave } from "@/components/ReceiptWave";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -13,11 +14,9 @@ import {
   COUNTRY_COOKIE,
   COUNTRY_OPTIONS,
   currencyForCountry,
-  formatMoney,
   isConverted,
 } from "@/lib/billing/currency";
 import {
-  PAID_BENEFITS,
   PLANS,
   TOPUP_PAUSED,
   paymentLink,
@@ -136,36 +135,32 @@ export default async function PayPage({
   const link = paymentLink();
 
   return (
-    <div className="min-h-dvh">
-      <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between gap-3 px-5 sm:px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href="/chat" aria-label="Back to chats">
-              <Brand compact />
-            </Link>
-            <span aria-hidden="true" className="text-line-strong">
-              /
-            </span>
-            <h1 className="truncate text-[14px] font-semibold tracking-[-0.02em] text-hi">
-              Plans &amp; billing
-            </h1>
-          </div>
+    <div className="min-h-dvh bg-canvas">
+      {/* ── Minimal Google One-style Top Bar ───────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-canvas/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-8">
+          <Link href="/chat" aria-label="Openmi workspace">
+            <Brand />
+          </Link>
 
           <div className="flex items-center gap-2">
             <ThemeSwitcher variant="icon" />
-            <Link href="/chat" className="btn gap-1.5 px-3 py-1.5 text-[12px]">
-              <ArrowLeft aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-              <span>Workspace</span>
+            <Link
+              href="/chat"
+              aria-label="Close plans"
+              className="grid size-10 place-items-center rounded-full text-hi transition-colors hover:bg-hover"
+            >
+              <X aria-hidden="true" className="size-6" strokeWidth={1.75} />
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="animate-enter mx-auto w-full max-w-4xl px-5 py-8 sm:px-8">
+      <main className="animate-enter mx-auto w-full max-w-6xl px-3 pb-14 pt-2 sm:px-8">
         {params.error && (
           <p
             role="alert"
-            className="mb-5 rounded-lg border border-danger/30 bg-danger/8 px-4 py-2.5 text-[12.5px] text-danger"
+            className="mb-4 rounded-2xl border border-danger/30 bg-danger/8 px-4 py-3 text-[13px] text-danger"
           >
             {params.error}
           </p>
@@ -174,7 +169,7 @@ export default async function PayPage({
         {params.submitted === "1" && (
           <p
             role="status"
-            className="mb-5 rounded-lg border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12.5px] text-accent-text"
+            className="mb-4 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3 text-[13px] text-accent-text"
           >
             Receipt received. It is pending until we review it; the status below
             updates in place.
@@ -184,24 +179,42 @@ export default async function PayPage({
         {params.credit && (
           <p
             role="status"
-            className="mb-5 rounded-lg border border-accent/30 bg-accent-soft px-4 py-2.5 text-[12.5px] text-accent-text"
+            className="mb-4 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3 text-[13px] text-accent-text"
           >
             {params.credit}
           </p>
         )}
 
-        <section className="panel p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        {/* ── 1:1 Google One Plan Cards ──────────────────────────────────── */}
+        <section aria-label="Plans">
+          <GoogleOnePlanCards
+            currency={currency}
+            mode="pay"
+            signedIn
+            paymentUrl={link}
+            topupPaused={TOPUP_PAUSED}
+          />
+        </section>
+
+        {/* ── Currency + Current Balance Strip ───────────────────────────── */}
+        <section className="mt-6 flex flex-col justify-between gap-4 rounded-2xl border border-line bg-card p-5 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <div>
-              <p className="text-[12px] font-medium text-low">Current balance</p>
-              <p className="mt-1.5 font-mono text-[clamp(2rem,4.5vw,2.6rem)] font-semibold leading-none tracking-[-0.03em] tabular-nums text-hi">
+              <p className="text-[11.5px] font-medium text-low">Your balance</p>
+              <p className="mt-0.5 font-mono text-[20px] font-semibold leading-none tabular-nums text-hi">
                 {formatCredit(profile?.balance ?? 0)}{" "}
-                <span className="font-sans text-[14px] font-medium text-low">
+                <span className="font-sans text-[12px] font-normal text-low">
                   Credit
                 </span>
               </p>
             </div>
-
+            <div className="h-7 w-px bg-line" aria-hidden="true" />
+            <div>
+              <p className="text-[11.5px] font-medium text-low">Wallet</p>
+              <p className="mt-0.5 font-mono text-[15px] font-semibold leading-none tabular-nums text-hi">
+                {formatCredit(profile?.wallet ?? 0)}
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               {pending > 0 && (
                 <StatusPill tone="pending">
@@ -210,168 +223,102 @@ export default async function PayPage({
               )}
               <StatusPill tone={profile?.paidActive ? "ok" : "optional"}>
                 {profile?.paidActive && profile.paidUntil
-                  ? `Pass active until ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"}`
+                  ? `Active until ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} (${formatPassRemaining(profile.paidUntil)})`
                   : "Free tier"}
               </StatusPill>
             </div>
           </div>
 
-          {TOPUP_PAUSED && (
-            <p className="mt-4 max-w-2xl text-[13px] leading-relaxed text-mid">
-              Checkout is paused while the payment path is tested. No payment is
-              accepted and the upload form is closed; a redeem code still adds
-              Credit.
-            </p>
-          )}
-
-          {profile?.paidUntil && profile.paidActive && (
-            <p className="mt-2 text-[12px] leading-relaxed text-low">
-              {`Your pass ends ${formatPassDate(profile.paidUntil, profile.timezone) ?? "—"} (${formatPassRemaining(profile.paidUntil)}).`}
-            </p>
-          )}
-
-          <div className="mt-5 grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
-            <div className="rounded-lg border border-line bg-raised px-4 py-3">
-              <p className="text-[11.5px] font-medium text-low">Wallet Credit</p>
-              <p className="mt-1 font-mono text-[18px] font-semibold leading-none tabular-nums text-hi">
-                {formatCredit(profile?.wallet ?? 0)}{" "}
-                <span className="font-sans text-[12px] font-normal text-low">
-                  Credit
-                </span>
-              </p>
-            </div>
-
-            <ul className="space-y-2 text-[12.5px] text-mid">
-              {PAID_BENEFITS.map((benefit) => (
-                <li key={benefit} className="flex items-start gap-2">
-                  <Check
-                    aria-hidden="true"
-                    className="mt-0.5 size-3.5 shrink-0 text-accent-text"
-                    strokeWidth={2}
-                  />
-                  <span>{benefit}</span>
-                </li>
+          <form action={setCountry} className="flex items-center gap-2">
+            <select
+              name="country"
+              defaultValue={country ?? ""}
+              className="field w-auto rounded-full px-3.5 py-1.5 text-[12.5px]"
+              aria-label="Choose your country for the price estimate"
+            >
+              <option value="">Currency (MYR)</option>
+              {COUNTRY_OPTIONS.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.name} ({option.currency})
+                </option>
               ))}
-            </ul>
-          </div>
+            </select>
+            <button
+              type="submit"
+              className="inline-flex h-8 items-center justify-center rounded-full border border-line-strong bg-raised px-3.5 text-[12px] font-medium text-hi transition-colors hover:bg-hover"
+            >
+              Update
+            </button>
+          </form>
         </section>
+
+        {localPrices && (
+          <p className="mt-2.5 px-1 text-[12px] text-low">
+            {`≈ ${currency.name} (${live ? "live" : "indicative"}). Charged in RM on Sociabuzz.`}
+          </p>
+        )}
+
+        {TOPUP_PAUSED && (
+          <p className="mt-4 rounded-2xl border border-line bg-raised px-4 py-3 text-[13px] text-mid">
+            Checkout is paused while the payment path is tested. No payment is
+            accepted and the upload form is closed; a redeem code still adds
+            Credit.
+          </p>
+        )}
 
         <AdBanner className="mt-6" />
 
-        <section aria-labelledby="plans-heading" className="mt-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2
-                id="plans-heading"
-                className="text-[17px] font-semibold tracking-[-0.02em] text-hi"
-              >
-                Passes
-              </h2>
-              <p className="mt-0.5 text-[12.5px] text-mid">
-                Fixed-term passes that never auto-renew.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <form action={setCountry} className="flex items-center gap-1.5">
-                <select
-                  name="country"
-                  defaultValue={country ?? ""}
-                  className="field w-auto py-1.5 text-[12px]"
-                  aria-label="Choose your country for the price estimate"
-                >
-                  <option value="">Currency (MYR)</option>
-                  {COUNTRY_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.name} ({option.currency})
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" className="btn px-3 py-1.5 text-[12px]">
-                  Update
-                </button>
-              </form>
-
-              {TOPUP_PAUSED ? (
-                <span className="rounded-lg border border-line bg-raised px-3 py-1.5 text-[12px] font-medium text-low">
-                  Checkout paused
-                </span>
-              ) : (
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-primary gap-1.5 px-3.5 py-1.5 text-[12.5px]"
-                >
-                  <span>Pay on Sociabuzz</span>
-                  <ArrowUpRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {PLANS.map((plan) => (
-              <div
-                key={plan.id}
-                className="panel flex flex-col justify-between p-5"
-              >
-                <div>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-[15px] font-semibold text-hi">{plan.name}</p>
-                    <p
-                      className="font-mono text-[13px] font-medium tabular-nums text-mid"
-                      title={`Charged as RM ${plan.price} on the payment page`}
-                    >
-                      {localPrices
-                        ? `≈ ${formatMoney(plan.price, currency)}`
-                        : `RM ${plan.price}`}
-                    </p>
-                  </div>
-
-                  <p className="mt-3 font-mono text-[26px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-accent-text">
-                    {plan.credit}
-                    <span className="ml-1.5 font-sans text-[13px] font-medium text-low">
-                      Credit · {plan.days} days
-                    </span>
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {localPrices && (
-            <p className="mt-3 text-[12px] text-low">
-              {`≈ ${currency.name} (${live ? "live" : "indicative"}). Charged in RM.`}
-            </p>
-          )}
-        </section>
-
+        {/* ── Receipt Upload ─────────────────────────────────────────────── */}
         {!TOPUP_PAUSED && (
-          <section aria-labelledby="receipt-heading" className="panel mt-8 p-6">
-            <div className="flex items-center gap-2">
-              <Receipt aria-hidden="true" className="size-4 text-accent-text" strokeWidth={1.75} />
-              <h2
-                id="receipt-heading"
-                className="text-[16px] font-semibold tracking-[-0.02em] text-hi"
+          <section
+            aria-labelledby="receipt-heading"
+            className="mt-6 rounded-2xl border border-line bg-card p-6"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Receipt
+                  aria-hidden="true"
+                  className="size-4 text-accent-text"
+                  strokeWidth={1.75}
+                />
+                <h2
+                  id="receipt-heading"
+                  className="text-[16px] font-semibold tracking-[-0.02em] text-hi"
+                >
+                  Upload payment receipt
+                </h2>
+              </div>
+              <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[12.5px] font-medium text-accent-text hover:underline"
               >
-                Upload a receipt
-              </h2>
+                <span>Open Sociabuzz checkout</span>
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className="size-3.5"
+                  strokeWidth={2}
+                />
+              </a>
             </div>
 
-            <form action={submitReceipt} className="mt-5 grid gap-4 sm:grid-cols-2">
+            <form
+              action={submitReceipt}
+              className="mt-5 grid gap-4 sm:grid-cols-2"
+            >
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-body">
                   Plan
                 </span>
                 <select
                   name="plan"
-                  defaultValue={PLANS[0]?.id}
+                  defaultValue={PLANS[1]?.id ?? PLANS[0]?.id}
                   className="field py-2 text-[12.5px]"
                 >
                   {PLANS.map((plan) => (
                     <option key={plan.id} value={plan.id}>
-                      {plan.name} — {plan.credit} Credit
+                      {plan.name} — {plan.credit} Credit (RM {plan.price})
                     </option>
                   ))}
                 </select>
@@ -387,7 +334,7 @@ export default async function PayPage({
                   min="0"
                   step="0.01"
                   inputMode="decimal"
-                  placeholder={String(PLANS[0]?.price ?? "")}
+                  placeholder={String(PLANS[1]?.price ?? PLANS[0]?.price ?? "")}
                   className="field py-2 font-mono text-[12.5px]"
                 />
               </label>
@@ -437,7 +384,7 @@ export default async function PayPage({
 
               <ReceiptWave>
                 <SubmitButton
-                  className="btn btn-primary py-2.5 text-[13px] sm:col-span-2"
+                  className="flex h-11 w-full items-center justify-center rounded-full bg-accent text-[14px] font-medium text-on-accent transition-opacity hover:opacity-90 sm:col-span-2"
                   optimisticText="Sent for review"
                   pendingText="Uploading the receipt…"
                 >
@@ -448,7 +395,11 @@ export default async function PayPage({
           </section>
         )}
 
-        <section aria-labelledby="requests-heading" className="panel mt-6 overflow-hidden">
+        {/* ── Payment Requests History ───────────────────────────────────── */}
+        <section
+          aria-labelledby="requests-heading"
+          className="mt-6 overflow-hidden rounded-2xl border border-line bg-card"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line bg-raised px-5 py-3.5">
             <h2
               id="requests-heading"
@@ -482,7 +433,8 @@ export default async function PayPage({
                           {plan?.name ?? row.plan}
                         </p>
                         <span className="font-mono text-[11.5px] tabular-nums text-low">
-                          RM {Number(row.amount).toFixed(2)} · {utc(row.created_at)}
+                          RM {Number(row.amount).toFixed(2)} ·{" "}
+                          {utc(row.created_at)}
                         </span>
                       </div>
                       <StatusPill tone={state.tone}>{state.label}</StatusPill>
@@ -492,11 +444,12 @@ export default async function PayPage({
                       ref {row.reference}
                     </p>
 
-                    {row.status === "approved" && row.credit_granted !== null && (
-                      <p className="mt-1.5 font-mono text-[12px] font-medium text-accent-text">
-                        +{row.credit_granted} Credit granted
-                      </p>
-                    )}
+                    {row.status === "approved" &&
+                      row.credit_granted !== null && (
+                        <p className="mt-1.5 font-mono text-[12px] font-medium text-accent-text">
+                          +{row.credit_granted} Credit granted
+                        </p>
+                      )}
 
                     {row.decision_note && (
                       <p className="mt-1.5 text-[12px] leading-relaxed text-mid">
@@ -512,7 +465,11 @@ export default async function PayPage({
                         className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-accent-text hover:underline"
                       >
                         <span>View receipt</span>
-                        <ArrowUpRight aria-hidden="true" className="size-3" strokeWidth={1.75} />
+                        <ArrowUpRight
+                          aria-hidden="true"
+                          className="size-3"
+                          strokeWidth={1.75}
+                        />
                       </a>
                     ) : (
                       <p className="mt-1.5 break-all text-[11.5px] text-low">
