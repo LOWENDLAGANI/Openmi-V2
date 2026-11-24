@@ -6,6 +6,7 @@ import {
   Lightbulb,
   LogOut,
   Settings,
+  ShieldCheck,
   SquarePen,
   Trash2,
 } from "lucide-react";
@@ -31,6 +32,7 @@ export function Sidebar({
   repo,
   hourEndsAt,
   hourServerNow,
+  admin,
 }: {
   email: string;
   folders: Folder[];
@@ -41,6 +43,8 @@ export function Sidebar({
   repo?: { fullName: string; branch: string; sha: string } | null;
   hourEndsAt?: string | null;
   hourServerNow?: string | null;
+  /** Operators only: the panel 404s for everyone else, so the row stays hidden. */
+  admin?: boolean;
 }) {
   const newChatHref = repo
     ? `/chat?new=1&repo=${encodeURIComponent(repo.fullName)}&branch=${encodeURIComponent(repo.branch)}&sha=${encodeURIComponent(repo.sha)}`
@@ -124,6 +128,15 @@ export function Sidebar({
           <Lightbulb aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
           <span>Suggestions</span>
         </Link>
+        {admin && (
+          <Link
+            href="/admin"
+            className="rail-row flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-mid"
+          >
+            <ShieldCheck aria-hidden="true" className="size-4 shrink-0 text-low" strokeWidth={1.75} />
+            <span>Admin</span>
+          </Link>
+        )}
         <Link
           href={trashView ? "/chat" : "/chat?trash=1"}
           aria-label={trashView ? "Back to chats" : `Trash, ${trashedCount} chat(s)`}

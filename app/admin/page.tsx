@@ -166,6 +166,10 @@ export default async function AdminPage({
   }>;
 }) {
   const params = await searchParams;
+  // Answered before the page renders: a visitor without the role gets a real
+  // 404. This route has no loading.tsx for that reason — a loading boundary
+  // above this call would stream its skeleton with a 200 first and the status
+  // would be fixed before the gate was decided.
   const access = await readAdminAccess();
 
   if (access.state === "unconfigured") redirect("/setup");

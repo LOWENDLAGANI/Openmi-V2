@@ -53,6 +53,12 @@ const nextConfig = {
       // The deletion path, under the two names people arrive with.
       { source: "/delete-account", destination: "/account/delete", permanent: true },
       { source: "/data-deletion", destination: "/account/delete", permanent: true },
+      // The workspace is /chat. /agent is the name the branch prefix and the
+      // old links still use, so those addresses land on the page they mean
+      // instead of 404ing after sign-in.
+      { source: "/agent", destination: "/chat", permanent: true },
+      { source: "/agent/new", destination: "/chat?new=1", permanent: true },
+      { source: "/agent/:id", destination: "/chat?chat=:id", permanent: true },
     ];
   },
   reactStrictMode: true,

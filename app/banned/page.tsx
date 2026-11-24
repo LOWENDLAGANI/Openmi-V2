@@ -27,7 +27,10 @@ export default async function BannedPage() {
     : null;
 
   return (
-    <main className="animate-enter mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
+    <main
+      data-consent-scope="none"
+      className="animate-enter mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6"
+    >
       <div className="panel p-6">
         <p className="text-[12px] font-medium text-danger">Account suspended</p>
 

@@ -5,7 +5,7 @@ import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div data-consent-scope="none" className="flex min-h-dvh flex-col">
       <header className="border-b border-line bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-5 sm:px-8">
           <Link href="/" aria-label="Openmi home">

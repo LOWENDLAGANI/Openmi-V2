@@ -15,7 +15,7 @@ export default function ChatLoading() {
   return (
     <div
       aria-busy="true"
-      className="flex h-dvh min-h-dvh flex-col overflow-hidden md:grid md:grid-cols-[286px_minmax(0,1fr)]"
+      className="consent-aware-viewport flex min-h-0 flex-col overflow-hidden md:grid md:grid-cols-[286px_minmax(0,1fr)]"
     >
       <aside className="hidden border-r border-line bg-raised p-4 md:block">
         <div className="flex items-center gap-2.5 px-1 pb-5">
@@ -34,7 +34,7 @@ export default function ChatLoading() {
         </div>
       </aside>
 
-      <main className="flex h-dvh min-w-0 flex-col md:h-full md:min-h-0">
+      <main className="consent-aware-viewport flex min-w-0 flex-col md:h-full md:min-h-0">
         <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3 md:px-7">
           <div className="flex items-center gap-3">
             <div className="skeleton size-9 rounded-full md:hidden" />

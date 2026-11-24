@@ -36,7 +36,7 @@ export function AppShell({
   }, [open]);
 
   return (
-    <div className="flex h-dvh min-h-dvh flex-col overflow-hidden md:grid md:grid-cols-[268px_minmax(0,1fr)]">
+    <div className="consent-aware-viewport flex min-h-0 flex-col overflow-hidden md:grid md:grid-cols-[268px_minmax(0,1fr)]">
       <div className="hidden min-h-0 md:block">{sidebar}</div>
 
       {open && (
@@ -53,7 +53,7 @@ export function AppShell({
         </div>
       )}
 
-      <main className="flex h-dvh min-w-0 flex-col md:h-full md:min-h-0">
+      <main className="consent-aware-viewport flex min-w-0 flex-col md:h-full md:min-h-0">
         <header className="sticky top-0 z-30 flex h-13 shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur-md md:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <button

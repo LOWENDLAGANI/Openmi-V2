@@ -562,18 +562,15 @@ async function readCitationPaths(
 async function DraftChat({
   repo,
   session,
+  isAdmin,
 }: {
   repo: { fullName: string; branch: string; sha: string } | null;
   /** Resolved by the page. Asking again here cost `getUser` and a profile read. */
   session: SignedIn;
+  /** The page's single operator check, so drawing a draft asks nothing extra. */
+  isAdmin: boolean;
 }) {
-  // The page already holds the session, so this is the operator check alone
-  // rather than a second auth round trip on the way to drawing a draft.
-  const access = await soft(readAdminAccess(session), {
-    state: "forbidden",
-    email: null,
-  } as AdminAccess);
-  const models = modelsForReader(modelCatalogue(), access.state === "admin").filter(
+  const models = modelsForReader(modelCatalogue(), isAdmin).filter(
     (model) => model.id !== "auto"
   );
 
@@ -666,6 +663,7 @@ export default async function ChatPage({
     profileResult,
     hourResult,
     refilledBalance,
+    adminAccess,
   ] = await Promise.all([
     supabase.from("folders").select("id, name, created_at").order("name"),
     supabase
@@ -691,7 +689,16 @@ export default async function ChatPage({
       .gt("expires_at", new Date().toISOString())
       .maybeSingle(),
     refill,
+    // One operator check for the page: the rail's admin entry and a draft chat's
+    // model list both need it, and asking twice cost an `is_admin()` round trip
+    // on every load.
+    soft(readAdminAccess(session), {
+      state: "forbidden",
+      email: null,
+    } as AdminAccess),
   ]);
+
+  const isAdmin = adminAccess.state === "admin";
 
   const creditBalance =
     refilledBalance ??
@@ -799,7 +806,7 @@ export default async function ChatPage({
   } else if (!connection) {
     body = <ConnectPanel oauthEnabled={oauthConfigured()} />;
   } else if (draft) {
-    body = <DraftChat repo={draftRepo} session={session} />;
+    body = <DraftChat repo={draftRepo} session={session} isAdmin={isAdmin} />;
   } else if (activeChat && (!workspaceView || filesView)) {
     // The conversation streams into a boundary of its own instead of holding
     // the page. Awaiting it here made every GitHub read part of the first byte:
@@ -819,7 +826,7 @@ export default async function ChatPage({
       </Suspense>
     );
   } else {
-    body = <DraftChat repo={latestRepo} session={session} />;
+    body = <DraftChat repo={latestRepo} session={session} isAdmin={isAdmin} />;
   }
 
   const banner =
@@ -856,6 +863,7 @@ export default async function ChatPage({
           repo={currentRepo}
           hourEndsAt={hourEndsAt}
           hourServerNow={hourServerNow}
+          admin={isAdmin}
         />
       }
       eyebrow={eyebrow}

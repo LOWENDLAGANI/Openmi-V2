@@ -23,6 +23,10 @@ export const metadata = {
  * check, and this is the only page that can say which key is missing.
  */
 export default async function SetupPage() {
+  // Resolved before anything is rendered, so a visitor without the role gets a
+  // real 404 rather than a 200 carrying the not-found page. That is also why
+  // this route has no loading.tsx: a loading boundary above this call streams
+  // its skeleton with a 200 first, and the status can no longer be changed.
   const access = await readAdminAccess();
 
   if (access.state === "signed-out") redirect("/login?next=%2Fsetup");

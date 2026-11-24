@@ -9,6 +9,10 @@ import { OpenmiMark } from "@/components/OpenmiMark";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
+type Provider = "github" | "google";
+type FieldErrors = { email?: string; password?: string };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Carries the intended post-login destination across the OAuth round trip.
@@ -25,6 +29,104 @@ function setInviteCookie(code: string) {
   if (!trimmed) return;
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `openmi_ref=${encodeURIComponent(trimmed)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
+}
+
+/**
+ * Field-level validation, run on submit.
+ *
+ * The form is `noValidate`, so the browser's own bubble never appears and every
+ * message this component shows lands under the field it is about.
+ */
+function validate(mode: Mode, email: string, password: string): FieldErrors {
+  const errors: FieldErrors = {};
+  const address = email.trim();
+
+  if (address.length === 0) {
+    errors.email = "Enter your email address.";
+  } else if (!EMAIL_PATTERN.test(address)) {
+    errors.email = "Enter an address in the form name@example.com.";
+  }
+
+  if (password.length === 0) {
+    errors.password = "Enter your password.";
+  } else if (mode === "signup" && password.length < 8) {
+    errors.password = "Use at least 8 characters.";
+  }
+
+  return errors;
+}
+
+type AuthFailure = { message?: string; code?: string; status?: number };
+
+/**
+ * Supabase answers a failed attempt with one sentence. These are the answers
+ * that belong next to a field, so they are put there; anything else (a network
+ * failure, a provider that is switched off) stays a line above the button.
+ */
+function describeFailure(
+  caught: unknown,
+  mode: Mode
+): { fields?: FieldErrors; message?: string } {
+  const failure = (caught ?? {}) as AuthFailure;
+  const code = failure.code ?? "";
+  const message = (failure.message ?? "").toLowerCase();
+
+  if (code === "invalid_credentials" || message.includes("invalid login")) {
+    return {
+      fields: {
+        password:
+          mode === "signin"
+            ? "Email or password is incorrect. If you signed up with Google or GitHub, use that button above."
+            : "Email or password is incorrect.",
+      },
+    };
+  }
+
+  if (code === "email_not_confirmed" || message.includes("not confirmed")) {
+    return {
+      fields: {
+        email:
+          "Confirm this address first: open the link in your inbox, then sign in.",
+      },
+    };
+  }
+
+  if (
+    code === "user_already_exists" ||
+    code === "email_exists" ||
+    message.includes("already registered")
+  ) {
+    return {
+      fields: {
+        email: "An account with this address already exists. Sign in instead.",
+      },
+    };
+  }
+
+  if (
+    code === "weak_password" ||
+    message.includes("weak") ||
+    message.includes("password should be")
+  ) {
+    return {
+      fields: { password: "Choose a stronger password: 8 characters or more." },
+    };
+  }
+
+  if (
+    code === "over_email_send_rate_limit" ||
+    code === "over_request_rate_limit" ||
+    failure.status === 429
+  ) {
+    return { message: "Too many attempts. Wait a minute, then try again." };
+  }
+
+  return {
+    message:
+      typeof failure.message === "string" && failure.message.length > 0
+        ? failure.message
+        : "That did not work. Try again.",
+  };
 }
 
 export function AuthForm({
@@ -45,16 +147,40 @@ export function AuthForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // The credentials failure belongs to the pair, not to one field: it marks both
+  // inputs and puts its sentence under the password.
+  const [pairRejected, setPairRejected] = useState(false);
+
+  function clearField(field: keyof FieldErrors) {
+    setFieldErrors((current) =>
+      current[field] ? { ...current, [field]: undefined } : current
+    );
+    setPairRejected(false);
+  }
 
   function switchMode(target: Mode) {
     setMode(target);
     setError(null);
     setNotice(null);
+    setFieldErrors({});
+    setPairRejected(false);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!configured) return;
+
+    const nextErrors = validate(mode, email, password);
+    setFieldErrors(nextErrors);
+    setPairRejected(false);
+    setError(null);
+    setNotice(null);
+
+    if (nextErrors.email || nextErrors.password) {
+      document.getElementById(nextErrors.email ? "email" : "password")?.focus();
+      return;
+    }
 
     const supabase = supabaseBrowser();
     if (!supabase) {
@@ -63,8 +189,6 @@ export function AuthForm({
     }
 
     setBusy(true);
-    setError(null);
-    setNotice(null);
 
     try {
       if (mode === "signin") {
@@ -103,17 +227,23 @@ export function AuthForm({
       );
       setMode("signin");
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "That did not work. Try again."
-      );
+      const failure = describeFailure(caught, mode);
+      if (failure.fields) {
+        setFieldErrors(failure.fields);
+        setPairRejected(mode === "signin");
+        if (failure.fields.email) {
+          document.getElementById("email")?.focus();
+        } else {
+          document.getElementById("password")?.focus();
+        }
+      }
+      if (failure.message) setError(failure.message);
     } finally {
       setBusy(false);
     }
   }
 
-  async function google() {
+  async function oauth(provider: Provider) {
     if (!configured) return;
 
     const supabase = supabaseBrowser();
@@ -125,24 +255,33 @@ export function AuthForm({
     setBusy(true);
     setError(null);
     setNotice(null);
+    setFieldErrors({});
+    setPairRejected(false);
 
     setNextCookie(next);
     setInviteCookie(inviteCode);
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: "select_account" },
-      },
-    });
+    const options = {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      // Google is asked to list accounts; GitHub hands back the grant it has.
+      queryParams:
+        provider === "google" ? { prompt: "select_account" } : undefined,
+    };
+
+    // Each provider is named as a literal in its own call, so the provider this
+    // form talks to is greppable and cannot be swapped by a variable.
+    const { error: oauthError } =
+      provider === "github"
+        ? await supabase.auth.signInWithOAuth({ provider: "github", options })
+        : await supabase.auth.signInWithOAuth({ provider: "google", options });
 
     if (oauthError) {
       setBusy(false);
+      const label = provider === "github" ? "GitHub" : "Google";
       setError(
         oauthError.message.toLowerCase().includes("provider")
-          ? "Google sign-in is not enabled in Supabase Auth yet."
-          : "Google sign-in did not work. Try again."
+          ? `${label} sign-in is not enabled in Supabase Auth yet.`
+          : `${label} sign-in did not work. Try again.`
       );
     }
   }
@@ -159,6 +298,9 @@ export function AuthForm({
       </div>
     );
   }
+
+  const emailInvalid = Boolean(fieldErrors.email) || pairRejected;
+  const passwordInvalid = Boolean(fieldErrors.password) || pairRejected;
 
   return (
     <div className="w-full">
@@ -221,24 +363,35 @@ export function AuthForm({
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={google}
-        disabled={busy}
-        aria-busy={busy}
-        className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl border border-line-strong bg-card/85 px-4 py-3 text-[13.5px] font-medium text-hi shadow-[var(--card-shadow)] backdrop-blur-sm transition-colors hover:bg-hover disabled:opacity-60"
-      >
-        <GoogleMark />
-        <span>{busy ? "Opening Google…" : "Continue with Google"}</span>
-      </button>
+      <div className="mt-4 space-y-2">
+        <button
+          type="button"
+          onClick={() => oauth("github")}
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line-strong bg-card/85 px-4 py-3 text-[13.5px] font-medium text-hi shadow-[var(--card-shadow)] backdrop-blur-sm transition-colors hover:bg-hover disabled:opacity-60"
+        >
+          <GithubMark />
+          <span>Continue with GitHub</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => oauth("google")}
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line-strong bg-card/85 px-4 py-3 text-[13.5px] font-medium text-hi shadow-[var(--card-shadow)] backdrop-blur-sm transition-colors hover:bg-hover disabled:opacity-60"
+        >
+          <GoogleMark />
+          <span>Continue with Google</span>
+        </button>
+      </div>
 
       <div className="my-5 flex items-center gap-3.5" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
-        <span className="text-[12px] text-low">or</span>
+        <span className="text-[12px] text-low">or use email</span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} noValidate className="space-y-4">
         <div>
           <label
             htmlFor="email"
@@ -253,10 +406,25 @@ export function AuthForm({
             required
             autoComplete="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="field rounded-xl bg-card/85 px-3.5 py-2.5 text-[14px] backdrop-blur-sm"
+            aria-invalid={emailInvalid || undefined}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              clearField("email");
+            }}
+            className={`field rounded-xl bg-card/85 px-3.5 py-2.5 text-[14px] backdrop-blur-sm ${
+              emailInvalid ? "border-danger" : ""
+            }`}
             placeholder="you@example.com"
           />
+          {fieldErrors.email && (
+            <p
+              id="email-error"
+              className="mt-1.5 text-[12px] leading-relaxed text-danger"
+            >
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
 
         <div>
@@ -275,8 +443,17 @@ export function AuthForm({
               minLength={8}
               autoComplete={mode === "signin" ? "current-password" : "new-password"}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="field rounded-xl bg-card/85 py-2.5 pl-3.5 pr-10 text-[14px] backdrop-blur-sm"
+              aria-invalid={passwordInvalid || undefined}
+              aria-describedby={
+                fieldErrors.password ? "password-error" : undefined
+              }
+              onChange={(event) => {
+                setPassword(event.target.value);
+                clearField("password");
+              }}
+              className={`field rounded-xl bg-card/85 py-2.5 pl-3.5 pr-10 text-[14px] backdrop-blur-sm ${
+                passwordInvalid ? "border-danger" : ""
+              }`}
               placeholder="At least 8 characters"
             />
             <button
@@ -292,6 +469,14 @@ export function AuthForm({
               )}
             </button>
           </div>
+          {fieldErrors.password && (
+            <p
+              id="password-error"
+              className="mt-1.5 text-[12px] leading-relaxed text-danger"
+            >
+              {fieldErrors.password}
+            </p>
+          )}
         </div>
 
         {mode === "signup" && (
@@ -361,6 +546,19 @@ export function AuthForm({
         .
       </p>
     </div>
+  );
+}
+
+function GithubMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 16 16"
+      className="size-[17px] shrink-0 fill-current text-hi"
+    >
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
   );
 }
 
