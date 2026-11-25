@@ -95,6 +95,7 @@ export const RUN_TOOLS_CLAUSE = [
   "- publish: say where this turn's change goes — `default-branch` for the repository's default branch, `new-branch` for a branch of its own with no pull request, `pull-request` for a PR left unmerged. It writes nothing itself; the app commits this run's changed files when the run settles.",
   "Never run `git push`, `git push --dry-run` or any command that authenticates to GitHub. The sandbox has no credential and cannot push, and such a command is refused before it runs. `publish` is the only way a change is written; a request to push means choosing a destination with it.",
   "Paths are relative to the workspace root. Work through the files, then verify by running the project's own check or build command when it has one.",
+  "Batch read-only calls: when you need multiple files or searches (`read_file`, `search_code`, `list_files`, `git_history`, `github_read`), call them together in one step — they run in parallel.",
   "Read the destination from the reader's own sentence: \"push to main\" is default-branch, \"open a PR\" is pull-request, \"just a branch\" is new-branch. Call publish once, after the edits, when they asked for the change to land somewhere; do not call it when they only asked for the change itself.",
 ].join("\n");
 
