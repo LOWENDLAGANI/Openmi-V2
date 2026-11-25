@@ -29,6 +29,7 @@ import {
   RUN_MAX_STEPS,
   RUN_MAX_TOKENS,
   RUN_STREAM_HEARTBEAT_MS,
+  compactMessages,
   estimateTokens,
   runCostUsd,
   runWallClockMs,
@@ -93,6 +94,14 @@ type ToolCall = { id: string; name: string; args: string };
 const MAX_DELTA_BUFFER = 160;
 const DELTA_FLUSH_MS = 150;
 
+const READ_ONLY_TOOLS = new Set([
+  "read_file",
+  "search_code",
+  "list_files",
+  "git_history",
+  "github_read",
+]);
+
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 32);
 }
@@ -121,7 +130,11 @@ function summaryOf(text: string): string {
  * truncated answer with nothing to say it had been cut — which reads as the
  * model giving up rather than as the cap it hit.
  */
-function stoppedNote(status: RunStatus, stopReason: string): string {
+function stoppedNote(
+  status: RunStatus,
+  stopReason: string,
+  failure?: string | null
+): string {
   if (status === "cancelled") return "stopped before this answer finished";
 
   switch (stopReason) {
@@ -135,6 +148,12 @@ function stoppedNote(status: RunStatus, stopReason: string): string {
       return `this answer stopped before it finished: the run reached its ${RUN_MAX_TOKENS.toLocaleString()}-token estimate.`;
     case "worker-shutdown":
       return "this answer stopped before it finished: the worker restarted.";
+    case "error": {
+      const detail = failure ? summaryOf(failure) : "";
+      return detail.length > 0
+        ? `this answer stopped before it finished: ${detail}`
+        : "this answer stopped before it finished";
+    }
     default:
       return "this answer stopped before it finished";
   }
@@ -363,19 +382,24 @@ export async function executeRun(
 
         let deltaBuffer = "";
         let lastFlush = 0;
+        let deltaFlushChain: Promise<void> = Promise.resolve();
         let reasoningBuffer = "";
         let lastReasoningFlush = 0;
+        let reasoningFlushChain: Promise<void> = Promise.resolve();
 
-        const flushDeltas = async (force = false) => {
-          if (deltaBuffer.length === 0) return;
+        const flushDeltas = (force = false): Promise<void> => {
+          if (deltaBuffer.length === 0) return deltaFlushChain;
           if (!force && deltaBuffer.length < MAX_DELTA_BUFFER && Date.now() - lastFlush < DELTA_FLUSH_MS) {
-            return;
+            return deltaFlushChain;
           }
 
           const text = deltaBuffer;
           deltaBuffer = "";
           lastFlush = Date.now();
-          await appendEvent(admin, runId, "message.delta", { text });
+          deltaFlushChain = deltaFlushChain
+            .then(() => appendEvent(admin, runId, "message.delta", { text }))
+            .then(() => undefined, () => undefined);
+          return deltaFlushChain;
         };
 
         /**
@@ -386,20 +410,23 @@ export async function executeRun(
          * folds it away and opens it on request; the answer is still a separate
          * channel, so nothing here can be mistaken for one.
          */
-        const flushReasoning = async (force = false) => {
-          if (reasoningBuffer.length === 0) return;
+        const flushReasoning = (force = false): Promise<void> => {
+          if (reasoningBuffer.length === 0) return reasoningFlushChain;
           if (
             !force &&
             reasoningBuffer.length < MAX_DELTA_BUFFER &&
             Date.now() - lastReasoningFlush < DELTA_FLUSH_MS
           ) {
-            return;
+            return reasoningFlushChain;
           }
 
           const text = reasoningBuffer;
           reasoningBuffer = "";
           lastReasoningFlush = Date.now();
-          await appendEvent(admin, runId, "message.reasoning", { text });
+          reasoningFlushChain = reasoningFlushChain
+            .then(() => appendEvent(admin, runId, "message.reasoning", { text }))
+            .then(() => undefined, () => undefined);
+          return reasoningFlushChain;
         };
 
         const emitUsage = async () => {
@@ -453,6 +480,15 @@ export async function executeRun(
             break;
           }
 
+          const compacted = compactMessages(messages);
+          if (compacted.evicted > 0) {
+            messages.splice(0, messages.length, ...compacted.messages);
+            await appendEvent(admin, runId, "warning", {
+              code: "context-compacted",
+              message: `Dropped ${compacted.evicted} older message(s) to stay within the context budget.`,
+            });
+          }
+
           const stepInput = estimateTokens(
             messages.map((message) => message.content).join("\n")
           );
@@ -499,15 +535,14 @@ export async function executeRun(
                 if (event.type === "text") {
                   stepText += event.text;
                   deltaBuffer += event.text;
-                  outputTokens += estimateTokens(event.text);
-                  await flushDeltas();
+                  void flushDeltas();
                 } else if (event.type === "reasoning") {
                   // Kept for the provider that requires it echoed back, and sent to
                   // the chat on its own channel so the reader can watch it think.
                   stepReasoning += event.text;
                   collectedReasoning += event.text;
                   reasoningBuffer += event.text;
-                  await flushReasoning();
+                  void flushReasoning();
                 } else {
                   const existing = fragments.get(event.index) ?? {
                     id: "",
@@ -545,6 +580,9 @@ export async function executeRun(
           await flushDeltas(true);
           await flushReasoning(true);
 
+          const stepOutput = stepText.length > 0 ? estimateTokens(stepText) : 0;
+          outputTokens += stepOutput;
+
           const calls = [...fragments.values()]
             .filter((call) => call.name.length > 0)
             .map((call, index) => ({
@@ -562,7 +600,7 @@ export async function executeRun(
 
             await finishStep(admin, runId, idx, {
               input_tokens: stepInput,
-              output_tokens: estimateTokens(stepText),
+              output_tokens: stepOutput,
               finish_reason: wasCancelled ? "cancelled" : "error",
               tool_names: [],
               duration_ms: Date.now() - stepStartedAt,
@@ -601,7 +639,7 @@ export async function executeRun(
           if (calls.length === 0) {
             await finishStep(admin, runId, idx, {
               input_tokens: stepInput,
-              output_tokens: estimateTokens(stepText),
+              output_tokens: stepOutput,
               finish_reason: "stop",
               tool_names: [],
               duration_ms: Date.now() - stepStartedAt,
@@ -630,8 +668,33 @@ export async function executeRun(
 
           const toolNames: string[] = [];
 
-          for (const [index, call] of calls.entries()) {
-            if (await isCancelledNow()) {
+          type PreparedCall = {
+            index: number;
+            call: ToolCall;
+            args: Record<string, unknown> | null;
+            command: string | undefined;
+            stepOffset: number;
+            chatStepIdx: number;
+          };
+
+          const batches: ToolCall[][] = [];
+          for (const call of calls) {
+            const last = batches[batches.length - 1];
+            if (
+              last &&
+              READ_ONLY_TOOLS.has(call.name) &&
+              READ_ONLY_TOOLS.has(last[0].name)
+            ) {
+              last.push(call);
+            } else {
+              batches.push([call]);
+            }
+          }
+
+          let callIndex = 0;
+
+          for (const batch of batches) {
+            if (cancelController.signal.aborted) {
               cancelled = true;
               break;
             }
@@ -643,130 +706,136 @@ export async function executeRun(
               break;
             }
 
-            const args = parseArgs(call.args);
-            toolNames.push(call.name);
+            const prepared: PreparedCall[] = batch.map((call) => {
+              const args = parseArgs(call.args);
+              toolNames.push(call.name);
+              const command =
+                typeof args?.command === "string" ? args.command : undefined;
+              const stepOffset = collectedText.length;
+              const chatStepIdx = chatSteps.length;
 
-            const command =
-              typeof args?.command === "string" ? args.command : undefined;
-            const stepOffset = collectedText.length;
-
-            await appendEvent(admin, runId, "tool.started", {
-              name: call.name,
-              summary: toolSummary(call.name, args),
-              ...(command ? { command } : {}),
-            });
-
-            chatSteps.push({
-              tool: call.name,
-              detail: toolSummary(call.name, args),
-              state: "start",
-              command,
-              offset: stepOffset,
-            });
-
-            const toolStartedAt = Date.now();
-            const result: RunToolResult = await executeRunTool({
-              name: call.name,
-              args,
-              sandbox,
-              github:
-                github && run.repo_full_name
-                  ? { token: github.token, repo: run.repo_full_name }
-                  : null,
-              signal: runSignal,
-            }).catch((caught: unknown) => ({
-              ok: false,
-              isError: true,
-              text: caught instanceof Error ? caught.message : "The tool failed.",
-              preview: "tool failed",
-            }));
-
-            const durationMs = Date.now() - toolStartedAt;
-
-            if (result.publish) publishDestination = result.publish;
-
-            // An attempt to reach loopback, a private range or the metadata service
-            // is the one tool failure that is about intent rather than a bad
-            // command. One signal per run: the operator needs to know it happened,
-            // not how many times the model retried.
-            if (
-              result.text.startsWith("refused:") &&
-              firstSignalIn(`egress:${runId}`, 6 * 3_600_000)
-            ) {
-              void recordRiskSignal({
-                userId: run.owner,
-                kind: "sandbox-egress",
-                severity: "high",
-                summary:
-                  "A sandbox command named an internal address and was refused",
-                detail: {
-                  runId,
-                  tool: call.name,
-                  command:
-                    typeof args?.command === "string"
-                      ? args.command.slice(0, 200)
-                      : null,
-                },
-                route: "worker:run_command",
-              });
-            }
-
-            await appendToolCall(admin, {
-              runId,
-              stepIdx: idx,
-              idx: index + 1,
-              name: call.name,
-              args,
-              result: capPayload(
-                { ok: result.ok, isError: result.isError, text: result.text.slice(0, 32_000) },
-                64_000
-              ),
-              isError: result.isError,
-              durationMs,
-            });
-
-            // Keep the stored step in step with the one the reader watched: a
-            // finished tool replaces its start entry rather than adding a second.
-            {
-              let stepIndex = -1;
-              for (let i = chatSteps.length - 1; i >= 0; i -= 1) {
-                if (
-                  chatSteps[i].state === "start" &&
-                  chatSteps[i].tool === call.name
-                ) {
-                  stepIndex = i;
-                  break;
-                }
-              }
-
-              const finished: AgentStep = {
+              chatSteps.push({
                 tool: call.name,
                 detail: toolSummary(call.name, args),
+                state: "start",
+                command,
+                offset: stepOffset,
+              });
+
+              return {
+                index: callIndex++,
+                call,
+                args,
+                command,
+                stepOffset,
+                chatStepIdx,
+              };
+            });
+
+            await Promise.all(
+              prepared.map((item) =>
+                appendEvent(admin, runId, "tool.started", {
+                  name: item.call.name,
+                  summary: toolSummary(item.call.name, item.args),
+                  ...(item.command ? { command: item.command } : {}),
+                })
+              )
+            );
+
+            const results = await Promise.all(
+              prepared.map(async (item) => {
+                const toolStartedAt = Date.now();
+                const result: RunToolResult = await executeRunTool({
+                  name: item.call.name,
+                  args: item.args,
+                  sandbox,
+                  github:
+                    github && run.repo_full_name
+                      ? { token: github.token, repo: run.repo_full_name }
+                      : null,
+                  signal: runSignal,
+                }).catch((caught: unknown) => ({
+                  ok: false,
+                  isError: true,
+                  text: caught instanceof Error ? caught.message : "The tool failed.",
+                  preview: "tool failed",
+                }));
+                return { item, result, durationMs: Date.now() - toolStartedAt };
+              })
+            );
+
+            const dbWrites: Promise<unknown>[] = [];
+
+            for (const { item, result, durationMs } of results) {
+              if (result.publish) publishDestination = result.publish;
+
+              // An attempt to reach loopback, a private range or the metadata service
+              // is the one tool failure that is about intent rather than a bad
+              // command. One signal per run: the operator needs to know it happened,
+              // not how many times the model retried.
+              if (
+                result.text.startsWith("refused:") &&
+                firstSignalIn(`egress:${runId}`, 6 * 3_600_000)
+              ) {
+                void recordRiskSignal({
+                  userId: run.owner,
+                  kind: "sandbox-egress",
+                  severity: "high",
+                  summary:
+                    "A sandbox command named an internal address and was refused",
+                  detail: {
+                    runId,
+                    tool: item.call.name,
+                    command:
+                      typeof item.args?.command === "string"
+                        ? item.args.command.slice(0, 200)
+                        : null,
+                  },
+                  route: "worker:run_command",
+                });
+              }
+
+              chatSteps[item.chatStepIdx] = {
+                tool: item.call.name,
+                detail: toolSummary(item.call.name, item.args),
                 state: result.isError ? "error" : "done",
-                command:
-                  typeof args?.command === "string" ? args.command : undefined,
+                command: item.command,
                 output: previewText(result.text, 400),
-                offset: stepIndex >= 0 ? chatSteps[stepIndex].offset : stepOffset,
+                offset: item.stepOffset,
               };
 
-              if (stepIndex >= 0) chatSteps[stepIndex] = finished;
-              else chatSteps.push(finished);
+              messages.push({
+                role: "tool",
+                tool_call_id: item.call.id,
+                content: result.text,
+              });
+
+              dbWrites.push(
+                appendToolCall(admin, {
+                  runId,
+                  stepIdx: idx,
+                  idx: item.index + 1,
+                  name: item.call.name,
+                  args: item.args,
+                  result: capPayload(
+                    { ok: result.ok, isError: result.isError, text: result.text.slice(0, 32_000) },
+                    64_000
+                  ),
+                  isError: result.isError,
+                  durationMs,
+                }),
+                appendEvent(admin, runId, "tool.finished", {
+                  name: item.call.name,
+                  isError: result.isError,
+                  durationMs,
+                  resultPreview: previewText(result.text, 400),
+                })
+              );
             }
 
-            await appendEvent(admin, runId, "tool.finished", {
-              name: call.name,
-              isError: result.isError,
-              durationMs,
-              resultPreview: previewText(result.text, 400),
-            });
+            await Promise.all(dbWrites);
 
-            messages.push({
-              role: "tool",
-              tool_call_id: call.id,
-              content: result.text,
-            });
-
-            if (await isCancelledNow()) {
+            if (cancelController.signal.aborted) {
               cancelled = true;
               break;
             }
@@ -781,7 +850,7 @@ export async function executeRun(
 
           await finishStep(admin, runId, idx, {
             input_tokens: stepInput,
-            output_tokens: estimateTokens(stepText),
+            output_tokens: stepOutput,
             finish_reason: cancelled ? "cancelled" : "tool_calls",
             tool_names: toolNames,
             duration_ms: Date.now() - stepStartedAt,
@@ -842,7 +911,7 @@ export async function executeRun(
         status === "done"
           ? answerText
           : partial.trim().length > 0
-            ? `${partial}\n\n_(${stoppedNote(status, stopReason)})_`
+            ? `${partial}\n\n_(${stoppedNote(status, stopReason, failure)})_`
             : partial;
 
       // For a completed turn, `deliveredText` is the final answer written after

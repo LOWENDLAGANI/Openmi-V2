@@ -105,8 +105,6 @@ export async function openRunWorkspace(
     };
   }
 
-  await input.runId; // the id is already recorded on the box's metadata
-
   const made = await sandbox.exec(`mkdir -p ${RUN_WORKDIR}`, ".", 60_000);
 
   if (made.exitCode !== 0) {

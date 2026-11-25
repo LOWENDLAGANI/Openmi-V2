@@ -118,7 +118,7 @@ export const RUN_EVENT_MAX_BYTES = 16_000;
 /** Tool caps. A refusal names the number; nothing is silently truncated. */
 export const RUN_TOOL_OUTPUT_BYTES = 32_768;
 export const RUN_READ_MAX_BYTES = 200_000;
-export const RUN_READ_MAX_LINES = 400;
+export const RUN_READ_MAX_LINES = 800;
 export const RUN_WRITE_MAX_CHARS = 200_000;
 export const RUN_EDIT_MAX_BYTES = 400_000;
 export const RUN_SEARCH_MAX_HITS = 40;

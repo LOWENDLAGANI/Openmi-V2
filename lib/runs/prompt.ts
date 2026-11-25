@@ -1,5 +1,6 @@
 import {
   RUN_INSTRUCTIONS_MAX_CHARS,
+  RUN_READ_MAX_LINES,
   RUN_TREE_MAX_CHARS,
   RUN_TREE_MAX_PATHS,
 } from "./limits";
@@ -81,7 +82,7 @@ export const RUN_UNTRUSTED_DATA_CLAUSE =
 
 export const RUN_TOOLS_CLAUSE = [
   "Your tools:",
-  "- read_file: read a text file with line numbers, up to 400 lines per call.",
+  `- read_file: read a text file with line numbers, up to ${RUN_READ_MAX_LINES} lines per call.`,
   "- write_file: create or replace one whole file.",
   "- edit_file: replace one exact, unique piece of text in a file.",
   "- search_code: ripgrep the workspace, up to 40 hits.",
@@ -105,26 +106,37 @@ export const INSTRUCTION_FILES = [
   "README.md",
 ] as const;
 
+const INSTR_MARKER_PREFIX = "===OPENMI_INSTR:";
+const INSTR_MARKER_SUFFIX = "===";
+
 /**
  * Reads the repository's own instructions, bounded.
  *
- * Read with `head -c` so a 2 MB README cannot fill the context before the first
- * model call. Missing files are skipped silently; that is not an error.
+ * Read in a single `sandbox.exec` with `head -c` so a 2 MB README cannot fill
+ * the context before the first model call and startup avoids 4 serial execs.
  */
 export async function readProjectInstructions(
   sandbox: SandboxHandle
 ): Promise<string | null> {
+  const script = INSTRUCTION_FILES.map(
+    (path) =>
+      `if [ -f ${path} ]; then printf '\\n${INSTR_MARKER_PREFIX}%s${INSTR_MARKER_SUFFIX}\\n' ${path}; head -c ${RUN_INSTRUCTIONS_MAX_CHARS} ${path}; fi`
+  ).join("; ");
+
+  const read = await sandbox.exec(script, RUN_WORKDIR, 30_000);
+  if (read.exitCode !== 0 || read.output.trim().length === 0) return null;
+
   const sections: string[] = [];
+  const parts = read.output.split(INSTR_MARKER_PREFIX);
 
-  for (const path of INSTRUCTION_FILES) {
-    const read = await sandbox.exec(
-      `test -f ${path} && head -c ${RUN_INSTRUCTIONS_MAX_CHARS} ${path} || true`,
-      RUN_WORKDIR,
-      30_000
-    );
+  for (const part of parts) {
+    const end = part.indexOf(INSTR_MARKER_SUFFIX);
+    if (end === -1) continue;
 
-    const text = read.output.trim();
-    if (read.exitCode === 0 && text.length > 0) {
+    const path = part.slice(0, end).trim();
+    const text = part.slice(end + INSTR_MARKER_SUFFIX.length).trim();
+
+    if (path.length > 0 && text.length > 0) {
       sections.push(`--- ${path} ---\n${text.slice(0, RUN_INSTRUCTIONS_MAX_CHARS)}`);
     }
   }

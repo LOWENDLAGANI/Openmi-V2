@@ -100,13 +100,13 @@ export const RUN_TOOL_SPECS: AgentToolDefinition[] = [
   {
     name: "read_file",
     description:
-      "Read a text file from the workspace with line numbers. Paths are relative to the workspace root. Refuses files over 200,000 bytes and caps a read at 400 lines; use offset to continue.",
+      `Read a text file from the workspace with line numbers. Paths are relative to the workspace root. Refuses files over 200,000 bytes and caps a read at ${RUN_READ_MAX_LINES} lines; use offset to continue.`,
     parameters: {
       type: "object",
       properties: {
         path: { type: "string", description: "Workspace-relative path, e.g. src/app/page.tsx." },
         offset: { type: "integer", description: "First line to read, 1-based. Default 1." },
-        limit: { type: "integer", description: "How many lines to read. Default 400, max 400." },
+        limit: { type: "integer", description: `How many lines to read. Default ${RUN_READ_MAX_LINES}, max ${RUN_READ_MAX_LINES}.` },
       },
       required: ["path"],
       additionalProperties: false,
