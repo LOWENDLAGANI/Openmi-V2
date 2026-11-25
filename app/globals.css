@@ -1366,3 +1366,241 @@ html.ink .mark-on-light {
   position: relative;
   background-color: var(--bg);
 }
+
+/* ── Landing: Groq-style bone ground, system type, scroll-filled manifesto ───
+   The marketing page borrows groq.com's material language — warm bone paper
+   (#f3f3ee), warm near-black ink (#302b28), signal orange, and the platform's
+   own UI face — without touching the app's semantic tokens. Every override is
+   scoped to `.lp`, so the product screens keep their cool-grey-cobalt palette.
+   The manifesto paragraphs fill from muted to ink as they cross the viewport
+   (components/ScrollFillText.tsx). */
+
+.lp {
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --bg: #f3f3ee;
+  --bg-raised: #eaeae2;
+  --card: #fafaf6;
+  --chip: #e6e6dd;
+  --hover: #e2e2d8;
+  --elevated: #ffffff;
+  --dock: #f3f3ee;
+
+  --line: rgba(48, 43, 40, 0.13);
+  --line-strong: rgba(48, 43, 40, 0.26);
+
+  --text-hi: #26221f;
+  --text: #302b28;
+  --text-mid: #57514c;
+  --text-low: #6a635c;
+
+  --accent: #c73a12;
+  --accent-text: #ab300c;
+  --accent-soft: rgba(199, 58, 18, 0.1);
+  --on-accent: #ffffff;
+  --accent-bright: #f55036;
+
+  --ground-sage: #e9ebe0;
+  --ground-sage-hi: #f2f3ec;
+
+  --fill-ink: #26221f;
+  --fill-muted: #c9c6ba;
+
+  --r-btn: 4px;
+}
+
+html.dark .lp,
+html.ink .lp {
+  --bg: #131210;
+  --bg-raised: #1b1a17;
+  --card: #1b1a17;
+  --chip: #24221f;
+  --hover: #282622;
+  --elevated: #2b2926;
+  --dock: #131210;
+
+  --line: rgba(243, 243, 238, 0.12);
+  --line-strong: rgba(243, 243, 238, 0.26);
+
+  --text-hi: #f5f4ee;
+  --text: #e3e1d9;
+  --text-mid: #b4b0a6;
+  --text-low: #a29e94;
+
+  --accent: #ff5b30;
+  --accent-text: #ff9d80;
+  --accent-soft: rgba(255, 91, 48, 0.16);
+  --on-accent: #1b0f0a;
+
+  --ground-sage: #1c1b17;
+  --ground-sage-hi: #22211c;
+
+  --fill-ink: #f5f4ee;
+  --fill-muted: #4c4942;
+}
+
+.lp,
+.lp h1,
+.lp h2,
+.lp h3,
+.lp h4,
+.lp .btn,
+.lp .t-link {
+  font-family: var(--font-system);
+}
+
+.lp .lp-wrap {
+  width: min(100% - 2.5rem, 1180px);
+}
+
+@media (min-width: 1024px) {
+  .lp .lp-wrap {
+    width: min(100% - 8rem, 1180px);
+  }
+}
+
+.lp .site-nav {
+  background-color: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+.lp .btn {
+  border-radius: var(--r-btn);
+  font-weight: 500;
+}
+
+.lp .btn:not(.btn-primary) {
+  background-color: transparent;
+  border-color: var(--line-strong);
+  color: var(--text-hi);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp .btn:not(.btn-primary):hover:not(:disabled) {
+    background-color: var(--hover);
+    border-color: var(--text-mid);
+    color: var(--text-hi);
+  }
+}
+
+.lp .btn-primary {
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp .btn-primary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--accent) 82%, #000);
+    color: var(--on-accent);
+  }
+}
+
+/* Display type */
+
+.display-xl {
+  font-size: clamp(2.6rem, 6.4vw, 5.35rem);
+  line-height: 0.98;
+  letter-spacing: -0.042em;
+  font-weight: 500;
+  color: var(--text-hi);
+  text-wrap: balance;
+}
+
+.display-lg {
+  font-size: clamp(2.15rem, 4.2vw, 3.5rem);
+  line-height: 1.04;
+  letter-spacing: -0.036em;
+  font-weight: 500;
+  color: var(--text-hi);
+  text-wrap: balance;
+}
+
+.display-md {
+  font-size: clamp(1.6rem, 2.6vw, 2.15rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  color: var(--text-hi);
+}
+
+.lp .accent-word {
+  color: var(--accent-text);
+}
+
+.lp .hairline {
+  height: 1px;
+  background-color: var(--line);
+}
+
+/* Manifesto: muted words fill to ink as they cross 62% of the viewport */
+
+.manifesto {
+  max-width: 30ch;
+  font-size: clamp(2rem, 4.5vw, 3.45rem);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+  color: var(--fill-ink);
+}
+
+.manifesto-stanza {
+  margin: 0;
+}
+
+.manifesto-stanza + .manifesto-stanza {
+  margin-top: 0.6em;
+}
+
+.manifesto-stanza--tight + .manifesto-stanza--tight {
+  margin-top: 0.35em;
+}
+
+.fill-word {
+  color: var(--fill-muted);
+  transition: color 360ms ease;
+}
+
+.fill-word.is-filled {
+  color: var(--fill-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill-word {
+    color: var(--fill-ink);
+    transition: none;
+  }
+}
+
+/* Feature index numerals and stat rows */
+
+.feature-index {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--accent-text);
+}
+
+.lp .stat-value {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 500;
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+.lp .product-stage {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background-color: var(--bg-raised);
+  padding: clamp(0.75rem, 2.5vw, 1.75rem);
+}
+
+.lp footer .wordmark {
+  font-size: clamp(4.25rem, 14vw, 11rem);
+  line-height: 0.82;
+  letter-spacing: -0.055em;
+  font-weight: 500;
+  color: var(--text-hi);
+}
