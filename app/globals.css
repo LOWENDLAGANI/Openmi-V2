@@ -1372,8 +1372,8 @@ html.ink .mark-on-light {
    (#f3f3ee), warm near-black ink (#302b28), signal orange, and the platform's
    own UI face — without touching the app's semantic tokens. Every override is
    scoped to `.lp`, so the product screens keep their cool-grey-cobalt palette.
-   The manifesto paragraphs fill from muted to ink as they cross the viewport
-   (components/ScrollFillText.tsx). */
+   The whole question/answer page fills from muted to ink, word by word, as it
+   crosses the viewport (components/ScrollFillText.tsx). */
 
 .lp {
   --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Display",
@@ -1405,7 +1405,7 @@ html.ink .mark-on-light {
   --ground-sage-hi: #f2f3ec;
 
   --fill-ink: #26221f;
-  --fill-muted: #c9c6ba;
+  --fill-muted: #b8b2a4;
 
   --r-btn: 4px;
 }
@@ -1437,7 +1437,7 @@ html.ink .lp {
   --ground-sage-hi: #22211c;
 
   --fill-ink: #f5f4ee;
-  --fill-muted: #4c4942;
+  --fill-muted: #5a564d;
 }
 
 .lp,
@@ -1533,68 +1533,102 @@ html.ink .lp {
   background-color: var(--line);
 }
 
-/* Manifesto: muted words fill to ink as they cross 62% of the viewport */
+/* Question/answer flow: the whole page fills from muted to ink in one pass */
 
-.manifesto {
-  max-width: 30ch;
-  font-size: clamp(2rem, 4.5vw, 3.45rem);
-  line-height: 1.1;
-  letter-spacing: -0.035em;
+.qa-kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--accent-text);
+}
+
+.qa-flow {
+  display: flex;
+  flex-direction: column;
+}
+
+.qa-item {
+  display: grid;
+  gap: 0.85rem;
+  border-top: 1px solid var(--line);
+  padding: clamp(1.9rem, 4.4vw, 3.4rem) 0;
+}
+
+@media (min-width: 900px) {
+  .qa-item {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 2.5rem;
+  }
+}
+
+.qa-index {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--accent-text);
+  padding-top: 0.6em;
+}
+
+.qa-body {
+  min-width: 0;
+}
+
+.qa-q {
+  margin: 0;
+  max-width: 32ch;
+  font-size: clamp(1.75rem, 4.6vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.034em;
   font-weight: 500;
+  text-wrap: balance;
   color: var(--fill-ink);
 }
 
-.manifesto-stanza {
-  margin: 0;
-}
-
-.manifesto-stanza + .manifesto-stanza {
-  margin-top: 0.6em;
-}
-
-.manifesto-stanza--tight + .manifesto-stanza--tight {
-  margin-top: 0.35em;
+.qa-a {
+  margin: clamp(0.9rem, 1.8vw, 1.35rem) 0 0;
+  max-width: 46ch;
+  font-size: clamp(1.15rem, 2.15vw, 1.6rem);
+  line-height: 1.45;
+  letter-spacing: -0.014em;
+  color: var(--fill-ink);
 }
 
 .fill-word {
-  color: var(--fill-muted);
-  transition: color 360ms ease;
+  color: var(--fill-ink);
 }
 
-.fill-word.is-filled {
+/* The muted baseline only applies once the effect has measured. */
+.fill-root[data-fill-ready] .fill-word {
+  color: var(--fill-muted);
+  transition: color 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.fill-root[data-fill-ready] .fill-word.is-filled {
   color: var(--fill-ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fill-word {
-    color: var(--fill-ink);
+  .fill-root[data-fill-ready] .fill-word {
+    color: var(--fill-ink) !important;
     transition: none;
   }
 }
 
-/* Feature index numerals and stat rows */
-
-.feature-index {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  color: var(--accent-text);
+.qa-close {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  border-top: 1px solid var(--line);
+  padding-top: clamp(2.5rem, 5vw, 4rem);
 }
 
-.lp .stat-value {
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1;
-  letter-spacing: -0.04em;
-  font-weight: 500;
-  color: var(--text-hi);
-  font-variant-numeric: tabular-nums;
-}
-
-.lp .product-stage {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background-color: var(--bg-raised);
-  padding: clamp(0.75rem, 2.5vw, 1.75rem);
+@media (min-width: 900px) {
+  .qa-close {
+    flex-direction: row;
+    align-items: flex-end;
+  }
 }
 
 .lp footer .wordmark {
