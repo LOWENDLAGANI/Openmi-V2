@@ -1,47 +1,47 @@
 @import "tailwindcss";
 
-/* ── Three themes, one semantic token layer (tasteskill 2.5.1: cool-grey-cobalt) ──
-   Paper (default) uses the dealt cool-grey-cobalt palette (#eef0f3 ground,
-   #e2e5ea surface, #0b0c0e ink, #1f2de6 cobalt). Dark is Obsidian (#0b0c0e);
+/* ── Three themes, one semantic token layer ──
+   Paper (default) uses the cheerful Candy Pink (#FFB5D8), Lime Burst (#C6FF4D),
+   and Chrome Silver (#D9D9D9) palette. Dark is Obsidian (#0b0c0e);
    Ink is Midnight Slate (#0c1118, zero purple/lavender). Every pair clears
    WCAG 4.5:1 via `node scripts/check-contrast.mjs`. */
 
 :root {
   color-scheme: light;
 
-  --bg: #eef0f3;
-  --bg-raised: #e2e5ea;
-  --card: #f8f9fb;
-  --chip: #e2e5ea;
-  --hover: #d8dce3;
+  --bg: #f6f4f6;
+  --bg-raised: #d9d9d9;
+  --card: #ffffff;
+  --chip: #d9d9d9;
+  --hover: #c9c9c9;
   --elevated: #ffffff;
-  --dock: #f4f5f7;
+  --dock: #f2eff3;
 
-  --line: rgba(11, 12, 14, 0.11);
-  --line-strong: rgba(11, 12, 14, 0.2);
-  --card-border: rgba(11, 12, 14, 0.1);
-  --chip-border: rgba(11, 12, 14, 0.12);
+  --line: rgba(22, 16, 20, 0.12);
+  --line-strong: rgba(22, 16, 20, 0.22);
+  --card-border: rgba(22, 16, 20, 0.11);
+  --chip-border: rgba(22, 16, 20, 0.14);
   --card-shadow: none;
 
-  --text-hi: #0b0c0e;
-  --text: #1c1f24;
-  --text-mid: #474e5a;
-  --text-low: #505763;
+  --text-hi: #120d11;
+  --text: #21191f;
+  --text-mid: #4a3f46;
+  --text-low: #574c53;
 
-  --accent: #1f2de6;
-  --accent-text: #1824c7;
-  --accent-soft: rgba(31, 45, 230, 0.08);
-  --on-accent: #ffffff;
+  --accent: #ffb5d8;
+  --accent-text: #9e1354;
+  --accent-soft: rgba(255, 181, 216, 0.28);
+  --on-accent: #1a0b13;
 
-  --inv-bg: #0b0c0e;
-  --inv-surface: #15171a;
-  --inv-ink: #eef0f3;
-  --inv-muted: #9ca3af;
-  --inv-line: rgba(238, 240, 243, 0.12);
+  --inv-bg: #120d11;
+  --inv-surface: #1d161b;
+  --inv-ink: #f6f4f6;
+  --inv-muted: #b6a8b1;
+  --inv-line: rgba(246, 244, 246, 0.14);
 
-  --ground-sage: #cdd6c6;
-  --ground-sage-hi: #dce3d6;
-  --ground-sage-ink: #262d24;
+  --ground-sage: #c6ff4d;
+  --ground-sage-hi: #dcff8a;
+  --ground-sage-ink: #141d04;
 
   --r-sm: 4px;
   --r-md: 6px;
@@ -51,21 +51,21 @@
   --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --bubble-user: #0b0c0e;
-  --bubble-user-text: #eef0f3;
+  --bubble-user: #ffb5d8;
+  --bubble-user-text: #1a0b13;
 
   --danger: #b91c1c;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
   --danger-strong: #991b1b;
-  --warn: #9a3412;
+  --warn: #7c2d12;
   --warn-bg: #fffbeb;
   --warn-border: #fde68a;
-  --warn-strong: #7c2d12;
-  --azure: #1f2de6;
-  --code: #9a3412;
-  --diff-add: #15803d;
-  --diff-add-bg: rgba(21, 128, 61, 0.09);
+  --warn-strong: #6c2710;
+  --azure: #9e1354;
+  --code: #9e1354;
+  --diff-add: #3b6e00;
+  --diff-add-bg: rgba(198, 255, 77, 0.28);
 
   --surface: none;
 }
@@ -401,7 +401,7 @@ html.ink {
   @media (hover: hover) and (pointer: fine) {
     .btn-primary:hover:not(:disabled) {
       border-color: transparent;
-      background-color: color-mix(in srgb, var(--accent) 86%, var(--text-hi));
+      background-color: color-mix(in srgb, var(--accent) 82%, #ff5ca8);
       color: var(--on-accent);
     }
 
@@ -1379,33 +1379,33 @@ html.ink .mark-on-light {
   --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Display",
     "SF Pro Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  --bg: #f3f3ee;
-  --bg-raised: #eaeae2;
-  --card: #fafaf6;
-  --chip: #e6e6dd;
-  --hover: #e2e2d8;
+  --bg: #f6f4f6;
+  --bg-raised: #d9d9d9;
+  --card: #ffffff;
+  --chip: #d9d9d9;
+  --hover: #c9c9c9;
   --elevated: #ffffff;
-  --dock: #f3f3ee;
+  --dock: #f6f4f6;
 
-  --line: rgba(48, 43, 40, 0.13);
-  --line-strong: rgba(48, 43, 40, 0.26);
+  --line: rgba(22, 16, 20, 0.12);
+  --line-strong: rgba(22, 16, 20, 0.24);
 
-  --text-hi: #26221f;
-  --text: #302b28;
-  --text-mid: #57514c;
-  --text-low: #6a635c;
+  --text-hi: #120d11;
+  --text: #21191f;
+  --text-mid: #4a3f46;
+  --text-low: #574c53;
 
-  --accent: #c73a12;
-  --accent-text: #ab300c;
-  --accent-soft: rgba(199, 58, 18, 0.1);
-  --on-accent: #ffffff;
-  --accent-bright: #f55036;
+  --accent: #ffb5d8;
+  --accent-text: #9e1354;
+  --accent-soft: rgba(255, 181, 216, 0.28);
+  --on-accent: #1a0b13;
+  --accent-bright: #c6ff4d;
 
-  --ground-sage: #e9ebe0;
-  --ground-sage-hi: #f2f3ec;
+  --ground-sage: #c6ff4d;
+  --ground-sage-hi: #dcff8a;
 
-  --fill-ink: #26221f;
-  --fill-muted: #b8b2a4;
+  --fill-ink: #120d11;
+  --fill-muted: #b8afb5;
 
   --r-btn: 4px;
 }
