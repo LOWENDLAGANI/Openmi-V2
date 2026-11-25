@@ -147,11 +147,7 @@ export default async function HomePage({
               </div>
             )}
 
-            <p className="qa-kicker">
-              Openmi · {CREDIT_PER_HOUR} Credit per active hour
-            </p>
-
-            <h1 className="display-xl mt-5 max-w-[24ch]">
+            <h1 className="display-xl max-w-[24ch]">
               Questions, answered before you let an agent{" "}
               <span className="accent-word">run your repo.</span>
             </h1>
@@ -168,10 +164,6 @@ export default async function HomePage({
                 See pricing
               </Link>
             </div>
-
-            <p className="mt-4 font-mono text-[12.5px] text-low">
-              {DAILY_FREE_CREDIT} free Credit every day · no card, no API keys
-            </p>
           </div>
         </section>
 
