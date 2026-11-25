@@ -123,8 +123,14 @@ while the pass runs:
 
 The wide margin is a consequence of the pass grants: 2 and 3 Credit per pass
 leave the plan's value in the 15 Credit daily allowance rather than in the
-wallet, so sandbox Credit is bought at the pass rate above. If the passes ever
-carry a larger wallet grant again, this floor and the table move with it.
+wallet, so this floor is the list price of the wallet grant only. Credit members
+actually spend is allowance Credit, whose effective price is **RM 0.079**
+(RM18 / 227 Credit; the 30-day pass is RM36 / 453). Measured against that price
+a sandbox minute earns RM 0.0040 against RM 0.0126 of compute and a sandbox hour
+earns RM 0.16 against RM 0.754 — the D6.2 rate loses money until the allowance
+is priced against the model and compute cost it actually buys. See
+`docs/PRICING_BILLING_FOLLOWUPS.md`. If the passes ever carry a larger wallet
+grant again, this floor and the table move with it.
 
 The symmetry is deliberate and easy to say out loud: **an execution hour costs
 the same as a chat hour.** Model tokens for the run are already covered by the
