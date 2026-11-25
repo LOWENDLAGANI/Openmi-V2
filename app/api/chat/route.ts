@@ -46,6 +46,7 @@ import {
   createRun,
   readEventsSince,
   readQuota,
+  readUnlimitedRuns,
   settleStalledRuns,
   readRun,
   type RunRow,
@@ -483,11 +484,16 @@ export async function POST(request: Request) {
   // in the one-live-run index, which would refuse every new chat with "you
   // already have a run in progress" for good. Its leftovers were aged out above,
   // before the quota is asked, so a leftover is not a permanent lockout.
-  const [quota, transcript] = await Promise.all([
+  const [quota, transcript, grantedUnlimited, adminAccess] = await Promise.all([
     readQuota(admin, session.user.id),
     listMessages(session.supabase, chatId),
+    readUnlimitedRuns(admin, session.user.id),
+    readAdminAccess(session),
   ]);
-  const decision = checkRunQuota(quota);
+  // Admins skip the daily budgets, and so does an account an admin granted
+  // unlimited from the panel. Concurrency is still checked for both.
+  const unlimited = grantedUnlimited || adminAccess.state === "admin";
+  const decision = checkRunQuota({ ...quota, unlimited });
 
   if (!decision.allowed) {
     // The hour was charged a moment ago and no run will start: the quota is

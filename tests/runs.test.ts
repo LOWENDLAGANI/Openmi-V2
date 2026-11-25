@@ -484,6 +484,14 @@ describe("the runtime the plan requires exists in the repository", () => {
     expect(route).not.toContain("createRunSandbox");
   });
 
+  test("chat route applies the unlimited exemption for admins and granted accounts", () => {
+    const chatRoute = read("/app/api/chat/route.ts");
+
+    expect(chatRoute).toContain("readUnlimitedRuns");
+    expect(chatRoute).toContain("readAdminAccess");
+    expect(chatRoute).toContain("checkRunQuota({ ...quota, unlimited })");
+  });
+
   test("the stream replays from a cursor and says when it is alive", () => {
     const stream = read("/app/api/runs/[id]/stream/route.ts");
 
